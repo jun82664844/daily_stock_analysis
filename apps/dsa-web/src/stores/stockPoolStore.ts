@@ -3,7 +3,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
-import type { AnalysisReport, HistoryItem, HistoryListResponse, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
+import type { AnalysisReport, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
@@ -29,6 +29,7 @@ type SubmitAnalysisOptions = {
   notify?: boolean;
   forceRefresh?: boolean;
   skills?: string[];
+  reportLanguage?: ReportLanguage;
 };
 
 let reportRequestSeq = 0;
@@ -175,6 +176,7 @@ function buildMarketReviewHistoryParams(page: number) {
 function buildStockHistoryParams(stockCode: string, page: number, filters: StockHistoryFilters) {
   const params: {
     stockCode: string;
+    reportType?: 'market_review';
     startDate?: string;
     endDate?: string;
     page: number;
@@ -184,6 +186,10 @@ function buildStockHistoryParams(stockCode: string, page: number, filters: Stock
     page,
     limit: STOCK_HISTORY_PAGE_SIZE,
   };
+
+  if (stockCode === MARKET_REVIEW_HISTORY_CODE) {
+    params.reportType = 'market_review';
+  }
 
   if (filters.range === '30d') {
     params.startDate = getRecentStartDate(30);
@@ -211,10 +217,25 @@ function reportToHistoryItem(report: AnalysisReport): HistoryItem | null {
     analysisSummary: report.summary.analysisSummary,
     sentimentScore: report.summary.sentimentScore,
     operationAdvice: report.summary.operationAdvice,
+    action: report.summary.action,
+    actionLabel: report.summary.actionLabel,
     currentPrice: report.meta.currentPrice,
     changePct: report.meta.changePct,
     modelUsed: report.meta.modelUsed,
     createdAt: report.meta.createdAt,
+  };
+}
+
+function normalizeSelectedReport(report: AnalysisReport): AnalysisReport {
+  if (report.meta.reportType !== 'market_review' || report.meta.stockCode) {
+    return report;
+  }
+  return {
+    ...report,
+    meta: {
+      ...report.meta,
+      stockCode: MARKET_REVIEW_HISTORY_CODE,
+    },
   };
 }
 
@@ -281,7 +302,7 @@ async function fetchStockHistory(
   const state = get();
   const report = state.selectedReport;
 
-  if (!report || report.meta.reportType === 'market_review') {
+  if (!report || !report.meta.stockCode) {
     resetStockHistoryState(set);
     set({
       isHistoryTrendOpen: false,
@@ -510,7 +531,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   closeMarkdownDrawer: () => set({ markdownDrawerOpen: false }),
 
   openHistoryTrend: async () => {
-    if (!get().selectedReport || get().selectedReport?.meta.reportType === 'market_review') {
+    if (!get().selectedReport || !get().selectedReport?.meta.stockCode) {
       return;
     }
     set({ isHistoryTrendOpen: true });
@@ -586,7 +607,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     }
 
     try {
-      const report = await historyApi.getDetail(recordId);
+      const report = normalizeSelectedReport(await historyApi.getDetail(recordId));
       if (requestId !== reportRequestSeq) {
         return;
       }
@@ -597,7 +618,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         isLoadingReport: false,
       });
 
-      if (report.meta.reportType === 'market_review' || !report.meta.stockCode) {
+      if (!report.meta.stockCode) {
         stockHistoryRequestSeq += 1;
         resetStockHistoryState(set);
         set({ isHistoryTrendOpen: false });
@@ -790,6 +811,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         notify,
         forceRefresh,
         skills,
+        ...(options?.reportLanguage !== undefined && { reportLanguage: options.reportLanguage }),
       });
 
       if (requestId !== analyzeRequestSeq) {
@@ -854,7 +876,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const localRevisionAtRequest = activeTaskLocalRevision;
     try {
       const response = await analysisApi.getTasks({
-        status: 'pending,processing',
+        status: 'pending,processing,cancel_requested',
         limit: 100,
       });
       if (requestId !== activeTaskRequestSeq) {
@@ -866,7 +888,10 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       );
       const remoteTaskIds = new Set(remoteTasks.map((task) => task.taskId));
       const remoteTaskById = new Map(remoteTasks.map((task) => [task.taskId, task]));
-      const isCompleteSnapshot = response.tasks.length === response.pending + response.processing;
+      const activeTaskCount = response.pending
+        + response.processing
+        + response.tasks.filter((task) => task.status === 'cancel_requested').length;
+      const isCompleteSnapshot = response.tasks.length === activeTaskCount;
       const canPruneLocalTasks = isCompleteSnapshot && activeTaskLocalRevision === localRevisionAtRequest;
 
       const currentTasks = get().activeTasks;
