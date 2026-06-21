@@ -15,8 +15,9 @@ YfinanceFetcher - 兜底数据源 (Priority 4)
 """
 
 import csv
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from typing import Optional, List, Dict, Any
 from urllib.error import HTTPError, URLError
@@ -427,6 +428,144 @@ class YfinanceFetcher(BaseFetcher):
         """
         return is_us_stock_code(stock_code)
 
+    def _get_us_stock_quote_from_yahoo_chart(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
+        """
+        Fetch a US stock quote from Yahoo's public chart endpoint.
+
+        This is a direct fallback for cases where the yfinance wrapper returns
+        an empty history frame even though Yahoo's chart JSON is still available.
+        """
+        symbol = stock_code.strip().upper()
+        url = (
+            f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}"
+            "?range=5d&interval=1h&includePrePost=true&events=div%2Csplits"
+        )
+        request = Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; DSA/1.0; +https://github.com/ZhuLinsen/daily_stock_analysis)",
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
+
+        try:
+            with urlopen(request, timeout=15) as response:
+                payload = response.read().decode("utf-8", "ignore")
+        except (HTTPError, URLError, TimeoutError) as exc:
+            logger.warning(f"[YahooChart] 获取美股 {symbol} 实时行情失败: {exc}")
+            return None
+
+        def _safe_float(value: Any) -> Optional[float]:
+            try:
+                if value is None:
+                    return None
+                value = float(value)
+                if pd.isna(value):
+                    return None
+                return value
+            except (TypeError, ValueError):
+                return None
+
+        def _safe_int(value: Any) -> Optional[int]:
+            value = _safe_float(value)
+            return int(value) if value is not None else None
+
+        def _last_valid(values: Any) -> Optional[Any]:
+            if not isinstance(values, list):
+                return None
+            for value in reversed(values):
+                if value is not None and not pd.isna(value):
+                    return value
+            return None
+
+        try:
+            chart = json.loads(payload).get("chart") or {}
+            if chart.get("error"):
+                raise ValueError(chart["error"])
+            results = chart.get("result") or []
+            if not results:
+                raise ValueError("empty chart result")
+
+            result = results[0] or {}
+            meta = result.get("meta") or {}
+            quote_blocks = (result.get("indicators") or {}).get("quote") or []
+            quote_block = quote_blocks[0] if quote_blocks else {}
+
+            meta_price = _safe_float(meta.get("regularMarketPrice"))
+            price = meta_price
+            if price is None:
+                price = _safe_float(_last_valid(quote_block.get("close")))
+            if price is None or price <= 0:
+                raise ValueError("missing regularMarketPrice")
+
+            prev_close = _safe_float(meta.get("previousClose"))
+            if prev_close is None:
+                prev_close = _safe_float(meta.get("chartPreviousClose"))
+
+            open_price = _safe_float(meta.get("regularMarketOpen"))
+            if open_price is None and meta_price is None:
+                open_price = _safe_float(_last_valid(quote_block.get("open")))
+
+            high = _safe_float(meta.get("regularMarketDayHigh"))
+            if high is None and meta_price is None:
+                high = _safe_float(_last_valid(quote_block.get("high")))
+
+            low = _safe_float(meta.get("regularMarketDayLow"))
+            if low is None and meta_price is None:
+                low = _safe_float(_last_valid(quote_block.get("low")))
+
+            volume = _safe_int(meta.get("regularMarketVolume"))
+            if volume is None:
+                volume = _safe_int(_last_valid(quote_block.get("volume")))
+
+            market_cap = _safe_float(meta.get("marketCap"))
+            timestamp = _safe_int(meta.get("regularMarketTime"))
+            if timestamp is None:
+                timestamp = _safe_int(_last_valid(result.get("timestamp")))
+            provider_timestamp = (
+                datetime.fromtimestamp(timestamp, timezone.utc).isoformat().replace("+00:00", "Z")
+                if timestamp is not None
+                else None
+            )
+
+            change_amount = None
+            change_pct = None
+            if prev_close is not None and prev_close > 0:
+                change_amount = price - prev_close
+                change_pct = (change_amount / prev_close) * 100
+
+            amplitude = None
+            if high is not None and low is not None and prev_close is not None and prev_close > 0:
+                amplitude = ((high - low) / prev_close) * 100
+
+            quote = UnifiedRealtimeQuote(
+                code=symbol,
+                name=STOCK_NAME_MAP.get(symbol, ""),
+                source=RealtimeSource.FALLBACK,
+                provider_timestamp=provider_timestamp,
+                price=price,
+                change_pct=round(change_pct, 2) if change_pct is not None else None,
+                change_amount=round(change_amount, 4) if change_amount is not None else None,
+                volume=volume,
+                amount=None,
+                volume_ratio=None,
+                turnover_rate=None,
+                amplitude=round(amplitude, 2) if amplitude is not None else None,
+                open_price=open_price,
+                high=high,
+                low=low,
+                pre_close=prev_close,
+                pe_ratio=None,
+                pb_ratio=None,
+                total_mv=market_cap,
+                circ_mv=None,
+            )
+            logger.info(f"[YahooChart] 获取美股 {symbol} 兜底行情成功: 价格={price}")
+            return quote
+        except Exception as exc:
+            logger.warning(f"[YahooChart] 解析美股 {symbol} 行情失败: {exc}")
+            return None
+
     def _get_us_stock_quote_from_stooq(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
         使用 Stooq 为美股实时行情提供免密钥兜底。
@@ -717,7 +856,10 @@ class YfinanceFetcher(BaseFetcher):
                 logger.debug("[Yfinance] fast_info 失败，尝试 history 方法")
                 hist = ticker.history(period='2d')
                 if hist.empty:
-                    logger.warning(f"[Yfinance] 无法获取 {symbol} 的数据，尝试 Stooq 兜底")
+                    logger.warning(f"[Yfinance] 无法获取 {symbol} 的数据，尝试 Yahoo chart / Stooq 兜底")
+                    yahoo_quote = self._get_us_stock_quote_from_yahoo_chart(symbol)
+                    if yahoo_quote is not None:
+                        return yahoo_quote
                     return self._get_us_stock_quote_from_stooq(symbol)
 
                 today = hist.iloc[-1]
@@ -776,7 +918,10 @@ class YfinanceFetcher(BaseFetcher):
             return quote
 
         except Exception as e:
-            logger.warning(f"[Yfinance] 获取美股 {stock_code} 实时行情失败: {e}，尝试 Stooq 兜底")
+            logger.warning(f"[Yfinance] 获取美股 {stock_code} 实时行情失败: {e}，尝试 Yahoo chart / Stooq 兜底")
+            yahoo_quote = self._get_us_stock_quote_from_yahoo_chart(stock_code)
+            if yahoo_quote is not None:
+                return yahoo_quote
             return self._get_us_stock_quote_from_stooq(stock_code)
 
 

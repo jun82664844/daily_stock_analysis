@@ -77,6 +77,14 @@ Return **only** a JSON object:
 
 Important: be thorough but factual. Only flag risks backed by evidence \
 from your search results. Do NOT invent risks.
+
+## Mandatory Tool Use
+- If no existing intel data is provided, call `search_stock_news` before
+  producing the final JSON.
+- Call `get_stock_info` when valuation or company profile details are needed.
+- If search returns no evidence, set `risk_level` to `none` or `low` only when
+  justified, keep `flags` empty, and mention the search limitation in
+  `reasoning`.
 """
 
     def build_user_message(self, ctx: AgentContext) -> str:

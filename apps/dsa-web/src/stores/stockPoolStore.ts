@@ -5,6 +5,7 @@ import { getParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
 import type { AnalysisReport, HistoryItem, HistoryListResponse, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
+import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
 
 const PAGE_SIZE = 20;
@@ -255,6 +256,10 @@ function dedupeHistoryItems(items: HistoryItem[]): HistoryItem[] {
   });
 }
 
+function isSameStockCode(left?: string, right?: string): boolean {
+  return normalizeStockCode(left || '') === normalizeStockCode(right || '');
+}
+
 function resetStockHistoryState(set: (partial: Partial<StockPoolState>) => void) {
   set({
     stockHistoryItems: [],
@@ -336,6 +341,7 @@ async function fetchHistory(
   const currentState = get();
   const page = reset ? 1 : currentState.currentPage + 1;
   const requestId = ++historyRequestSeq;
+  let newestSameStockRecordId: number | null = null;
 
   if (!silent) {
     set(
@@ -356,6 +362,16 @@ async function fetchHistory(
       const newItems = response.items.filter((item) => !existingIds.has(item.id));
       if (newItems.length > 0) {
         set({ historyItems: [...newItems, ...get().historyItems] });
+      }
+
+      const selectedReport = get().selectedReport;
+      if (selectedReport?.meta.reportType !== 'market_review' && selectedReport?.meta.stockCode) {
+        const newestSameStock = newItems.find((item) => (
+          typeof item.id === 'number'
+          && item.id !== selectedReport.meta.id
+          && isSameStockCode(item.stockCode, selectedReport.meta.stockCode)
+        ));
+        newestSameStockRecordId = newestSameStock?.id ?? null;
       }
     } else if (reset) {
       set({
@@ -378,6 +394,10 @@ async function fetchHistory(
     set({
       selectedHistoryIds: get().selectedHistoryIds.filter((id) => visibleIds.has(id)),
     });
+
+    if (newestSameStockRecordId !== null) {
+      await get().selectHistoryItem(newestSameStockRecordId);
+    }
 
     if (autoSelectFirst && response.items.length > 0 && !get().selectedReport) {
       await get().selectHistoryItem(response.items[0].id);

@@ -48,6 +48,14 @@ capital inflow/outflow data and include it in your analysis
 4. Classify positive catalysts and risk alerts
 5. Assess overall sentiment
 
+## Mandatory Tool Use
+- If no pre-fetched `news_context` or `intel_opinion` is provided, call
+  `search_comprehensive_intel` before producing the final JSON.
+- For A-share stocks only, call `get_capital_flow`; for US/HK stocks, mark
+  `capital_flow_signal` as `not_available`.
+- If search returns no results or public search is rate-limited, do not invent
+  news. State the limitation in `reasoning` and keep `key_news` empty.
+
 ## Risk Detection Priorities
 - Insider / major shareholder sell-downs (减持)
 - Earnings warnings or pre-loss announcements (业绩预亏)

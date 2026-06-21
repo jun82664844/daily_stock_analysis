@@ -549,6 +549,61 @@ describe('stockPoolStore', () => {
     expect(state.currentPage).toBe(1);
   });
 
+  it('opens the newest same-stock report discovered during silent refresh', async () => {
+    const oldReport = {
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        id: 5,
+        queryId: 'q-old',
+        stockCode: 'MU',
+        stockName: 'Micron Technology',
+        createdAt: '2026-06-06T18:12:00Z',
+        currentPrice: 864.01,
+      },
+    };
+    const newItem = {
+      ...historyItem,
+      id: 6,
+      queryId: 'q-new',
+      stockCode: 'MU',
+      stockName: 'Micron Technology',
+      currentPrice: 1133.99,
+      createdAt: '2026-06-19T19:19:23Z',
+    };
+    const newReport = {
+      ...oldReport,
+      meta: {
+        ...oldReport.meta,
+        id: 6,
+        queryId: 'q-new',
+        createdAt: '2026-06-19T19:19:23Z',
+        currentPrice: 1133.99,
+      },
+    };
+
+    useStockPoolStore.setState({
+      selectedReport: oldReport,
+      historyItems: [{ ...newItem, id: 5, queryId: 'q-old', currentPrice: 864.01 }],
+      currentPage: 1,
+      hasMore: true,
+    });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 2,
+      page: 1,
+      limit: 20,
+      items: [newItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(newReport);
+
+    await useStockPoolStore.getState().refreshHistory(true);
+
+    const state = useStockPoolStore.getState();
+    expect(historyApi.getDetail).toHaveBeenCalledWith(6);
+    expect(state.selectedReport?.meta.id).toBe(6);
+    expect(state.selectedReport?.meta.currentPrice).toBe(1133.99);
+  });
+
   it('ignores late history responses after dashboard reset', async () => {
     const deferred = createDeferred<{
       total: number;

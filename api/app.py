@@ -29,7 +29,6 @@ from typing import List, Optional
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
@@ -47,6 +46,15 @@ _FRONTEND_INDEX_NO_CACHE_HEADERS = {
     "Pragma": "no-cache",
     "Expires": "0",
 }
+
+# Windows registry entries can make Python report .js as text/plain, which
+# causes browsers to reject Vite module scripts. Register the web asset MIME
+# types explicitly before serving the bundle.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("application/json", ".map")
+mimetypes.add_type("application/wasm", ".wasm")
 
 
 def _frontend_index_response(static_dir: Path) -> FileResponse:
@@ -372,7 +380,6 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
         # static file simply does not exist on disk.
         assets_dir = static_dir / "assets"
 
-        assets_static_files = StaticFiles(directory=str(assets_dir), check_dir=False)
         assets_root = assets_dir.resolve()
 
         @app.api_route(
@@ -389,8 +396,12 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
                     media_type="text/plain",
                 )
             if file_path.is_file():
-                relative_path = file_path.relative_to(assets_root).as_posix()
-                return await assets_static_files.get_response(relative_path, request.scope)
+                content_type, _ = mimetypes.guess_type(str(file_path))
+                return FileResponse(
+                    file_path,
+                    media_type=content_type or "application/octet-stream",
+                    headers=_FRONTEND_INDEX_NO_CACHE_HEADERS,
+                )
             return Response(
                 content="asset not found",
                 status_code=404,

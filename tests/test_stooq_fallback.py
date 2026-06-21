@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 import unittest
 from unittest.mock import patch, MagicMock, PropertyMock
 
@@ -69,7 +70,8 @@ class TestStooqFallback(unittest.TestCase):
         mock_ticker_class.return_value = mock_ticker
 
         # 2. 模拟 Stooq 成功返回
-        with patch.object(self.fetcher, '_get_us_stock_quote_from_stooq') as mock_stooq:
+        with patch.object(self.fetcher, '_get_us_stock_quote_from_yahoo_chart', return_value=None), \
+                patch.object(self.fetcher, '_get_us_stock_quote_from_stooq') as mock_stooq:
             mock_stooq.return_value = MagicMock(code="NVDA", price=900.0)
 
             quote = self.fetcher.get_realtime_quote("NVDA")
@@ -77,6 +79,68 @@ class TestStooqFallback(unittest.TestCase):
             self.assertIsNotNone(quote)
             self.assertEqual(quote.price, 900.0)
             mock_stooq.assert_called_once_with("NVDA")
+
+    @unittest.skipUnless(HAS_YFINANCE, "yfinance is required for this test")
+    @patch('data_provider.yfinance_fetcher.urlopen')
+    @patch('yfinance.Ticker')
+    def test_fetcher_uses_yahoo_chart_when_yfinance_history_empty(
+        self, mock_ticker_class, mock_urlopen
+    ):
+        mock_ticker = MagicMock()
+        type(mock_ticker).fast_info = PropertyMock(side_effect=Exception("API Error"))
+        mock_ticker.history.return_value = MagicMock(empty=True)
+        mock_ticker.info = {}
+        mock_ticker_class.return_value = mock_ticker
+
+        yahoo_payload = {
+            "chart": {
+                "result": [
+                    {
+                        "meta": {
+                            "regularMarketPrice": 1133.99,
+                            "previousClose": 1043.19,
+                            "regularMarketTime": 1781812800,
+                            "regularMarketVolume": 32100000,
+                            "regularMarketOpen": 1080.0,
+                            "regularMarketDayHigh": 1151.95,
+                            "regularMarketDayLow": 1070.0,
+                            "marketCap": 1234567890,
+                        },
+                        "timestamp": [1781812800],
+                        "indicators": {
+                            "quote": [
+                                {
+                                    "open": [1080.0],
+                                    "high": [1151.95],
+                                    "low": [1070.0],
+                                    "close": [1133.99],
+                                    "volume": [32100000],
+                                }
+                            ]
+                        },
+                    }
+                ],
+                "error": None,
+            }
+        }
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(yahoo_payload).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        quote = self.fetcher.get_realtime_quote("MU")
+
+        self.assertIsNotNone(quote)
+        self.assertEqual(quote.code, "MU")
+        self.assertEqual(quote.price, 1133.99)
+        self.assertEqual(quote.pre_close, 1043.19)
+        self.assertEqual(quote.volume, 32100000)
+        self.assertEqual(quote.open_price, 1080.0)
+        self.assertEqual(quote.high, 1151.95)
+        self.assertEqual(quote.low, 1070.0)
+        self.assertAlmostEqual(quote.change_amount, 90.8, places=2)
+        self.assertAlmostEqual(quote.change_pct, 8.7, places=2)
+        self.assertIn("query2.finance.yahoo.com", mock_urlopen.call_args.args[0].full_url)
 
 
 if __name__ == '__main__':

@@ -143,6 +143,9 @@ limitation must be reflected in ``confidence_reason`` or ``data_limitations``.
                 f"Stock: {ctx.stock_code} ({ctx.stock_name})" if ctx.stock_name else f"Stock: {ctx.stock_code}",
                 "",
             ]
+            market_facts = self._build_chat_market_facts(ctx)
+            if market_facts:
+                parts.extend(["## Authoritative Market Data", market_facts, ""])
         else:
             parts = [
                 f"# Synthesis Request for {ctx.stock_code}",
@@ -187,6 +190,46 @@ limitation must be reflected in ``confidence_reason`` or ``data_limitations``.
         else:
             parts.append("Synthesise the above into the Decision Dashboard JSON.")
         return "\n".join(parts)
+
+    @staticmethod
+    def _build_chat_market_facts(ctx: AgentContext) -> str:
+        quote = ctx.get_data("realtime_quote")
+        if not isinstance(quote, dict):
+            return ""
+
+        lines = []
+        price = quote.get("price")
+        if price is not None:
+            lines.append(
+                f"- Current price MUST be treated as realtime_quote.price = {price} "
+                f"(source: {quote.get('source') or 'unknown'})."
+            )
+        if quote.get("pre_close") is not None:
+            lines.append(f"- Previous close from realtime quote = {quote.get('pre_close')}.")
+        if quote.get("high") is not None or quote.get("low") is not None:
+            lines.append(f"- Realtime session range: low={quote.get('low')}, high={quote.get('high')}.")
+
+        for key, label in (("trend_result", "trend result"), ("ma_result", "MA result")):
+            data = ctx.get_data(key)
+            if not isinstance(data, dict):
+                continue
+            original = data.get("indicator_original_current_price")
+            if original is not None:
+                lines.append(
+                    f"- {label} originally used daily-history close {original}; "
+                    "do NOT call it current price."
+                )
+            note = data.get("price_alignment_note")
+            if note:
+                lines.append(f"- {label} note: {note}")
+
+        if not lines:
+            return ""
+        lines.append(
+            "- In the final answer, any phrase like current price / 当前价格 must use "
+            "realtime_quote.price, not resistance, daily close, or indicator source price."
+        )
+        return "\n".join(lines)
 
     def post_process(self, ctx: AgentContext, raw_text: str) -> Optional[AgentOpinion]:
         """Store the parsed dashboard in ctx.meta; also return an opinion."""
