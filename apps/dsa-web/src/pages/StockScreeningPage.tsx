@@ -677,7 +677,7 @@ const StockScreeningPage: React.FC = () => {
 
     const pollingTaskId = activeTaskId;
     let active = true;
-    let timer: ReturnType<typeof window.setTimeout> | undefined;
+    let timer: number | undefined;
 
     function finishTask() {
       clearPersistedScreenTask();
