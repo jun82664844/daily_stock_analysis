@@ -20,6 +20,8 @@ const TITLES: Record<string, { title: UiTextKey; description: UiTextKey }> = {
   '/backtest': { title: 'layout.route.backtest.title', description: 'layout.route.backtest.description' },
   '/alerts': { title: 'layout.route.alerts.title', description: 'layout.route.alerts.description' },
   '/usage': { title: 'layout.route.usage.title', description: 'layout.route.usage.description' },
+  '/account': { title: 'layout.route.account.title', description: 'layout.route.account.description' },
+  '/admin': { title: 'layout.route.admin.title', description: 'layout.route.admin.description' },
   '/settings': { title: 'layout.route.settings.title', description: 'layout.route.settings.description' },
 };
 

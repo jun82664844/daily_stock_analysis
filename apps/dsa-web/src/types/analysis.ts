@@ -8,6 +8,8 @@
 export type StockReportType = 'simple' | 'detailed' | 'full' | 'brief';
 export type ReportType = StockReportType | 'market_review';
 export type AnalysisPhase = 'auto' | 'premarket' | 'intraday' | 'postmarket';
+export type AnalysisDepth = 'fast' | 'deep';
+export type ApiKeyMode = 'platform' | 'user' | 'local';
 
 export interface AnalysisRequest {
   stockCode?: string;
@@ -16,6 +18,8 @@ export interface AnalysisRequest {
   forceRefresh?: boolean;
   asyncMode?: boolean;
   analysisPhase?: AnalysisPhase;
+  analysisDepth?: AnalysisDepth;
+  apiKeyMode?: ApiKeyMode;
   stockName?: string;
   originalQuery?: string;
   selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image';
@@ -313,6 +317,7 @@ export interface TaskAccepted {
   status: 'pending' | 'processing';
   message?: string;
   analysisPhase?: AnalysisPhase;
+  analysisDepth?: AnalysisDepth;
 }
 
 export interface BatchTaskAcceptedItem {
@@ -322,6 +327,7 @@ export interface BatchTaskAcceptedItem {
   status: 'pending' | 'processing';
   message?: string;
   analysisPhase?: AnalysisPhase;
+  analysisDepth?: AnalysisDepth;
 }
 
 export interface BatchDuplicateTaskItem {
@@ -354,6 +360,7 @@ export interface TaskStatus {
   originalQuery?: string;
   selectionSource?: string;
   analysisPhase?: AnalysisPhase | null;
+  analysisDepth?: AnalysisDepth | null;
   skills?: string[];
 }
 
@@ -374,6 +381,7 @@ export interface TaskInfo {
   originalQuery?: string;
   selectionSource?: string;
   analysisPhase?: AnalysisPhase;
+  analysisDepth?: AnalysisDepth;
   skills?: string[];
 }
 
@@ -414,6 +422,15 @@ export interface HistoryItem {
   turnoverRate?: number;
   modelUsed?: string;  // Display-only model snapshot from persisted history; runtime provider/model/base URL still come from analyzer configuration
   marketPhaseSummary?: MarketPhaseSummary | null;
+  currentQuoteRefreshed?: boolean;
+  currentQuoteRefreshedAt?: string | null;
+  currentQuoteRefresh?: Record<string, unknown> | null;
+  favorite?: boolean;
+  important?: boolean;
+  archived?: boolean;
+  read?: boolean;
+  note?: string | null;
+  noteUpdatedAt?: string | null;
   createdAt: string;
 }
 
@@ -433,6 +450,51 @@ export interface HistoryListResponse {
   items: HistoryItem[];
 }
 
+export type HistoryExportFormat = 'markdown' | 'json';
+
+export type HistoryStateFilter =
+  | 'favorite'
+  | 'important'
+  | 'archived'
+  | 'active'
+  | 'has_note'
+  | 'unread'
+  | 'read';
+
+export interface HistoryExportResponse {
+  format: HistoryExportFormat;
+  filename: string;
+  content: string;
+  recordCount: number;
+  recordIds: number[];
+  aiUsed: boolean;
+}
+
+export interface HistoryStateUpdatePayload {
+  favorite?: boolean;
+  important?: boolean;
+  archived?: boolean;
+  read?: boolean;
+  note?: string;
+}
+
+export interface HistoryStateUpdateResponse {
+  recordId: number;
+  favorite: boolean;
+  important: boolean;
+  archived: boolean;
+  read: boolean;
+  note?: string | null;
+  noteUpdatedAt?: string | null;
+  aiUsed: boolean;
+}
+
+export interface HistoryBatchStateResponse {
+  updated: number;
+  recordIds: number[];
+  aiUsed: boolean;
+}
+
 /** News item */
 export interface NewsIntelItem {
   title: string;
@@ -449,9 +511,14 @@ export interface NewsIntelResponse {
 /** History filter parameters */
 export interface HistoryFilters {
   stockCode?: string;
+  noteSearch?: string;
   reportType?: ReportType;
   startDate?: string;
   endDate?: string;
+  market?: 'cn' | 'us' | 'hk' | 'crypto';
+  refreshStatus?: 'refreshed' | 'not_refreshed';
+  state?: HistoryStateFilter;
+  sort?: 'newest' | 'oldest';
 }
 
 /** History pagination parameters */

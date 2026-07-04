@@ -9,6 +9,11 @@ import type {
   NewsIntelItem,
   RunDiagnosticSummary,
   StockBarResponse,
+  HistoryExportFormat,
+  HistoryExportResponse,
+  HistoryStateUpdatePayload,
+  HistoryStateUpdateResponse,
+  HistoryBatchStateResponse,
 } from '../types/analysis';
 import type { RunFlowSnapshot } from '../types/runFlow';
 
@@ -19,19 +24,56 @@ export interface GetHistoryListParams extends HistoryFilters {
   limit?: number;
 }
 
+export interface MarkCurrentQuoteRefreshedPayload {
+  stockCode?: string;
+  routeLane?: string | null;
+  quoteSource?: string | null;
+  freshness?: string | null;
+  aiUsed?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MarkCurrentQuoteRefreshedResponse {
+  recordId: number;
+  stockCode: string;
+  currentQuoteRefreshed: boolean;
+  currentQuoteRefreshedAt?: string | null;
+  aiUsed: boolean;
+  routeLane?: string | null;
+  quoteSource?: string | null;
+  freshness?: string | null;
+}
+
 export const historyApi = {
   /**
    * 获取历史分析列表
    * @param params 筛选和分页参数
    */
   getList: async (params: GetHistoryListParams = {}): Promise<HistoryListResponse> => {
-    const { stockCode, reportType, startDate, endDate, page = 1, limit = 20 } = params;
+    const {
+      stockCode,
+      noteSearch,
+      reportType,
+      startDate,
+      endDate,
+      market,
+      refreshStatus,
+      state,
+      sort,
+      page = 1,
+      limit = 20,
+    } = params;
 
     const queryParams: Record<string, string | number> = { page, limit };
     if (stockCode) queryParams.stock_code = stockCode;
+    if (noteSearch) queryParams.note_search = noteSearch;
     if (reportType) queryParams.report_type = reportType;
     if (startDate) queryParams.start_date = startDate;
     if (endDate) queryParams.end_date = endDate;
+    if (market) queryParams.market = market;
+    if (refreshStatus) queryParams.refresh_status = refreshStatus;
+    if (state) queryParams.state = state;
+    if (sort) queryParams.sort = sort;
 
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/history', {
       params: queryParams,
@@ -44,6 +86,21 @@ export const historyApi = {
       limit: data.limit,
       items: data.items.map(item => toCamelCase<HistoryItem>(item)),
     };
+  },
+
+  markCurrentQuoteRefreshed: async (
+    recordId: number,
+    payload: MarkCurrentQuoteRefreshedPayload,
+  ): Promise<MarkCurrentQuoteRefreshedResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>(`/api/v1/history/${recordId}/refresh-marker`, {
+      stock_code: payload.stockCode,
+      route_lane: payload.routeLane ?? undefined,
+      quote_source: payload.quoteSource ?? undefined,
+      freshness: payload.freshness ?? undefined,
+      ai_used: payload.aiUsed ?? false,
+      metadata: payload.metadata ?? {},
+    });
+    return toCamelCase<MarkCurrentQuoteRefreshedResponse>(response.data);
   },
 
   /**
@@ -80,6 +137,47 @@ export const historyApi = {
   getMarkdown: async (recordId: number): Promise<string> => {
     const response = await apiClient.get<{ content: string }>(`/api/v1/history/${recordId}/markdown`);
     return response.data.content;
+  },
+
+  exportReports: async (
+    recordIds: number[],
+    format: HistoryExportFormat = 'markdown',
+  ): Promise<HistoryExportResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/history/export', {
+      record_ids: recordIds,
+      format,
+    });
+    return toCamelCase<HistoryExportResponse>(response.data);
+  },
+
+  updateState: async (
+    recordId: number,
+    payload: HistoryStateUpdatePayload,
+  ): Promise<HistoryStateUpdateResponse> => {
+    const response = await apiClient.patch<Record<string, unknown>>(`/api/v1/history/${recordId}/state`, {
+      favorite: payload.favorite,
+      important: payload.important,
+      archived: payload.archived,
+      read: payload.read,
+      note: payload.note,
+      ai_used: false,
+    });
+    return toCamelCase<HistoryStateUpdateResponse>(response.data);
+  },
+
+  batchUpdateState: async (
+    recordIds: number[],
+    payload: Omit<HistoryStateUpdatePayload, 'note'>,
+  ): Promise<HistoryBatchStateResponse> => {
+    const response = await apiClient.patch<Record<string, unknown>>('/api/v1/history/state', {
+      record_ids: recordIds,
+      favorite: payload.favorite,
+      important: payload.important,
+      archived: payload.archived,
+      read: payload.read,
+      ai_used: false,
+    });
+    return toCamelCase<HistoryBatchStateResponse>(response.data);
   },
 
   /**

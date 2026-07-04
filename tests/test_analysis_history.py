@@ -124,7 +124,13 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         auth._auth_enabled = False
         self._temp_dir = tempfile.TemporaryDirectory()
         self._db_path = os.path.join(self._temp_dir.name, "test_analysis_history.db")
+        self._env_restore = {
+            "ADMIN_AUTH_ENABLED": os.environ.get("ADMIN_AUTH_ENABLED"),
+            "PLATFORM_USER_AUTH_ENABLED": os.environ.get("PLATFORM_USER_AUTH_ENABLED"),
+        }
         os.environ["DATABASE_PATH"] = self._db_path
+        os.environ["ADMIN_AUTH_ENABLED"] = "false"
+        os.environ["PLATFORM_USER_AUTH_ENABLED"] = "false"
 
         Config._instance = None
         DatabaseManager.reset_instance()
@@ -133,6 +139,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         """清理资源"""
         DatabaseManager.reset_instance()
+        for key, old_value in self._env_restore.items():
+            if old_value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old_value
         self._temp_dir.cleanup()
 
     def _build_result(self) -> AnalysisResult:

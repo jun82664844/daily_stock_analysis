@@ -1,0 +1,238 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { stocksApi } from '../stocks';
+
+const get = vi.hoisted(() => vi.fn());
+const post = vi.hoisted(() => vi.fn());
+
+vi.mock('../index', () => ({
+  default: { get, post },
+}));
+
+describe('stocksApi', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+  });
+
+  it('loads no-AI stock snapshots as camelCase data', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: 'AAPL',
+        stock_name: 'Apple Inc.',
+        market: 'us',
+        quote: {
+          current_price: 200,
+          change_percent: 1.5,
+          source: 'yahoo_chart',
+          freshness: 'fresh',
+        },
+        indicators: { ma5: 198, ma20: 190 },
+        route: {
+          input_code: 'AAPL',
+          normalized_code: 'AAPL',
+          market: 'us',
+          channel: 'us_equity',
+          data_source_lane: 'us_market_data',
+          quote_sources: ['us_realtime'],
+          history_sources: ['us_history'],
+          ai_required: false,
+        },
+        warnings: [
+          { code: 'stale_quote', severity: 'warning', message: 'Quote is stale' },
+        ],
+        degradation: { status: 'degraded', severity: 'warning', message: 'Quote is stale' },
+        diagnostics: {
+          elapsed_ms: 12,
+          quote_elapsed_ms: 5,
+          history_elapsed_ms: 7,
+          cache: { quote: 'miss', history: 'miss' },
+          sources: { quote: 'yahoo_chart', history: 'yfinance' },
+          freshness: { quote: 'fresh', history: 'fresh' },
+          timeouts: { quote: false, history: false },
+          errors: { quote: null, history: null },
+          fallback: { quote: 'live', history: 'live' },
+          source_health: {
+            quote: { source: 'unit_quote', status: 'ok', consecutive_failures: 0 },
+            history: { source: 'unit_history', status: 'ok', consecutive_failures: 0 },
+          },
+          persistent_cache: { quote: 'disk', history: 'memory', mode: 'local_json' },
+          refresh: { mode: 'cache_first', requested: false },
+          route_lane: 'us_market_data',
+          performance: { status: 'ok', slow_threshold_ms: 3000 },
+        },
+        ai_used: false,
+      },
+    });
+
+    const result = await stocksApi.snapshot('AAPL');
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/AAPL/snapshot');
+    expect(result.stockCode).toBe('AAPL');
+    expect(result.quote.currentPrice).toBe(200);
+    expect(result.route?.dataSourceLane).toBe('us_market_data');
+    expect(result.warnings?.[0].code).toBe('stale_quote');
+    expect(result.degradation?.status).toBe('degraded');
+    expect(result.diagnostics?.elapsedMs).toBe(12);
+    expect(result.diagnostics?.quoteElapsedMs).toBe(5);
+    expect(result.diagnostics?.cache.quote).toBe('miss');
+    expect(result.diagnostics?.fallback?.quote).toBe('live');
+    expect(result.diagnostics?.timeouts?.quote).toBe(false);
+    expect(result.diagnostics?.sourceHealth?.quote.status).toBe('ok');
+    expect(result.diagnostics?.sourceHealth?.quote.consecutiveFailures).toBe(0);
+    expect(result.diagnostics?.persistentCache?.quote).toBe('disk');
+    expect(result.diagnostics?.persistentCache?.mode).toBe('local_json');
+    expect(result.diagnostics?.refresh?.mode).toBe('cache_first');
+    expect(result.diagnostics?.routeLane).toBe('us_market_data');
+    expect(result.aiUsed).toBe(false);
+  });
+
+  it('loads force-refresh no-AI stock snapshots with refresh diagnostics', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: 'AAPL',
+        market: 'us',
+        quote: {
+          current_price: 210,
+          source: 'yahoo_chart',
+          freshness: 'fresh',
+        },
+        indicators: {},
+        diagnostics: {
+          elapsed_ms: 30,
+          quote_elapsed_ms: 14,
+          history_elapsed_ms: 16,
+          cache: { quote: 'refresh', history: 'refresh' },
+          sources: { quote: 'yahoo_chart', history: 'yfinance' },
+          freshness: { quote: 'fresh', history: 'fresh' },
+          fallback: { quote: 'live', history: 'live' },
+          persistent_cache: { quote: 'none', history: 'none', mode: 'local_json' },
+          refresh: { mode: 'force_refresh', requested: true, quote: true, history: true },
+          route_lane: 'us_market_data',
+          performance: { status: 'ok' },
+        },
+        ai_used: false,
+      },
+    });
+
+    const result = await stocksApi.snapshot('AAPL', { refresh: true });
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/AAPL/snapshot?refresh=true');
+    expect(result.quote.currentPrice).toBe(210);
+    expect(result.diagnostics?.cache.quote).toBe('refresh');
+    expect(result.diagnostics?.refresh?.mode).toBe('force_refresh');
+    expect(result.diagnostics?.refresh?.requested).toBe(true);
+    expect(result.aiUsed).toBe(false);
+  });
+
+  it('prewarms no-AI market cache as camelCase data', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        requested: 2,
+        warmed: 2,
+        degraded: 0,
+        symbols: ['AAPL', 'BTC-USD'],
+        results: {},
+        elapsed_ms: 15,
+        ai_used: false,
+      },
+    });
+
+    const result = await stocksApi.prewarm(['AAPL', 'BTC-USD']);
+
+    expect(post).toHaveBeenCalledWith('/api/v1/stocks/prewarm', { symbols: ['AAPL', 'BTC-USD'] });
+    expect(result.requested).toBe(2);
+    expect(result.elapsedMs).toBe(15);
+    expect(result.aiUsed).toBe(false);
+  });
+
+  it('loads local market source health as camelCase data', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        mode: 'local_only',
+        ai_used: false,
+        cache: { mode: 'local_json', storage: 'local_market_cache' },
+        lanes: [
+          {
+            market: 'hk',
+            channel: 'hk_equity',
+            route_lane: 'hk_market_data',
+            quote_sources: [
+              {
+                source: 'hk_realtime',
+                priority_rank: 1,
+                status: 'cooling_down',
+                consecutive_failures: 2,
+                last_error: 'timeout',
+                last_latency_ms: 4200,
+                cooldown_remaining_sec: 55,
+              },
+            ],
+            history_sources: [
+              {
+                source: 'hk_history',
+                priority_rank: 1,
+                status: 'ok',
+                consecutive_failures: 0,
+                last_error: null,
+                last_latency_ms: null,
+                cooldown_remaining_sec: 0,
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const result = await stocksApi.marketSourceHealth();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/sources/health');
+    expect(result.aiUsed).toBe(false);
+    expect(result.cache.mode).toBe('local_json');
+    expect(result.lanes[0].routeLane).toBe('hk_market_data');
+    expect(result.lanes[0].quoteSources[0].priorityRank).toBe(1);
+    expect(result.lanes[0].quoteSources[0].cooldownRemainingSec).toBe(55);
+  });
+
+  it('recovers local market sources as admin-only no-AI camelCase data', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        mode: 'local_only',
+        action: 'reset_source_health',
+        market: 'all',
+        reset_sources: ['hk_realtime'],
+        reset_count: 1,
+        prewarm: {
+          requested: 4,
+          warmed: 4,
+          degraded: 0,
+          symbols: ['600519', 'AAPL', 'HK00700', 'BTC-USD'],
+          results: {},
+          elapsed_ms: 18,
+          ai_used: false,
+        },
+        health: {
+          mode: 'local_only',
+          ai_used: false,
+          cache: { mode: 'local_json', storage: 'local_market_cache' },
+          lanes: [],
+        },
+        ai_used: false,
+      },
+    });
+
+    const result = await stocksApi.recoverMarketSources({
+      market: 'all',
+      symbols: ['600519', 'AAPL', 'HK00700', 'BTC-USD'],
+      prewarm: true,
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/v1/stocks/sources/recovery', {
+      market: 'all',
+      symbols: ['600519', 'AAPL', 'HK00700', 'BTC-USD'],
+      prewarm: true,
+    });
+    expect(result.aiUsed).toBe(false);
+    expect(result.resetSources).toEqual(['hk_realtime']);
+    expect(result.prewarm.elapsedMs).toBe(18);
+  });
+});

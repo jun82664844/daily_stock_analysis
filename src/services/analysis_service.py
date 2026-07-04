@@ -12,6 +12,7 @@
 
 import logging
 import copy
+import os
 import uuid
 from typing import Optional, Dict, Any, Callable, List
 
@@ -33,6 +34,49 @@ from src.services.run_diagnostics import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+_FAST_DISABLED_SEARCH_KEY_FIELDS = (
+    "bocha_api_keys",
+    "tavily_api_keys",
+    "anspire_api_keys",
+    "brave_api_keys",
+    "serpapi_keys",
+    "minimax_api_keys",
+    "searxng_base_urls",
+)
+
+
+def _normalize_analysis_depth(value: Optional[str]) -> str:
+    normalized = (value or "fast").strip().lower()
+    return "deep" if normalized == "deep" else "fast"
+
+
+def _with_request_analysis_depth(config: Any, analysis_depth: Optional[str]) -> tuple[Any, Dict[str, Any]]:
+    """Return a request-scoped config/pipeline override for fast analysis."""
+    if _normalize_analysis_depth(analysis_depth) != "fast":
+        return config, {}
+
+    scoped_config = copy.copy(config)
+    for field_name in (
+        "daily_market_context_enabled",
+        "enable_fundamental_pipeline",
+        "enable_chip_distribution",
+        "searxng_public_instances_enabled",
+        "prefetch_realtime_quotes",
+    ):
+        setattr(scoped_config, field_name, False)
+
+    for field_name in _FAST_DISABLED_SEARCH_KEY_FIELDS:
+        if hasattr(scoped_config, field_name):
+            setattr(scoped_config, field_name, [])
+    if hasattr(scoped_config, "social_sentiment_api_key"):
+        setattr(scoped_config, "social_sentiment_api_key", "")
+
+    return scoped_config, {
+        "daily_market_context_enabled": False,
+        "daily_market_context_allow_generate": False,
+    }
 
 
 class AnalysisService:
@@ -58,9 +102,12 @@ class AnalysisService:
         progress_callback: Optional[Callable[[int, str], None]] = None,
         skills: Optional[List[str]] = None,
         analysis_phase: str = "auto",
+        analysis_depth: str = "fast",
         query_source: str = "api",
         portfolio_context: Optional[Dict[str, Any]] = None,
         report_language: Optional[str] = None,
+        platform_user_id: Optional[int] = None,
+        api_key_mode: str = "platform",
     ) -> Optional[Dict[str, Any]]:
         """
         执行股票分析
@@ -81,6 +128,7 @@ class AnalysisService:
         """
         try:
             self.last_error = None
+            local_model_ticket = None
             # 导入分析相关模块
             from src.config import get_config
             from src.core.pipeline import StockAnalysisPipeline
@@ -101,6 +149,27 @@ class AnalysisService:
             
             # 获取配置
             config = get_config()
+            normalized_api_key_mode = (api_key_mode or "platform").lower()
+            if normalized_api_key_mode == "local":
+                from src.llm.local_model_router import get_default_local_model_router
+
+                local_model_ticket = get_default_local_model_router().try_acquire()
+                if not local_model_ticket.acquired:
+                    self.last_error = local_model_ticket.reason
+                    logger.warning("本地模型不可用: %s", local_model_ticket.reason)
+                    return None
+                config = copy.copy(config)
+                setattr(config, "litellm_model", os.getenv("LOCAL_LLM_MODEL", "qwen2.5:14b-instruct-q4"))
+                setattr(config, "litellm_api_base", os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:11434/v1"))
+            elif platform_user_id and normalized_api_key_mode == "user":
+                from src.platform_accounts import PlatformAccountService
+
+                config = PlatformAccountService().apply_user_llm_config(
+                    config,
+                    platform_user_id,
+                    mode=api_key_mode,
+                )
+            config, pipeline_overrides = _with_request_analysis_depth(config, analysis_depth)
             normalized_report_language = normalize_report_language(report_language, default="")
             if normalized_report_language:
                 config = copy.copy(config)
@@ -116,6 +185,8 @@ class AnalysisService:
                 analysis_skills=skills,
                 analysis_phase=analysis_phase,
                 portfolio_context=portfolio_context,
+                platform_user_id=platform_user_id,
+                **pipeline_overrides,
             )
             
             # 确定报告类型 (API: simple/detailed/full/brief -> ReportType)
@@ -147,6 +218,11 @@ class AnalysisService:
             logger.error(f"分析股票 {stock_code} 失败: {e}", exc_info=True)
             return None
         finally:
+            if locals().get("local_model_ticket") is not None:
+                try:
+                    locals()["local_model_ticket"].release()
+                except Exception:
+                    pass
             reset_run_diagnostic_context(locals().get("diag_token"))
     
     def _build_analysis_response(

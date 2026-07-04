@@ -48,6 +48,16 @@ class HistoryItem(BaseModel):
     )
     created_at: Optional[str] = Field(None, description="创建时间")
     
+    current_quote_refreshed: bool = Field(False, description="No-AI current quote refresh marker")
+    current_quote_refreshed_at: Optional[str] = Field(None, description="No-AI current quote refreshed time")
+    current_quote_refresh: Optional[Dict[str, Any]] = Field(None, description="No-AI current quote refresh metadata")
+    favorite: bool = Field(False, description="Per-user local favorite marker")
+    important: bool = Field(False, description="Per-user local important marker")
+    archived: bool = Field(False, description="Per-user local archived marker")
+    read: bool = Field(False, description="Per-user local read marker")
+    note: Optional[str] = Field(None, description="Per-user local note")
+    note_updated_at: Optional[str] = Field(None, description="Per-user local note updated time")
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "id": 1234,
@@ -78,6 +88,73 @@ class HistoryListResponse(BaseModel):
             "items": []
         }
     })
+
+
+class HistoryCurrentQuoteRefreshMarkerRequest(BaseModel):
+    """No-AI current quote refresh marker write request."""
+
+    stock_code: Optional[str] = Field(None, description="Refreshed stock code")
+    route_lane: Optional[str] = Field(None, description="quick/no-AI route lane")
+    quote_source: Optional[str] = Field(None, description="Quote source")
+    freshness: Optional[str] = Field(None, description="Quote freshness")
+    ai_used: bool = Field(False, description="Must be false for this no-AI marker")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Low-risk diagnostics metadata")
+
+
+class HistoryCurrentQuoteRefreshMarkerResponse(BaseModel):
+    """No-AI current quote refresh marker write response."""
+
+    record_id: int = Field(..., description="History record ID")
+    stock_code: str = Field(..., description="Refreshed stock code")
+    current_quote_refreshed: bool = Field(True, description="Whether marker was persisted")
+    current_quote_refreshed_at: Optional[str] = Field(None, description="Refresh time")
+    ai_used: bool = Field(False, description="Whether AI was used")
+    route_lane: Optional[str] = Field(None, description="quick/no-AI route lane")
+    quote_source: Optional[str] = Field(None, description="Quote source")
+    freshness: Optional[str] = Field(None, description="Quote freshness")
+
+
+class HistoryStateUpdateRequest(BaseModel):
+    """Per-user local history state update request."""
+
+    favorite: Optional[bool] = Field(None, description="Favorite marker")
+    important: Optional[bool] = Field(None, description="Important marker")
+    archived: Optional[bool] = Field(None, description="Archived marker")
+    read: Optional[bool] = Field(None, description="Read marker")
+    note: Optional[str] = Field(None, description="Local note")
+    ai_used: bool = Field(False, description="Must be false for this no-AI local state update")
+
+
+class HistoryStateResponse(BaseModel):
+    """Per-user local history state response."""
+
+    record_id: int = Field(..., description="History record ID")
+    favorite: bool = Field(False, description="Favorite marker")
+    important: bool = Field(False, description="Important marker")
+    archived: bool = Field(False, description="Archived marker")
+    read: bool = Field(False, description="Read marker")
+    note: Optional[str] = Field(None, description="Local note")
+    note_updated_at: Optional[str] = Field(None, description="Local note updated time")
+    ai_used: bool = Field(False, description="Whether AI was used")
+
+
+class HistoryBatchStateRequest(BaseModel):
+    """Per-user batch local history state update request."""
+
+    record_ids: List[int] = Field(default_factory=list, description="History record IDs")
+    favorite: Optional[bool] = Field(None, description="Favorite marker")
+    important: Optional[bool] = Field(None, description="Important marker")
+    archived: Optional[bool] = Field(None, description="Archived marker")
+    read: Optional[bool] = Field(None, description="Read marker")
+    ai_used: bool = Field(False, description="Must be false for this no-AI local state update")
+
+
+class HistoryBatchStateResponse(BaseModel):
+    """Per-user batch local history state response."""
+
+    updated: int = Field(..., description="Number of owner-scoped records updated")
+    record_ids: List[int] = Field(default_factory=list, description="Updated history record IDs")
+    ai_used: bool = Field(False, description="Whether AI was used")
 
 
 class DeleteHistoryRequest(BaseModel):
@@ -308,6 +385,24 @@ class MarkdownReportResponse(BaseModel):
             "content": "# 📊 贵州茅台 (600519) 分析报告\n\n> 分析日期：**2024-01-01**\n\n..."
         }
     })
+
+
+class HistoryExportRequest(BaseModel):
+    """Local history export request."""
+
+    record_ids: List[int] = Field(default_factory=list, description="History record IDs to export")
+    format: Literal["markdown", "json"] = Field("markdown", description="Export format")
+
+
+class HistoryExportResponse(BaseModel):
+    """Local history export bundle response."""
+
+    format: Literal["markdown", "json"] = Field(..., description="Export format")
+    filename: str = Field(..., description="Suggested download filename")
+    content: str = Field(..., description="Export file content")
+    record_count: int = Field(..., description="Number of exported records")
+    record_ids: List[int] = Field(default_factory=list, description="Exported record IDs")
+    ai_used: bool = Field(False, description="Whether the export consumed AI quota")
 
 
 class StockBarItem(BaseModel):

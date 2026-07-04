@@ -60,6 +60,10 @@ vi.mock('./pages/TokenUsagePage', () => ({
   default: () => <div data-testid="token-usage-page">Usage</div>,
 }));
 
+vi.mock('./pages/AdminPage', () => ({
+  default: () => <div data-testid="admin-page">Admin</div>,
+}));
+
 vi.mock('./pages/SettingsPage', () => ({
   default: () => <div data-testid="settings-page">Settings</div>,
 }));
@@ -106,19 +110,34 @@ describe('App routing behavior', () => {
     expect(container.querySelector('.border-t-cyan')).toBeInTheDocument();
   });
 
-  it('redirects protected routes to login when auth is enabled but user is not logged in', async () => {
+  it('redirects admin routes to login when auth is enabled but admin is not logged in', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
       authEnabled: true,
       loggedIn: false,
       setupState: 'enabled',
     }));
-    window.history.pushState({}, '', '/portfolio');
+    window.history.pushState({}, '', '/admin');
 
     render(<App />);
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
-    expect(window.location.search).toBe('?redirect=%2Fportfolio');
+    expect(window.location.search).toBe('?redirect=%2Fadmin');
+  });
+
+  it('allows ordinary platform landing routes when auth is enabled but admin is not logged in', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', '/');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('home-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
   });
 
   it('renders the current route page after auth is ready', async () => {
@@ -139,6 +158,16 @@ describe('App routing behavior', () => {
 
     expect(await screen.findByTestId('token-usage-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenCalledWith('/usage');
+    expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('routes /admin to the operations page after auth is ready', async () => {
+    window.history.pushState({}, '', '/admin');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('admin-page')).toBeInTheDocument();
+    expect(setCurrentRoute).toHaveBeenCalledWith('/admin');
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
   });
 

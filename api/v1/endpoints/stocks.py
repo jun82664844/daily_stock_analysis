@@ -19,6 +19,14 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, 
 
 from api.deps import get_system_config_service
 
+from api.v1.schemas.basic_query import (
+    BasicMarketSourceOpsResponse,
+    BasicMarketSourceRecoveryRequest,
+    BasicMarketSourceRecoveryResponse,
+    BasicPrewarmRequest,
+    BasicPrewarmResponse,
+    BasicStockSnapshot,
+)
 from api.v1.schemas.stocks import (
     ExtractFromImageResponse,
     ExtractItem,
@@ -39,7 +47,12 @@ from src.services.import_parser import (
     parse_import_from_text,
 )
 from src.services.stock_service import StockService
+from src.services.basic_query_service import BasicQueryService
+from src.services.market_source_ops import build_market_source_ops_snapshot, recover_market_sources
+from src.services.stock_code_utils import normalize_crypto_symbol
 from src.services.system_config_service import SystemConfigService
+from src.auth import COOKIE_NAME, verify_session
+from src.platform_accounts import PlatformIdentity, platform_identity_from_request
 from data_provider.base import normalize_stock_code
 
 logger = logging.getLogger(__name__)
@@ -98,6 +111,9 @@ def _validate_and_normalize_stock_code(code: str) -> str:
             status_code=400,
             detail={"error": "invalid_stock_code", "message": "股票代码不能为空"},
         )
+    crypto_symbol = normalize_crypto_symbol(stripped)
+    if crypto_symbol is not None:
+        return crypto_symbol
     if not _STOCK_CODE_RE.match(stripped):
         raise HTTPException(
             status_code=400,
@@ -107,6 +123,23 @@ def _validate_and_normalize_stock_code(code: str) -> str:
             },
         )
     return normalize_stock_code(stripped)
+
+
+def _require_stock_admin_identity(request: Request) -> PlatformIdentity:
+    admin_cookie = request.cookies.get(COOKIE_NAME)
+    if admin_cookie and verify_session(admin_cookie):
+        return PlatformIdentity(
+            user_id=None,
+            email="admin",
+            role="admin",
+            plan="enterprise",
+            is_admin=True,
+        )
+
+    identity = platform_identity_from_request(request)
+    if identity is None or not identity.is_admin:
+        raise HTTPException(status_code=403, detail={"error": "forbidden", "message": "Admin role required"})
+    return identity
 
 
 def _watchlist_match_key(code: str) -> str:
@@ -401,6 +434,122 @@ def remove_from_watchlist(
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"从自选删除失败: {str(e)}"},
+        )
+
+
+@router.post(
+    "/prewarm",
+    response_model=BasicPrewarmResponse,
+    responses={
+        200: {"description": "No-AI local prewarm summary"},
+        400: {"description": "参数错误", "model": ErrorResponse},
+        500: {"description": "服务器错误", "model": ErrorResponse},
+    },
+    summary="Prewarm no-AI market data cache",
+    description="Prewarm deterministic market data snapshots without invoking AI.",
+)
+def prewarm_basic_stock_snapshots(request: BasicPrewarmRequest) -> BasicPrewarmResponse:
+    """Prewarm a small local cache for quick snapshots without invoking AI."""
+    try:
+        symbols = request.symbols or ["600519", "AAPL", "HK00700", "BTC-USD"]
+        normalized = [_validate_and_normalize_stock_code(symbol) for symbol in symbols]
+        summary = BasicQueryService().prewarm_snapshots(normalized)
+        return BasicPrewarmResponse.model_validate(summary)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("No-AI market prewarm failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"No-AI market prewarm failed: {str(e)}"},
+        )
+
+
+@router.get(
+    "/sources/health",
+    response_model=BasicMarketSourceOpsResponse,
+    responses={
+        200: {"description": "Local no-AI market source health and priority summary"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Local market source health",
+    description="Read-only local diagnostics for quick-query source priority, cooldown, latency, and cache mode. Does not invoke AI.",
+)
+def get_market_source_health() -> BasicMarketSourceOpsResponse:
+    """Return local quick-query source diagnostics without fetching live market data."""
+    try:
+        return BasicMarketSourceOpsResponse.model_validate(build_market_source_ops_snapshot())
+    except Exception as e:
+        logger.error("Local market source health failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"Local market source health failed: {str(e)}"},
+        )
+
+
+@router.post(
+    "/sources/recovery",
+    response_model=BasicMarketSourceRecoveryResponse,
+    responses={
+        200: {"description": "Admin-only local source-health recovery summary"},
+        403: {"description": "Admin role required", "model": ErrorResponse},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Recover local market sources",
+    description="Admin-only local recovery for quick-query source cooldown state. Optionally prewarms no-AI snapshots and never invokes AI.",
+)
+def recover_market_source_health(
+    request: BasicMarketSourceRecoveryRequest,
+    _identity: PlatformIdentity = Depends(_require_stock_admin_identity),
+) -> BasicMarketSourceRecoveryResponse:
+    """Reset local source-health cooldown state without deleting user data."""
+    try:
+        normalized_symbols = [_validate_and_normalize_stock_code(symbol) for symbol in request.symbols]
+        summary = recover_market_sources(
+            market=request.market,
+            sources=request.sources,
+            symbols=normalized_symbols,
+            prewarm=request.prewarm,
+        )
+        return BasicMarketSourceRecoveryResponse.model_validate(summary)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Local market source recovery failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"Local market source recovery failed: {str(e)}"},
+        )
+
+
+@router.get(
+    "/{stock_code}/snapshot",
+    response_model=BasicStockSnapshot,
+    responses={
+        200: {"description": "No-AI stock snapshot"},
+        400: {"description": "参数错误", "model": ErrorResponse},
+        404: {"description": "股票不存在", "model": ErrorResponse},
+        500: {"description": "服务器错误", "model": ErrorResponse},
+    },
+    summary="获取 No-AI 股票快照",
+    description="返回行情、均线、成交量等基础数据，不调用 AI 模型。",
+)
+def get_basic_stock_snapshot(
+    stock_code: str,
+    refresh: bool = Query(False, description="Force a deterministic no-AI market data refresh and update local cache."),
+) -> BasicStockSnapshot:
+    """Return a fast stock snapshot without invoking an AI model."""
+    try:
+        normalized = _validate_and_normalize_stock_code(stock_code)
+        snapshot = BasicQueryService().get_snapshot(normalized, force_refresh=refresh)
+        return BasicStockSnapshot.model_validate(snapshot)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("No-AI stock snapshot failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"No-AI 股票快照失败: {str(e)}"},
         )
 
 

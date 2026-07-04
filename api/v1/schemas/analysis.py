@@ -28,6 +28,8 @@ class TaskStatusEnum(str, Enum):
 
 
 AnalysisPhase = Literal["auto", "premarket", "intraday", "postmarket"]
+AnalysisDepth = Literal["fast", "deep"]
+ApiKeyMode = Literal["platform", "user", "local"]
 
 
 class AnalyzeRequest(BaseModel):
@@ -60,6 +62,16 @@ class AnalyzeRequest(BaseModel):
         "auto",
         description="分析阶段覆盖：auto(自动推断) / premarket(盘前) / intraday(盘中) / postmarket(盘后)",
     )
+    analysis_depth: AnalysisDepth = Field(
+        "fast",
+        validation_alias=AliasChoices("analysis_depth", "analysisDepth"),
+        description="Analysis depth: fast(default lightweight path) or deep(manual expanded path)",
+    )
+    api_key_mode: ApiKeyMode = Field(
+        "platform",
+        validation_alias=AliasChoices("api_key_mode", "apiKeyMode", "llm_key_mode", "llmKeyMode"),
+        description="LLM API key mode: platform(default) or user(user-owned encrypted provider key)",
+    )
     stock_name: Optional[str] = Field(
         None,
         description="用户选中的股票名称（自动补全时提供）",
@@ -91,7 +103,6 @@ class AnalyzeRequest(BaseModel):
         description="本次分析使用的策略 skill ID 列表；兼容 legacy strategies 字段",
         json_schema_extra={"example": ["bull_trend", "growth_quality"]},
     )
-
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "stock_code": "600519",
@@ -149,7 +160,6 @@ class AnalysisResultResponse(BaseModel):
     report: Optional[Any] = Field(None, description="分析报告")
     diagnostic_summary: Optional[Any] = Field(None, description="运行诊断摘要")
     created_at: str = Field(..., description="创建时间")
-    
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "query_id": "abc123def456",
@@ -178,6 +188,7 @@ class TaskAccepted(BaseModel):
     )
     message: Optional[str] = Field(None, description="提示信息")
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
+    analysis_depth: AnalysisDepth = Field("fast", description="Analysis depth")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -202,6 +213,8 @@ class BatchTaskAcceptedItem(BaseModel):
     )
     message: Optional[str] = Field(None, description="提示信息")
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
+
+    analysis_depth: AnalysisDepth = Field("fast", description="Analysis depth")
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -303,6 +316,7 @@ class TaskStatus(BaseModel):
         description="请求的分析阶段；无持久化字段的历史 DB fallback 可能为空",
     )
     skills: Optional[List[str]] = Field(None, description="本次任务使用的策略 skill ID 列表")
+    analysis_depth: Optional[AnalysisDepth] = Field(None, description="Analysis depth")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -348,6 +362,7 @@ class TaskInfo(BaseModel):
     )
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
     skills: Optional[List[str]] = Field(None, description="本次任务使用的策略 skill ID 列表")
+    analysis_depth: AnalysisDepth = Field("fast", description="Analysis depth")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {

@@ -9,17 +9,27 @@
 2. 提供 GET /api/v1/history/{query_id} 历史详情查询接口
 """
 
+import json
 import logging
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Depends, Body
+from fastapi import APIRouter, HTTPException, Query, Depends, Body, Request
 
 from api.deps import get_database_manager
 from api.v1.schemas.history import (
     HistoryListResponse,
     HistoryItem,
+    HistoryCurrentQuoteRefreshMarkerRequest,
+    HistoryCurrentQuoteRefreshMarkerResponse,
+    HistoryStateUpdateRequest,
+    HistoryStateResponse,
+    HistoryBatchStateRequest,
+    HistoryBatchStateResponse,
     DeleteHistoryRequest,
     DeleteHistoryResponse,
+    HistoryExportRequest,
+    HistoryExportResponse,
     NewsIntelItem,
     NewsIntelResponse,
     AnalysisReport,
@@ -35,6 +45,9 @@ from api.v1.schemas.history import (
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.run_flow import RunFlowSnapshot
 from src.storage import DatabaseManager
+from src.auth import COOKIE_NAME as ADMIN_SESSION_COOKIE
+from src.auth import verify_session as verify_admin_session
+from src.platform_accounts import is_platform_user_auth_enabled, platform_identity_from_request
 from src.report_language import (
     get_sentiment_label,
     get_localized_stock_name,
@@ -43,6 +56,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.services.history_service import HistoryService, MarkdownReportGenerationError
+from src.platform_audit import redact_metadata
 from src.schemas.decision_action import build_action_fields
 from src.utils.data_processing import (
     normalize_model_used,
@@ -61,6 +75,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _request_history_platform_user_id(http_request: Optional[Request]) -> Optional[int]:
+    if http_request is None or not hasattr(http_request, "cookies"):
+        return None
+    admin_session = http_request.cookies.get(ADMIN_SESSION_COOKIE)
+    if admin_session and verify_admin_session(admin_session):
+        return None
+    if not is_platform_user_auth_enabled():
+        return None
+    identity = platform_identity_from_request(http_request)
+    if identity is None or identity.user_id is None or identity.is_admin:
+        return None
+    return int(identity.user_id)
+
+
 def _normalize_code_for_grouping(code: str) -> str:
     """Normalize stock code for deduplication grouping.
 
@@ -69,6 +97,101 @@ def _normalize_code_for_grouping(code: str) -> str:
     """
     from data_provider.base import normalize_stock_code
     return normalize_stock_code(code or "")
+
+
+def _dedupe_export_record_ids(record_ids: List[int]) -> List[int]:
+    seen = set()
+    deduped: List[int] = []
+    for record_id in record_ids:
+        if not isinstance(record_id, int) or record_id <= 0 or record_id in seen:
+            continue
+        seen.add(record_id)
+        deduped.append(record_id)
+    return deduped
+
+
+def _redact_export_text(content: str) -> str:
+    redacted = redact_metadata({"content": content or ""}).get("content", "")
+    return redacted if isinstance(redacted, str) else ""
+
+
+def _fallback_history_export_markdown(detail: Dict[str, Any]) -> str:
+    stock_code = detail.get("stock_code") or ""
+    stock_name = detail.get("stock_name") or stock_code
+    lines = [
+        f"# {stock_name} ({stock_code})",
+        "",
+        f"- Record ID: {detail.get('id')}",
+        f"- Query ID: {detail.get('query_id') or ''}",
+        f"- Report type: {detail.get('report_type') or 'unknown'}",
+        f"- Created at: {detail.get('created_at') or 'unknown'}",
+        "",
+        "## Summary",
+        "",
+        detail.get("analysis_summary") or "",
+        "",
+        "## Operation Snapshot",
+        "",
+        f"- Operation: {detail.get('operation_advice') or ''}",
+        f"- Trend: {detail.get('trend_prediction') or ''}",
+        f"- Sentiment score: {detail.get('sentiment_score') if detail.get('sentiment_score') is not None else ''}",
+        "",
+        "## Risk Boundary",
+        "",
+        "This local history export is for informational analysis only and is not investment advice.",
+    ]
+    return "\n".join(lines).strip()
+
+
+def _build_history_export_content(
+    *,
+    items: List[Dict[str, Any]],
+    export_format: str,
+    generated_at: str,
+) -> str:
+    if export_format == "json":
+        payload = {
+            "generated_at": generated_at,
+            "ai_used": False,
+            "disclaimer": "Local history export only; not investment advice.",
+            "items": [
+                {
+                    "record_id": item["record_id"],
+                    "query_id": item["query_id"],
+                    "stock_code": item["stock_code"],
+                    "stock_name": item["stock_name"],
+                    "report_type": item["report_type"],
+                    "created_at": item["created_at"],
+                    "summary": {
+                        "analysis_summary": item["analysis_summary"],
+                        "operation_advice": item["operation_advice"],
+                        "trend_prediction": item["trend_prediction"],
+                        "sentiment_score": item["sentiment_score"],
+                    },
+                }
+                for item in items
+            ],
+        }
+        return _redact_export_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+
+    parts = [
+        "# DSA History Export",
+        "",
+        f"- Generated at (UTC): {generated_at}",
+        f"- Records: {len(items)}",
+        "- AI used: false",
+        "- Scope: local history export only; not investment advice.",
+    ]
+    for item in items:
+        parts.extend([
+            "",
+            "---",
+            "",
+            f"<!-- record_id: {item['record_id']} stock_code: {item['stock_code']} -->",
+            "",
+            item["markdown"].strip(),
+        ])
+    return _redact_export_text("\n".join(parts).strip() + "\n")
 
 
 @router.get(
@@ -82,6 +205,7 @@ def _normalize_code_for_grouping(code: str) -> str:
     description="分页获取历史分析记录摘要，支持按股票代码和日期范围筛选"
 )
 def get_history_list(
+    http_request: Request = None,
     stock_code: Optional[str] = Query(None, description="股票代码筛选"),
     report_type: Optional[str] = Query(None, description="报告类型筛选，如 market_review"),
     start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
@@ -111,13 +235,25 @@ def get_history_list(
         service = HistoryService(db_manager)
         
         # 使用 def 而非 async def，FastAPI 自动在线程池中执行
+        query_params = getattr(http_request, "query_params", {}) or {}
+        market = query_params.get("market")
+        refresh_status = query_params.get("refresh_status")
+        state_filter = query_params.get("state")
+        note_search = query_params.get("note_search")
+        sort = query_params.get("sort") or "newest"
         result = service.get_history_list(
             stock_code=stock_code,
             report_type=report_type,
             start_date=start_date,
             end_date=end_date,
             page=page,
-            limit=limit
+            limit=limit,
+            platform_user_id=_request_history_platform_user_id(http_request),
+            market=market,
+            refresh_status=refresh_status,
+            state_filter=state_filter,
+            note_search=note_search,
+            sort=sort,
         )
         
         # 转换为响应模型
@@ -141,6 +277,15 @@ def get_history_list(
                 model_used=item.get("model_used"),
                 created_at=item.get("created_at"),
                 market_phase_summary=item.get("market_phase_summary"),
+                current_quote_refreshed=bool(item.get("current_quote_refreshed")),
+                current_quote_refreshed_at=item.get("current_quote_refreshed_at"),
+                current_quote_refresh=item.get("current_quote_refresh"),
+                favorite=bool(item.get("favorite")),
+                important=bool(item.get("important")),
+                archived=bool(item.get("archived")),
+                read=bool(item.get("read")),
+                note=item.get("note"),
+                note_updated_at=item.get("note_updated_at"),
             )
             for item in result.get("items", [])
         ]
@@ -163,6 +308,207 @@ def get_history_list(
         )
 
 
+@router.post(
+    "/{record_id}/refresh-marker",
+    response_model=HistoryCurrentQuoteRefreshMarkerResponse,
+    responses={
+        200: {"description": "No-AI current quote refresh marker persisted"},
+        400: {"description": "Invalid marker request", "model": ErrorResponse},
+        404: {"description": "History record not found", "model": ErrorResponse},
+        500: {"description": "Internal error", "model": ErrorResponse},
+    },
+    summary="Persist no-AI current quote refresh marker",
+)
+def mark_history_current_quote_refreshed(
+    record_id: int,
+    request: HistoryCurrentQuoteRefreshMarkerRequest,
+    http_request: Request = None,
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> HistoryCurrentQuoteRefreshMarkerResponse:
+    if request.ai_used:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_request",
+                "message": "refresh-marker only accepts no-AI current quote refreshes",
+            },
+        )
+
+    try:
+        marker = HistoryService(db_manager).mark_current_quote_refreshed(
+            record_id=record_id,
+            platform_user_id=_request_history_platform_user_id(http_request),
+            stock_code=request.stock_code,
+            route_lane=request.route_lane,
+            quote_source=request.quote_source,
+            freshness=request.freshness,
+            ai_used=False,
+            metadata=request.metadata,
+        )
+        if marker is None:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "not_found",
+                    "message": f"history record {record_id} not found",
+                },
+            )
+        return HistoryCurrentQuoteRefreshMarkerResponse(
+            record_id=record_id,
+            stock_code=marker.get("stock_code") or request.stock_code or "",
+            current_quote_refreshed=True,
+            current_quote_refreshed_at=marker.get("refreshed_at"),
+            ai_used=bool(marker.get("ai_used")),
+            route_lane=marker.get("route_lane"),
+            quote_source=marker.get("quote_source"),
+            freshness=marker.get("freshness"),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"鍐欏叆鍘嗗彶琛屾儏鍒锋柊 marker 澶辫触: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"marker write failed: {str(e)}"},
+        )
+
+
+def _state_response_from_dict(record_id: int, state: Dict[str, Any]) -> HistoryStateResponse:
+    return HistoryStateResponse(
+        record_id=int(record_id),
+        favorite=bool(state.get("favorite")),
+        important=bool(state.get("important")),
+        archived=bool(state.get("archived")),
+        read=bool(state.get("read")),
+        note=state.get("note"),
+        note_updated_at=state.get("note_updated_at"),
+        ai_used=False,
+    )
+
+
+def _has_state_update_fields(request: HistoryStateUpdateRequest) -> bool:
+    fields = getattr(request, "model_fields_set", set())
+    return any(field in fields for field in {"favorite", "important", "archived", "read", "note"})
+
+
+def _has_batch_state_update_fields(request: HistoryBatchStateRequest) -> bool:
+    fields = getattr(request, "model_fields_set", set())
+    return any(field in fields for field in {"favorite", "important", "archived", "read"})
+
+
+@router.patch(
+    "/state",
+    response_model=HistoryBatchStateResponse,
+    responses={
+        200: {"description": "Per-user local history state updated"},
+        400: {"description": "Invalid state request", "model": ErrorResponse},
+        500: {"description": "Internal error", "model": ErrorResponse},
+    },
+    summary="Batch update per-user local history state",
+)
+def batch_update_history_state(
+    request: HistoryBatchStateRequest,
+    http_request: Request = None,
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> HistoryBatchStateResponse:
+    if request.ai_used:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_request",
+                "message": "history state updates are local no-AI operations",
+            },
+        )
+    record_ids = sorted({int(record_id) for record_id in request.record_ids if record_id is not None and int(record_id) > 0})
+    if not record_ids:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_request", "message": "record_ids cannot be empty"},
+        )
+    if not _has_batch_state_update_fields(request):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_request", "message": "no history state fields provided"},
+        )
+
+    try:
+        states = HistoryService(db_manager).batch_update_history_state(
+            record_ids=record_ids,
+            platform_user_id=_request_history_platform_user_id(http_request),
+            favorite=request.favorite,
+            important=request.important,
+            archived=request.archived,
+            read=request.read,
+        )
+        updated_ids = [int(state["history_id"]) for state in states]
+        return HistoryBatchStateResponse(updated=len(updated_ids), record_ids=updated_ids, ai_used=False)
+    except Exception as e:
+        logger.error("batch history state update failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"history state update failed: {str(e)}"},
+        )
+
+
+@router.patch(
+    "/{record_id}/state",
+    response_model=HistoryStateResponse,
+    responses={
+        200: {"description": "Per-user local history state updated"},
+        400: {"description": "Invalid state request", "model": ErrorResponse},
+        404: {"description": "History record not found", "model": ErrorResponse},
+        500: {"description": "Internal error", "model": ErrorResponse},
+    },
+    summary="Update per-user local history state",
+)
+def update_history_state(
+    record_id: int,
+    request: HistoryStateUpdateRequest,
+    http_request: Request = None,
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> HistoryStateResponse:
+    if request.ai_used:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_request",
+                "message": "history state updates are local no-AI operations",
+            },
+        )
+    if not _has_state_update_fields(request):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_request", "message": "no history state fields provided"},
+        )
+
+    try:
+        fields = getattr(request, "model_fields_set", set())
+        state = HistoryService(db_manager).update_history_state(
+            record_id=record_id,
+            platform_user_id=_request_history_platform_user_id(http_request),
+            favorite=request.favorite,
+            important=request.important,
+            archived=request.archived,
+            read=request.read,
+            note_present="note" in fields,
+            note=request.note,
+        )
+        if state is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "not_found", "message": f"history record {record_id} not found"},
+            )
+        return _state_response_from_dict(record_id, state)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("history state update failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"history state update failed: {str(e)}"},
+        )
+
+
 @router.delete(
     "/by-code/{stock_code}",
     response_model=DeleteHistoryResponse,
@@ -176,15 +522,24 @@ def get_history_list(
 )
 def delete_history_by_code(
     stock_code: str,
+    http_request: Request = None,
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> DeleteHistoryResponse:
     try:
+        platform_user_id = _request_history_platform_user_id(http_request)
         candidates = HistoryService._history_code_filter_candidates(stock_code)
-        records, _ = db_manager.get_analysis_history_paginated(code=candidates, limit=10000)
+        records, _ = db_manager.get_analysis_history_paginated(
+            code=candidates,
+            limit=10000,
+            platform_user_id=platform_user_id,
+        )
         record_ids = [r.id for r in records if r.id is not None]
         if not record_ids:
             return DeleteHistoryResponse(deleted=0)
-        deleted = db_manager.delete_analysis_history_records(record_ids)
+        deleted = db_manager.delete_analysis_history_records(
+            record_ids,
+            platform_user_id=platform_user_id,
+        )
         return DeleteHistoryResponse(deleted=deleted)
     except Exception as e:
         logger.error(f"按股票代码删除历史记录失败: {e}", exc_info=True)
@@ -206,6 +561,7 @@ def delete_history_by_code(
     description="按历史记录主键 ID 批量删除分析历史"
 )
 def delete_history_records(
+    http_request: Request = None,
     request: DeleteHistoryRequest = Body(...),
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> DeleteHistoryResponse:
@@ -224,7 +580,10 @@ def delete_history_records(
 
     try:
         service = HistoryService(db_manager)
-        deleted = service.delete_history_records(record_ids)
+        deleted = service.delete_history_records(
+            record_ids,
+            platform_user_id=_request_history_platform_user_id(http_request),
+        )
         return DeleteHistoryResponse(deleted=deleted)
     except HTTPException:
         raise
@@ -239,6 +598,109 @@ def delete_history_records(
         )
 
 
+@router.post(
+    "/export",
+    response_model=HistoryExportResponse,
+    responses={
+        200: {"description": "Local history export bundle"},
+        400: {"description": "Invalid export request", "model": ErrorResponse},
+        404: {"description": "History record not found", "model": ErrorResponse},
+        500: {"description": "Internal error", "model": ErrorResponse},
+    },
+    summary="Export selected local history reports",
+)
+def export_history_records(
+    request: HistoryExportRequest,
+    http_request: Request = None,
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> HistoryExportResponse:
+    record_ids = _dedupe_export_record_ids(request.record_ids)
+    if not record_ids:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_request",
+                "message": "record_ids cannot be empty",
+            },
+        )
+    if len(record_ids) > 50:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_request",
+                "message": "history export supports at most 50 records per bundle",
+            },
+        )
+
+    try:
+        service = HistoryService(db_manager)
+        platform_user_id = _request_history_platform_user_id(http_request)
+        export_items: List[Dict[str, Any]] = []
+        for record_id in record_ids:
+            detail = service.resolve_and_get_detail(
+                str(record_id),
+                platform_user_id=platform_user_id,
+            )
+            if detail is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": "not_found",
+                        "message": f"history record {record_id} not found",
+                    },
+                )
+
+            try:
+                markdown = service.get_markdown_report(
+                    str(record_id),
+                    platform_user_id=platform_user_id,
+                )
+            except MarkdownReportGenerationError:
+                markdown = None
+
+            export_items.append({
+                "record_id": int(detail.get("id") or record_id),
+                "query_id": detail.get("query_id") or "",
+                "stock_code": detail.get("stock_code") or "",
+                "stock_name": detail.get("stock_name") or "",
+                "report_type": detail.get("report_type") or "",
+                "created_at": detail.get("created_at") or "",
+                "analysis_summary": detail.get("analysis_summary") or "",
+                "operation_advice": detail.get("operation_advice") or "",
+                "trend_prediction": detail.get("trend_prediction") or "",
+                "sentiment_score": detail.get("sentiment_score"),
+                "markdown": markdown or _fallback_history_export_markdown(detail),
+            })
+
+        generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        content = _build_history_export_content(
+            items=export_items,
+            export_format=request.format,
+            generated_at=generated_at,
+        )
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        extension = "json" if request.format == "json" else "md"
+        return HistoryExportResponse(
+            format=request.format,
+            filename=f"dsa-history-export-{timestamp}.{extension}",
+            content=content,
+            record_count=len(export_items),
+            record_ids=[item["record_id"] for item in export_items],
+            ai_used=False,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"export history records failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": f"export history records failed: {str(e)}",
+            },
+        )
+
+
 @router.get(
     "/stocks",
     response_model=StockBarResponse,
@@ -250,6 +712,7 @@ def delete_history_records(
     description="返回历史记录中每只股票的最新一条分析摘要，不包含大盘复盘（code=MARKET）。",
 )
 def get_stock_bar(
+    http_request: Request = None,
     start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
     limit: int = Query(200, ge=1, le=500, description="最大返回数量"),
@@ -260,6 +723,7 @@ def get_stock_bar(
         from src.utils.data_processing import parse_json_field
 
         service = HistoryService(db_manager)
+        platform_user_id = _request_history_platform_user_id(http_request)
         start = date_type.fromisoformat(start_date) if start_date else None
         end = date_type.fromisoformat(end_date) if end_date else None
 
@@ -270,6 +734,7 @@ def get_stock_bar(
             start_date=start,
             end_date=end,
             limit=fetch_limit,
+            platform_user_id=platform_user_id,
         )
 
         # Deduplicate by normalized code, keeping the record with highest id
@@ -301,6 +766,7 @@ def get_stock_bar(
             analysis_count = db_manager.get_analysis_history_paginated(
                 code=HistoryService._history_code_filter_candidates(display_stock_code),
                 limit=1,
+                platform_user_id=platform_user_id,
             )[1]
             items.append(
                 StockBarItem(
@@ -351,6 +817,7 @@ def get_stock_bar(
 )
 def get_history_detail(
     record_id: str,
+    http_request: Request = None,
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> AnalysisReport:
     """
@@ -373,7 +840,10 @@ def get_history_detail(
         service = HistoryService(db_manager)
         
         # Try integer ID first, fall back to query_id string lookup
-        result = service.resolve_and_get_detail(record_id)
+        result = service.resolve_and_get_detail(
+            record_id,
+            platform_user_id=_request_history_platform_user_id(http_request),
+        )
         
         if result is None:
             raise HTTPException(
@@ -514,6 +984,7 @@ def get_history_detail(
 )
 def get_history_diagnostics(
     record_id: str,
+    http_request: Request = None,
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> RunDiagnosticSummaryResponse:
     """
@@ -521,7 +992,10 @@ def get_history_diagnostics(
     """
     try:
         service = HistoryService(db_manager)
-        summary = service.resolve_and_get_diagnostics(record_id)
+        summary = service.resolve_and_get_diagnostics(
+            record_id,
+            platform_user_id=_request_history_platform_user_id(http_request),
+        )
         if summary is None:
             raise HTTPException(
                 status_code=404,
@@ -557,6 +1031,7 @@ def get_history_diagnostics(
 )
 def get_history_run_flow(
     record_id: str,
+    http_request: Request = None,
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> RunFlowSnapshot:
     """
@@ -564,7 +1039,10 @@ def get_history_run_flow(
     """
     try:
         service = HistoryService(db_manager)
-        snapshot = service.resolve_and_get_run_flow(record_id)
+        snapshot = service.resolve_and_get_run_flow(
+            record_id,
+            platform_user_id=_request_history_platform_user_id(http_request),
+        )
         if snapshot is None:
             raise HTTPException(
                 status_code=404,
@@ -599,6 +1077,7 @@ def get_history_run_flow(
 )
 def get_history_news(
     record_id: str,
+    http_request: Request = None,
     limit: int = Query(20, ge=1, le=100, description="返回数量限制"),
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> NewsIntelResponse:
@@ -618,7 +1097,11 @@ def get_history_news(
     """
     try:
         service = HistoryService(db_manager)
-        items = service.resolve_and_get_news(record_id=record_id, limit=limit)
+        items = service.resolve_and_get_news(
+            record_id=record_id,
+            limit=limit,
+            platform_user_id=_request_history_platform_user_id(http_request),
+        )
 
         response_items = [
             NewsIntelItem(
@@ -658,6 +1141,7 @@ def get_history_news(
 )
 def get_history_markdown(
     record_id: str,
+    http_request: Request = None,
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> MarkdownReportResponse:
     """
@@ -679,7 +1163,10 @@ def get_history_markdown(
     service = HistoryService(db_manager)
 
     try:
-        markdown_content = service.get_markdown_report(record_id)
+        markdown_content = service.get_markdown_report(
+            record_id,
+            platform_user_id=_request_history_platform_user_id(http_request),
+        )
     except MarkdownReportGenerationError as e:
         logger.error(f"Markdown report generation failed for {record_id}: {e.message}")
         raise HTTPException(

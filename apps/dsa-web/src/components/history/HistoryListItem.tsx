@@ -13,15 +13,34 @@ interface HistoryListItemProps {
   isViewing: boolean; // Indicates if this report is currently being viewed in the right panel
   isChecked: boolean; // Indicates if the checkbox is checked for bulk operations
   isDeleting: boolean;
+  selectable?: boolean;
+  currentQuoteRefreshed?: boolean;
   onToggleChecked: (recordId: number) => void;
   onClick: (recordId: number) => void;
 }
+
+const getHistoryMarketLabel = (stockCode: string): string => {
+  const code = stockCode.trim().toUpperCase();
+  if (code === 'MARKET') return 'Market review';
+  if (code.endsWith('-USD') || code.endsWith('-USDT') || /^(BTC|ETH|SOL|BNB|DOGE)([-/]|$)/.test(code)) {
+    return 'Crypto';
+  }
+  if (code.startsWith('HK') || code.endsWith('.HK') || /^\d{5}$/.test(code)) {
+    return 'HK';
+  }
+  if (/^(SH|SZ|BJ)\d{6}$/.test(code) || /^\d{6}(\.(SH|SZ|BJ))?$/.test(code)) {
+    return 'A-share';
+  }
+  return 'US';
+};
 
 export const HistoryListItem: React.FC<HistoryListItemProps> = ({
   item,
   isViewing,
   isChecked,
   isDeleting,
+  selectable = true,
+  currentQuoteRefreshed = false,
   onToggleChecked,
   onClick,
 }) => {
@@ -43,6 +62,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
 
   return (
     <div className="flex items-start gap-2 group">
+      {selectable ? (
       <div className="pt-5">
         <input
           type="checkbox"
@@ -52,8 +72,10 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
           className="h-3.5 w-3.5 cursor-pointer rounded border-subtle-hover bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
         />
       </div>
+      ) : null}
       <button
         type="button"
+        data-testid={`history-center-item-${item.id}`}
         onClick={() => onClick(item.id)}
         aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
         className={`home-history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
@@ -92,12 +114,34 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
                     {operationLabel} {item.sentimentScore}
                   </Badge>
                 )}
+                <span
+                  data-testid={`history-card-refresh-status-${item.id}`}
+                  className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+                    currentQuoteRefreshed
+                      ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
+                      : 'border-subtle bg-surface/70 text-muted-text'
+                  }`}
+                >
+                  {currentQuoteRefreshed ? 'Current quote refreshed' : 'Not refreshed'}
+                </span>
               </div>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2" data-testid="history-card-meta">
               <span className="text-[11px] text-secondary-text font-mono">
                 {item.stockCode}
               </span>
+              <span className="w-1 h-1 rounded-full bg-subtle-hover" />
+              <span className="text-[10px] text-muted-text">
+                {getHistoryMarketLabel(item.stockCode)}
+              </span>
+              {item.reportType ? (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-subtle-hover" />
+                  <span className="text-[10px] text-muted-text">
+                    {item.reportType}
+                  </span>
+                </>
+              ) : null}
               <span className="w-1 h-1 rounded-full bg-subtle-hover" />
               <span className="text-[11px] text-muted-text">
                 {formatDateTime(item.createdAt)}
@@ -109,6 +153,46 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
                     {phaseLabel}
                   </Badge>
                 </>
+              ) : null}
+              {item.favorite ? (
+                <Badge
+                  variant="default"
+                  size="sm"
+                  data-testid={`history-card-state-favorite-${item.id}`}
+                  className="shrink-0 border-amber-400/30 bg-amber-500/10 text-[10px] leading-none text-amber-300"
+                >
+                  Favorite
+                </Badge>
+              ) : null}
+              {item.important ? (
+                <Badge
+                  variant="default"
+                  size="sm"
+                  data-testid={`history-card-state-important-${item.id}`}
+                  className="shrink-0 border-rose-400/30 bg-rose-500/10 text-[10px] leading-none text-rose-300"
+                >
+                  Important
+                </Badge>
+              ) : null}
+              {item.archived ? (
+                <Badge
+                  variant="default"
+                  size="sm"
+                  data-testid={`history-card-state-archived-${item.id}`}
+                  className="shrink-0 border-slate-400/30 bg-slate-500/10 text-[10px] leading-none text-slate-300"
+                >
+                  Archived
+                </Badge>
+              ) : null}
+              {item.note ? (
+                <Badge
+                  variant="default"
+                  size="sm"
+                  data-testid={`history-card-state-note-${item.id}`}
+                  className="shrink-0 border-cyan/30 bg-cyan/10 text-[10px] leading-none text-cyan"
+                >
+                  Note
+                </Badge>
               ) : null}
             </div>
           </div>

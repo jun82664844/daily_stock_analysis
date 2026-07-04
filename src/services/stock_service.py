@@ -10,10 +10,15 @@
 """
 
 import logging
+import json
+import os
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
 from src.repositories.stock_repo import StockRepository
+from src.services.stock_code_utils import normalize_crypto_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +45,10 @@ class StockService:
             实时行情数据字典
         """
         try:
+            crypto_symbol = normalize_crypto_symbol(stock_code)
+            if crypto_symbol is not None:
+                return self._get_crypto_realtime_quote(crypto_symbol)
+
             # 调用数据获取器获取实时行情
             from data_provider.base import DataFetcherManager
             
@@ -112,6 +121,10 @@ class StockService:
                 "weekly/monthly 聚合功能将在后续版本实现。"
             )
         
+        crypto_symbol = normalize_crypto_symbol(stock_code)
+        if crypto_symbol is not None:
+            return self._get_crypto_history_data(crypto_symbol, period=period, days=days)
+
         try:
             # 调用数据获取器获取历史数据
             from data_provider.base import DataFetcherManager
@@ -159,6 +172,119 @@ class StockService:
         except Exception as e:
             logger.error(f"获取历史数据失败: {e}", exc_info=True)
             return {"stock_code": stock_code, "period": period, "data": []}
+
+    def _crypto_yahoo_timeout(self) -> float:
+        try:
+            return max(0.5, float(os.getenv("CRYPTO_YAHOO_TIMEOUT_SECONDS", "3")))
+        except ValueError:
+            return 3.0
+
+    def _load_crypto_yahoo_chart(
+        self,
+        symbol: str,
+        *,
+        range_value: str,
+        interval: str,
+    ) -> Optional[Dict[str, Any]]:
+        query = urllib.parse.urlencode({"range": range_value, "interval": interval})
+        encoded_symbol = urllib.parse.quote(symbol, safe="")
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?{query}"
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "DSA-local-quick-query/1.0"})
+            with urllib.request.urlopen(request, timeout=self._crypto_yahoo_timeout()) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception as exc:
+            logger.info("[crypto_quote] Yahoo chart unavailable for %s: %s", symbol, exc)
+            return None
+
+        try:
+            result = payload["chart"]["result"][0]
+        except (KeyError, IndexError, TypeError):
+            return None
+        return result if isinstance(result, dict) else None
+
+    def _get_crypto_realtime_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        result = self._load_crypto_yahoo_chart(symbol, range_value="2d", interval="1d")
+        if not result:
+            return None
+        meta = result.get("meta") or {}
+        quote_block = ((result.get("indicators") or {}).get("quote") or [{}])[0] or {}
+        close_values = [value for value in (quote_block.get("close") or []) if value is not None]
+        volume_values = [value for value in (quote_block.get("volume") or []) if value is not None]
+        current_price = meta.get("regularMarketPrice")
+        if current_price is None and close_values:
+            current_price = close_values[-1]
+        prev_close = meta.get("chartPreviousClose")
+        if prev_close is None and len(close_values) > 1:
+            prev_close = close_values[-2]
+        change = None
+        change_percent = None
+        try:
+            if current_price is not None and prev_close:
+                change = float(current_price) - float(prev_close)
+                change_percent = (change / float(prev_close)) * 100
+        except (TypeError, ValueError, ZeroDivisionError):
+            change = None
+            change_percent = None
+        return {
+            "stock_code": symbol,
+            "stock_name": meta.get("shortName") or meta.get("longName") or symbol,
+            "current_price": float(current_price) if current_price is not None else None,
+            "change": round(change, 6) if change is not None else None,
+            "change_percent": round(change_percent, 4) if change_percent is not None else None,
+            "open": (quote_block.get("open") or [None])[-1],
+            "high": (quote_block.get("high") or [None])[-1],
+            "low": (quote_block.get("low") or [None])[-1],
+            "prev_close": prev_close,
+            "volume": volume_values[-1] if volume_values else None,
+            "amount": None,
+            "source": "crypto_yahoo_chart",
+            "update_time": datetime.now().isoformat(),
+        }
+
+    def _get_crypto_history_data(self, symbol: str, *, period: str, days: int) -> Dict[str, Any]:
+        requested_days = max(5, int(days or 30))
+        result = self._load_crypto_yahoo_chart(symbol, range_value=f"{requested_days}d", interval="1d")
+        if not result:
+            return {
+                "stock_code": symbol,
+                "stock_name": symbol,
+                "period": period,
+                "source": "crypto_yahoo_chart",
+                "data": [],
+            }
+        meta = result.get("meta") or {}
+        timestamps = result.get("timestamp") or []
+        quote_block = ((result.get("indicators") or {}).get("quote") or [{}])[0] or {}
+        rows = []
+        start_index = max(0, len(timestamps) - int(days or 30))
+        for index in range(start_index, len(timestamps)):
+            def _value(name: str):
+                values = quote_block.get(name) or []
+                return values[index] if index < len(values) else None
+
+            close = _value("close")
+            if close is None:
+                continue
+            rows.append(
+                {
+                    "date": datetime.utcfromtimestamp(int(timestamps[index])).strftime("%Y-%m-%d"),
+                    "open": _value("open"),
+                    "high": _value("high"),
+                    "low": _value("low"),
+                    "close": close,
+                    "volume": _value("volume"),
+                    "amount": None,
+                    "change_percent": None,
+                }
+            )
+        return {
+            "stock_code": symbol,
+            "stock_name": meta.get("shortName") or meta.get("longName") or symbol,
+            "period": period,
+            "source": "crypto_yahoo_chart",
+            "data": rows,
+        }
     
     def _get_placeholder_quote(self, stock_code: str) -> Dict[str, Any]:
         """

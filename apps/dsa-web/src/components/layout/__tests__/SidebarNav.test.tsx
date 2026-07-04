@@ -1,19 +1,22 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarNav } from '../SidebarNav';
 
 const mockLogout = vi.fn().mockResolvedValue(undefined);
 const mockGetAlphaSiftStatus = vi.fn().mockResolvedValue({ enabled: false, available: false, installSpecIsDefault: false });
+const mockPlatformCurrent = vi.fn().mockResolvedValue(null);
 const mockThemeToggle = vi.fn(({ collapsed }: { collapsed?: boolean }) => (
   <button type="button">{collapsed ? '切换主题(折叠)' : '切换主题'}</button>
 ));
 
+const authState = { authEnabled: true, loggedIn: false };
 const completionBadgeState = { value: true };
 
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    authEnabled: true,
+    authEnabled: authState.authEnabled,
+    loggedIn: authState.loggedIn,
     logout: mockLogout,
   }),
 }));
@@ -31,11 +34,25 @@ vi.mock('../../../api/alphasift', () => ({
   },
 }));
 
+vi.mock('../../../api/platform', () => ({
+  PLATFORM_SESSION_CHANGED_EVENT: 'dsa-platform-session-changed',
+  platformApi: {
+    current: () => mockPlatformCurrent(),
+  },
+}));
+
 vi.mock('../../theme/ThemeToggle', () => ({
   ThemeToggle: (props: { collapsed?: boolean }) => mockThemeToggle(props),
 }));
 
 describe('SidebarNav', () => {
+  beforeEach(() => {
+    mockPlatformCurrent.mockResolvedValue(null);
+    completionBadgeState.value = true;
+    authState.authEnabled = true;
+    authState.loggedIn = false;
+  });
+
   it('hides the screening navigation item while AlphaSift is disabled', () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false });
 
@@ -139,6 +156,81 @@ describe('SidebarNav', () => {
     expect(alertsLink).toHaveClass('font-medium');
   });
 
+  it('renders the admin operations navigation item', async () => {
+    authState.loggedIn = true;
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+      expect(hrefs).toContain('/admin');
+    });
+  });
+
+  it('hides admin-only navigation and logout for public unauthenticated users', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(mockPlatformCurrent).toHaveBeenCalled());
+    const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+    expect(hrefs).not.toContain('/admin');
+    expect(hrefs).not.toContain('/settings');
+    expect(screen.queryByRole('button', { name: '閫€鍑?' })).not.toBeInTheDocument();
+  });
+
+  it('hides the admin operations navigation item for ordinary platform users', async () => {
+    mockPlatformCurrent.mockResolvedValueOnce({
+      user: { id: 2, email: 'user@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 2, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-06-29' },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+      expect(hrefs).not.toContain('/admin');
+    });
+  });
+
+  it('refreshes platform role after a platform session change event', async () => {
+    authState.loggedIn = true;
+    mockPlatformCurrent
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        user: { id: 2, email: 'user@example.com', role: 'user', plan: 'free', status: 'active' },
+        quota: { userId: 2, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-06-29' },
+      });
+
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+      expect(hrefs).toContain('/admin');
+    });
+
+    window.dispatchEvent(new Event('dsa-platform-session-changed'));
+
+    await waitFor(() => {
+      const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+      expect(hrefs).not.toContain('/admin');
+    });
+  });
+
   it('renders the AI signals navigation item and marks it active', () => {
     render(
       <MemoryRouter initialEntries={['/decision-signals']}>
@@ -152,6 +244,8 @@ describe('SidebarNav', () => {
   });
 
   it('opens the logout confirmation and confirms logout', async () => {
+    authState.loggedIn = true;
+
     render(
       <MemoryRouter initialEntries={['/chat']}>
         <SidebarNav />

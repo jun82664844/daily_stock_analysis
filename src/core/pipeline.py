@@ -183,6 +183,7 @@ class StockAnalysisPipeline:
         analysis_skills: Optional[List[str]] = None,
         analysis_phase: str = "auto",
         portfolio_context: Optional[Dict[str, Any]] = None,
+        platform_user_id: Optional[int] = None,
         daily_market_context_enabled: Optional[bool] = None,
         daily_market_context_allow_generate: bool = True,
     ):
@@ -206,6 +207,7 @@ class StockAnalysisPipeline:
         self.analysis_skills = list(analysis_skills) if analysis_skills is not None else None
         self.analysis_phase = analysis_phase or "auto"
         self.portfolio_context = dict(portfolio_context) if isinstance(portfolio_context, dict) else None
+        self.platform_user_id = platform_user_id
         self.daily_market_context_enabled = (
             bool(getattr(self.config, "daily_market_context_enabled", True))
             if daily_market_context_enabled is None
@@ -794,7 +796,8 @@ class StockAnalysisPipeline:
                         report_type=report_type.value,
                         news_content=news_context,
                         context_snapshot=context_snapshot,
-                        save_snapshot=self.save_context_snapshot
+                        save_snapshot=self.save_context_snapshot,
+                        platform_user_id=self.platform_user_id,
                     )
                     valid_saved_history_id = (
                         isinstance(saved_history_id, int)
@@ -1393,6 +1396,7 @@ class StockAnalysisPipeline:
                         news_content=None,
                         context_snapshot=agent_context_snapshot,
                         save_snapshot=self.save_context_snapshot,
+                        platform_user_id=self.platform_user_id,
                     )
                     valid_saved_history_id = (
                         isinstance(saved_history_id, int)

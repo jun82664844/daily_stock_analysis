@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
+import { platformApi } from '../../api/platform';
+import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { useStockPoolStore } from '../../stores';
@@ -31,6 +33,10 @@ vi.mock('../../api/history', () => ({
     getDiagnostics: vi.fn(),
     getRecordFlow: vi.fn(),
     getStockBarList: vi.fn().mockResolvedValue({ total: 0, items: [] }),
+    markCurrentQuoteRefreshed: vi.fn(),
+    exportReports: vi.fn(),
+    updateState: vi.fn(),
+    batchUpdateState: vi.fn(),
     deleteByCode: vi.fn(),
   },
 }));
@@ -56,9 +62,36 @@ vi.mock('../../api/systemConfig', () => ({
   },
 }));
 
+vi.mock('../../api/stocks', () => ({
+  stocksApi: {
+    extractFromImage: vi.fn(),
+    parseImport: vi.fn(),
+    prewarm: vi.fn(),
+    snapshot: vi.fn(),
+  },
+}));
+
 vi.mock('../../api/agent', () => ({
   agentApi: {
     getSkills: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/platform', () => ({
+  PLATFORM_SESSION_CHANGED_EVENT: 'dsa-platform-session-changed',
+  platformApi: {
+    status: vi.fn(),
+    current: vi.fn(),
+    account: vi.fn(),
+    listApiKeys: vi.fn(),
+    register: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+    saveApiKey: vi.fn(),
+    watchlist: vi.fn(),
+    addWatchlistItem: vi.fn(),
+    removeWatchlistItem: vi.fn(),
+    refreshWatchlist: vi.fn(),
   },
 }));
 
@@ -190,6 +223,28 @@ describe('HomePage', () => {
       tasks: [],
     });
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: false });
+    vi.mocked(platformApi.current).mockResolvedValue(null);
+    vi.mocked(platformApi.account).mockRejectedValue(new Error('not signed in'));
+    vi.mocked(platformApi.listApiKeys).mockResolvedValue([]);
+    vi.mocked(platformApi.logout).mockResolvedValue(undefined);
+    vi.mocked(platformApi.saveApiKey).mockResolvedValue({
+      provider: 'deepseek',
+      model: 'deepseek/deepseek-v4-flash',
+      maskedKey: 'sk-...test',
+      enabled: true,
+    });
+    vi.mocked(platformApi.watchlist).mockResolvedValue({ userId: 0, items: [], total: 0, aiUsed: false });
+    vi.mocked(platformApi.addWatchlistItem).mockResolvedValue({ userId: 0, items: [], total: 0, aiUsed: false });
+    vi.mocked(platformApi.removeWatchlistItem).mockResolvedValue({ userId: 0, items: [], total: 0, aiUsed: false });
+    vi.mocked(platformApi.refreshWatchlist).mockResolvedValue({
+      userId: 0,
+      requested: 0,
+      refreshed: 0,
+      degraded: 0,
+      items: [],
+      aiUsed: false,
+    });
     vi.mocked(historyApi.getDiagnostics).mockResolvedValue({
       status: 'unknown',
       statusLabel: '未知',
@@ -198,7 +253,49 @@ describe('HomePage', () => {
       copyText: 'data_status: unknown',
     });
     vi.mocked(historyApi.getRecordFlow).mockResolvedValue(runFlowSnapshot);
+    vi.mocked(historyApi.markCurrentQuoteRefreshed).mockResolvedValue({
+      recordId: 0,
+      stockCode: 'AAPL',
+      currentQuoteRefreshed: true,
+      currentQuoteRefreshedAt: '2026-07-03T09:30:00',
+      aiUsed: false,
+      routeLane: 'us_market_data',
+      quoteSource: 'yahoo_chart',
+      freshness: 'fresh',
+    });
+    vi.mocked(historyApi.exportReports).mockResolvedValue({
+      format: 'markdown',
+      filename: 'dsa-history-export-test.md',
+      content: '# DSA History Export\n\nAAPL informational report',
+      recordCount: 1,
+      recordIds: [1],
+      aiUsed: false,
+    });
+    vi.mocked(historyApi.updateState).mockResolvedValue({
+      recordId: 1,
+      favorite: true,
+      important: false,
+      archived: false,
+      read: false,
+      note: 'local note',
+      noteUpdatedAt: '2026-07-04T08:00:00Z',
+      aiUsed: false,
+    });
+    vi.mocked(historyApi.batchUpdateState).mockResolvedValue({
+      updated: 1,
+      recordIds: [1],
+      aiUsed: false,
+    });
     vi.mocked(analysisApi.getTaskFlow).mockResolvedValue(runFlowSnapshot);
+    vi.mocked(stocksApi.prewarm).mockResolvedValue({
+      requested: 4,
+      warmed: 0,
+      degraded: 4,
+      symbols: ['600519', 'AAPL', 'HK00700', 'BTC-USD'],
+      results: {},
+      elapsedMs: 1,
+      aiUsed: false,
+    });
     vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
       isComplete: true,
       readyForSmoke: true,
@@ -271,6 +368,724 @@ describe('HomePage', () => {
       expect(historyApi.getMarkdown).toHaveBeenCalledWith(historyReport.meta.id);
     });
     expect(await screen.findByRole('heading', { name: 'Full Markdown Report' })).toBeInTheDocument();
+  });
+
+  it('marks historical reports as separate from current quotes and refreshes a no-AI snapshot', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(historyReport);
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      market: 'cn',
+      quote: {
+        currentPrice: 1688,
+        changePercent: 0.8,
+        source: 'a_share_realtime',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 1650, ma20: 1600 },
+      diagnostics: {
+        elapsedMs: 25,
+        quoteElapsedMs: 10,
+        historyElapsedMs: 15,
+        cache: { quote: 'refresh', history: 'refresh' },
+        sources: { quote: 'a_share_realtime', history: 'a_share_history' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        fallback: { quote: 'live', history: 'live' },
+        persistentCache: { quote: 'none', history: 'none', mode: 'local_json' },
+        refresh: { mode: 'force_refresh', requested: true, quote: true, history: true },
+        routeLane: 'a_share_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run when refreshing current quote from history'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const boundary = await screen.findByTestId('history-report-freshness-boundary');
+    expect(boundary).toHaveTextContent('Historical AI report');
+    expect(boundary).toHaveTextContent('not current quote');
+    expect(screen.queryByTestId('basic-query-snapshot')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('history-report-refresh-current'));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519', { refresh: true });
+    });
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('1,688');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('force_refresh');
+    expect(screen.queryByTestId('history-report-freshness-boundary')).not.toBeInTheDocument();
+  });
+
+  it('filters the history center and marks reports refreshed after a current quote refresh', async () => {
+    const aaplHistoryItem = {
+      ...historyItem,
+      id: 3,
+      queryId: 'q-aapl',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'simple' as const,
+      createdAt: '2026-07-03T08:00:00Z',
+    };
+    const btcHistoryItem = {
+      ...historyItem,
+      id: 4,
+      queryId: 'q-btc',
+      stockCode: 'BTC-USD',
+      stockName: 'Bitcoin',
+      reportType: 'brief' as const,
+      createdAt: '2026-07-02T08:00:00Z',
+    };
+    const hkHistoryItem = {
+      ...historyItem,
+      id: 5,
+      queryId: 'q-hk',
+      stockCode: 'HK00700',
+      stockName: 'Tencent',
+      reportType: 'full' as const,
+      createdAt: '2026-07-01T08:00:00Z',
+    };
+    const aaplReport = {
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        id: 3,
+        queryId: 'q-aapl',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'simple' as const,
+        createdAt: '2026-07-03T08:00:00Z',
+      },
+      summary: {
+        ...historyReport.summary,
+        analysisSummary: 'Apple historical report',
+      },
+    };
+
+    vi.mocked(historyApi.getList).mockImplementation((params: {
+      reportType?: string;
+      market?: string;
+      stockCode?: string;
+      refreshStatus?: string;
+    } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 0,
+          page: 1,
+          limit: 10,
+          items: [],
+        });
+      }
+      let items = [
+        { ...historyItem, reportType: 'detailed' as const, createdAt: '2026-07-03T09:00:00Z' },
+        aaplHistoryItem,
+        btcHistoryItem,
+        hkHistoryItem,
+      ];
+      if (params.market === 'us') {
+        items = items.filter((item) => item.stockCode === 'AAPL');
+      }
+      if (params.stockCode) {
+        const needle = params.stockCode.toUpperCase();
+        items = items.filter((item) => `${item.stockCode} ${item.stockName ?? ''}`.toUpperCase().includes(needle));
+      }
+      if (params.refreshStatus === 'refreshed') {
+        items = items.filter((item) => item.id === 3);
+      }
+      if (params.refreshStatus === 'not_refreshed') {
+        items = items.filter((item) => item.id !== 3);
+      }
+      return Promise.resolve({
+        total: items.length,
+        page: 1,
+        limit: 20,
+        items,
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      Promise.resolve(recordId === 3 ? aaplReport : historyReport)
+    ));
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      quote: {
+        currentPrice: 211.34,
+        changePercent: 1.2,
+        source: 'yahoo_chart',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 205, ma20: 198 },
+      diagnostics: {
+        elapsedMs: 20,
+        quoteElapsedMs: 10,
+        historyElapsedMs: 10,
+        cache: { quote: 'refresh', history: 'refresh' },
+        sources: { quote: 'yahoo_chart', history: 'yahoo_chart' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        fallback: { quote: 'live', history: 'live' },
+        persistentCache: { quote: 'none', history: 'none', mode: 'local_json' },
+        refresh: { mode: 'force_refresh', requested: true, quote: true, history: true },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('history-center-filters')).toBeInTheDocument();
+    expect(await screen.findByTestId('history-center-item-3')).toHaveTextContent('AAPL');
+    expect(screen.getByTestId('history-center-item-4')).toHaveTextContent('BTC-USD');
+    expect(screen.getByTestId('history-card-refresh-status-3')).toHaveTextContent('Not refreshed');
+
+    fireEvent.change(screen.getByTestId('history-center-market-filter'), { target: { value: 'us' } });
+
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        market: 'us',
+        sort: 'newest',
+      }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('history-center-item-3')).toBeInTheDocument();
+      expect(screen.queryByTestId('history-center-item-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('history-center-item-4')).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('history-center-code-filter'), { target: { value: 'AAP' } });
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        market: 'us',
+        stockCode: 'AAP',
+      }));
+    });
+    expect(screen.getByTestId('history-center-item-3')).toHaveTextContent('Apple');
+
+    fireEvent.click(screen.getByTestId('history-center-item-3'));
+
+    await waitFor(() => {
+      expect(historyApi.getDetail).toHaveBeenCalledWith(3);
+    });
+    fireEvent.click(await screen.findByTestId('history-report-refresh-current'));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('AAPL', { refresh: true });
+    });
+    expect(historyApi.markCurrentQuoteRefreshed).toHaveBeenCalledWith(3, expect.objectContaining({
+      stockCode: 'AAPL',
+      routeLane: 'us_market_data',
+      quoteSource: 'yahoo_chart',
+      freshness: 'fresh',
+      aiUsed: false,
+    }));
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(screen.getByTestId('history-card-refresh-status-3')).toHaveTextContent('Current quote refreshed');
+
+    fireEvent.change(screen.getByTestId('history-center-refresh-filter'), { target: { value: 'refreshed' } });
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        market: 'us',
+        stockCode: 'AAP',
+        refreshStatus: 'refreshed',
+      }));
+    });
+    expect(screen.getByTestId('history-center-item-3')).toBeInTheDocument();
+    expect(screen.queryByTestId('history-center-item-1')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('history-center-reset-filters'));
+    fireEvent.change(screen.getByTestId('history-center-refresh-filter'), { target: { value: 'not_refreshed' } });
+    await waitFor(() => {
+      expect(screen.queryByTestId('history-center-item-3')).not.toBeInTheDocument();
+      expect(screen.getByTestId('history-center-item-1')).toBeInTheDocument();
+    });
+  });
+
+  it('restores history center filters from local storage and displays the backend total', async () => {
+    const aaplHistoryItem = {
+      ...historyItem,
+      id: 6,
+      queryId: 'q-aapl-restored',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'simple' as const,
+      createdAt: '2026-07-03T08:00:00Z',
+    };
+    const aaplReport = {
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        id: 6,
+        queryId: 'q-aapl-restored',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'simple' as const,
+        createdAt: '2026-07-03T08:00:00Z',
+      },
+    };
+
+    window.localStorage.setItem('dsa-history-center-filters-v1', JSON.stringify({
+      market: 'us',
+      reportType: 'simple',
+      refreshStatus: 'refreshed',
+      range: '30d',
+      sort: 'oldest',
+      code: 'AAP',
+    }));
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 0,
+          page: 1,
+          limit: 10,
+          items: [],
+        });
+      }
+      return Promise.resolve({
+        total: 12,
+        page: 1,
+        limit: 20,
+        items: [aaplHistoryItem],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(aaplReport);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('history-center-filters')).toBeInTheDocument();
+    expect(screen.getByTestId('history-center-market-filter')).toHaveValue('us');
+    expect(screen.getByTestId('history-center-report-type-filter')).toHaveValue('simple');
+    expect(screen.getByTestId('history-center-refresh-filter')).toHaveValue('refreshed');
+    expect(screen.getByTestId('history-center-range-filter')).toHaveValue('30d');
+    expect(screen.getByTestId('history-center-time-filter')).toHaveValue('oldest');
+    expect(screen.getByTestId('history-center-code-filter')).toHaveValue('AAP');
+
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        market: 'us',
+        reportType: 'simple',
+        refreshStatus: 'refreshed',
+        stockCode: 'AAP',
+        sort: 'oldest',
+        startDate: expect.any(String),
+        endDate: expect.any(String),
+      }));
+    });
+    expect(await screen.findByTestId('history-center-item-6')).toHaveTextContent('AAPL');
+    expect(screen.getByTestId('history-total-count')).toHaveTextContent('12');
+  });
+
+  it('exports selected history reports as a local no-AI markdown bundle', async () => {
+    const createObjectURL = vi.fn(() => 'blob:dsa-history-export-v27');
+    const revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+
+    const aaplHistoryItem = {
+      ...historyItem,
+      id: 7,
+      queryId: 'q-aapl-export',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'simple' as const,
+      createdAt: '2026-07-03T08:00:00Z',
+    };
+
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 0,
+          page: 1,
+          limit: 10,
+          items: [],
+        });
+      }
+      return Promise.resolve({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [aaplHistoryItem],
+      });
+    });
+    vi.mocked(historyApi.exportReports).mockResolvedValue({
+      format: 'markdown',
+      filename: 'dsa-history-export-v27.md',
+      content: '# DSA History Export\n\nAAPL informational report',
+      recordCount: 1,
+      recordIds: [7],
+      aiUsed: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('history-center-item-7')).toHaveTextContent('AAPL');
+    fireEvent.click(await screen.findByRole('checkbox', { name: /全选当前已加载历史记录|Select all loaded history records/i }));
+    fireEvent.click(await screen.findByTestId('history-center-export-selected'));
+
+    await waitFor(() => {
+      expect(historyApi.exportReports).toHaveBeenCalledWith([7], 'markdown');
+    });
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:dsa-history-export-v27');
+    expect(screen.getByTestId('history-center-export-status')).toHaveTextContent('Exported 1 local reports');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    clickSpy.mockRestore();
+  });
+
+  it('manages local history state with filters, batch archive, favorite and notes without AI', async () => {
+    const aaplHistoryItem = {
+      ...historyItem,
+      id: 8,
+      queryId: 'q-aapl-state',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'simple' as const,
+      favorite: false,
+      important: false,
+      archived: false,
+      read: false,
+      note: '',
+      createdAt: '2026-07-04T08:00:00Z',
+    };
+    const aaplReport = {
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        id: 8,
+        queryId: 'q-aapl-state',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'simple' as const,
+        createdAt: '2026-07-04T08:00:00Z',
+      },
+      summary: {
+        ...historyReport.summary,
+        analysisSummary: 'Apple state management report',
+      },
+    };
+
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string; state?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 0,
+          page: 1,
+          limit: 10,
+          items: [],
+        });
+      }
+      const item = params.state === 'favorite'
+        ? { ...aaplHistoryItem, favorite: true, note: 'Watch after earnings' }
+        : aaplHistoryItem;
+      return Promise.resolve({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [item],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(aaplReport);
+    vi.mocked(historyApi.batchUpdateState).mockResolvedValue({
+      updated: 1,
+      recordIds: [8],
+      aiUsed: false,
+    });
+    vi.mocked(historyApi.updateState).mockResolvedValue({
+      recordId: 8,
+      favorite: true,
+      important: false,
+      archived: false,
+      read: false,
+      note: 'Watch after earnings',
+      noteUpdatedAt: '2026-07-04T08:30:00Z',
+      aiUsed: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('history-center-item-8')).toHaveTextContent('AAPL');
+
+    fireEvent.change(screen.getByTestId('history-center-state-filter'), { target: { value: 'favorite' } });
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        state: 'favorite',
+      }));
+    });
+
+    fireEvent.click(await screen.findByTestId('history-select-all-visible'));
+    fireEvent.click(screen.getByTestId('history-center-archive-selected'));
+    await waitFor(() => {
+      expect(historyApi.batchUpdateState).toHaveBeenCalledWith([8], { archived: true });
+    });
+    expect(screen.getByTestId('history-center-state-status')).toHaveTextContent('Archived 1 local reports');
+
+    fireEvent.click(screen.getByTestId('history-center-item-8'));
+    await waitFor(() => {
+      expect(historyApi.getDetail).toHaveBeenCalledWith(8);
+    });
+
+    fireEvent.click(await screen.findByTestId('history-state-favorite'));
+    await waitFor(() => {
+      expect(historyApi.updateState).toHaveBeenCalledWith(8, { favorite: false });
+    });
+
+    fireEvent.change(screen.getByTestId('history-state-note-input'), {
+      target: { value: 'Watch after earnings' },
+    });
+    fireEvent.click(screen.getByTestId('history-state-note-save'));
+    await waitFor(() => {
+      expect(historyApi.updateState).toHaveBeenCalledWith(8, { note: 'Watch after earnings' });
+    });
+    expect(screen.getByTestId('history-state-status')).toHaveTextContent('Saved local history state');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('enhances history center with active default, note search, date groups and batch flags without AI', async () => {
+    const aaplHistoryItem = {
+      ...historyItem,
+      id: 10,
+      queryId: 'q-aapl-v29',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'simple' as const,
+      important: false,
+      archived: false,
+      read: false,
+      note: 'Apple earnings gap monitor',
+      createdAt: '2026-07-04T08:00:00Z',
+    };
+    const hkHistoryItem = {
+      ...historyItem,
+      id: 11,
+      queryId: 'q-hk-v29',
+      stockCode: 'HK00700',
+      stockName: 'Tencent',
+      reportType: 'full' as const,
+      important: false,
+      archived: false,
+      read: false,
+      note: 'Dividend watch',
+      createdAt: '2026-07-03T08:00:00Z',
+    };
+
+    vi.mocked(historyApi.getList).mockImplementation((params: {
+      reportType?: string;
+      state?: string;
+      noteSearch?: string;
+    } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 0,
+          page: 1,
+          limit: 10,
+          items: [],
+        });
+      }
+      let items = [aaplHistoryItem, hkHistoryItem];
+      if (params.noteSearch) {
+        const needle = params.noteSearch.toLowerCase();
+        items = items.filter((item) => (item.note || '').toLowerCase().includes(needle));
+      }
+      return Promise.resolve({
+        total: items.length,
+        page: 1,
+        limit: 20,
+        items,
+      });
+    });
+    vi.mocked(historyApi.batchUpdateState).mockResolvedValue({
+      updated: 1,
+      recordIds: [10],
+      aiUsed: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('history-center-item-10')).toHaveTextContent('AAPL');
+    expect(screen.getByTestId('history-center-state-filter')).toHaveValue('active');
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        state: 'active',
+      }));
+    });
+    expect(screen.getByTestId('history-group-2026-07-04')).toHaveTextContent('2026-07-04');
+    expect(screen.getByTestId('history-group-2026-07-03')).toHaveTextContent('2026-07-03');
+
+    fireEvent.change(screen.getByTestId('history-center-note-filter'), { target: { value: 'earnings' } });
+    await waitFor(() => {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+        state: 'active',
+        noteSearch: 'earnings',
+      }));
+    });
+    expect(screen.getByTestId('history-center-item-10')).toBeInTheDocument();
+    expect(screen.queryByTestId('history-center-item-11')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('history-select-all-visible'));
+    fireEvent.click(screen.getByTestId('history-center-important-selected'));
+    await waitFor(() => {
+      expect(historyApi.batchUpdateState).toHaveBeenCalledWith([10], { important: true });
+    });
+    expect(screen.getByTestId('history-center-state-status')).toHaveTextContent('Marked important 1 local reports');
+
+    fireEvent.click(screen.getByTestId('history-center-read-selected'));
+    await waitFor(() => {
+      expect(historyApi.batchUpdateState).toHaveBeenCalledWith([10], { read: true });
+    });
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('adds no-AI report detail search, section jumps and same-stock timeline', async () => {
+    const currentItem = {
+      ...historyItem,
+      id: 30,
+      queryId: 'q-v30-current',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'detailed' as const,
+      createdAt: '2026-07-04T08:00:00Z',
+    };
+    const previousItem = {
+      ...historyItem,
+      id: 31,
+      queryId: 'q-v30-previous',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'simple' as const,
+      createdAt: '2026-07-01T08:00:00Z',
+    };
+    const otherItem = {
+      ...historyItem,
+      id: 32,
+      queryId: 'q-v30-other',
+      stockCode: 'MSFT',
+      stockName: 'Microsoft',
+      reportType: 'simple' as const,
+      createdAt: '2026-07-03T08:00:00Z',
+    };
+    const currentReport = {
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        id: 30,
+        queryId: 'q-v30-current',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed' as const,
+        createdAt: '2026-07-04T08:00:00Z',
+      },
+      summary: {
+        ...historyReport.summary,
+        analysisSummary: 'Apple margin expansion remains visible',
+        operationAdvice: 'Review valuation risk before adding',
+        trendPrediction: 'Momentum holds',
+      },
+      strategy: {
+        idealBuy: 'Wait for valuation reset near support',
+        secondaryBuy: 'Add only after volume confirms',
+        stopLoss: 'Break below support',
+        takeProfit: 'Scale out near resistance',
+      },
+      details: {
+        newsContent: 'Supply chain update mentions valuation discipline.',
+      },
+    };
+    const previousReport = {
+      ...currentReport,
+      meta: {
+        ...currentReport.meta,
+        id: 31,
+        queryId: 'q-v30-previous',
+        createdAt: '2026-07-01T08:00:00Z',
+      },
+      summary: {
+        ...currentReport.summary,
+        analysisSummary: 'Previous Apple history report',
+      },
+    };
+
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({ total: 0, page: 1, limit: 10, items: [] });
+      }
+      return Promise.resolve({
+        total: 3,
+        page: 1,
+        limit: 20,
+        items: [currentItem, previousItem, otherItem],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      Promise.resolve(recordId === 31 ? previousReport : currentReport)
+    ));
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for local report detail tools'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Apple margin expansion remains visible')).toBeInTheDocument();
+    expect(screen.getByTestId('history-report-tools')).toBeInTheDocument();
+    expect(screen.getByTestId('history-report-stock-timeline')).toHaveTextContent('AAPL');
+    expect(screen.getByTestId('history-report-timeline-30')).toHaveTextContent('Current');
+    expect(screen.getByTestId('history-report-timeline-31')).toHaveTextContent('2026-07-01');
+    expect(screen.queryByTestId('history-report-timeline-32')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('history-report-search'), { target: { value: 'valuation' } });
+    expect(screen.getByTestId('history-report-search-count')).toHaveTextContent('1/3');
+    expect(screen.getByTestId('history-report-search-hit')).toHaveTextContent('valuation risk');
+    fireEvent.click(screen.getByTestId('history-report-search-next'));
+    expect(screen.getByTestId('history-report-search-count')).toHaveTextContent('2/3');
+
+    fireEvent.click(screen.getByTestId('history-report-jump-strategy'));
+    expect(screen.getByTestId('history-report-section-status')).toHaveTextContent('Strategy');
+
+    fireEvent.click(screen.getByTestId('history-report-timeline-31'));
+    await waitFor(() => {
+      expect(historyApi.getDetail).toHaveBeenCalledWith(31);
+    });
+    expect(await screen.findByText('Previous Apple history report')).toBeInTheDocument();
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
   it('shows the empty report workspace when history is empty', async () => {
@@ -476,12 +1291,629 @@ describe('HomePage', () => {
 
     const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
-    fireEvent.click(screen.getByRole('button', { name: '分析' }));
+    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
 
     await waitFor(() => {
       expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
     });
     expect(screen.getByText(/股票 600519 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
+  });
+
+  it('runs basic query without submitting AI analysis', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 200,
+        changePercent: 1.5,
+        source: 'yahoo_chart',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 198, ma20: 190 },
+      diagnostics: {
+        elapsedMs: 18,
+        quoteElapsedMs: 8,
+        historyElapsedMs: 10,
+        cache: { quote: 'miss', history: 'miss' },
+        sources: { quote: 'yahoo_chart', history: 'yfinance' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        timeouts: { quote: false, history: false },
+        errors: { quote: null, history: null },
+        fallback: { quote: 'live', history: 'live' },
+        sourceHealth: {
+          quote: { source: 'unit_quote', status: 'ok', consecutiveFailures: 0 },
+          history: { source: 'unit_history', status: 'ok', consecutiveFailures: 0 },
+        },
+        persistentCache: { quote: 'memory', history: 'memory', mode: 'local_json' },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for basic query'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('AAPL');
+    });
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(await screen.findByText('Apple Inc.')).toBeInTheDocument();
+    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('No AI');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('18ms');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q miss / H miss');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q live / H live');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q ok / H ok');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q memory / H memory');
+  });
+
+  it('force-refreshes the current no-AI snapshot without submitting AI analysis', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot)
+      .mockResolvedValueOnce({
+        stockCode: 'AAPL',
+        stockName: 'Apple Inc.',
+        market: 'us',
+        quote: {
+          currentPrice: 200,
+          changePercent: 1.5,
+          source: 'yahoo_chart',
+          freshness: 'cached',
+        },
+        indicators: { ma5: 198, ma20: 190 },
+        diagnostics: {
+          elapsedMs: 18,
+          quoteElapsedMs: 8,
+          historyElapsedMs: 10,
+          cache: { quote: 'hit', history: 'hit' },
+          sources: { quote: 'yahoo_chart', history: 'yfinance' },
+          freshness: { quote: 'cached', history: 'cached' },
+          fallback: { quote: 'cache', history: 'cache' },
+          persistentCache: { quote: 'memory', history: 'memory', mode: 'local_json' },
+          refresh: { mode: 'cache_first', requested: false },
+          routeLane: 'us_market_data',
+          performance: { status: 'ok', slowThresholdMs: 3000 },
+        },
+        aiUsed: false,
+      })
+      .mockResolvedValueOnce({
+        stockCode: 'AAPL',
+        stockName: 'Apple Inc.',
+        market: 'us',
+        quote: {
+          currentPrice: 210,
+          changePercent: 2.0,
+          source: 'yahoo_chart',
+          freshness: 'fresh',
+        },
+        indicators: { ma5: 202, ma20: 191 },
+        diagnostics: {
+          elapsedMs: 31,
+          quoteElapsedMs: 13,
+          historyElapsedMs: 18,
+          cache: { quote: 'refresh', history: 'refresh' },
+          sources: { quote: 'yahoo_chart', history: 'yfinance' },
+          freshness: { quote: 'fresh', history: 'fresh' },
+          fallback: { quote: 'live', history: 'live' },
+          persistentCache: { quote: 'none', history: 'none', mode: 'local_json' },
+          refresh: { mode: 'force_refresh', requested: true, quote: true, history: true },
+          routeLane: 'us_market_data',
+          performance: { status: 'ok', slowThresholdMs: 3000 },
+        },
+        aiUsed: false,
+      });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for snapshot refresh'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('200');
+    fireEvent.click(screen.getByTestId('basic-query-refresh-market'));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenLastCalledWith('AAPL', { refresh: true });
+    });
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('210');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('force_refresh');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q refresh / H refresh');
+  });
+
+  it('shows quick query route and degradation warnings without submitting AI analysis', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'BTC-USD',
+      stockName: 'Bitcoin',
+      market: 'crypto',
+      quote: {
+        source: 'crypto_yahoo_chart',
+        freshness: 'stale',
+      },
+      indicators: { ma5: 101, ma20: 99, volumePriceSignal: 'neutral' },
+      route: {
+        inputCode: 'BTC-USD',
+        normalizedCode: 'BTC-USD',
+        market: 'crypto',
+        channel: 'crypto_spot',
+        dataSourceLane: 'crypto_market_data',
+        quoteSources: ['crypto_yahoo_chart'],
+        historySources: ['crypto_yahoo_chart'],
+        aiRequired: false,
+      },
+      warnings: [
+        { code: 'stale_quote', severity: 'warning', message: 'Quote is stale; using cached data.' },
+      ],
+      degradation: {
+        status: 'degraded',
+        severity: 'warning',
+        message: 'Quote is stale; using cached data.',
+      },
+      diagnostics: {
+        elapsedMs: 7,
+        quoteElapsedMs: 2,
+        historyElapsedMs: 5,
+        cache: { quote: 'hit', history: 'hit' },
+        sources: { quote: 'crypto_yahoo_chart', history: 'crypto_yahoo_chart' },
+        freshness: { quote: 'stale', history: 'cached' },
+        timeouts: { quote: false, history: false },
+        errors: { quote: null, history: null },
+        fallback: { quote: 'stale_cache', history: 'cache' },
+        sourceHealth: {
+          quote: { source: 'crypto_yahoo_chart', status: 'ok', consecutiveFailures: 0 },
+          history: { source: 'crypto_yahoo_chart', status: 'ok', consecutiveFailures: 0 },
+        },
+        persistentCache: { quote: 'disk', history: 'disk', mode: 'local_json' },
+        routeLane: 'crypto_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for degraded quick query'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: 'BTC-USD' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    expect(await screen.findByTestId('basic-query-route')).toHaveTextContent('crypto_market_data');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q hit / H hit');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q stale_cache / H cache');
+    expect(screen.getByTestId('basic-query-degradation')).toHaveTextContent('stale_quote');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows ordinary-user account guardrails for no-AI quick queries and AI quota cost', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue({
+      user: {
+        id: 15,
+        email: 'v15-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 15,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 4,
+        remaining: 1,
+        periodStart: '2026-07-01',
+      },
+    });
+    vi.mocked(platformApi.account).mockResolvedValue({
+      user: {
+        id: 15,
+        email: 'v15-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 15,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 4,
+        remaining: 1,
+        periodStart: '2026-07-01',
+      },
+      quotaBuckets: [
+        {
+          userId: 15,
+          plan: 'free',
+          weeklyLimit: 10,
+          used: 1,
+          remaining: 9,
+          periodStart: '2026-07-01',
+          quotaBucket: 'basic_query',
+        },
+        {
+          userId: 15,
+          plan: 'free',
+          weeklyLimit: 3,
+          used: 1,
+          remaining: 2,
+          periodStart: '2026-07-01',
+          quotaBucket: 'ai_deep_user_key',
+        },
+      ],
+      apiKeys: [
+        {
+          provider: 'deepseek',
+          model: 'deepseek/deepseek-v4-flash',
+          maskedKey: 'sk-...live',
+          enabled: true,
+        },
+      ],
+      recommendedQueryMode: 'user',
+    });
+    vi.mocked(platformApi.listApiKeys).mockResolvedValue([
+      {
+        provider: 'deepseek',
+        model: 'deepseek/deepseek-v4-flash',
+        maskedKey: 'sk-...live',
+        enabled: true,
+      },
+    ]);
+    vi.mocked(platformApi.watchlist).mockResolvedValue({
+      userId: 15,
+      total: 4,
+      aiUsed: false,
+      items: [
+        { id: 1, stockCode: '600519', market: 'cn' },
+        { id: 2, stockCode: 'AAPL', market: 'us' },
+        { id: 3, stockCode: 'HK00700', market: 'hk' },
+        { id: 4, stockCode: 'BTC-USD', market: 'crypto' },
+      ],
+    });
+    vi.mocked(platformApi.refreshWatchlist).mockResolvedValue({
+      userId: 15,
+      requested: 4,
+      refreshed: 4,
+      degraded: 1,
+      aiUsed: false,
+      items: [
+        { stockCode: '600519', stockName: 'Kweichow Moutai', market: 'cn', routeLane: 'a_share_market_data', freshness: 'fresh', degradationStatus: 'ok', warningCodes: [], aiUsed: false, status: 'ok' },
+        { stockCode: 'AAPL', stockName: 'Apple Inc.', market: 'us', routeLane: 'us_market_data', freshness: 'fresh', degradationStatus: 'ok', warningCodes: [], aiUsed: false, status: 'ok' },
+        { stockCode: 'HK00700', stockName: 'Tencent Holdings', market: 'hk', routeLane: 'hk_market_data', freshness: 'fresh', degradationStatus: 'degraded', warningCodes: ['missing_history'], aiUsed: false, status: 'degraded' },
+        { stockCode: 'BTC-USD', stockName: 'Bitcoin', market: 'crypto', routeLane: 'crypto_market_data', freshness: 'fresh', degradationStatus: 'ok', warningCodes: [], aiUsed: false, status: 'ok' },
+      ],
+    });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'HK00700',
+      stockName: 'Tencent Holdings',
+      market: 'hk',
+      quote: {
+        currentPrice: 390.2,
+        changePercent: 0.8,
+        source: 'yahoo_chart',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 388, ma20: 376 },
+      route: {
+        inputCode: 'HK00700',
+        normalizedCode: '0700.HK',
+        market: 'hk',
+        channel: 'hk_equity',
+        dataSourceLane: 'hk_market_data',
+        quoteSources: ['yahoo_chart'],
+        historySources: ['yfinance'],
+        aiRequired: false,
+      },
+      diagnostics: {
+        elapsedMs: 21,
+        quoteElapsedMs: 9,
+        historyElapsedMs: 12,
+        cache: { quote: 'hit', history: 'miss' },
+        sources: { quote: 'yahoo_chart', history: 'yfinance' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        timeouts: { quote: false, history: false },
+        errors: { quote: null, history: null },
+        fallback: { quote: 'live', history: 'live' },
+        sourceHealth: {
+          quote: { source: 'yahoo_chart', status: 'ok', consecutiveFailures: 0 },
+          history: { source: 'yfinance', status: 'ok', consecutiveFailures: 0 },
+        },
+        persistentCache: { quote: 'disk', history: 'disk', mode: 'local_json' },
+        routeLane: 'hk_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for no-AI quick query'));
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    const platformStatus = await screen.findByTestId('platform-query-status');
+    expect(platformStatus).toHaveTextContent('Signed in v15-user@example.com');
+    expect(platformStatus).toHaveTextContent('Plan free');
+    expect(platformStatus).toHaveTextContent('Weekly free 1/5 left');
+    expect(platformStatus).toHaveTextContent('No-AI quick 9/10 left');
+    expect(platformStatus).toHaveTextContent('BYOK ready sk-...live');
+    expect(platformStatus).toHaveTextContent('Recommended BYOK');
+    expect(platformStatus).not.toHaveTextContent('sk-live-secret');
+    expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('Quick snapshot stays no-AI');
+    expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('Quick/Deep AI uses selected quota');
+    expect(await screen.findByTestId('platform-watchlist-panel')).toHaveTextContent('Watchlist 4');
+    expect(screen.getByTestId('platform-watchlist-panel')).toHaveTextContent('600519');
+    expect(screen.getByTestId('platform-watchlist-panel')).toHaveTextContent('BTC-USD');
+
+    fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
+    expect(await screen.findByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('No AI used');
+    expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('refreshed 4/4');
+    expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('degraded 1');
+    expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('hk_market_data');
+
+    fireEvent.change(screen.getByPlaceholderText('Enter a stock code or name, e.g. 600519, Kweichow Moutai, AAPL'), {
+      target: { value: 'HK00700' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Query' }));
+
+    expect(await screen.findByTestId('basic-query-user-guardrails')).toHaveTextContent('Current quick snapshot');
+    expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('No AI used');
+    expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('HK market data');
+    expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('Historical reports stay separate');
+    expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('Cache local_json');
+    expect(screen.getByTestId('basic-query-route')).toHaveTextContent('hk_market_data');
+    const workspace = screen.getByTestId('basic-query-workspace-lanes');
+    expect(workspace).toHaveTextContent('Current Snapshot');
+    expect(workspace).toHaveTextContent('No AI');
+    expect(workspace).toHaveTextContent('HK market data');
+    expect(workspace).toHaveTextContent('Watchlist');
+    expect(workspace).toHaveTextContent('4 symbols');
+    expect(workspace).toHaveTextContent('History Reports');
+    expect(workspace).toHaveTextContent('0 reports');
+    expect(workspace).toHaveTextContent('separate');
+    expect(workspace).toHaveTextContent('AI Analysis');
+    expect(workspace).toHaveTextContent('Selected Platform API');
+    expect(workspace).toHaveTextContent('BYOK ready');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('renders refreshed watchlist board rows and runs no-AI quick query from a row', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue({
+      user: {
+        id: 18,
+        email: 'v18-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 18,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-01',
+      },
+    });
+    vi.mocked(platformApi.account).mockResolvedValue({
+      user: {
+        id: 18,
+        email: 'v18-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 18,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-01',
+      },
+      quotaBuckets: [],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    vi.mocked(platformApi.watchlist).mockResolvedValue({
+      userId: 18,
+      total: 4,
+      aiUsed: false,
+      items: [
+        { id: 1, stockCode: '600519', market: 'cn' },
+        { id: 2, stockCode: 'AAPL', market: 'us' },
+        { id: 3, stockCode: 'HK00700', market: 'hk' },
+        { id: 4, stockCode: 'BTC-USD', market: 'crypto' },
+      ],
+    });
+    vi.mocked(platformApi.refreshWatchlist).mockResolvedValue({
+      userId: 18,
+      requested: 4,
+      refreshed: 4,
+      degraded: 1,
+      aiUsed: false,
+      items: [
+        {
+          stockCode: '600519',
+          stockName: 'Kweichow Moutai',
+          market: 'cn',
+          routeLane: 'a_share_market_data',
+          currentPrice: 1512.34,
+          changePercent: 1.23,
+          freshness: 'fresh',
+          degradationStatus: 'ok',
+          warningCodes: [],
+          aiUsed: false,
+          status: 'ok',
+        },
+        {
+          stockCode: 'AAPL',
+          stockName: 'Apple Inc.',
+          market: 'us',
+          routeLane: 'us_market_data',
+          currentPrice: 211.88,
+          changePercent: -0.42,
+          freshness: 'fresh',
+          degradationStatus: 'ok',
+          warningCodes: [],
+          aiUsed: false,
+          status: 'ok',
+        },
+        {
+          stockCode: 'HK00700',
+          stockName: 'Tencent Holdings',
+          market: 'hk',
+          routeLane: 'hk_market_data',
+          currentPrice: 390.2,
+          changePercent: 0.8,
+          freshness: 'fresh',
+          degradationStatus: 'degraded',
+          warningCodes: ['missing_history'],
+          aiUsed: false,
+          status: 'degraded',
+        },
+        {
+          stockCode: 'BTC-USD',
+          stockName: 'Bitcoin',
+          market: 'crypto',
+          routeLane: 'crypto_market_data',
+          currentPrice: 61888.12,
+          changePercent: 2.5,
+          freshness: 'fresh',
+          degradationStatus: 'ok',
+          warningCodes: [],
+          aiUsed: false,
+          status: 'ok',
+        },
+      ],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'HK00700',
+      stockName: 'Tencent Holdings',
+      market: 'hk',
+      quote: {
+        currentPrice: 390.2,
+        changePercent: 0.8,
+        source: 'yahoo_chart',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 388, ma20: 376 },
+      route: {
+        inputCode: 'HK00700',
+        normalizedCode: '0700.HK',
+        market: 'hk',
+        channel: 'hk_equity',
+        dataSourceLane: 'hk_market_data',
+        quoteSources: ['yahoo_chart'],
+        historySources: ['yfinance'],
+        aiRequired: false,
+      },
+      diagnostics: {
+        elapsedMs: 21,
+        quoteElapsedMs: 9,
+        historyElapsedMs: 12,
+        cache: { quote: 'hit', history: 'miss' },
+        sources: { quote: 'yahoo_chart', history: 'yfinance' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        timeouts: { quote: false, history: false },
+        errors: { quote: null, history: null },
+        fallback: { quote: 'live', history: 'live' },
+        sourceHealth: {
+          quote: { source: 'yahoo_chart', status: 'ok', consecutiveFailures: 0 },
+          history: { source: 'yfinance', status: 'ok', consecutiveFailures: 0 },
+        },
+        persistentCache: { quote: 'disk', history: 'disk', mode: 'local_json' },
+        routeLane: 'hk_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run from watchlist board quick query'));
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    await screen.findByTestId('platform-watchlist-panel');
+    fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
+
+    const board = await screen.findByTestId('platform-watchlist-board');
+    expect(board).toHaveTextContent('Tencent Holdings');
+    expect(board).toHaveTextContent('HK00700');
+    expect(board).toHaveTextContent('390.2');
+    expect(board).toHaveTextContent('0.8%');
+    expect(board).toHaveTextContent('hk_market_data');
+    expect(board).toHaveTextContent('degraded');
+    expect(board).toHaveTextContent('missing_history');
+    expect(board).toHaveTextContent('Apple Inc.');
+    expect(board).toHaveTextContent('AAPL');
+    expect(board).toHaveTextContent('us_market_data');
+    expect(board).toHaveTextContent('fresh');
+    expect(board).toHaveTextContent('No AI');
+
+    fireEvent.click(screen.getByTestId('platform-watchlist-board-query-HK00700'));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('HK00700');
+    });
+    expect(await screen.findByTestId('basic-query-route')).toHaveTextContent('hk_market_data');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
   it('submits market review from the home toolbar', async () => {
@@ -560,7 +1992,7 @@ describe('HomePage', () => {
     fireEvent.change(await screen.findByPlaceholderText('Enter a stock code or name, e.g. 600519, Kweichow Moutai, AAPL'), {
       target: { value: 'AAPL' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quick AI' }));
     fireEvent.click(screen.getByRole('button', { name: 'Market review' }));
 
     await waitFor(() => {
@@ -1031,12 +2463,43 @@ describe('HomePage', () => {
 
     const input = screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
-    fireEvent.click(screen.getByRole('button', { name: '分析' }));
+    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
 
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
         stockCode: '600519',
         skills: ['growth_quality'],
+      }));
+    });
+  });
+
+  it('submits deep analysis from the manual deep action', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-deep-1',
+      status: 'pending',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '600519' } });
+    fireEvent.click(await screen.findByRole('button', { name: '深度分析' }));
+
+    await waitFor(() => {
+      expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+        stockCode: '600519',
+        reportType: 'detailed',
+        analysisDepth: 'deep',
       }));
     });
   });

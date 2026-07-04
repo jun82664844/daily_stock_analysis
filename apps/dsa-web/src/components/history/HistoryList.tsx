@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useRef, useCallback, useEffect, useId } from 'react';
+import { Fragment, useRef, useCallback, useEffect, useId } from 'react';
 import type { HistoryItem } from '../../types/analysis';
 import { Badge, Button, ScrollArea } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
@@ -22,8 +22,21 @@ interface HistoryListProps {
   title?: string;
   emptyTitle?: string;
   emptyDescription?: string;
+  controls?: React.ReactNode;
+  selectable?: boolean;
+  totalCount?: number;
+  refreshedRecordIds?: Set<number>;
   className?: string;
 }
+
+const historyGroupKey = (createdAt?: string): string => {
+  if (!createdAt) {
+    return 'unknown';
+  }
+  const text = String(createdAt);
+  const datePart = text.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : 'unknown';
+};
 
 /**
  * 历史记录列表组件 (升级版)
@@ -45,6 +58,10 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   title,
   emptyTitle,
   emptyDescription,
+  controls,
+  selectable = true,
+  totalCount,
+  refreshedRecordIds,
   className = '',
 }) => {
   const { t } = useUiLanguage();
@@ -111,15 +128,21 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             )}
             headingClassName="items-center"
             actions={
-              selectedCount > 0 ? (
+              selectable && selectedCount > 0 ? (
                 <Badge variant="info" size="sm" className="history-selection-badge animate-in fade-in zoom-in duration-200">
                   {t('common.selectedCount', { count: selectedCount })}
                 </Badge>
+              ) : items.length > 0 ? (
+                <span data-testid="history-total-count" className="text-[11px] text-muted-text">
+                  {t('common.itemsCount', { count: totalCount ?? items.length })}
+                </span>
               ) : undefined
             }
           />
 
-          {items.length > 0 && (
+          {controls}
+
+          {selectable && items.length > 0 && (
             <div className="flex items-center gap-2">
               <label
                 className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
@@ -133,6 +156,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                   onChange={onToggleSelectAll}
                   disabled={isDeleting}
                   aria-label={t('history.selectAllHistoryAria')}
+                  data-testid="history-select-all-visible"
                   className="history-select-all-checkbox h-3.5 w-3.5 cursor-pointer bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
                 />
                 <span className="text-[11px] text-muted-text select-none">{t('common.selectAllCurrent')}</span>
@@ -169,17 +193,33 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           />
         ) : (
           <div className="space-y-2">
-            {items.map((item) => (
-              <HistoryListItem
-                key={item.id}
-                item={item}
-                isViewing={selectedId === item.id}
-                isChecked={selectedIds.has(item.id)}
-                isDeleting={isDeleting}
-                onToggleChecked={onToggleItemSelection}
-                onClick={onItemClick}
-              />
-            ))}
+            {items.map((item, index) => {
+              const group = historyGroupKey(item.createdAt);
+              const previousGroup = index > 0 ? historyGroupKey(items[index - 1]?.createdAt) : '';
+              const showGroup = group !== previousGroup;
+              return (
+                <Fragment key={item.id}>
+                  {showGroup ? (
+                    <div
+                      data-testid={`history-group-${group}`}
+                      className="sticky top-0 z-10 -mx-1 rounded-md border border-subtle bg-surface/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-text backdrop-blur"
+                    >
+                      {group === 'unknown' ? 'Unknown date' : group}
+                    </div>
+                  ) : null}
+                  <HistoryListItem
+                    item={item}
+                    isViewing={selectedId === item.id}
+                    isChecked={selectedIds.has(item.id)}
+                    isDeleting={isDeleting}
+                    selectable={selectable}
+                    currentQuoteRefreshed={(refreshedRecordIds?.has(item.id) ?? false) || Boolean(item.currentQuoteRefreshed)}
+                    onToggleChecked={onToggleItemSelection}
+                    onClick={onItemClick}
+                  />
+                </Fragment>
+              );
+            })}
 
             <div ref={loadMoreTriggerRef} className="h-4" />
             

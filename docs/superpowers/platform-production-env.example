@@ -1,0 +1,51 @@
+# DSA Platform V2 production-evaluation env example
+# Copy into a deployment-specific secret/config system before launch review.
+# Do not paste real API keys into this template. Keep production secrets in a managed secret store or protected environment variables.
+
+# Auth and session boundary
+ADMIN_AUTH_ENABLED=true
+PLATFORM_USER_AUTH_ENABLED=true
+PLATFORM_CSRF_ENABLED=true
+ADMIN_SESSION_MAX_AGE_HOURS=24
+PLATFORM_SESSION_MAX_AGE_HOURS=336
+
+# Database and local data paths
+DATABASE_PATH=/var/lib/dsa/stock_analysis.db
+DSA_SECRET_SOURCE=managed-secret-store-or-protected-env
+
+# Network and browser security
+TRUST_X_FORWARDED_FOR=true
+CORS_ALLOW_ALL=false
+DEBUG=false
+LOG_LEVEL=INFO
+
+# LLM routing. Store real provider keys outside this file.
+LITELLM_MODEL=deepseek/deepseek-v4-flash
+LLM_CHANNELS=prod_gateway
+LLM_PROD_GATEWAY_BASE_URL=https://llm-gateway.example.com/v1
+LLM_PROD_GATEWAY_API_KEYS=__SET_IN_SECRET_STORE__
+
+# Public search and expensive enrichment stay disabled until production policy is approved.
+SEARXNG_BASE_URLS=
+SEARXNG_PUBLIC_INSTANCES_ENABLED=false
+ENABLE_FUNDAMENTAL_PIPELINE=false
+ENABLE_CHIP_DISTRIBUTION=false
+DAILY_MARKET_CONTEXT_ENABLED=false
+
+# Basic market snapshot cache
+REALTIME_CACHE_TTL=600
+FUNDAMENTAL_CACHE_TTL_SECONDS=3600
+FUNDAMENTAL_CACHE_MAX_ENTRIES=1000
+
+# Billing boundary. V2 evaluation package keeps real payment disabled.
+BILLING_ENABLED=false
+BILLING_PROVIDER=disabled
+BILLING_WEBHOOK_SECRET=__SET_IN_SECRET_STORE_WHEN_REAL_PROVIDER_IS_APPROVED__
+
+# Optional local model mode. Enable only after local capacity and abuse limits are approved.
+LOCAL_LLM_ENABLED=false
+LOCAL_LLM_BASE_URL=http://127.0.0.1:11434/v1
+LOCAL_LLM_MAX_CONCURRENT=2
+
+# Legal/product safety display must remain visible in production UI copy.
+DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true

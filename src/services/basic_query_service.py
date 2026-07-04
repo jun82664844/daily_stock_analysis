@@ -1,0 +1,612 @@
+# -*- coding: utf-8 -*-
+"""No-AI stock snapshot service."""
+
+from __future__ import annotations
+
+import concurrent.futures
+import os
+import time
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Iterable, Optional
+
+from data_provider.base import normalize_stock_code
+from src.services.stock_code_utils import normalize_crypto_symbol
+from src.services.market_data_cache import CacheHit, MarketDataCache
+from src.services.market_source_health import MarketSourceHealthRegistry, default_market_source_health
+from src.services.persistent_market_data_cache import default_persistent_market_data_cache
+from src.services.stock_service import StockService
+
+
+_BASIC_QUERY_FETCH_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=max(2, int(os.getenv("BASIC_QUERY_FETCH_MAX_WORKERS", "8")))
+)
+_DEFAULT_FETCH_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_FETCH_TIMEOUT_SEC", "4"))
+
+
+@dataclass(frozen=True)
+class MarketRoute:
+    input_code: str
+    normalized_code: str
+    market: str
+    channel: str
+    data_source_lane: str
+    quote_sources: tuple[str, ...]
+    history_sources: tuple[str, ...]
+    ai_required: bool = False
+
+    def to_payload(self) -> Dict[str, Any]:
+        return {
+            "input_code": self.input_code,
+            "normalized_code": self.normalized_code,
+            "market": self.market,
+            "channel": self.channel,
+            "data_source_lane": self.data_source_lane,
+            "quote_sources": list(self.quote_sources),
+            "history_sources": list(self.history_sources),
+            "ai_required": self.ai_required,
+        }
+
+
+class BasicQueryService:
+    """Build fast stock snapshots from deterministic market data only."""
+
+    def __init__(
+        self,
+        stock_service: Optional[StockService] = None,
+        cache: Optional[MarketDataCache] = None,
+        fetch_timeout_seconds: Optional[float] = None,
+        source_health: Optional[MarketSourceHealthRegistry] = None,
+    ):
+        self.stock_service = stock_service or StockService()
+        self.cache = cache or default_persistent_market_data_cache
+        self.source_health = source_health or default_market_source_health
+        self.fetch_timeout_seconds = (
+            _DEFAULT_FETCH_TIMEOUT_SECONDS if fetch_timeout_seconds is None else max(0.001, float(fetch_timeout_seconds))
+        )
+
+    def get_snapshot(self, stock_code: str, *, force_refresh: bool = False) -> Dict[str, Any]:
+        started = time.perf_counter()
+        route = self._resolve_route(stock_code)
+        code = route.normalized_code
+        (
+            quote,
+            quote_freshness,
+            quote_cache,
+            quote_elapsed_ms,
+            quote_source,
+            quote_timeout,
+            quote_fallback,
+            quote_error,
+            quote_health,
+            quote_cache_origin,
+        ) = self._get_quote(code, route=route, force_refresh=force_refresh)
+        (
+            history,
+            history_freshness,
+            history_cache,
+            history_elapsed_ms,
+            history_source,
+            history_timeout,
+            history_fallback,
+            history_error,
+            history_health,
+            history_cache_origin,
+        ) = self._get_history(code, route=route, force_refresh=force_refresh)
+        indicators = self._compute_indicators((history or {}).get("data", []))
+        warnings = self._build_warnings(
+            quote=quote,
+            quote_freshness=quote_freshness,
+            history=history,
+            route=route,
+            quote_error=quote_error,
+            history_error=history_error,
+        )
+
+        return {
+            "stock_code": code,
+            "stock_name": self._stock_name(quote, history),
+            "market": route.market,
+            "quote": self._quote_payload(
+                quote,
+                freshness=quote_freshness,
+                source_fallback=route.quote_sources[0],
+            ),
+            "indicators": indicators,
+            "route": route.to_payload(),
+            "warnings": warnings,
+            "degradation": self._degradation_payload(warnings),
+            "diagnostics": self._diagnostics_payload(
+                started=started,
+                route=route,
+                quote_elapsed_ms=quote_elapsed_ms,
+                history_elapsed_ms=history_elapsed_ms,
+                quote_cache=quote_cache,
+                history_cache=history_cache,
+                quote_source=quote_source,
+                history_source=history_source,
+                quote_freshness=quote_freshness,
+                history_freshness=history_freshness,
+                quote_timeout=quote_timeout,
+                history_timeout=history_timeout,
+                quote_fallback=quote_fallback,
+                history_fallback=history_fallback,
+                quote_error=quote_error,
+                history_error=history_error,
+                quote_health=quote_health,
+                history_health=history_health,
+                quote_cache_origin=quote_cache_origin,
+                history_cache_origin=history_cache_origin,
+                force_refresh=force_refresh,
+            ),
+            "ai_used": False,
+        }
+
+    def prewarm_snapshots(self, stock_codes: Iterable[str]) -> Dict[str, Any]:
+        started = time.perf_counter()
+        seen: set[str] = set()
+        symbols: list[str] = []
+        results: Dict[str, Dict[str, Any]] = {}
+        warmed = 0
+        degraded = 0
+        for raw_code in stock_codes or []:
+            route = self._resolve_route(str(raw_code))
+            code = route.normalized_code
+            if code in seen:
+                continue
+            seen.add(code)
+            symbols.append(code)
+            try:
+                snapshot = self.get_snapshot(code)
+                diagnostics = snapshot.get("diagnostics") or {}
+                quote_ready = (snapshot.get("quote") or {}).get("freshness") != "unavailable"
+                history_ready = bool((snapshot.get("indicators") or {}).get("last_close") is not None)
+                status = "warmed" if quote_ready or history_ready else "degraded"
+                if status == "warmed":
+                    warmed += 1
+                else:
+                    degraded += 1
+                results[code] = {
+                    "status": status,
+                    "market": snapshot.get("market"),
+                    "route_lane": diagnostics.get("route_lane"),
+                    "cache": diagnostics.get("cache"),
+                    "fallback": diagnostics.get("fallback"),
+                    "source_health": diagnostics.get("source_health"),
+                    "warnings": [item.get("code") for item in snapshot.get("warnings", [])],
+                }
+            except Exception:
+                degraded += 1
+                results[code] = {
+                    "status": "error",
+                    "warnings": ["prewarm_failed"],
+                }
+        return {
+            "requested": len(symbols),
+            "warmed": warmed,
+            "degraded": degraded,
+            "symbols": symbols,
+            "results": results,
+            "elapsed_ms": self._elapsed_ms(started),
+            "ai_used": False,
+        }
+
+    def _get_quote(
+        self,
+        code: str,
+        *,
+        route: MarketRoute,
+        force_refresh: bool = False,
+    ) -> tuple[Optional[Dict[str, Any]], str, str, int, str, bool, str, Optional[str], Dict[str, Any], str]:
+        started = time.perf_counter()
+        cache_key = f"quote:{code}"
+        hit = None if force_refresh else self.cache.get(cache_key)
+        if hit is not None:
+            source = self._payload_source(hit.value, hit.source or route.quote_sources[0])
+            fallback = self._cache_fallback(hit)
+            return hit.value, hit.freshness, "hit", self._elapsed_ms(started), source, False, fallback, None, self.source_health.snapshot(source), hit.origin
+        source_id = route.quote_sources[0]
+        health = self.source_health.snapshot(source_id)
+        if health.get("status") == "cooling_down":
+            return None, "unavailable", "unavailable", self._elapsed_ms(started), source_id, False, "none", "cooling_down", health, "none"
+        quote, error = self._call_with_timeout(lambda: self.stock_service.get_realtime_quote(code))
+        elapsed_ms = self._elapsed_ms(started)
+        if quote:
+            quote = dict(quote)
+            quote.setdefault("source", source_id)
+            self.cache.set(cache_key, quote, source=quote.get("source") or source_id)
+            self.source_health.record_success(source_id, elapsed_ms=elapsed_ms)
+        elif error == "timeout":
+            self.source_health.record_timeout(source_id, elapsed_ms=elapsed_ms)
+        elif error == "error":
+            self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+        health = self.source_health.snapshot(source_id)
+        source = self._payload_source(quote, source_id)
+        cache_state = "refresh" if force_refresh and quote else ("miss" if error is None else "unavailable")
+        fallback = "live" if quote else "none"
+        return quote, "fresh" if quote else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
+
+    def _get_history(
+        self,
+        code: str,
+        *,
+        route: MarketRoute,
+        force_refresh: bool = False,
+    ) -> tuple[Optional[Dict[str, Any]], str, str, int, str, bool, str, Optional[str], Dict[str, Any], str]:
+        started = time.perf_counter()
+        cache_key = f"history:{code}:daily:30"
+        hit = None if force_refresh else self.cache.get(cache_key)
+        if hit is not None:
+            source = self._payload_source(hit.value, hit.source or route.history_sources[0])
+            fallback = self._cache_fallback(hit)
+            return hit.value, hit.freshness, "hit", self._elapsed_ms(started), source, False, fallback, None, self.source_health.snapshot(source), hit.origin
+        source_id = route.history_sources[0]
+        health = self.source_health.snapshot(source_id)
+        if health.get("status") == "cooling_down":
+            return None, "unavailable", "unavailable", self._elapsed_ms(started), source_id, False, "none", "cooling_down", health, "none"
+        history, error = self._call_with_timeout(lambda: self.stock_service.get_history_data(code, period="daily", days=30))
+        elapsed_ms = self._elapsed_ms(started)
+        if history:
+            history = dict(history)
+            history.setdefault("source", source_id)
+            self.cache.set(cache_key, history, source=history.get("source") or source_id)
+            self.source_health.record_success(source_id, elapsed_ms=elapsed_ms)
+        elif error == "timeout":
+            self.source_health.record_timeout(source_id, elapsed_ms=elapsed_ms)
+        elif error == "error":
+            self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+        health = self.source_health.snapshot(source_id)
+        source = self._payload_source(history, source_id)
+        cache_state = "refresh" if force_refresh and history else ("miss" if error is None else "unavailable")
+        fallback = "live" if history else "none"
+        return history, "fresh" if history else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
+
+    def _quote_payload(
+        self,
+        quote: Optional[Dict[str, Any]],
+        *,
+        freshness: str = "fresh",
+        source_fallback: str = "stock_service",
+    ) -> Dict[str, Any]:
+        if not quote:
+            return {"source": source_fallback, "freshness": "unavailable"}
+        return {
+            "current_price": quote.get("current_price"),
+            "change": quote.get("change"),
+            "change_percent": quote.get("change_percent"),
+            "open": quote.get("open"),
+            "high": quote.get("high"),
+            "low": quote.get("low"),
+            "prev_close": quote.get("prev_close"),
+            "volume": quote.get("volume"),
+            "amount": quote.get("amount"),
+            "update_time": quote.get("update_time"),
+            "source": quote.get("source") or source_fallback,
+            "freshness": freshness if freshness in {"cached", "stale"} else quote.get("freshness") or freshness,
+        }
+
+    def _stock_name(self, quote: Optional[Dict[str, Any]], history: Optional[Dict[str, Any]]) -> Optional[str]:
+        if quote and quote.get("stock_name"):
+            return quote.get("stock_name")
+        if history and history.get("stock_name"):
+            return history.get("stock_name")
+        return None
+
+    def _diagnostics_payload(
+        self,
+        *,
+        started: float,
+        route: MarketRoute,
+        quote_elapsed_ms: int,
+        history_elapsed_ms: int,
+        quote_cache: str,
+        history_cache: str,
+        quote_source: str,
+        history_source: str,
+        quote_freshness: str,
+        history_freshness: str,
+        quote_timeout: bool,
+        history_timeout: bool,
+        quote_fallback: str,
+        history_fallback: str,
+        quote_error: Optional[str],
+        history_error: Optional[str],
+        quote_health: Dict[str, Any],
+        history_health: Dict[str, Any],
+        quote_cache_origin: str,
+        history_cache_origin: str,
+        force_refresh: bool,
+    ) -> Dict[str, Any]:
+        elapsed_ms = self._elapsed_ms(started)
+        slow_threshold_ms = 3000
+        timed_out = quote_timeout or history_timeout
+        return {
+            "elapsed_ms": elapsed_ms,
+            "quote_elapsed_ms": quote_elapsed_ms,
+            "history_elapsed_ms": history_elapsed_ms,
+            "cache": {
+                "quote": quote_cache,
+                "history": history_cache,
+            },
+            "sources": {
+                "quote": quote_source,
+                "history": history_source,
+            },
+            "freshness": {
+                "quote": quote_freshness,
+                "history": history_freshness,
+            },
+            "timeouts": {
+                "quote": quote_timeout,
+                "history": history_timeout,
+            },
+            "errors": {
+                "quote": quote_error,
+                "history": history_error,
+            },
+            "fallback": {
+                "quote": quote_fallback,
+                "history": history_fallback,
+            },
+            "source_health": {
+                "quote": quote_health,
+                "history": history_health,
+            },
+            "persistent_cache": {
+                "quote": quote_cache_origin,
+                "history": history_cache_origin,
+                "mode": getattr(self.cache, "persistent_mode", "memory"),
+                "storage": getattr(self.cache, "storage_label", "memory"),
+            },
+            "refresh": {
+                "mode": "force_refresh" if force_refresh else "cache_first",
+                "requested": bool(force_refresh),
+                "quote": bool(force_refresh),
+                "history": bool(force_refresh),
+            },
+            "route_lane": route.data_source_lane,
+            "performance": {
+                "status": "slow" if timed_out or elapsed_ms > slow_threshold_ms else "ok",
+                "slow_threshold_ms": slow_threshold_ms,
+            },
+        }
+
+    def _call_with_timeout(self, callback: Callable[[], Optional[Dict[str, Any]]]) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+        future = _BASIC_QUERY_FETCH_EXECUTOR.submit(callback)
+        try:
+            return future.result(timeout=self.fetch_timeout_seconds), None
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            return None, "timeout"
+        except Exception:
+            return None, "error"
+
+    def _cache_fallback(self, hit: CacheHit) -> str:
+        if hit.origin == "disk":
+            return "stale_disk_cache" if hit.freshness == "stale" else "disk_cache"
+        return "stale_cache" if hit.freshness == "stale" else "cache"
+
+    def _payload_source(self, payload: Optional[Dict[str, Any]], fallback: str) -> str:
+        if isinstance(payload, dict) and payload.get("source"):
+            return str(payload.get("source"))
+        return fallback
+
+    def _elapsed_ms(self, started: float) -> int:
+        return max(0, int(round((time.perf_counter() - started) * 1000)))
+
+    def _compute_indicators(self, rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+        closes: list[float] = []
+        volumes: list[float] = []
+        for row in rows or []:
+            close = self._float_or_none(row.get("close"))
+            if close is not None:
+                closes.append(close)
+            volume = self._float_or_none(row.get("volume"))
+            if volume is not None:
+                volumes.append(volume)
+
+        return {
+            "ma5": self._moving_average(closes, 5),
+            "ma10": self._moving_average(closes, 10),
+            "ma20": self._moving_average(closes, 20),
+            "volume_ma5": self._moving_average(volumes, 5),
+            "last_close": closes[-1] if closes else None,
+            "price_change_5d": self._percent_change(closes, 5),
+            "price_change_20d": self._percent_change(closes, 20),
+            "volume_change_vs_ma5": self._volume_change_vs_ma(volumes, 5),
+            "volume_price_signal": self._volume_price_signal(closes, volumes),
+        }
+
+    def _moving_average(self, values: list[float], window: int) -> Optional[float]:
+        if len(values) < window:
+            return None
+        return round(sum(values[-window:]) / window, 4)
+
+    def _percent_change(self, values: list[float], window: int) -> Optional[float]:
+        if len(values) <= window:
+            return None
+        previous = values[-window - 1]
+        current = values[-1]
+        if previous == 0:
+            return None
+        return round(((current - previous) / previous) * 100, 4)
+
+    def _volume_change_vs_ma(self, volumes: list[float], window: int) -> Optional[float]:
+        if len(volumes) < window + 1:
+            return None
+        average = self._moving_average(volumes[:-1], window)
+        if average in (None, 0):
+            return None
+        return round(((volumes[-1] - average) / average) * 100, 4)
+
+    def _volume_price_signal(self, closes: list[float], volumes: list[float]) -> str:
+        ma20 = self._moving_average(closes, 20)
+        volume_ma5 = self._moving_average(volumes[:-1], 5) if len(volumes) > 5 else None
+        if not closes or not volumes or ma20 is None or volume_ma5 in (None, 0):
+            return "insufficient_data"
+        price_above_trend = closes[-1] >= ma20
+        volume_expanded = volumes[-1] >= volume_ma5
+        if price_above_trend and volume_expanded:
+            return "price_volume_confirmed"
+        if price_above_trend:
+            return "price_above_trend_volume_soft"
+        if volume_expanded:
+            return "volume_expanded_price_below_trend"
+        return "neutral"
+
+    def _float_or_none(self, value: Any) -> Optional[float]:
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _resolve_route(self, stock_code: str) -> MarketRoute:
+        raw = (stock_code or "").strip()
+        crypto = normalize_crypto_symbol(raw)
+        code = crypto or normalize_stock_code(raw)
+        market = self._market_for_code(code)
+
+        if market == "cn":
+            return MarketRoute(
+                input_code=raw,
+                normalized_code=code,
+                market="cn",
+                channel="a_share",
+                data_source_lane="a_share_market_data",
+                quote_sources=("a_share_realtime", "tencent", "akshare_sina", "efinance", "akshare_em"),
+                history_sources=("a_share_history", "akshare", "tushare", "efinance"),
+            )
+        if market == "crypto":
+            return MarketRoute(
+                input_code=raw,
+                normalized_code=code,
+                market="crypto",
+                channel="crypto_spot",
+                data_source_lane="crypto_market_data",
+                quote_sources=("crypto_yahoo_chart", "crypto_cache"),
+                history_sources=("crypto_yahoo_chart", "crypto_cache"),
+            )
+        if market == "hk":
+            return MarketRoute(
+                input_code=raw,
+                normalized_code=code,
+                market="hk",
+                channel="hk_equity",
+                data_source_lane="hk_market_data",
+                quote_sources=("hk_realtime", "longbridge", "akshare_hk"),
+                history_sources=("hk_history", "longbridge", "yfinance", "akshare_hk"),
+            )
+        return MarketRoute(
+            input_code=raw,
+            normalized_code=code,
+            market="us",
+            channel="us_equity",
+            data_source_lane="us_market_data",
+            quote_sources=("us_realtime", "yfinance", "longbridge", "finnhub", "alphavantage"),
+            history_sources=("us_history", "yfinance", "longbridge", "finnhub", "alphavantage"),
+        )
+
+    def _build_warnings(
+        self,
+        *,
+        quote: Optional[Dict[str, Any]],
+        quote_freshness: str,
+        history: Optional[Dict[str, Any]],
+        route: MarketRoute,
+        quote_error: Optional[str] = None,
+        history_error: Optional[str] = None,
+    ) -> list[Dict[str, str]]:
+        warnings: list[Dict[str, str]] = []
+        history_rows = (history or {}).get("data", [])
+        if quote_freshness == "stale":
+            warnings.append(
+                {
+                    "code": "stale_quote",
+                    "severity": "warning",
+                    "message": "Quote is stale; quick view uses cached quote and latest available history.",
+                }
+            )
+        if quote_error == "timeout":
+            warnings.append(
+                {
+                    "code": "quote_timeout",
+                    "severity": "warning",
+                    "message": f"{route.channel} realtime quote source timed out; quick view degraded without invoking AI.",
+                }
+            )
+        if quote_error == "cooling_down":
+            warnings.append(
+                {
+                    "code": "quote_source_cooling_down",
+                    "severity": "warning",
+                    "message": f"{route.channel} realtime quote source is cooling down after repeated failures; quick view skipped the live call.",
+                }
+            )
+        if not quote or quote_freshness == "unavailable":
+            warnings.append(
+                {
+                    "code": "missing_quote",
+                    "severity": "warning",
+                    "message": f"{route.channel} realtime quote is unavailable; quick view keeps AI off and uses historical data when present.",
+                }
+            )
+        if history_error == "timeout":
+            warnings.append(
+                {
+                    "code": "history_timeout",
+                    "severity": "warning",
+                    "message": f"{route.channel} historical source timed out; moving averages may be incomplete.",
+                }
+            )
+        if history_error == "cooling_down":
+            warnings.append(
+                {
+                    "code": "history_source_cooling_down",
+                    "severity": "warning",
+                    "message": f"{route.channel} historical source is cooling down after repeated failures; moving averages may be incomplete.",
+                }
+            )
+        if not history_rows:
+            warnings.append(
+                {
+                    "code": "missing_history",
+                    "severity": "warning",
+                    "message": f"{route.channel} historical bars are unavailable; moving averages may be incomplete.",
+                }
+            )
+        if not quote and not history_rows:
+            warnings.append(
+                {
+                    "code": "market_data_unavailable",
+                    "severity": "error",
+                    "message": "No market quote or historical bars are available for this symbol.",
+                }
+            )
+        return warnings
+
+    def _degradation_payload(self, warnings: list[Dict[str, str]]) -> Dict[str, str]:
+        if not warnings:
+            return {"status": "ok", "severity": "info", "message": "Market data ready"}
+        severity = "error" if any(item.get("severity") == "error" for item in warnings) else "warning"
+        return {
+            "status": "degraded",
+            "severity": severity,
+            "message": warnings[0].get("message") or "Market data is degraded",
+        }
+
+    def _market_for_code(self, code: str) -> str:
+        upper = (code or "").upper()
+        if normalize_crypto_symbol(upper) is not None:
+            return "crypto"
+        if upper.endswith((".SH", ".SZ", ".BJ")):
+            return "cn"
+        if upper.endswith(".HK") or upper.startswith("HK"):
+            return "hk"
+        if upper in {"BTC", "ETH"} or upper.endswith("-USD"):
+            return "crypto"
+        if upper.isdigit() and len(upper) == 6:
+            return "cn"
+        if upper.isdigit() and len(upper) <= 5:
+            return "hk"
+        return "us"

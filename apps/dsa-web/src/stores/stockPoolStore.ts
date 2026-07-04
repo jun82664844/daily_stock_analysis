@@ -3,7 +3,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
-import type { AnalysisReport, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
+import type { AnalysisDepth, AnalysisReport, ApiKeyMode, HistoryFilters, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
@@ -30,6 +30,8 @@ type SubmitAnalysisOptions = {
   forceRefresh?: boolean;
   skills?: string[];
   reportLanguage?: ReportLanguage;
+  analysisDepth?: AnalysisDepth;
+  apiKeyMode?: ApiKeyMode;
 };
 
 let reportRequestSeq = 0;
@@ -45,17 +47,20 @@ export interface StockPoolState {
   query: string;
   selectionSource: SelectionSource;
   notify: boolean;
+  apiKeyMode: ApiKeyMode;
   inputError?: string;
   duplicateError: string | null;
   error: ParsedApiError | null;
   isAnalyzing: boolean;
   historyItems: HistoryItem[];
+  historyTotal: number;
   selectedHistoryIds: number[];
   isDeletingHistory: boolean;
   isLoadingHistory: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
   currentPage: number;
+  historyFilters: HistoryFilters;
   marketReviewHistoryItems: HistoryItem[];
   selectedMarketReviewHistoryIds: number[];
   isLoadingMarketReviewHistory: boolean;
@@ -90,6 +95,7 @@ export interface StockPoolState {
   loadInitialHistory: () => Promise<void>;
   refreshHistory: (silent?: boolean) => Promise<void>;
   loadMoreHistory: () => Promise<void>;
+  setHistoryFilters: (filters: HistoryFilters) => Promise<void>;
   loadMarketReviewHistory: () => Promise<void>;
   refreshMarketReviewHistory: (silent?: boolean) => Promise<void>;
   loadMoreMarketReviewHistory: () => Promise<void>;
@@ -102,6 +108,7 @@ export interface StockPoolState {
   deleteSelectedMarketReviewHistory: () => Promise<void>;
   submitAnalysis: (options?: SubmitAnalysisOptions) => Promise<void>;
   setNotify: (notify: boolean) => void;
+  setApiKeyMode: (mode: ApiKeyMode) => void;
   syncTaskCreated: (task: TaskInfo) => void;
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
@@ -116,17 +123,20 @@ const initialState = {
   query: '',
   selectionSource: 'manual' as SelectionSource,
   notify: true,
+  apiKeyMode: 'platform' as ApiKeyMode,
   inputError: undefined,
   duplicateError: null,
   error: null,
   isAnalyzing: false,
   historyItems: [] as HistoryItem[],
+  historyTotal: 0,
   selectedHistoryIds: [] as number[],
   isDeletingHistory: false,
   isLoadingHistory: false,
   isLoadingMore: false,
   hasMore: true,
   currentPage: 1,
+  historyFilters: {} as HistoryFilters,
   marketReviewHistoryItems: [] as HistoryItem[],
   selectedMarketReviewHistoryIds: [] as number[],
   isLoadingMarketReviewHistory: false,
@@ -155,10 +165,9 @@ const initialState = {
   isLoadingStockBar: false,
 };
 
-function buildHistoryParams(page: number) {
+function buildHistoryParams(page: number, filters: HistoryFilters = {}) {
   return {
-    startDate: getRecentStartDate(30),
-    endDate: getTodayInShanghai(),
+    ...filters,
     page,
     limit: PAGE_SIZE,
   };
@@ -277,6 +286,10 @@ function dedupeHistoryItems(items: HistoryItem[]): HistoryItem[] {
   });
 }
 
+function isUnauthenticatedError(error: unknown): boolean {
+  return getParsedApiError(error).status === 401;
+}
+
 function isSameStockCode(left?: string, right?: string): boolean {
   return normalizeStockCode(left || '') === normalizeStockCode(right || '');
 }
@@ -373,7 +386,7 @@ async function fetchHistory(
   }
 
   try {
-    const response = await historyApi.getList(buildHistoryParams(page));
+    const response = await historyApi.getList(buildHistoryParams(page, currentState.historyFilters));
     if (requestId !== historyRequestSeq) {
       return null;
     }
@@ -381,9 +394,14 @@ async function fetchHistory(
     if (silent && reset) {
       const existingIds = new Set(get().historyItems.map((item) => item.id));
       const newItems = response.items.filter((item) => !existingIds.has(item.id));
+      let nextHistoryItems = get().historyItems;
       if (newItems.length > 0) {
-        set({ historyItems: [...newItems, ...get().historyItems] });
+        nextHistoryItems = [...newItems, ...nextHistoryItems];
       }
+      set({
+        historyItems: nextHistoryItems,
+        historyTotal: Math.max(response.total, nextHistoryItems.length),
+      });
 
       const selectedReport = get().selectedReport;
       if (selectedReport?.meta.reportType !== 'market_review' && selectedReport?.meta.stockCode) {
@@ -397,11 +415,14 @@ async function fetchHistory(
     } else if (reset) {
       set({
         historyItems: response.items,
+        historyTotal: response.total,
         currentPage: 1,
       });
     } else {
+      const nextHistoryItems = [...get().historyItems, ...response.items];
       set({
-        historyItems: [...get().historyItems, ...response.items],
+        historyItems: nextHistoryItems,
+        historyTotal: Math.max(response.total, nextHistoryItems.length),
         currentPage: page,
       });
     }
@@ -428,6 +449,17 @@ async function fetchHistory(
   } catch (error) {
     if (requestId !== historyRequestSeq) {
       return null;
+    }
+    if (reset && isUnauthenticatedError(error)) {
+      set({
+        error: null,
+        historyItems: [],
+        historyTotal: 0,
+        selectedHistoryIds: [],
+        hasMore: false,
+        currentPage: 1,
+      });
+      return { total: 0, page: 1, limit: PAGE_SIZE, items: [] };
     }
     set({ error: getParsedApiError(error) });
     return null;
@@ -496,6 +528,16 @@ async function fetchMarketReviewHistory(
     if (requestId !== marketReviewHistoryRequestSeq) {
       return null;
     }
+    if (reset && isUnauthenticatedError(error)) {
+      set({
+        error: null,
+        marketReviewHistoryItems: [],
+        selectedMarketReviewHistoryIds: [],
+        marketReviewHistoryHasMore: false,
+        marketReviewHistoryPage: 1,
+      });
+      return { total: 0, page: 1, limit: MARKET_REVIEW_HISTORY_PAGE_SIZE, items: [] };
+    }
     set({ error: getParsedApiError(error) });
     return null;
   } finally {
@@ -525,6 +567,8 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   clearInlineMessages: () => set({ inputError: undefined, duplicateError: null }),
 
   setNotify: (notify) => set({ notify }),
+
+  setApiKeyMode: (apiKeyMode) => set({ apiKeyMode }),
 
   openMarkdownDrawer: () => set({ markdownDrawerOpen: true }),
 
@@ -580,6 +624,18 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       return;
     }
     await fetchHistory(get, set, { reset: false });
+  },
+
+  setHistoryFilters: async (filters) => {
+    historyRequestSeq += 1;
+    set({
+      historyFilters: filters,
+      historyTotal: 0,
+      selectedHistoryIds: [],
+      hasMore: true,
+      currentPage: 1,
+    });
+    await fetchHistory(get, set, { reset: true });
   },
 
   loadMarketReviewHistory: async () => {
@@ -770,8 +826,11 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const selectionSource = options?.selectionSource ?? state.selectionSource;
     const originalQuery = (options?.originalQuery ?? state.query).trim();
     const notify = options?.notify ?? state.notify;
+    const apiKeyMode = options?.apiKeyMode ?? state.apiKeyMode;
     const forceRefresh = options?.forceRefresh ?? false;
     const skills = options?.skills;
+    const analysisDepth = options?.analysisDepth ?? 'fast';
+    const reportType = analysisDepth === 'deep' ? 'detailed' : 'brief';
 
     if (!stockCodeInput) {
       set({ inputError: '请输入股票代码', duplicateError: null });
@@ -804,11 +863,13 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     try {
       await analysisApi.analyzeAsync({
         stockCode: normalizedStockCode,
-        reportType: 'detailed',
+        reportType,
+        analysisDepth,
         stockName,
         originalQuery: originalQuery || stockCodeInput,
         selectionSource,
         notify,
+        apiKeyMode,
         forceRefresh,
         skills,
         ...(options?.reportLanguage !== undefined && { reportLanguage: options.reportLanguage }),

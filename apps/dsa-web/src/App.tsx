@@ -22,7 +22,17 @@ const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const DecisionSignalsPage = lazy(() => import('./pages/DecisionSignalsPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const TokenUsagePage = lazy(() => import('./pages/TokenUsagePage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
+
+const ADMIN_ONLY_ROUTE_PREFIXES = ['/admin', '/settings'];
+
+function isAdminOnlyRoute(pathname: string): boolean {
+  return ADMIN_ONLY_ROUTE_PREFIXES.some((routePath) => (
+    pathname === routePath || pathname.startsWith(`${routePath}/`)
+  ));
+}
 
 const AppContent: React.FC = () => {
   const location = useLocation();
@@ -54,14 +64,15 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (authEnabled && !loggedIn) {
-    if (location.pathname === '/login') {
-      return (
-        <StandaloneRouteBoundary>
-          <LoginPage />
-        </StandaloneRouteBoundary>
-      );
-    }
+  if (authEnabled && !loggedIn && location.pathname === '/login') {
+    return (
+      <StandaloneRouteBoundary>
+        <LoginPage />
+      </StandaloneRouteBoundary>
+    );
+  }
+
+  if (authEnabled && !loggedIn && isAdminOnlyRoute(location.pathname)) {
     const redirect = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
@@ -87,6 +98,8 @@ const AppContent: React.FC = () => {
         <Route path="/backtest" element={<BacktestPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/usage" element={<TokenUsagePage />} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

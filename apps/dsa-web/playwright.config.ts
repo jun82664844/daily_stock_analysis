@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, '../..');
 const shouldRunWebSmoke = !!process.env.DSA_WEB_SMOKE_PASSWORD;
+const shouldRunPlatformE2E = !!process.env.DSA_PLATFORM_E2E;
 
 function resolveBackendCommand() {
   if (process.env.DSA_WEB_SMOKE_BACKEND_CMD) {
@@ -25,6 +26,29 @@ function resolveBackendCommand() {
   return 'python main.py --webui-only --host 127.0.0.1 --port 8000';
 }
 
+function resolveWebServers() {
+  const servers = [];
+  if (shouldRunWebSmoke) {
+    servers.push({
+      command: resolveBackendCommand(),
+      cwd: repoRoot,
+      url: 'http://127.0.0.1:8000/api/v1/auth/status',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    });
+  }
+  if (shouldRunWebSmoke || shouldRunPlatformE2E) {
+    servers.push({
+      command: 'npm run dev -- --host 127.0.0.1 --port 4173',
+      cwd: currentDir,
+      url: 'http://127.0.0.1:4173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    });
+  }
+  return servers.length > 0 ? servers : undefined;
+}
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -37,24 +61,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: shouldRunWebSmoke
-    ? [
-        {
-          command: resolveBackendCommand(),
-          cwd: repoRoot,
-          url: 'http://127.0.0.1:8000/api/v1/auth/status',
-          reuseExistingServer: !process.env.CI,
-          timeout: 120_000,
-        },
-        {
-          command: 'npm run dev -- --host 127.0.0.1 --port 4173',
-          cwd: currentDir,
-          url: 'http://127.0.0.1:4173',
-          reuseExistingServer: !process.env.CI,
-          timeout: 120_000,
-        },
-      ]
-    : undefined,
+  webServer: resolveWebServers(),
   projects: [
     {
       name: 'chromium',

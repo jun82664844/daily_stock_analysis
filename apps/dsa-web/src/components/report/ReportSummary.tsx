@@ -20,6 +20,7 @@ interface ReportSummaryProps {
     actionMessage: string | null;
   };
   onOpenRunFlow?: (recordId: number) => void;
+  sectionIdPrefix?: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
   isHistory = false,
   watchlist,
   onOpenRunFlow,
+  sectionIdPrefix,
 }) => {
   // 兼容 AnalysisResult 和 AnalysisReport 两种数据格式
   const report: AnalysisReport = 'report' in data ? data.report : data;
@@ -44,6 +46,9 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
   const modelUsed = (meta.modelUsed || '').trim();
   const shouldShowModel = Boolean(
     modelUsed && !['unknown', 'error', 'none', 'null', 'n/a'].includes(modelUsed.toLowerCase()),
+  );
+  const sectionId = (id: string): string | undefined => (
+    sectionIdPrefix ? `${sectionIdPrefix}-${id}` : undefined
   );
 
   if (meta.reportType === 'market_review') {
@@ -60,36 +65,48 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
   return (
     <div className="space-y-5 pb-8 animate-fade-in">
       {/* 概览区（首屏） */}
-      <ReportOverview
-        meta={meta}
-        summary={summary}
-        details={details}
-        isHistory={isHistory}
-        watchlist={watchlist}
-      />
+      <section id={sectionId('overview')}>
+        <ReportOverview
+          meta={meta}
+          summary={summary}
+          details={details}
+          isHistory={isHistory}
+          watchlist={watchlist}
+        />
+      </section>
 
       {/* 策略点位区 */}
-      <ReportStrategy strategy={strategy} language={reportLanguage} />
+      <section id={sectionId('strategy')}>
+        <ReportStrategy strategy={strategy} language={reportLanguage} />
+      </section>
 
       {/* 资讯区 */}
-      <ReportNews recordId={recordId} limit={8} language={reportLanguage} />
+      <section id={sectionId('news')}>
+        <ReportNews recordId={recordId} limit={8} language={reportLanguage} />
+      </section>
 
       {/* 输入数据块低敏摘要 */}
-      <AnalysisContextSummary
-        overview={details?.analysisContextPackOverview}
-        language={reportLanguage}
-      />
+      <section id={sectionId('context')}>
+        <AnalysisContextSummary
+          overview={details?.analysisContextPackOverview}
+          language={reportLanguage}
+        />
+      </section>
 
       {/* 运行诊断摘要 */}
-      <ReportDiagnostics
-        recordId={recordId}
-        summary={diagnosticSummary}
-        language={reportLanguage}
-        onOpenRunFlow={onOpenRunFlow}
-      />
+      <section id={sectionId('diagnostics')}>
+        <ReportDiagnostics
+          recordId={recordId}
+          summary={diagnosticSummary}
+          language={reportLanguage}
+          onOpenRunFlow={onOpenRunFlow}
+        />
+      </section>
 
       {/* 透明度与追溯区 */}
-      <ReportDetails details={details} recordId={recordId} language={reportLanguage} />
+      <section id={sectionId('details')}>
+        <ReportDetails details={details} recordId={recordId} language={reportLanguage} />
+      </section>
 
       {/* 分析模型标记（Issue #528）— 报告末尾 */}
       {shouldShowModel && (

@@ -33,6 +33,7 @@ from src.auth import (
 )
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
+from src.csrf import csrf_enabled, delete_csrf_cookie, set_csrf_cookie
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,8 @@ def _set_session_cookie(response: Response, session_value: str, request: Request
         path=params["path"],
         max_age=params["max_age"],
     )
+    if csrf_enabled():
+        set_csrf_cookie(response, secure=bool(params["secure"]), max_age=int(params["max_age"]))
 
 
 def _get_auth_status_dict(request: Request | None = None) -> dict:
@@ -350,6 +353,7 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
 
     resp = JSONResponse(content=_get_auth_status_dict(request))
     resp.delete_cookie(key=COOKIE_NAME, path="/")
+    delete_csrf_cookie(resp)
     return resp
 
 
@@ -474,4 +478,5 @@ async def auth_logout(request: Request):
         )
     resp = Response(status_code=204)
     resp.delete_cookie(key=COOKIE_NAME, path="/")
+    delete_csrf_cookie(resp)
     return resp

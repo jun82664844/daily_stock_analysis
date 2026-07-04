@@ -158,7 +158,13 @@ class HistoryService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         page: int = 1,
-        limit: int = 20
+        limit: int = 20,
+        platform_user_id: Optional[int] = None,
+        market: Optional[str] = None,
+        refresh_status: Optional[str] = None,
+        state_filter: Optional[str] = None,
+        note_search: Optional[str] = None,
+        sort: str = "newest",
     ) -> Dict[str, Any]:
         """
         Get history analysis list.
@@ -204,13 +210,40 @@ class HistoryService:
                 start_date=start_dt,
                 end_date=end_dt,
                 offset=offset,
-                limit=limit
+                limit=limit,
+                platform_user_id=platform_user_id,
+                market=market,
+                refresh_status=refresh_status,
+                state_filter=state_filter,
+                note_search=note_search,
+                sort=sort,
+            )
+            record_ids = [record.id for record in records if getattr(record, "id", None) is not None]
+            markers = self.db.get_analysis_history_refresh_markers(
+                record_ids,
+                platform_user_id=platform_user_id,
+            )
+            states = self.db.get_analysis_history_user_states(
+                record_ids,
+                platform_user_id=platform_user_id,
             )
             
             # Convert to response format
             items = []
             for record in records:
-                items.append(self._record_to_list_item_dict(record))
+                item = self._record_to_list_item_dict(record)
+                marker = markers.get(record.id)
+                item["current_quote_refreshed"] = marker is not None
+                item["current_quote_refreshed_at"] = marker.get("refreshed_at") if marker else None
+                item["current_quote_refresh"] = marker
+                state = states.get(record.id) or {}
+                item["favorite"] = bool(state.get("favorite"))
+                item["important"] = bool(state.get("important"))
+                item["archived"] = bool(state.get("archived"))
+                item["read"] = bool(state.get("read"))
+                item["note"] = state.get("note")
+                item["note_updated_at"] = state.get("note_updated_at")
+                items.append(item)
             
             return {
                 "total": total,
@@ -220,6 +253,83 @@ class HistoryService:
         except Exception as e:
             logger.error(f"查询历史列表失败: {e}", exc_info=True)
             return {"total": 0, "items": []}
+
+    def mark_current_quote_refreshed(
+        self,
+        *,
+        record_id: int,
+        platform_user_id: Optional[int] = None,
+        stock_code: Optional[str] = None,
+        route_lane: Optional[str] = None,
+        quote_source: Optional[str] = None,
+        freshness: Optional[str] = None,
+        ai_used: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        return self.db.mark_analysis_history_current_quote_refreshed(
+            record_id=record_id,
+            platform_user_id=platform_user_id,
+            stock_code=stock_code,
+            route_lane=route_lane,
+            quote_source=quote_source,
+            freshness=freshness,
+            ai_used=ai_used,
+            metadata=metadata,
+        )
+
+    def update_history_state(
+        self,
+        *,
+        record_id: int,
+        platform_user_id: Optional[int] = None,
+        favorite: Optional[bool] = None,
+        important: Optional[bool] = None,
+        archived: Optional[bool] = None,
+        read: Optional[bool] = None,
+        note_present: bool = False,
+        note: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        return self.db.update_analysis_history_user_state(
+            record_id=record_id,
+            platform_user_id=platform_user_id,
+            favorite=favorite,
+            important=important,
+            archived=archived,
+            read=read,
+            note_present=note_present,
+            note=note,
+        )
+
+    def batch_update_history_state(
+        self,
+        *,
+        record_ids: List[int],
+        platform_user_id: Optional[int] = None,
+        favorite: Optional[bool] = None,
+        important: Optional[bool] = None,
+        archived: Optional[bool] = None,
+        read: Optional[bool] = None,
+    ) -> List[Dict[str, Any]]:
+        updated: List[Dict[str, Any]] = []
+        seen = set()
+        for record_id in record_ids:
+            if record_id is None:
+                continue
+            normalized_id = int(record_id)
+            if normalized_id <= 0 or normalized_id in seen:
+                continue
+            seen.add(normalized_id)
+            state = self.update_history_state(
+                record_id=normalized_id,
+                platform_user_id=platform_user_id,
+                favorite=favorite,
+                important=important,
+                archived=archived,
+                read=read,
+            )
+            if state is not None:
+                updated.append(state)
+        return updated
 
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:
@@ -325,6 +435,7 @@ class HistoryService:
         *,
         code: Optional[str] = None,
         report_type: Optional[str] = None,
+        platform_user_id: Optional[int] = None,
     ):
         """
         Resolve a record_id parameter to an AnalysisHistory object.
@@ -340,22 +451,31 @@ class HistoryService:
         """
         try:
             int_id = int(record_id)
-            record = self.db.get_analysis_history_by_id(int_id)
+            record = self.db.get_analysis_history_by_id(
+                int_id,
+                platform_user_id=platform_user_id,
+            )
             if record:
                 return record
         except (ValueError, TypeError):
             pass
         # Fall back to query_id lookup. Keep the old no-kwargs call for
         # unfiltered paths so existing test doubles and integrations remain compatible.
-        if code is None and report_type is None:
+        if code is None and report_type is None and platform_user_id is None:
             return self.db.get_latest_analysis_by_query_id(record_id)
         return self.db.get_latest_analysis_by_query_id(
             record_id,
             code=code,
             report_type=report_type,
+            platform_user_id=platform_user_id,
         )
 
-    def resolve_and_get_detail(self, record_id: str) -> Optional[Dict[str, Any]]:
+    def resolve_and_get_detail(
+        self,
+        record_id: str,
+        *,
+        platform_user_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Resolve record_id (int PK or query_id string) and return history detail.
 
@@ -366,7 +486,7 @@ class HistoryService:
             Complete analysis report dict, or None
         """
         try:
-            record = self._resolve_record(record_id)
+            record = self._resolve_record(record_id, platform_user_id=platform_user_id)
             if not record:
                 return None
             return self._record_to_detail_dict(record)
@@ -374,7 +494,13 @@ class HistoryService:
             logger.error(f"resolve_and_get_detail failed for {record_id}: {e}", exc_info=True)
             return None
 
-    def resolve_and_get_news(self, record_id: str, limit: int = 20) -> List[Dict[str, str]]:
+    def resolve_and_get_news(
+        self,
+        record_id: str,
+        limit: int = 20,
+        *,
+        platform_user_id: Optional[int] = None,
+    ) -> List[Dict[str, str]]:
         """
         Resolve record_id (int PK or query_id string) and return associated news.
 
@@ -386,7 +512,7 @@ class HistoryService:
             List of news intel dicts
         """
         try:
-            record = self._resolve_record(record_id)
+            record = self._resolve_record(record_id, platform_user_id=platform_user_id)
             if not record:
                 logger.warning(f"resolve_and_get_news: record not found for {record_id}")
                 return []
@@ -395,7 +521,12 @@ class HistoryService:
             logger.error(f"resolve_and_get_news failed for {record_id}: {e}", exc_info=True)
             return []
 
-    def resolve_and_get_diagnostics(self, record_id: str) -> Optional[Dict[str, Any]]:
+    def resolve_and_get_diagnostics(
+        self,
+        record_id: str,
+        *,
+        platform_user_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Resolve record_id and return a user-facing run diagnostic summary.
 
@@ -403,7 +534,7 @@ class HistoryService:
         summary instead of failing. Storage and JSON parsing errors are
         propagated so callers can surface backend failures accurately.
         """
-        record = self._resolve_record(record_id)
+        record = self._resolve_record(record_id, platform_user_id=platform_user_id)
         if not record:
             return None
 
@@ -427,6 +558,7 @@ class HistoryService:
         *,
         code: Optional[str] = None,
         report_type: Optional[str] = None,
+        platform_user_id: Optional[int] = None,
     ):
         """
         Resolve record_id and return a sanitized run-flow snapshot.
@@ -434,7 +566,12 @@ class HistoryService:
         Uses the same strict JSON parsing behavior as diagnostics so malformed
         persisted payloads surface as backend errors instead of partial graphs.
         """
-        record = self._resolve_record(record_id, code=code, report_type=report_type)
+        record = self._resolve_record(
+            record_id,
+            code=code,
+            report_type=report_type,
+            platform_user_id=platform_user_id,
+        )
         if not record:
             return None
 
@@ -466,7 +603,12 @@ class HistoryService:
                 raise ValueError(f"invalid {field_name} JSON") from exc
         return value
 
-    def get_history_detail_by_id(self, record_id: int) -> Optional[Dict[str, Any]]:
+    def get_history_detail_by_id(
+        self,
+        record_id: int,
+        *,
+        platform_user_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Get history report detail.
 
@@ -480,7 +622,10 @@ class HistoryService:
             Complete analysis report dictionary, or None if not exists
         """
         try:
-            record = self.db.get_analysis_history_by_id(record_id)
+            record = self.db.get_analysis_history_by_id(
+                record_id,
+                platform_user_id=platform_user_id,
+            )
             if not record:
                 return None
             return self._record_to_detail_dict(record)
@@ -592,7 +737,12 @@ class HistoryService:
             report_language=normalize_report_language(raw.get("report_language")),
         )
 
-    def delete_history_records(self, record_ids: List[int]) -> int:
+    def delete_history_records(
+        self,
+        record_ids: List[int],
+        *,
+        platform_user_id: Optional[int] = None,
+    ) -> int:
         """
         Delete specified analysis history records.
 
@@ -606,7 +756,10 @@ class HistoryService:
             Exception: Re-raises any storage-layer exception so the API caller
                        receives a proper 500 error instead of a silent success.
         """
-        return self.db.delete_analysis_history_records(record_ids)
+        return self.db.delete_analysis_history_records(
+            record_ids,
+            platform_user_id=platform_user_id,
+        )
 
     def get_news_intel(self, query_id: str, limit: int = 20) -> List[Dict[str, str]]:
         """
@@ -743,7 +896,12 @@ class HistoryService:
         else:
             return "极度悲观"
 
-    def get_markdown_report(self, record_id: str) -> Optional[str]:
+    def get_markdown_report(
+        self,
+        record_id: str,
+        *,
+        platform_user_id: Optional[int] = None,
+    ) -> Optional[str]:
         """
         Generate a Markdown report for a single analysis history record.
 
@@ -759,7 +917,7 @@ class HistoryService:
         Raises:
             MarkdownReportGenerationError: If report generation fails due to internal errors
         """
-        record = self._resolve_record(record_id)
+        record = self._resolve_record(record_id, platform_user_id=platform_user_id)
         if not record:
             logger.warning(f"get_markdown_report: record not found for {record_id}")
             return None

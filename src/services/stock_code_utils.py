@@ -10,6 +10,9 @@ from typing import Optional
 
 from data_provider.base import canonical_stock_code, is_bse_code
 
+_CRYPTO_BASES = {"BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "MATIC"}
+_CRYPTO_QUOTES = {"USD", "USDT", "USDC"}
+
 
 # Known exchange prefixes (case-insensitive) and the digit lengths they accept.
 # e.g. SH600519 -> 600519, HK00700 -> 00700
@@ -33,6 +36,33 @@ _SUFFIX_DIGIT_LENS: dict = {
 }
 
 _PRESERVE_SUFFIXES = {".T", ".KS", ".KQ"}
+
+
+def normalize_crypto_symbol(raw: str) -> Optional[str]:
+    """Return canonical crypto spot symbol for the local quick-query lane."""
+    text = (raw or "").strip().upper().replace("/", "-").replace("_", "-")
+    if not text:
+        return None
+
+    if "-" in text:
+        base, quote = text.split("-", 1)
+        if base in _CRYPTO_BASES and quote in _CRYPTO_QUOTES:
+            return f"{base}-USD"
+        return None
+
+    for quote in sorted(_CRYPTO_QUOTES, key=len, reverse=True):
+        if text.endswith(quote):
+            base = text[: -len(quote)]
+            if base in _CRYPTO_BASES:
+                return f"{base}-USD"
+
+    if text in _CRYPTO_BASES:
+        return f"{text}-USD"
+    return None
+
+
+def is_crypto_symbol(raw: str) -> bool:
+    return normalize_crypto_symbol(raw) is not None
 
 
 def _valid_exchange_code(exchange: str, base: str, digit_lens: tuple[int, ...]) -> bool:
@@ -69,6 +99,8 @@ def is_code_like(value: str) -> bool:
     text = value.strip().upper()
     if not text:
         return False
+    if is_crypto_symbol(text):
+        return True
     if text.isdigit() and len(text) in (5, 6):
         return True
     if _strip_exchange_suffix(text) is not None:
@@ -93,6 +125,9 @@ def normalize_code(raw: str) -> Optional[str]:
     text = raw.strip().upper()
     if not text:
         return None
+    crypto = normalize_crypto_symbol(text)
+    if crypto is not None:
+        return crypto
     if text.isdigit() and len(text) in (5, 6):
         return text
     if any(text.endswith(suffix) for suffix in _PRESERVE_SUFFIXES):

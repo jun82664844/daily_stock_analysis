@@ -142,6 +142,7 @@ def run_market_review(
     save_report_file: bool = True,
     persist_history: bool = True,
     trigger_source: str = "cli",
+    platform_user_id: Optional[int] = None,
 ) -> Optional[str] | Optional[MarketReviewRunResult]:
     """
     执行大盘复盘分析
@@ -285,6 +286,7 @@ def run_market_review(
                     query_id=history_query_id,
                     market_light_snapshots=market_light_snapshots,
                     market_review_payload=market_review_payload,
+                    platform_user_id=platform_user_id,
                 )
             
             # 推送通知（合并模式下跳过，由 main 层统一发送）
@@ -504,6 +506,7 @@ def _persist_market_review_history(
     query_id: Optional[str] = None,
     market_light_snapshots: Optional[Dict[str, Dict[str, Any]]] = None,
     market_review_payload: Optional[Dict[str, Any]] = None,
+    platform_user_id: Optional[int] = None,
 ) -> int:
     """Persist market review output into the existing analysis history table."""
     try:
@@ -560,6 +563,7 @@ def _persist_market_review_history(
             news_content=review_report,
             context_snapshot=context_snapshot,
             save_snapshot=True,
+            platform_user_id=platform_user_id,
         )
         valid_saved_history_id = (
             saved_history_id

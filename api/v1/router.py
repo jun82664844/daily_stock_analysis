@@ -18,10 +18,12 @@ from api.v1.endpoints import (
     analysis,
     auth,
     backtest,
+    billing,
     decision_signals,
     health,
     history,
     intelligence,
+    platform,
     portfolio,
     stocks,
     system_config,
@@ -36,6 +38,18 @@ router.include_router(
     auth.router,
     prefix="/auth",
     tags=["Auth"]
+)
+
+router.include_router(
+    platform.router,
+    prefix="/platform",
+    tags=["Platform"]
+)
+
+router.include_router(
+    billing.router,
+    prefix="/billing",
+    tags=["Billing"]
 )
 
 router.include_router(

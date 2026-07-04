@@ -76,6 +76,38 @@ local/
 run.sh
 
 verify_*.py
+!scripts/verify_local_v1_operability.py
+!scripts/verify_platform_v2_readiness.py
+!scripts/verify_platform_release_candidate_package.py
+!scripts/verify_platform_user_e2e.py
+!scripts/verify_platform_billing_lifecycle.py
+!scripts/verify_platform_query_quality_v4.py
+!scripts/verify_platform_local_functional_v5.py
+!scripts/verify_platform_local_usability_v6.py
+!scripts/verify_platform_local_query_speed_v7.py
+!scripts/verify_platform_local_query_resilience_v8.py
+!scripts/verify_platform_local_market_source_health_v9.py
+!scripts/verify_platform_local_persistent_market_cache_v10.py
+!scripts/verify_platform_local_market_source_ops_v11.py
+!scripts/verify_platform_local_market_prewarm_console_v12.py
+!scripts/verify_platform_local_market_recovery_console_v13.py
+!scripts/verify_platform_local_real_use_loop_v14.py
+!scripts/verify_platform_local_user_query_loop_v15.py
+!scripts/verify_platform_local_browser_user_loop_v16.py
+!scripts/verify_platform_local_watchlist_v17.py
+!scripts/verify_platform_local_watchlist_board_v18.py
+!scripts/verify_platform_local_query_workspace_v19.py
+!scripts/verify_platform_local_public_entry_v20.py
+!scripts/verify_platform_local_public_user_flow_v21.py
+!scripts/verify_platform_local_market_refresh_v22.py
+!scripts/verify_platform_local_history_snapshot_boundary_v23.py
+!scripts/verify_platform_local_history_center_v24.py
+!scripts/verify_platform_local_history_center_v25.py
+!scripts/verify_platform_local_history_center_v26.py
+!scripts/verify_platform_local_history_export_v27.py
+!scripts/verify_platform_local_history_state_v28.py
+!scripts/verify_platform_local_history_ops_v29.py
+!scripts/verify_platform_local_history_detail_v30.py
 
 # ignore Claude workspace artifacts, but keep shared repo skills versioned
 .claude/*

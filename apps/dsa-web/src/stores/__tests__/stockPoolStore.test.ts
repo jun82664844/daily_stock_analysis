@@ -126,6 +126,34 @@ describe('stockPoolStore', () => {
     expect(state.isLoadingReport).toBe(false);
   });
 
+  it('treats unauthenticated initial history as an empty public entry state', async () => {
+    vi.mocked(historyApi.getList).mockRejectedValueOnce({
+      response: { status: 401, data: { detail: 'Login required' } },
+    });
+
+    await useStockPoolStore.getState().loadInitialHistory();
+
+    const state = useStockPoolStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.historyItems).toEqual([]);
+    expect(state.hasMore).toBe(false);
+    expect(state.isLoadingHistory).toBe(false);
+  });
+
+  it('treats unauthenticated market review history as an empty public entry state', async () => {
+    vi.mocked(historyApi.getList).mockRejectedValueOnce({
+      response: { status: 401, data: { detail: 'Login required' } },
+    });
+
+    await useStockPoolStore.getState().loadMarketReviewHistory();
+
+    const state = useStockPoolStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.marketReviewHistoryItems).toEqual([]);
+    expect(state.marketReviewHistoryHasMore).toBe(false);
+    expect(state.isLoadingMarketReviewHistory).toBe(false);
+  });
+
   it('opens same-stock history trend and loads more records', async () => {
     const olderItem = {
       ...historyItem,
@@ -530,11 +558,51 @@ describe('stockPoolStore', () => {
     expect(state.isAnalyzing).toBe(false);
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: '00700.HK',
-      reportType: 'detailed',
+      reportType: 'brief',
+      analysisDepth: 'fast',
       stockName: '腾讯控股',
       originalQuery: '00700',
       selectionSource: 'autocomplete',
       notify: true,
+    }));
+  });
+
+  it('submits deep analysis when requested explicitly', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-deep-1',
+      stockCode: '600519',
+      status: 'pending',
+      message: 'accepted',
+    } as never);
+
+    await useStockPoolStore.getState().submitAnalysis({
+      stockCode: '600519',
+      analysisDepth: 'deep',
+    });
+
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: '600519',
+      reportType: 'detailed',
+      analysisDepth: 'deep',
+    }));
+  });
+
+  it('submits analysis with the selected API key mode', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-user-key-1',
+      stockCode: '600519',
+      status: 'pending',
+      message: 'accepted',
+    } as never);
+
+    useStockPoolStore.getState().setApiKeyMode('user');
+    await useStockPoolStore.getState().submitAnalysis({
+      stockCode: '600519',
+    });
+
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: '600519',
+      apiKeyMode: 'user',
     }));
   });
 

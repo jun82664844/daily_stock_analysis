@@ -8,6 +8,7 @@ tenacity>=8.2.0             # Retry support with exponential backoff
 sqlalchemy>=2.0.0           # ORM database access
 schedule>=1.2.0             # Scheduled task runner
 exchange-calendars>=4.13.0   # Trading calendars; 4.5.x is incompatible with pandas 3 Timedelta "T"
+cryptography>=42.0.0        # Platform user API key encryption and session signing
 
 # Data source dependencies, ordered by fallback priority
 efinance>=0.5.5             # Priority 0: East Money data source https://github.com/Micro-sheep/efinance

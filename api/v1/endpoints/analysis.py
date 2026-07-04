@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.deps import get_config_dep
@@ -74,6 +74,7 @@ from src.market_phase_summary import (
     extract_market_phase_summary,
     rebuild_market_phase_summary_for_stock_code,
 )
+from src.auth import COOKIE_NAME as ADMIN_SESSION_COOKIE, verify_session as verify_admin_session
 from src.services.stock_code_utils import is_code_like, resolve_index_stock_code_for_analysis
 from src.report_language import get_localized_stock_name, normalize_report_language
 from src.schemas.decision_action import build_action_fields
@@ -83,6 +84,14 @@ from src.services.task_queue import (
     DuplicateTaskError,
     TaskStatus as TaskStatusEnum,
 )
+from src.platform_accounts import (
+    PlatformAccountService,
+    QuotaExceeded,
+    is_platform_user_auth_enabled,
+    platform_identity_from_request,
+)
+from src.platform_feature_policy import get_feature_policy
+from src.platform_rate_limit import check_platform_rate_limit
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
 from src.utils.data_processing import (
@@ -135,6 +144,7 @@ def _run_market_review_background(
     lock_token: Optional[_MarketReviewExecutionLock] = None,
     config: Optional[Config] = None,
     query_id: Optional[str] = None,
+    platform_user_id: Optional[int] = None,
 ) -> None:
     """Run market review after the API response has been accepted."""
     from src.core.market_review import run_market_review
@@ -154,6 +164,8 @@ def _run_market_review_background(
         }
         if query_id:
             review_kwargs["query_id"] = query_id
+        if platform_user_id is not None:
+            review_kwargs["platform_user_id"] = platform_user_id
         logger.info(
             "[MarketReview] component=market_review action=background_start "
             "trigger_source=api task_id=%s region=%s",
@@ -215,6 +227,194 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
     raise _invalid_analysis_input_error()
 
 
+def _platform_quota_exceeded_response(exc: QuotaExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "quota_exceeded",
+            "message": "Weekly analysis quota exhausted",
+            "remaining": exc.remaining,
+            "requested": exc.requested,
+            "weekly_limit": exc.weekly_limit,
+        },
+    )
+
+
+def _get_platform_user_id(http_request: Optional[Request]) -> Optional[int]:
+    if http_request is None or not hasattr(http_request, "cookies") or not is_platform_user_auth_enabled():
+        return None
+    identity = platform_identity_from_request(http_request)
+    if identity is None or identity.user_id is None:
+        return None
+    return int(identity.user_id)
+
+
+def _get_platform_identity(http_request: Optional[Request]):
+    if http_request is None or not hasattr(http_request, "cookies") or not is_platform_user_auth_enabled():
+        return None
+    return platform_identity_from_request(http_request)
+
+
+def _request_has_admin_session(http_request: Optional[Request]) -> bool:
+    if http_request is None or not hasattr(http_request, "cookies"):
+        return False
+    session_value = http_request.cookies.get(ADMIN_SESSION_COOKIE)
+    return bool(session_value and verify_admin_session(session_value))
+
+
+def _request_can_see_all_tasks(http_request: Optional[Request]) -> bool:
+    if _request_has_admin_session(http_request):
+        return True
+    identity = _get_platform_identity(http_request)
+    return bool(identity and identity.is_admin)
+
+
+def _is_platform_scoped_request(http_request: Optional[Request]) -> bool:
+    return _get_platform_user_id(http_request) is not None and not _request_can_see_all_tasks(http_request)
+
+
+def _task_owner_id(task_or_payload: Any) -> Optional[int]:
+    owner = None
+    if isinstance(task_or_payload, dict):
+        owner = task_or_payload.get("platform_user_id")
+    else:
+        owner = getattr(task_or_payload, "platform_user_id", None)
+    try:
+        return int(owner) if owner is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _task_visible_to_request(task: Any, http_request: Optional[Request]) -> bool:
+    if _request_can_see_all_tasks(http_request):
+        return True
+    platform_user_id = _get_platform_user_id(http_request)
+    if platform_user_id is None:
+        return True
+    return _task_owner_id(task) == platform_user_id
+
+
+def _filter_tasks_for_request(tasks: list[Any], http_request: Optional[Request]) -> list[Any]:
+    if not _is_platform_scoped_request(http_request):
+        return tasks
+    return [task for task in tasks if _task_visible_to_request(task, http_request)]
+
+
+def _task_stats_from_tasks(tasks: list[Any]) -> Dict[str, int]:
+    pending = 0
+    processing = 0
+    for task in tasks:
+        status = getattr(task, "status", None)
+        status_value = getattr(status, "value", status)
+        if status_value == TaskStatusEnum.PENDING.value:
+            pending += 1
+        elif status_value == TaskStatusEnum.PROCESSING.value:
+            processing += 1
+    return {"total": len(tasks), "pending": pending, "processing": processing}
+
+
+def _task_event_visible_to_request(
+    event_data: Any,
+    task_queue: Any,
+    http_request: Optional[Request],
+) -> bool:
+    if _request_can_see_all_tasks(http_request):
+        return True
+    platform_user_id = _get_platform_user_id(http_request)
+    if platform_user_id is None:
+        return True
+    owner_id = _task_owner_id(event_data)
+    if owner_id is not None:
+        return owner_id == platform_user_id
+    task_id = event_data.get("task_id") if isinstance(event_data, dict) else None
+    if not task_id:
+        return False
+    try:
+        task = task_queue.get_task(task_id)
+    except Exception:
+        task = None
+    return bool(task and _task_visible_to_request(task, http_request))
+
+
+def _ensure_platform_analysis_quota_available(
+    http_request: Optional[Request],
+    quantity: int,
+    request: AnalyzeRequest,
+) -> Optional[JSONResponse]:
+    user_id = _get_platform_user_id(http_request)
+    if user_id is None:
+        return None
+    try:
+        identity = _get_platform_identity(http_request)
+        plan = getattr(identity, "plan", "free") if identity is not None else "free"
+        policy = get_feature_policy(
+            _analysis_feature_for_request(request),
+            plan=plan,
+            api_key_mode=_api_key_mode_for_request(request),
+        )
+        requested = max(1, int(quantity or 1)) * max(int(policy.cost_units), int(policy.server_abuse_units))
+        if requested <= 0:
+            return None
+        status = PlatformAccountService().get_feature_quota_status(user_id, policy.quota_bucket)
+    except ValueError:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "unauthorized", "message": "Login required"},
+        )
+    remaining = status.get("remaining")
+    if remaining is not None and requested > int(remaining):
+        return _platform_quota_exceeded_response(
+            QuotaExceeded(
+                remaining=int(remaining),
+                requested=requested,
+                weekly_limit=status.get("weekly_limit"),
+            )
+        )
+    return None
+
+
+def _current_request_dep(request: Request) -> Request:
+    return request
+
+
+def _api_key_mode_for_request(request: AnalyzeRequest) -> str:
+    mode = (getattr(request, "api_key_mode", "platform") or "platform").strip().lower()
+    return mode if mode in {"user", "local"} else "platform"
+
+
+def _analysis_feature_for_request(request: AnalyzeRequest) -> str:
+    depth = (getattr(request, "analysis_depth", "fast") or "fast").strip().lower()
+    return "ai_deep" if depth in {"deep", "full"} else "ai_quick"
+
+
+def _reserve_platform_analysis_quota(
+    http_request: Optional[Request],
+    quantity: int,
+    *,
+    request: AnalyzeRequest,
+    reference_id: Optional[str] = None,
+) -> Optional[JSONResponse]:
+    user_id = _get_platform_user_id(http_request)
+    if user_id is None or quantity <= 0:
+        return None
+    try:
+        PlatformAccountService().reserve_feature_quota(
+            user_id=user_id,
+            feature=_analysis_feature_for_request(request),
+            api_key_mode=_api_key_mode_for_request(request),
+            quantity=quantity,
+            reference_id=reference_id,
+        )
+    except QuotaExceeded as exc:
+        return _platform_quota_exceeded_response(exc)
+    except ValueError:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "unauthorized", "message": "Login required"},
+        )
+    return None
+
+
 # ============================================================
 # POST /analyze - 触发股票分析
 # ============================================================
@@ -237,6 +437,7 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
 )
 def trigger_analysis(
         request: AnalyzeRequest,
+        http_request: Any = Depends(_current_request_dep),
         config: Config = Depends(get_config_dep)
 ) -> Union[AnalysisResultResponse, JSONResponse]:
     """
@@ -296,6 +497,15 @@ def trigger_analysis(
     if not stock_codes:
         raise api_error(400, "validation_error", "股票代码不能为空或仅包含空白字符")
 
+    if isinstance(http_request, Request):
+        limited = check_platform_rate_limit(
+            http_request,
+            "analysis",
+            user_id=_get_platform_user_id(http_request),
+        )
+        if limited is not None:
+            return limited
+
     # Sync mode only supports single-stock analysis.
     if not request.async_mode:
         if len(stock_codes) > 1:
@@ -304,15 +514,31 @@ def trigger_analysis(
                 "validation_error",
                 "同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析",
             )
-        return _handle_sync_analysis(stock_codes[0], request)
+        quota_error = _reserve_platform_analysis_quota(
+            http_request,
+            1,
+            request=request,
+            reference_id=stock_codes[0],
+        )
+        if quota_error is not None:
+            return quota_error
+        return _handle_sync_analysis(
+            stock_codes[0],
+            request,
+            platform_user_id=_get_platform_user_id(http_request),
+        )
 
     # Async mode submits one task per stock.
-    return _handle_async_analysis_batch(stock_codes, request)
+    quota_error = _ensure_platform_analysis_quota_available(http_request, len(stock_codes), request)
+    if quota_error is not None:
+        return quota_error
+    return _handle_async_analysis_batch(stock_codes, request, http_request=http_request)
 
 
 def _handle_async_analysis_batch(
     stock_codes: list,
-    request: AnalyzeRequest
+    request: AnalyzeRequest,
+    http_request: Optional[Request] = None,
 ) -> JSONResponse:
     """
     Handle asynchronous analysis requests, including batch submission.
@@ -331,7 +557,10 @@ def _handle_async_analysis_batch(
     notify = getattr(request, "notify", True)
     skills = getattr(request, "skills", None)
     analysis_phase = request.analysis_phase
+    analysis_depth = getattr(request, "analysis_depth", "fast") or "fast"
     report_language = normalize_report_language(getattr(request, "report_language", None), default="")
+    api_key_mode = _api_key_mode_for_request(request)
+    platform_user_id = _get_platform_user_id(http_request)
 
     submit_kwargs = dict(
         stock_codes=stock_codes,
@@ -340,15 +569,27 @@ def _handle_async_analysis_batch(
         selection_source=selection_source,
         report_type=request.report_type,
         analysis_phase=analysis_phase,
+        analysis_depth=analysis_depth,
         force_refresh=request.force_refresh,
         notify=notify,
     )
+    if platform_user_id is not None:
+        submit_kwargs["platform_user_id"] = platform_user_id
+        submit_kwargs["api_key_mode"] = api_key_mode
     if report_language:
         submit_kwargs["report_language"] = report_language
     if skills is not None:
         submit_kwargs["skills"] = skills
 
     accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
+    quota_error = _reserve_platform_analysis_quota(
+        http_request,
+        len(accepted_tasks),
+        request=request,
+        reference_id=",".join(task.stock_code for task in accepted_tasks) if accepted_tasks else None,
+    )
+    if quota_error is not None:
+        return quota_error
 
     accepted = [
         BatchTaskAcceptedItem(
@@ -358,6 +599,7 @@ def _handle_async_analysis_batch(
             status="pending",
             message=f"分析任务已加入队列: {task.stock_code}",
             analysis_phase=task.analysis_phase,
+            analysis_depth=getattr(task, "analysis_depth", "fast") or "fast",
         )
         for task in accepted_tasks
     ]
@@ -392,6 +634,7 @@ def _handle_async_analysis_batch(
             status="pending",
             message=accepted[0].message,
             analysis_phase=accepted[0].analysis_phase,
+            analysis_depth=accepted[0].analysis_depth,
         )
         return JSONResponse(
             status_code=202,
@@ -412,7 +655,8 @@ def _handle_async_analysis_batch(
 
 def _handle_sync_analysis(
     stock_code: str,
-    request: AnalyzeRequest
+    request: AnalyzeRequest,
+    platform_user_id: Optional[int] = None,
 ) -> AnalysisResultResponse:
     """
     处理同步分析请求
@@ -426,6 +670,12 @@ def _handle_sync_analysis(
     
     try:
         service = AnalysisService()
+        analysis_kwargs = {}
+        api_key_mode = _api_key_mode_for_request(request)
+        if platform_user_id is not None:
+            analysis_kwargs["platform_user_id"] = platform_user_id
+        if platform_user_id is not None or api_key_mode in {"user", "local"}:
+            analysis_kwargs["api_key_mode"] = api_key_mode
         result = service.analyze_stock(
             stock_code=stock_code,
             report_type=request.report_type,
@@ -434,7 +684,9 @@ def _handle_sync_analysis(
             send_notification=getattr(request, "notify", True),
             skills=getattr(request, "skills", None),
             analysis_phase=request.analysis_phase,
+            analysis_depth=getattr(request, "analysis_depth", "fast") or "fast",
             report_language=getattr(request, "report_language", None),
+            **analysis_kwargs,
         )
 
         if result is None:
@@ -468,6 +720,9 @@ def _handle_sync_analysis(
 
     except HTTPException:
         raise
+    except TimeoutError as e:
+        logger.warning("AI analysis timed out: %s", e)
+        raise api_error(504, "ai_timeout", f"AI analysis timed out: {str(e)}")
     except Exception as e:
         logger.error(f"分析失败: {e}", exc_info=True)
         raise api_error(500, "internal_error", f"分析过程发生错误: {str(e)}")
@@ -491,6 +746,7 @@ def _handle_sync_analysis(
 )
 def trigger_market_review(
     request: Optional[MarketReviewRequest] = Body(None),
+    http_request: Any = Depends(_current_request_dep),
     config: Config = Depends(get_config_dep),
 ) -> MarketReviewAccepted:
     """Trigger market review from Web/API without blocking the request."""
@@ -521,11 +777,14 @@ def trigger_market_review(
                 lock_token=lock_token,
                 config=runtime_config,
                 query_id=task_id,
+                platform_user_id=_get_platform_user_id(http_request),
             ),
             stock_code="market_review",
             stock_name="大盘复盘",
             message="大盘复盘任务已提交",
             task_id=task_id,
+            platform_user_id=_get_platform_user_id(http_request),
+            api_key_mode="platform",
         )
     except Exception:
         _release_market_review_lock(lock_token)
@@ -559,6 +818,7 @@ def get_task_list(
         description="筛选状态：pending, processing, completed, failed, cancel_requested, cancelled（支持逗号分隔多个）"
     ),
     limit: int = Query(20, description="返回数量限制", ge=1, le=100),
+    http_request: Any = Depends(_current_request_dep),
 ) -> TaskListResponse:
     """
     获取分析任务列表
@@ -573,15 +833,18 @@ def get_task_list(
     task_queue = get_task_queue()
     
     # 获取所有任务
-    all_tasks = task_queue.list_all_tasks(limit=limit)
+    fetch_limit = 100 if _is_platform_scoped_request(http_request) else limit
+    all_tasks = task_queue.list_all_tasks(limit=fetch_limit)
+    all_tasks = _filter_tasks_for_request(all_tasks, http_request)
     
     # 状态筛选
     if status:
         status_list = [s.strip().lower() for s in status.split(",")]
         all_tasks = [t for t in all_tasks if t.status.value in status_list]
+    all_tasks = all_tasks[:limit]
     
     # 统计信息
-    stats = task_queue.get_task_stats()
+    stats = _task_stats_from_tasks(all_tasks) if _is_platform_scoped_request(http_request) else task_queue.get_task_stats()
     
     # 转换为 Schema
     task_infos = [
@@ -601,6 +864,7 @@ def get_task_list(
             original_query=t.original_query,
             selection_source=t.selection_source,
             analysis_phase=t.analysis_phase,
+            analysis_depth=getattr(t, "analysis_depth", "fast") or "fast",
             skills=getattr(t, "skills", None),
         )
         for t in all_tasks
@@ -626,7 +890,7 @@ def get_task_list(
     summary="任务状态 SSE 流",
     description="通过 Server-Sent Events 实时推送任务状态变化"
 )
-async def task_stream():
+async def task_stream(http_request: Any = Depends(_current_request_dep)):
     """
     SSE 任务状态流
     
@@ -652,7 +916,8 @@ async def task_stream():
         # 发送当前进行中的任务
         pending_tasks = task_queue.list_pending_tasks()
         for task in pending_tasks:
-            yield _format_sse_event("task_created", task.to_dict())
+            if _task_visible_to_request(task, http_request):
+                yield _format_sse_event("task_created", task.to_dict())
         
         # 订阅任务事件
         task_queue.subscribe(event_queue)
@@ -662,7 +927,9 @@ async def task_stream():
                 try:
                     # 等待事件，超时发送心跳
                     event = await asyncio.wait_for(event_queue.get(), timeout=30)
-                    yield _format_sse_event(event["type"], event["data"])
+                    event_data = event.get("data") or {}
+                    if _task_event_visible_to_request(event_data, task_queue, http_request):
+                        yield _format_sse_event(event["type"], event_data)
                 except asyncio.TimeoutError:
                     # 心跳
                     yield _format_sse_event("heartbeat", {
@@ -738,7 +1005,7 @@ def _load_history_run_flow_by_query_id(
     summary="获取分析任务运行流",
     description="根据 task_id 查询任务数据流/信息流快照；活跃任务缺少诊断时返回骨架流。",
 )
-def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
+def get_task_run_flow(task_id: str, http_request: Any = Depends(_current_request_dep)) -> RunFlowSnapshot:
     """
     查询分析任务运行流。
 
@@ -749,6 +1016,8 @@ def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
     task = task_queue.get_task(task_id)
 
     if task:
+        if not _task_visible_to_request(task, http_request):
+            raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
         if task.status == TaskStatusEnum.COMPLETED:
             task_report_type = _history_report_type_for_task_flow(
                 getattr(task, "report_type", None)
@@ -765,6 +1034,9 @@ def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
             if history_snapshot is not None:
                 return history_snapshot
         return build_task_run_flow_snapshot(task)
+
+    if _is_platform_scoped_request(http_request):
+        raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
 
     try:
         history_snapshot = _load_history_run_flow_by_query_id(task_id)
@@ -959,7 +1231,7 @@ def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
     summary="查询分析任务状态",
     description="根据 task_id 查询单个任务的状态"
 )
-def get_analysis_status(task_id: str) -> TaskStatus:
+def get_analysis_status(task_id: str, http_request: Any = Depends(_current_request_dep)) -> TaskStatus:
     """
     查询分析任务状态
     
@@ -979,6 +1251,8 @@ def get_analysis_status(task_id: str) -> TaskStatus:
     task = task_queue.get_task(task_id)
     
     if task:
+        if not _task_visible_to_request(task, http_request):
+            raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
         result: Optional[AnalysisResultResponse] = None
         market_review_report = None
         market_review_payload = None
@@ -1013,9 +1287,13 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             original_query=task.original_query,
             selection_source=task.selection_source,
             analysis_phase=task.analysis_phase,
+            analysis_depth=getattr(task, "analysis_depth", "fast") or "fast",
             skills=getattr(task, "skills", None),
         )
     
+    if _is_platform_scoped_request(http_request):
+        raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
+
     # 2. 从数据库查询已完成的记录
     try:
         from src.storage import DatabaseManager

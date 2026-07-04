@@ -952,6 +952,84 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(result, {"stock_code": "600519"})
         self.assertEqual(pipeline_cls.call_args.kwargs["analysis_skills"], request_skills)
 
+    def test_analyze_request_defaults_to_fast_depth(self) -> None:
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        request = analysis_endpoint_module.AnalyzeRequest.model_validate({"stock_code": "600519"})
+
+        self.assertEqual(request.analysis_depth, "fast")
+
+    def test_analysis_service_fast_depth_disables_heavy_request_modules(self) -> None:
+        service = object.__new__(AnalysisService)
+        pipeline_instance = MagicMock()
+        pipeline_instance.process_single_stock.return_value = object()
+        base_config = SimpleNamespace(
+            report_language="zh",
+            daily_market_context_enabled=True,
+            enable_fundamental_pipeline=True,
+            enable_chip_distribution=True,
+            searxng_public_instances_enabled=True,
+            prefetch_realtime_quotes=True,
+        )
+
+        with patch("src.config.get_config", return_value=base_config), \
+             patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance) as pipeline_cls, \
+             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "600519"}):
+            result = AnalysisService.analyze_stock(
+                service,
+                "600519",
+                report_type="detailed",
+                query_id="q1",
+                analysis_depth="fast",
+            )
+
+        self.assertEqual(result, {"stock_code": "600519"})
+        scoped_config = pipeline_cls.call_args.kwargs["config"]
+        self.assertIsNot(scoped_config, base_config)
+        self.assertFalse(scoped_config.daily_market_context_enabled)
+        self.assertFalse(scoped_config.enable_fundamental_pipeline)
+        self.assertFalse(scoped_config.enable_chip_distribution)
+        self.assertFalse(scoped_config.searxng_public_instances_enabled)
+        self.assertFalse(scoped_config.prefetch_realtime_quotes)
+        self.assertFalse(pipeline_cls.call_args.kwargs["daily_market_context_enabled"])
+        self.assertFalse(pipeline_cls.call_args.kwargs["daily_market_context_allow_generate"])
+
+    def test_analysis_service_deep_depth_keeps_configured_modules(self) -> None:
+        service = object.__new__(AnalysisService)
+        pipeline_instance = MagicMock()
+        pipeline_instance.process_single_stock.return_value = object()
+        base_config = SimpleNamespace(
+            report_language="zh",
+            daily_market_context_enabled=True,
+            enable_fundamental_pipeline=True,
+            enable_chip_distribution=True,
+            searxng_public_instances_enabled=True,
+            prefetch_realtime_quotes=True,
+        )
+
+        with patch("src.config.get_config", return_value=base_config), \
+             patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance) as pipeline_cls, \
+             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "600519"}):
+            result = AnalysisService.analyze_stock(
+                service,
+                "600519",
+                report_type="detailed",
+                query_id="q1",
+                analysis_depth="deep",
+            )
+
+        self.assertEqual(result, {"stock_code": "600519"})
+        scoped_config = pipeline_cls.call_args.kwargs["config"]
+        self.assertIs(scoped_config, base_config)
+        self.assertTrue(scoped_config.daily_market_context_enabled)
+        self.assertTrue(scoped_config.enable_fundamental_pipeline)
+        self.assertTrue(scoped_config.enable_chip_distribution)
+        self.assertTrue(scoped_config.searxng_public_instances_enabled)
+        self.assertTrue(scoped_config.prefetch_realtime_quotes)
+        self.assertNotIn("daily_market_context_enabled", pipeline_cls.call_args.kwargs)
+        self.assertNotIn("daily_market_context_allow_generate", pipeline_cls.call_args.kwargs)
+
     def test_report_type_full_is_preserved_in_response_metadata(self) -> None:
         service = AnalysisService()
         pipeline_instance = MagicMock()
@@ -2258,6 +2336,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2297,6 +2376,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2331,6 +2411,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source=None,
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
             report_language="en",
@@ -2364,10 +2445,12 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     analysis_phase="intraday",
                 ),
                 config=SimpleNamespace(),
-            )
+        )
 
         self.assertEqual(response.status_code, 202)
-        self.assertEqual(json.loads(response.body)["analysis_phase"], "intraday")
+        body = json.loads(response.body)
+        self.assertEqual(body["analysis_phase"], "intraday")
+        self.assertEqual(body["analysis_depth"], "fast")
         queue.submit_tasks_batch.assert_called_once_with(
             stock_codes=["600519"],
             stock_name=None,
@@ -2375,6 +2458,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source=None,
             report_type="detailed",
             analysis_phase="intraday",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2412,6 +2496,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="autocomplete",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2450,6 +2535,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="autocomplete",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2519,6 +2605,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2556,6 +2643,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2593,6 +2681,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2629,6 +2718,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="import",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2723,6 +2813,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             selection_source="import",
             report_type="detailed",
             analysis_phase="auto",
+            analysis_depth="fast",
             force_refresh=False,
             notify=True,
         )
@@ -2926,6 +3017,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
             ["600519"],
             report_type="detailed",
             analysis_phase="intraday",
+            analysis_depth="deep",
             query_source="portfolio",
             portfolio_context=portfolio_context,
             skills=request_skills,
@@ -2935,18 +3027,22 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
 
         self.assertEqual(duplicates, [])
         self.assertEqual(accepted[0].analysis_phase, "intraday")
+        self.assertEqual(accepted[0].analysis_depth, "deep")
         self.assertEqual(accepted[0].to_dict()["analysis_phase"], "intraday")
+        self.assertEqual(accepted[0].to_dict()["analysis_depth"], "deep")
         self.assertNotIn("portfolio_context", accepted[0].to_dict())
         self.assertNotIn("query_source", accepted[0].to_dict())
         self.assertNotIn("portfolio_context", broadcast_events[0][1])
         self.assertNotIn("query_source", broadcast_events[0][1])
         self.assertEqual(accepted[0].copy().analysis_phase, "intraday")
+        self.assertEqual(accepted[0].copy().analysis_depth, "deep")
         self.assertEqual(accepted[0].query_source, "portfolio")
         self.assertEqual(accepted[0].portfolio_context["quantity"], 100)
         self.assertEqual(accepted[0].copy().portfolio_context["quantity"], 100)
         self.assertEqual(accepted[0].skills, ["growth_quality"])
-        self.assertIs(executor.calls[0][1][5], accepted[0].skills)
-        self.assertIsNone(executor.calls[0][1][6])
+        self.assertEqual(executor.calls[0][1][3], "deep")
+        self.assertIs(executor.calls[0][1][6], accepted[0].skills)
+        self.assertIsNone(executor.calls[0][1][7])
 
         service_instance = MagicMock()
         service_instance.analyze_stock.return_value = {"stock_name": "贵州茅台"}
@@ -2959,6 +3055,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         )
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["skills"], ["growth_quality"])
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["analysis_phase"], "intraday")
+        self.assertEqual(service_instance.analyze_stock.call_args.kwargs["analysis_depth"], "deep")
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["query_source"], "portfolio")
         self.assertEqual(
             service_instance.analyze_stock.call_args.kwargs["portfolio_context"]["quantity"],

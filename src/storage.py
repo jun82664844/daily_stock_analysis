@@ -95,6 +95,159 @@ class DatabaseSchemaMigration(Base):
     applied_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
 
 
+class PlatformUser(Base):
+    """End-user account used by the public platform mode."""
+
+    __tablename__ = 'platform_users'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    password_hash = Column(String(512), nullable=False)
+    role = Column(String(32), nullable=False, default='user', index=True)
+    plan = Column(String(32), nullable=False, default='free', index=True)
+    status = Column(String(32), nullable=False, default='active', index=True)
+    weekly_quota = Column(Integer)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class PlatformUserApiKey(Base):
+    """Encrypted user-owned provider API key."""
+
+    __tablename__ = 'platform_user_api_keys'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    provider = Column(String(32), nullable=False, index=True)
+    model = Column(String(128))
+    encrypted_secret = Column(Text, nullable=False)
+    masked_key = Column(String(64), nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'provider', name='uix_platform_user_api_key_provider'),
+    )
+
+
+class PlatformUsageEvent(Base):
+    """Quota and usage ledger for platform users."""
+
+    __tablename__ = 'platform_usage_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    event_type = Column(String(32), nullable=False, index=True)
+    feature = Column(String(64), nullable=False, default='analysis', index=True)
+    quota_bucket = Column(String(64), nullable=False, default='analysis', index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    units = Column(Integer, nullable=False, default=1)
+    reason = Column(String(128))
+    reference_id = Column(String(128), index=True)
+    period_start = Column(Date, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+    __table_args__ = (
+        Index('ix_platform_usage_user_period', 'user_id', 'event_type', 'period_start'),
+        Index('ix_platform_usage_bucket_period', 'user_id', 'quota_bucket', 'period_start'),
+    )
+
+
+class PlatformAuditEvent(Base):
+    """Structured audit trail for public platform operations."""
+
+    __tablename__ = 'platform_audit_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=True, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+    __table_args__ = (
+        Index('ix_platform_audit_user_time', 'user_id', 'created_at'),
+    )
+
+
+class PlatformBillingCheckoutSession(Base):
+    """Local sandbox checkout session ledger."""
+
+    __tablename__ = 'platform_billing_checkout_sessions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    provider = Column(String(32), nullable=False, default='sandbox', index=True)
+    provider_session_id = Column(String(128), nullable=False, unique=True, index=True)
+    checkout_url = Column(String(512), nullable=False)
+    plan = Column(String(32), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default='created', index=True)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        Index('ix_platform_billing_checkout_user_time', 'user_id', 'created_at'),
+    )
+
+
+class PlatformBillingSubscription(Base):
+    """Current local sandbox subscription state per platform user."""
+
+    __tablename__ = 'platform_billing_subscriptions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, unique=True, index=True)
+    provider = Column(String(32), nullable=False, default='sandbox', index=True)
+    provider_subscription_id = Column(String(128), index=True)
+    plan = Column(String(32), nullable=False, default='free', index=True)
+    status = Column(String(32), nullable=False, default='none', index=True)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+
+class PlatformBillingEvent(Base):
+    """Signed billing event ledger with provider idempotency key."""
+
+    __tablename__ = 'platform_billing_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=True, index=True)
+    provider = Column(String(32), nullable=False, default='sandbox', index=True)
+    provider_event_id = Column(String(128), nullable=False, unique=True, index=True)
+    provider_session_id = Column(String(128), index=True)
+    event_type = Column(String(64), nullable=False, index=True)
+    plan = Column(String(32), index=True)
+    processing_status = Column(String(32), nullable=False, default='processed', index=True)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        Index('ix_platform_billing_events_user_time', 'user_id', 'created_at'),
+        Index('ix_platform_billing_events_type_time', 'event_type', 'created_at'),
+    )
+
+
+class PlatformWatchlistItem(Base):
+    """Per-platform-user watchlist item for local multi-user mode."""
+
+    __tablename__ = 'platform_watchlist_items'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    stock_code = Column(String(32), nullable=False, index=True)
+    input_code = Column(String(64))
+    market = Column(String(16), nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'stock_code', name='uix_platform_watchlist_user_stock'),
+        Index('ix_platform_watchlist_user_time', 'user_id', 'created_at'),
+    )
+
+
 class StockDaily(Base):
     """
     股票日线数据模型
@@ -315,6 +468,7 @@ class AnalysisHistory(Base):
     code = Column(String(10), nullable=False, index=True)
     name = Column(String(50))
     report_type = Column(String(16), index=True)
+    platform_user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=True, index=True)
 
     # 核心结论
     sentiment_score = Column(Integer)
@@ -337,6 +491,7 @@ class AnalysisHistory(Base):
 
     __table_args__ = (
         Index('ix_analysis_code_time', 'code', 'created_at'),
+        Index('ix_analysis_history_platform_user_time', 'platform_user_id', 'created_at'),
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -347,6 +502,7 @@ class AnalysisHistory(Base):
             'code': self.code,
             'name': self.name,
             'report_type': self.report_type,
+            'platform_user_id': self.platform_user_id,
             'sentiment_score': self.sentiment_score,
             'operation_advice': self.operation_advice,
             'trend_prediction': self.trend_prediction,
@@ -359,6 +515,98 @@ class AnalysisHistory(Base):
             'stop_loss': self.stop_loss,
             'take_profit': self.take_profit,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AnalysisHistoryRefreshMarker(Base):
+    """No-AI current quote refresh marker for an analysis history record."""
+
+    __tablename__ = 'analysis_history_refresh_markers'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    history_id = Column(Integer, ForeignKey('analysis_history.id'), nullable=False, index=True)
+    platform_user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=True, index=True)
+    stock_code = Column(String(32), nullable=False, index=True)
+    route_lane = Column(String(64))
+    quote_source = Column(String(128))
+    freshness = Column(String(32))
+    ai_used = Column(Boolean, nullable=False, default=False, index=True)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    refreshed_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'history_id',
+            'platform_user_id',
+            name='uix_analysis_history_refresh_user_record',
+        ),
+        Index('ix_analysis_history_refresh_user_time', 'platform_user_id', 'refreshed_at'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
+        if self.metadata_json:
+            try:
+                parsed = json.loads(self.metadata_json)
+                if isinstance(parsed, dict):
+                    metadata = parsed
+            except Exception:
+                metadata = {}
+        return {
+            'id': self.id,
+            'history_id': self.history_id,
+            'platform_user_id': self.platform_user_id,
+            'stock_code': self.stock_code,
+            'route_lane': self.route_lane,
+            'quote_source': self.quote_source,
+            'freshness': self.freshness,
+            'ai_used': bool(self.ai_used),
+            'metadata': metadata,
+            'refreshed_at': self.refreshed_at.isoformat() if self.refreshed_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class AnalysisHistoryUserState(Base):
+    """Per-user local state for an analysis history record."""
+
+    __tablename__ = 'analysis_history_user_states'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    history_id = Column(Integer, ForeignKey('analysis_history.id'), nullable=False, index=True)
+    platform_user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=True, index=True)
+    favorite = Column(Boolean, nullable=False, default=False, index=True)
+    important = Column(Boolean, nullable=False, default=False, index=True)
+    archived = Column(Boolean, nullable=False, default=False, index=True)
+    read = Column(Boolean, nullable=False, default=False, index=True)
+    note = Column(Text)
+    note_updated_at = Column(DateTime)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'history_id',
+            'platform_user_id',
+            name='uix_analysis_history_state_user_record',
+        ),
+        Index('ix_analysis_history_state_user_time', 'platform_user_id', 'updated_at'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'history_id': self.history_id,
+            'platform_user_id': self.platform_user_id,
+            'favorite': bool(self.favorite),
+            'important': bool(self.important),
+            'archived': bool(self.archived),
+            'read': bool(self.read),
+            'note': self.note,
+            'note_updated_at': self.note_updated_at.isoformat() if self.note_updated_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
@@ -862,6 +1110,23 @@ _LLM_USAGE_INTEGER_TELEMETRY_COLUMNS = {
 _LLM_USAGE_DROPPED_FREE_TEXT_COLUMNS = {"tokenizer_name", "tokenizer_version"}
 
 
+_PLATFORM_USAGE_EVENT_COLUMN_SQL: Dict[str, str] = {
+    "feature": "VARCHAR(64) NOT NULL DEFAULT 'analysis'",
+    "quota_bucket": "VARCHAR(64) NOT NULL DEFAULT 'analysis'",
+    "units": "INTEGER NOT NULL DEFAULT 1",
+}
+
+
+_PLATFORM_USER_API_KEY_COLUMN_SQL: Dict[str, str] = {
+    "model": "VARCHAR(128)",
+}
+
+
+_ANALYSIS_HISTORY_PLATFORM_COLUMN_SQL: Dict[str, str] = {
+    "platform_user_id": "INTEGER",
+}
+
+
 class AlertRuleRecord(Base):
     """Persisted alert rule managed through the Alert API."""
 
@@ -1160,6 +1425,9 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             # 创建所有表
             Base.metadata.create_all(self._engine)
             self._ensure_llm_usage_telemetry_columns()
+            self._ensure_platform_usage_event_columns()
+            self._ensure_platform_user_api_key_columns()
+            self._ensure_analysis_history_platform_columns()
             self._ensure_intelligence_item_scope_values()
             self._ensure_schema_migration_record()
             self._ensure_intelligence_items_unique_index()
@@ -1361,6 +1629,109 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                         continue
                     raise
 
+    def _ensure_platform_usage_event_columns(self) -> None:
+        """Add feature-level quota columns to existing SQLite DBs."""
+        if not self._is_sqlite_engine:
+            return
+        try:
+            existing = {
+                column["name"]
+                for column in inspect(self._engine).get_columns(PlatformUsageEvent.__tablename__)
+            }
+        except Exception as exc:
+            logger.warning(
+                "[Platform usage] failed to inspect quota columns; "
+                "skipping best-effort SQLite feature column backfill: %s",
+                exc,
+            )
+            return
+
+        for column, column_type in _PLATFORM_USAGE_EVENT_COLUMN_SQL.items():
+            if column in existing:
+                continue
+            try:
+                with self._engine.begin() as connection:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {PlatformUsageEvent.__tablename__} "
+                        f"ADD COLUMN {column} {column_type}"
+                    )
+                existing.add(column)
+            except OperationalError as exc:
+                if self._is_sqlite_duplicate_column_error(exc, column):
+                    existing.add(column)
+                    continue
+                raise
+
+    def _ensure_platform_user_api_key_columns(self) -> None:
+        """Add product metadata columns to existing user API key tables."""
+        if not self._is_sqlite_engine:
+            return
+        try:
+            existing = {
+                column["name"]
+                for column in inspect(self._engine).get_columns(PlatformUserApiKey.__tablename__)
+            }
+        except Exception as exc:
+            logger.warning(
+                "[Platform API keys] failed to inspect metadata columns; "
+                "skipping best-effort SQLite column backfill: %s",
+                exc,
+            )
+            return
+
+        for column, column_type in _PLATFORM_USER_API_KEY_COLUMN_SQL.items():
+            if column in existing:
+                continue
+            try:
+                with self._engine.begin() as connection:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {PlatformUserApiKey.__tablename__} "
+                        f"ADD COLUMN {column} {column_type}"
+                    )
+                existing.add(column)
+            except OperationalError as exc:
+                if self._is_sqlite_duplicate_column_error(exc, column):
+                    existing.add(column)
+                    continue
+                raise
+
+    def _ensure_analysis_history_platform_columns(self) -> None:
+        """Add nullable owner scope columns to existing analysis history tables."""
+        if not self._is_sqlite_engine:
+            return
+        try:
+            existing = {
+                column["name"]
+                for column in inspect(self._engine).get_columns(AnalysisHistory.__tablename__)
+            }
+        except Exception:
+            return
+
+        for column, column_type in _ANALYSIS_HISTORY_PLATFORM_COLUMN_SQL.items():
+            if column in existing:
+                continue
+            try:
+                with self._engine.begin() as connection:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {AnalysisHistory.__tablename__} "
+                        f"ADD COLUMN {column} {column_type}"
+                    )
+                existing.add(column)
+            except OperationalError as exc:
+                if self._is_sqlite_duplicate_column_error(exc, column):
+                    existing.add(column)
+                    continue
+                raise
+
+        try:
+            with self._engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_analysis_history_platform_user_time "
+                    f"ON {AnalysisHistory.__tablename__} (platform_user_id, created_at)"
+                )
+        except Exception as exc:
+            logger.warning("分析历史用户归属索引创建失败，已跳过: %s", exc)
+
     def _ensure_intelligence_item_scope_values(self) -> None:
         """Backfill nullable intelligence item scopes so SQLite unique keys work."""
         if not self._is_sqlite_engine:
@@ -1549,6 +1920,54 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             raise
         finally:
             session.close()
+
+    def add_platform_audit_event(
+        self,
+        *,
+        user_id: Optional[int],
+        action: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        with self.session_scope() as session:
+            session.add(
+                PlatformAuditEvent(
+                    user_id=int(user_id) if user_id is not None else None,
+                    action=(action or "").strip(),
+                    metadata_json=json.dumps(metadata or {}, ensure_ascii=False, default=str),
+                    created_at=datetime.now(),
+                )
+            )
+
+    def list_platform_audit_events(
+        self,
+        *,
+        user_id: Optional[int] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        capped_limit = max(1, min(int(limit or 100), 500))
+        with self.get_session() as session:
+            statement = select(PlatformAuditEvent)
+            if user_id is not None:
+                statement = statement.where(PlatformAuditEvent.user_id == int(user_id))
+            rows = session.execute(
+                statement.order_by(PlatformAuditEvent.created_at.desc(), PlatformAuditEvent.id.desc()).limit(capped_limit)
+            ).scalars().all()
+            events: List[Dict[str, Any]] = []
+            for row in rows:
+                try:
+                    metadata = json.loads(row.metadata_json or "{}")
+                except (TypeError, ValueError):
+                    metadata = {}
+                events.append(
+                    {
+                        "id": row.id,
+                        "user_id": row.user_id,
+                        "action": row.action,
+                        "metadata": metadata,
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                    }
+                )
+            return events
     
     def has_today_data(self, code: str, target_date: Optional[date] = None) -> bool:
         """
@@ -1873,7 +2292,8 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         report_type: str,
         news_content: Optional[str],
         context_snapshot: Optional[Dict[str, Any]] = None,
-        save_snapshot: bool = True
+        save_snapshot: bool = True,
+        platform_user_id: Optional[int] = None,
     ) -> int:
         """
         保存分析结果历史记录。
@@ -1897,6 +2317,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     code=result.code,
                     name=result.name,
                     report_type=report_type,
+                    platform_user_id=platform_user_id,
                     sentiment_score=result.sentiment_score,
                     operation_advice=result.operation_advice,
                     trend_prediction=result.trend_prediction,
@@ -2077,7 +2498,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         offset: int = 0,
-        limit: int = 20
+        limit: int = 20,
+        platform_user_id: Optional[int] = None,
+        market: Optional[str] = None,
+        refresh_status: Optional[str] = None,
+        state_filter: Optional[str] = None,
+        note_search: Optional[str] = None,
+        sort: str = "newest",
     ) -> Tuple[List[AnalysisHistory], int]:
         """
         分页查询分析历史记录（带总数）
@@ -2093,8 +2520,6 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         Returns:
             Tuple[List[AnalysisHistory], int]: (记录列表, 总数)
         """
-        from sqlalchemy import func
-        
         with self.get_session() as session:
             conditions = []
             
@@ -2113,6 +2538,29 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             if end_date:
                 # created_at < end_date+1 00:00:00 (即 <= end_date 23:59:59)
                 conditions.append(AnalysisHistory.created_at < datetime.combine(end_date + timedelta(days=1), datetime.min.time()))
+            if platform_user_id is not None:
+                conditions.append(AnalysisHistory.platform_user_id == int(platform_user_id))
+            market_condition = self._analysis_history_market_condition(market)
+            if market_condition is not None:
+                conditions.append(market_condition)
+            refresh_condition = self._analysis_history_refresh_condition(
+                refresh_status,
+                platform_user_id=platform_user_id,
+            )
+            if refresh_condition is not None:
+                conditions.append(refresh_condition)
+            state_condition = self._analysis_history_state_condition(
+                state_filter,
+                platform_user_id=platform_user_id,
+            )
+            if state_condition is not None:
+                conditions.append(state_condition)
+            note_condition = self._analysis_history_note_search_condition(
+                note_search,
+                platform_user_id=platform_user_id,
+            )
+            if note_condition is not None:
+                conditions.append(note_condition)
             
             # 构建 where 子句
             where_clause = and_(*conditions) if conditions else True
@@ -2125,15 +2573,147 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             data_query = (
                 select(AnalysisHistory)
                 .where(where_clause)
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(*self._analysis_history_order_by(sort))
                 .offset(offset)
                 .limit(limit)
             )
             results = session.execute(data_query).scalars().all()
             
             return list(results), total
+
+    @staticmethod
+    def _analysis_history_market_condition(market: Optional[str]):
+        normalized = str(market or "").strip().lower()
+        if not normalized or normalized in {"all", "any"}:
+            return None
+
+        upper_code = func.upper(AnalysisHistory.code)
+        cn_condition = or_(
+            upper_code.op("GLOB")("SH[0-9][0-9][0-9][0-9][0-9][0-9]"),
+            upper_code.op("GLOB")("SZ[0-9][0-9][0-9][0-9][0-9][0-9]"),
+            upper_code.op("GLOB")("BJ[0-9][0-9][0-9][0-9][0-9][0-9]"),
+            upper_code.op("GLOB")("[0-9][0-9][0-9][0-9][0-9][0-9]"),
+            upper_code.op("GLOB")("[0-9][0-9][0-9][0-9][0-9][0-9].SH"),
+            upper_code.op("GLOB")("[0-9][0-9][0-9][0-9][0-9][0-9].SZ"),
+            upper_code.op("GLOB")("[0-9][0-9][0-9][0-9][0-9][0-9].BJ"),
+        )
+        hk_condition = or_(
+            upper_code.like("HK%"),
+            upper_code.like("%.HK"),
+            upper_code.op("GLOB")("[0-9][0-9][0-9][0-9][0-9]"),
+        )
+        crypto_condition = or_(
+            upper_code.like("%-USD"),
+            upper_code.like("%-USDT"),
+            upper_code.like("%/USD"),
+            upper_code.like("%/USDT"),
+        )
+
+        if normalized in {"cn", "a", "a_share", "a-share", "ashare"}:
+            return cn_condition
+        if normalized in {"hk", "hongkong", "hong_kong"}:
+            return hk_condition
+        if normalized in {"crypto", "coin", "coins"}:
+            return crypto_condition
+        if normalized in {"us", "usa", "nasdaq", "nyse"}:
+            return and_(
+                upper_code != "MARKET",
+                ~or_(cn_condition, hk_condition, crypto_condition),
+            )
+        return None
+
+    @staticmethod
+    def _analysis_history_refresh_condition(
+        refresh_status: Optional[str],
+        *,
+        platform_user_id: Optional[int] = None,
+    ):
+        normalized = str(refresh_status or "").strip().lower()
+        if not normalized or normalized in {"all", "any"}:
+            return None
+        marker_conditions = [AnalysisHistoryRefreshMarker.history_id == AnalysisHistory.id]
+        if platform_user_id is not None:
+            marker_conditions.append(
+                AnalysisHistoryRefreshMarker.platform_user_id == int(platform_user_id)
+            )
+        marker_exists = select(AnalysisHistoryRefreshMarker.id).where(and_(*marker_conditions)).exists()
+        if normalized in {"refreshed", "current_quote_refreshed"}:
+            return marker_exists
+        if normalized in {"not_refreshed", "unrefreshed", "stale"}:
+            return ~marker_exists
+        return None
+
+    @staticmethod
+    def _analysis_history_state_condition(
+        state_filter: Optional[str],
+        *,
+        platform_user_id: Optional[int] = None,
+    ):
+        normalized = str(state_filter or "").strip().lower()
+        if not normalized or normalized in {"all", "any"}:
+            return None
+
+        def state_exists(*extra_conditions):
+            state_conditions = [AnalysisHistoryUserState.history_id == AnalysisHistory.id]
+            if platform_user_id is None:
+                state_conditions.append(AnalysisHistoryUserState.platform_user_id.is_(None))
+            else:
+                state_conditions.append(AnalysisHistoryUserState.platform_user_id == int(platform_user_id))
+            state_conditions.extend(extra_conditions)
+            return select(AnalysisHistoryUserState.id).where(and_(*state_conditions)).exists()
+
+        if normalized in {"favorite", "favorites", "starred"}:
+            return state_exists(AnalysisHistoryUserState.favorite.is_(True))
+        if normalized in {"important", "pinned"}:
+            return state_exists(AnalysisHistoryUserState.important.is_(True))
+        if normalized in {"archived", "archive"}:
+            return state_exists(AnalysisHistoryUserState.archived.is_(True))
+        if normalized in {"active", "unarchived"}:
+            return ~state_exists(AnalysisHistoryUserState.archived.is_(True))
+        if normalized in {"read"}:
+            return state_exists(AnalysisHistoryUserState.read.is_(True))
+        if normalized in {"unread"}:
+            return ~state_exists(AnalysisHistoryUserState.read.is_(True))
+        if normalized in {"has_note", "noted", "note"}:
+            return state_exists(
+                AnalysisHistoryUserState.note.is_not(None),
+                AnalysisHistoryUserState.note != "",
+            )
+        return None
+
+    @staticmethod
+    def _analysis_history_note_search_condition(
+        note_search: Optional[str],
+        *,
+        platform_user_id: Optional[int] = None,
+    ):
+        needle = str(note_search or "").strip().lower()
+        if not needle:
+            return None
+        state_conditions = [
+            AnalysisHistoryUserState.history_id == AnalysisHistory.id,
+            AnalysisHistoryUserState.note.is_not(None),
+            AnalysisHistoryUserState.note != "",
+            func.lower(AnalysisHistoryUserState.note).like(f"%{needle}%"),
+        ]
+        if platform_user_id is None:
+            state_conditions.append(AnalysisHistoryUserState.platform_user_id.is_(None))
+        else:
+            state_conditions.append(AnalysisHistoryUserState.platform_user_id == int(platform_user_id))
+        return select(AnalysisHistoryUserState.id).where(and_(*state_conditions)).exists()
+
+    @staticmethod
+    def _analysis_history_order_by(sort: Optional[str]):
+        normalized = str(sort or "").strip().lower()
+        if normalized in {"oldest", "asc", "created_asc"}:
+            return [AnalysisHistory.created_at.asc(), AnalysisHistory.id.asc()]
+        return [desc(AnalysisHistory.created_at), desc(AnalysisHistory.id)]
     
-    def get_analysis_history_by_id(self, record_id: int) -> Optional[AnalysisHistory]:
+    def get_analysis_history_by_id(
+        self,
+        record_id: int,
+        platform_user_id: Optional[int] = None,
+    ) -> Optional[AnalysisHistory]:
         """
         根据数据库主键 ID 查询单条分析历史记录
         
@@ -2147,12 +2727,224 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             AnalysisHistory 对象，不存在返回 None
         """
         with self.get_session() as session:
+            conditions = [AnalysisHistory.id == record_id]
+            if platform_user_id is not None:
+                conditions.append(AnalysisHistory.platform_user_id == int(platform_user_id))
             result = session.execute(
-                select(AnalysisHistory).where(AnalysisHistory.id == record_id)
+                select(AnalysisHistory).where(and_(*conditions))
             ).scalars().first()
             return result
 
-    def delete_analysis_history_records(self, record_ids: List[int]) -> int:
+    def mark_analysis_history_current_quote_refreshed(
+        self,
+        *,
+        record_id: int,
+        platform_user_id: Optional[int] = None,
+        stock_code: Optional[str] = None,
+        route_lane: Optional[str] = None,
+        quote_source: Optional[str] = None,
+        freshness: Optional[str] = None,
+        ai_used: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Persist a no-AI current quote refresh marker for one history record."""
+
+        def _write(session: Session) -> Optional[Dict[str, Any]]:
+            record_conditions = [AnalysisHistory.id == int(record_id)]
+            if platform_user_id is not None:
+                record_conditions.append(AnalysisHistory.platform_user_id == int(platform_user_id))
+            record = session.execute(
+                select(AnalysisHistory).where(and_(*record_conditions)).limit(1)
+            ).scalars().first()
+            if record is None:
+                return None
+
+            marker_conditions = [AnalysisHistoryRefreshMarker.history_id == int(record_id)]
+            if platform_user_id is None:
+                marker_conditions.append(AnalysisHistoryRefreshMarker.platform_user_id.is_(None))
+            else:
+                marker_conditions.append(
+                    AnalysisHistoryRefreshMarker.platform_user_id == int(platform_user_id)
+                )
+            marker = session.execute(
+                select(AnalysisHistoryRefreshMarker).where(and_(*marker_conditions)).limit(1)
+            ).scalars().first()
+
+            now = utc_naive_now()
+            marker_metadata = metadata if isinstance(metadata, dict) else {}
+            if marker is None:
+                marker = AnalysisHistoryRefreshMarker(
+                    history_id=int(record_id),
+                    platform_user_id=int(platform_user_id) if platform_user_id is not None else None,
+                    stock_code=str(stock_code or record.code or "").strip(),
+                    ai_used=bool(ai_used),
+                    refreshed_at=now,
+                    updated_at=now,
+                )
+                session.add(marker)
+
+            marker.stock_code = str(stock_code or record.code or "").strip()
+            marker.route_lane = str(route_lane).strip() if route_lane else None
+            marker.quote_source = str(quote_source).strip() if quote_source else None
+            marker.freshness = str(freshness).strip() if freshness else None
+            marker.ai_used = bool(ai_used)
+            marker.metadata_json = self._safe_json_dumps(marker_metadata)
+            marker.refreshed_at = now
+            marker.updated_at = now
+            session.flush()
+            return marker.to_dict()
+
+        return self._run_write_transaction(
+            f"mark_analysis_history_current_quote_refreshed[{record_id}]",
+            _write,
+        )
+
+    def get_analysis_history_refresh_markers(
+        self,
+        record_ids: List[int],
+        platform_user_id: Optional[int] = None,
+    ) -> Dict[int, Dict[str, Any]]:
+        ids = sorted({int(record_id) for record_id in record_ids if record_id is not None})
+        if not ids:
+            return {}
+
+        with self.get_session() as session:
+            conditions = [AnalysisHistoryRefreshMarker.history_id.in_(ids)]
+            if platform_user_id is not None:
+                conditions.append(AnalysisHistoryRefreshMarker.platform_user_id == int(platform_user_id))
+            rows = session.execute(
+                select(AnalysisHistoryRefreshMarker)
+                .where(and_(*conditions))
+                .order_by(desc(AnalysisHistoryRefreshMarker.refreshed_at), desc(AnalysisHistoryRefreshMarker.id))
+            ).scalars().all()
+
+            markers: Dict[int, Dict[str, Any]] = {}
+            for row in rows:
+                if row.history_id not in markers:
+                    markers[int(row.history_id)] = row.to_dict()
+            return markers
+
+    def get_analysis_history_user_states(
+        self,
+        record_ids: List[int],
+        platform_user_id: Optional[int] = None,
+    ) -> Dict[int, Dict[str, Any]]:
+        ids = sorted({int(record_id) for record_id in record_ids if record_id is not None})
+        if not ids:
+            return {}
+
+        with self.get_session() as session:
+            conditions = [AnalysisHistoryUserState.history_id.in_(ids)]
+            if platform_user_id is None:
+                conditions.append(AnalysisHistoryUserState.platform_user_id.is_(None))
+            else:
+                conditions.append(AnalysisHistoryUserState.platform_user_id == int(platform_user_id))
+            rows = session.execute(
+                select(AnalysisHistoryUserState)
+                .where(and_(*conditions))
+                .order_by(desc(AnalysisHistoryUserState.updated_at), desc(AnalysisHistoryUserState.id))
+            ).scalars().all()
+
+            states: Dict[int, Dict[str, Any]] = {}
+            for row in rows:
+                if row.history_id not in states:
+                    states[int(row.history_id)] = row.to_dict()
+            return states
+
+    @staticmethod
+    def _default_analysis_history_user_state(
+        history_id: int,
+        platform_user_id: Optional[int],
+    ) -> Dict[str, Any]:
+        return {
+            'id': None,
+            'history_id': int(history_id),
+            'platform_user_id': int(platform_user_id) if platform_user_id is not None else None,
+            'favorite': False,
+            'important': False,
+            'archived': False,
+            'read': False,
+            'note': None,
+            'note_updated_at': None,
+            'created_at': None,
+            'updated_at': None,
+        }
+
+    def update_analysis_history_user_state(
+        self,
+        *,
+        record_id: int,
+        platform_user_id: Optional[int] = None,
+        favorite: Optional[bool] = None,
+        important: Optional[bool] = None,
+        archived: Optional[bool] = None,
+        read: Optional[bool] = None,
+        note_present: bool = False,
+        note: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Upsert per-user local state for a history record."""
+
+        def _write(session: Session) -> Optional[Dict[str, Any]]:
+            record_conditions = [AnalysisHistory.id == int(record_id)]
+            if platform_user_id is not None:
+                record_conditions.append(AnalysisHistory.platform_user_id == int(platform_user_id))
+            record = session.execute(
+                select(AnalysisHistory).where(and_(*record_conditions)).limit(1)
+            ).scalars().first()
+            if record is None:
+                return None
+
+            state_conditions = [AnalysisHistoryUserState.history_id == int(record_id)]
+            if platform_user_id is None:
+                state_conditions.append(AnalysisHistoryUserState.platform_user_id.is_(None))
+            else:
+                state_conditions.append(
+                    AnalysisHistoryUserState.platform_user_id == int(platform_user_id)
+                )
+            state = session.execute(
+                select(AnalysisHistoryUserState).where(and_(*state_conditions)).limit(1)
+            ).scalars().first()
+
+            now = utc_naive_now()
+            if state is None:
+                state = AnalysisHistoryUserState(
+                    history_id=int(record_id),
+                    platform_user_id=int(platform_user_id) if platform_user_id is not None else None,
+                    favorite=False,
+                    important=False,
+                    archived=False,
+                    read=False,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(state)
+
+            if favorite is not None:
+                state.favorite = bool(favorite)
+            if important is not None:
+                state.important = bool(important)
+            if archived is not None:
+                state.archived = bool(archived)
+            if read is not None:
+                state.read = bool(read)
+            if note_present:
+                cleaned_note = str(note or "").strip()
+                state.note = cleaned_note[:1000] if cleaned_note else None
+                state.note_updated_at = now
+            state.updated_at = now
+            session.flush()
+            return state.to_dict()
+
+        return self._run_write_transaction(
+            f"update_analysis_history_user_state[{record_id}]",
+            _write,
+        )
+
+    def delete_analysis_history_records(
+        self,
+        record_ids: List[int],
+        platform_user_id: Optional[int] = None,
+    ) -> int:
         """
         删除指定的分析历史记录。
 
@@ -2171,9 +2963,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             return 0
 
         with self.session_scope() as session:
+            existing_conditions = [AnalysisHistory.id.in_(ids)]
+            if platform_user_id is not None:
+                existing_conditions.append(AnalysisHistory.platform_user_id == int(platform_user_id))
             existing_ids = sorted(
                 session.execute(
-                    select(AnalysisHistory.id).where(AnalysisHistory.id.in_(ids))
+                    select(AnalysisHistory.id).where(and_(*existing_conditions))
                 ).scalars().all()
             )
             if not existing_ids:
@@ -2217,6 +3012,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         end_date: Optional[date] = None,
         limit: int = 200,
         include_market_review: bool = False,
+        platform_user_id: Optional[int] = None,
     ) -> List[AnalysisHistory]:
         """
         获取历史记录中的不重复股票列表，每只股票取最新一条记录。
@@ -2248,6 +3044,8 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 subq = subq.where(
                     AnalysisHistory.created_at < datetime.combine(end_date + timedelta(days=1), datetime.min.time())
                 )
+            if platform_user_id is not None:
+                subq = subq.where(AnalysisHistory.platform_user_id == int(platform_user_id))
             if not include_market_review:
                 subq = subq.where(
                     and_(
@@ -2280,6 +3078,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         *,
         code: Optional[str] = None,
         report_type: Optional[str] = None,
+        platform_user_id: Optional[int] = None,
     ) -> Optional[AnalysisHistory]:
         """
         根据 query_id 查询最新一条分析历史记录
@@ -2300,6 +3099,8 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 conditions.append(AnalysisHistory.code == code)
             if report_type:
                 conditions.append(AnalysisHistory.report_type == report_type)
+            if platform_user_id is not None:
+                conditions.append(AnalysisHistory.platform_user_id == int(platform_user_id))
 
             result = session.execute(
                 select(AnalysisHistory)

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, Search, Settings2 } from 'lucide-react';
+import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { ALPHASIFT_CONFIG_CHANGED_EVENT, SYSTEM_CONFIG_CHANGED_EVENT, alphasiftApi } from '../../api/alphasift';
+import { PLATFORM_SESSION_CHANGED_EVENT, platformApi } from '../../api/platform';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -36,15 +37,18 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'backtest', labelKey: 'layout.nav.backtest', to: '/backtest', icon: BarChart3 },
   { key: 'alerts', labelKey: 'layout.nav.alerts', to: '/alerts', icon: Bell },
   { key: 'usage', labelKey: 'layout.nav.usage', to: '/usage', icon: Gauge },
+  { key: 'account', labelKey: 'layout.nav.account', to: '/account', icon: UserRound },
+  { key: 'admin', labelKey: 'layout.nav.admin', to: '/admin', icon: ShieldCheck },
   { key: 'settings', labelKey: 'layout.nav.settings', to: '/settings', icon: Settings2 },
 ];
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, variant = 'default' }) => {
-  const { authEnabled, logout } = useAuth();
+  const { authEnabled, loggedIn, logout } = useAuth();
   const { t } = useUiLanguage();
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAlphaSiftNav, setShowAlphaSiftNav] = useState(false);
+  const [platformRole, setPlatformRole] = useState<string | null>('loading');
 
   useEffect(() => {
     let active = true;
@@ -73,7 +77,34 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
     };
   }, []);
 
-  const navItems = showAlphaSiftNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening');
+  useEffect(() => {
+    let active = true;
+
+    const refreshPlatformUser = async () => {
+      try {
+        const payload = await platformApi.current();
+        if (active) {
+          setPlatformRole(payload?.user?.role ?? null);
+        }
+      } catch {
+        if (active) {
+          setPlatformRole(null);
+        }
+      }
+    };
+
+    void refreshPlatformUser();
+    window.addEventListener(PLATFORM_SESSION_CHANGED_EVENT, refreshPlatformUser);
+
+    return () => {
+      active = false;
+      window.removeEventListener(PLATFORM_SESSION_CHANGED_EVENT, refreshPlatformUser);
+    };
+  }, []);
+
+  const showAdminOnlyNav = platformRole === 'admin' || (loggedIn && platformRole !== 'user');
+  const navItems = (showAlphaSiftNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening'))
+    .filter((item) => !['admin', 'settings'].includes(item.key) || showAdminOnlyNav);
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
     'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-2xl border border-transparent text-sm leading-none text-secondary-text transition-all',
@@ -171,7 +202,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         />
       </nav>
 
-      {authEnabled ? (
+      {authEnabled && loggedIn ? (
         <button
           type="button"
           onClick={() => setShowLogoutConfirm(true)}
