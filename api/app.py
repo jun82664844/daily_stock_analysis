@@ -64,6 +64,46 @@ def _frontend_index_response(static_dir: Path) -> FileResponse:
     )
 
 
+def _frontend_reset_response() -> HTMLResponse:
+    html = """<!doctype html>
+<html lang="zh-CN" translate="no"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="google" content="notranslate">
+<title>DSA Reset</title>
+<style>
+body{min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;background:#080c15;color:#e5eefb;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.card{width:min(560px,calc(100vw - 32px));border:1px solid #203044;border-radius:18px;background:#111827;padding:28px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+h1{margin:0 0 12px;font-size:22px}p{margin:8px 0;color:#aebbd0;line-height:1.7}.muted{font-size:13px;color:#718096}
+</style></head><body><main class="card">
+<h1>DSA page state is being refreshed</h1>
+<p>This local recovery page clears stale browser UI cache for 127.0.0.1:8018 only, then opens the current DSA page.</p>
+<p class="muted">Market reports, database records, and server data are not deleted.</p>
+</main>
+<script>
+(async () => {
+  try { window.localStorage.clear(); } catch (error) {}
+  try { window.sessionStorage.clear(); } catch (error) {}
+  try {
+    if ('caches' in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((key) => window.caches.delete(key)));
+    }
+  } catch (error) {}
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch (error) {}
+  const target = new URL('/', window.location.origin);
+  target.searchParams.set('dsa_route_reload', String(Date.now()));
+  target.searchParams.set('dsa_ui_reset', '1');
+  window.location.replace(target.toString());
+})();
+</script></body></html>"""
+    return HTMLResponse(content=html, headers=_FRONTEND_INDEX_NO_CACHE_HEADERS)
+
+
 def _check_frontend_assets_consistency(static_dir: Path) -> List[str]:
     """
     Verify that ``index.html`` only references assets that actually exist
@@ -324,6 +364,11 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
         async def root():
             """根路由 - 前端未构建时返回引导页面"""
             return HTMLResponse(content=_FRONTEND_NOT_BUILT_HTML)
+
+    @app.get("/reset-ui", include_in_schema=False)
+    async def reset_ui():
+        """Browser-side recovery page for stale local SPA state/cache."""
+        return _frontend_reset_response()
     
     @app.get(
         "/health",

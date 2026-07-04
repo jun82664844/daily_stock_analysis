@@ -323,7 +323,7 @@ def classify_dirty_path(path: str) -> str | None:
         or normalized.startswith("tests/")
     ):
         return "tests-and-verifiers"
-    if normalized.startswith("apps/dsa-web/src/"):
+    if normalized == "apps/dsa-web/index.html" or normalized.startswith("apps/dsa-web/src/"):
         return "frontend-platform-experience"
     if normalized.startswith("api/") or normalized.startswith("src/"):
         return "backend-platform-foundation"

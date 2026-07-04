@@ -324,3 +324,11 @@ git diff --check
 - The manual `重新加载页面` action and one-shot chunk-load recovery share the same cache-busting path.
 - Added test coverage for cache-busting recovery URL construction and rebuilt local static assets. Fresh browser automation on 8018 with a cache-bust query opens the homepage and runs anonymous `AAPL` quick snapshot with `No AI` / `US market data`.
 - V33 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
+
+## 2026-07-04 Browser State Recovery V34 gate
+
+- Added backend `/reset-ui` as a React-independent recovery page. It clears browser-side UI storage/cache/service-worker state for the local 8018 origin and redirects to `/?dsa_route_reload=<timestamp>&dsa_ui_reset=1`.
+- The reset page uses no-store headers and does not delete reports, databases, server-side user data, API keys, or market cache files.
+- Updated the frontend HTML template to `lang="zh-CN"`, `translate="no"`, and `notranslate` metadata to reduce Chrome Translate DOM mutation risk on the local React page.
+- Live 8018 verification opened `/reset-ui`, redirected to the refreshed homepage, ran anonymous `AAPL` quick snapshot, and rendered `No AI` / `US market data` without the route error page.
+- V34 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.

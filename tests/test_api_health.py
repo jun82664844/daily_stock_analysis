@@ -61,6 +61,23 @@ class HealthEndpointTestCase(unittest.TestCase):
         self.assertIn("application/json", resp.headers["content-type"])
         self.assertEqual(resp.json()["status"], "ok")
 
+    def test_reset_ui_returns_backend_cache_recovery_page(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            static_dir = Path(temp_dir)
+            (static_dir / "assets").mkdir()
+            (static_dir / "index.html").write_text("<!doctype html><div id=\"root\"></div>", encoding="utf-8")
+
+            client = TestClient(create_app(static_dir=static_dir))
+            resp = client.get("/reset-ui")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/html", resp.headers["content-type"])
+        self.assertIn("no-store", resp.headers.get("cache-control", ""))
+        self.assertIn("localStorage.clear", resp.text)
+        self.assertIn("sessionStorage.clear", resp.text)
+        self.assertIn("serviceWorker", resp.text)
+        self.assertIn("dsa_route_reload", resp.text)
+
 
 class HealthEndpointAuthEnabledTestCase(unittest.TestCase):
     """Health endpoints must remain accessible when admin auth is enabled."""

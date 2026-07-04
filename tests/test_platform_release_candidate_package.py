@@ -1066,6 +1066,14 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertEqual(by_id["manifest_covers_dirty_files"].status, "failed")
         self.assertIn("private-notes.txt", by_id["manifest_covers_dirty_files"].metadata["missing_files"])
 
+    def test_classifies_frontend_html_entrypoint(self):
+        from scripts.verify_platform_release_candidate_package import classify_dirty_path
+
+        self.assertEqual(
+            classify_dirty_path("apps/dsa-web/index.html"),
+            "frontend-platform-experience",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

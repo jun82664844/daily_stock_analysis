@@ -88,6 +88,7 @@ Rollback note: roll back backend schema/service/API files as one slice. Do not p
 
 Files:
 
+- `api/app.py`
 - `api/middlewares/auth.py`
 - `api/v1/endpoints/analysis.py`
 - `api/v1/endpoints/auth.py`
@@ -152,6 +153,7 @@ Rollback note: roll back frontend files together with matching frontend tests. D
 
 Files:
 
+- `apps/dsa-web/index.html`
 - `apps/dsa-web/src/App.test.tsx`
 - `apps/dsa-web/src/App.tsx`
 - `apps/dsa-web/src/api/analysis.ts`
@@ -247,6 +249,7 @@ Files:
 
 - `apps/dsa-web/playwright.config.ts`
 - `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `tests/test_api_health.py`
 - `tests/test_analysis_api_contract.py`
 - `tests/test_analysis_history.py`
 - `tests/test_basic_query_no_ai.py`
