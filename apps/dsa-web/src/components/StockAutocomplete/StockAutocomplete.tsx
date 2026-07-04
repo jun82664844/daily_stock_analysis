@@ -30,6 +30,8 @@ export interface StockAutocompleteProps {
   placeholder?: string;
   /** Additional CSS class name */
   className?: string;
+  /** Incrementing signal from parent to close the suggestion list */
+  closeSignal?: number;
 }
 
 function FallbackInput({
@@ -98,6 +100,7 @@ function StockAutocompleteInner({
   disabled = false,
   placeholder = '输入股票代码或名称',
   className,
+  closeSignal,
 }: StockAutocompleteProps) {
   const { index, loading, fallback } = useStockIndex();
   const {
@@ -116,9 +119,9 @@ function StockAutocompleteInner({
     runtimeFallback,
     error: autocompleteError,
   } = useAutocomplete(index);
-
   const inputRef = useRef<HTMLInputElement>(null);
   const prevValueRef = useRef(value);
+  const prevCloseSignalRef = useRef(closeSignal);
   const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: string } | null>(null);
 
   const updateDropdownPosition = () => {
@@ -172,6 +175,15 @@ function StockAutocompleteInner({
 
     console.error('Autocomplete runtime fallback activated.', autocompleteError);
   }, [autocompleteError]);
+
+  useEffect(() => {
+    if (closeSignal === undefined || prevCloseSignalRef.current === closeSignal) {
+      return;
+    }
+    prevCloseSignalRef.current = closeSignal;
+    closeSuggestions();
+    inputRef.current?.blur();
+  }, [closeSignal]);
 
   // Keyboard event handling
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {

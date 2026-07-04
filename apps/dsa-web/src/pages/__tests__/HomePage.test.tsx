@@ -1390,6 +1390,14 @@ describe('HomePage', () => {
     expect(primarySummary).toHaveTextContent('Consumer Electronics');
     expect(primarySummary).toHaveTextContent('4.5T');
     expect(primarySummary).toHaveTextContent('31.2');
+    const freeReport = screen.getByTestId('basic-query-free-report');
+    expect(freeReport).toHaveTextContent('No AI');
+    expect(freeReport).toHaveTextContent('Technology');
+    expect(freeReport).toHaveTextContent('Consumer Electronics');
+    expect(freeReport).toHaveTextContent('MA5');
+    expect(freeReport).toHaveTextContent('MA20');
+    expect(freeReport).toHaveTextContent('4.5T');
+    expect(freeReport).toHaveTextContent('31.2');
     expect(
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
       & Node.DOCUMENT_POSITION_FOLLOWING,

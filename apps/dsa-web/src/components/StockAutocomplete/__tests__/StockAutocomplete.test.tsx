@@ -3,7 +3,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { StockAutocomplete } from '../StockAutocomplete';
 import type { StockIndexItem, StockSuggestion } from '../../../types/stockIndex';
 
@@ -208,6 +209,44 @@ describe('StockAutocomplete', () => {
     fireEvent.change(input, { target: { value: '600519' } });
 
     expect(mockOnChange).toHaveBeenCalledWith('600519');
+  });
+
+  it('closes open suggestions when the parent close signal changes', async () => {
+    const closeMock = vi.fn();
+    autocompleteHookImpl = () => ({
+      query: 'AAPL',
+      setQuery: vi.fn(),
+      suggestions: mockSuggestions,
+      isOpen: true,
+      highlightedIndex: -1,
+      setHighlightedIndex: vi.fn(),
+      highlightPrevious: vi.fn(),
+      highlightNext: vi.fn(),
+      handleSelect: vi.fn(),
+      close: closeMock,
+      reset: vi.fn(),
+      isComposing: false,
+      setIsComposing: vi.fn(),
+      runtimeFallback: false,
+      error: null,
+    });
+    const props = {
+      value: 'AAPL',
+      onChange: mockOnChange,
+      onSubmit: mockOnSubmit,
+      closeSignal: 1,
+    } as ComponentProps<typeof StockAutocomplete> & { closeSignal: number };
+
+    const { rerender } = render(<StockAutocomplete {...props} />);
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+    expect(closeMock).not.toHaveBeenCalled();
+
+    rerender(<StockAutocomplete {...props} closeSignal={2} />);
+
+    expect(closeMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
   });
 
   it('applies a custom class name', () => {

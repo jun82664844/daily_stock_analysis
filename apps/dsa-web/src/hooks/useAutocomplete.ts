@@ -153,6 +153,11 @@ export function useAutocomplete(
 
   // Close dropdown
   const close = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    setSuggestions([]);
     setIsOpen(false);
     setHighlightedIndex(-1);
   }, []);

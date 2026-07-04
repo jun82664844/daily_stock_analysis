@@ -45,6 +45,19 @@ const formatBasicPercent = (value: unknown): string => {
   return formatted === '-' ? '-' : `${formatted}%`;
 };
 
+const toFiniteBasicNumber = (value: unknown): number | null => (
+  typeof value === 'number' && Number.isFinite(value) ? value : null
+);
+
+const formatSignedBasicPercent = (value: unknown): string => {
+  const numberValue = toFiniteBasicNumber(value);
+  if (numberValue === null) {
+    return '-';
+  }
+  const formatted = formatBasicPercent(numberValue);
+  return numberValue > 0 ? `+${formatted}` : formatted;
+};
+
 const volumePriceSignalLabel = (value: unknown, language: string): string => {
   const signal = typeof value === 'string' ? value : '';
   const isEnglish = language === 'en';
@@ -316,6 +329,7 @@ const HomePage: React.FC = () => {
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [basicSnapshot, setBasicSnapshot] = useState<BasicStockSnapshot | null>(null);
+  const [autocompleteCloseSignal, setAutocompleteCloseSignal] = useState(0);
   const restoredHistoryCenterFiltersRef = useRef(false);
   const appliedInitialHistoryCenterFiltersRef = useRef(false);
   const [historyCenterFilters, setHistoryCenterFilters] = useState<HistoryCenterFilters>(() => {
@@ -807,6 +821,9 @@ const HomePage: React.FC = () => {
   const recommendedModeText = `Recommended ${apiKeyModeLabel(platformAccount?.recommendedQueryMode)}`;
   const basicSnapshotLane = basicSnapshot?.route?.dataSourceLane || basicSnapshot?.diagnostics?.routeLane || null;
   const basicSnapshotCacheMode = basicSnapshot?.diagnostics?.persistentCache?.mode;
+  const autocompleteInputKey = basicSnapshot
+    ? `snapshot-${basicSnapshot.stockCode}-${basicSnapshot.quote.updateTime || basicSnapshot.quote.source || 'quote'}`
+    : 'search';
   const basicQuoteDetailItems = useMemo(() => {
     if (!basicSnapshot) {
       return [];
@@ -874,6 +891,100 @@ const HomePage: React.FC = () => {
       { label: isEnglish ? 'Market cap' : '总市值', value: formatBasicCompactNumber(profile.marketCap) },
       { label: isEnglish ? 'PE' : '市盈率', value: formatBasicNumber(profile.peRatio) },
     ].filter((item) => item.value !== '-');
+  }, [basicSnapshot, uiLanguage]);
+  const basicFreeReport = useMemo(() => {
+    if (!basicSnapshot) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const indicators = basicSnapshot.indicators || {};
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const ma5 = toFiniteBasicNumber(indicators['ma5']);
+    const ma20 = toFiniteBasicNumber(indicators['ma20']);
+    const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
+    const change5d = toFiniteBasicNumber(pickBasicIndicator(indicators, 'priceChange5D', 'priceChange5d', 'price_change_5d'));
+    const change20d = toFiniteBasicNumber(pickBasicIndicator(indicators, 'priceChange20D', 'priceChange20d', 'price_change_20d'));
+    const volumeChange = toFiniteBasicNumber(pickBasicIndicator(indicators, 'volumeChangeVsMa5', 'volume_change_vs_ma5'));
+    const aboveMa5 = currentPrice !== null && ma5 !== null && currentPrice >= ma5;
+    const aboveMa20 = currentPrice !== null && ma20 !== null && currentPrice >= ma20;
+    const trendHeadline = currentPrice === null || ma5 === null || ma20 === null
+      ? (isEnglish ? 'Trend context needs more history' : '趋势上下文仍需更多历史数据')
+      : aboveMa5 && aboveMa20
+        ? (isEnglish ? 'Price above MA5 and MA20' : '价格站上 MA5 与 MA20')
+        : !aboveMa5 && !aboveMa20
+          ? (isEnglish ? 'Price below MA5 and MA20' : '价格低于 MA5 与 MA20')
+          : (isEnglish ? 'Price between short and medium trend' : '价格位于短中期均线之间');
+    const momentumHeadline = change5d === null && change20d === null
+      ? (isEnglish ? 'Momentum data is limited' : '动能数据有限')
+      : `${isEnglish ? '5d' : '5日'} ${formatSignedBasicPercent(change5d)} / ${isEnglish ? '20d' : '20日'} ${formatSignedBasicPercent(change20d)}`;
+    const volumeHeadline = volumePriceSignalLabel(
+      pickBasicIndicator(indicators, 'volumePriceSignal', 'volume_price_signal'),
+      uiLanguage,
+    );
+    const profile = basicSnapshot.profile;
+    const profileHeadline = profile
+      ? [profile.sector, profile.industry].filter(Boolean).join(' · ') || (isEnglish ? 'Company profile available' : '公司资料可用')
+      : (isEnglish ? 'Company profile not available yet' : '公司资料暂不可用');
+    let score = 50;
+    if (aboveMa5) score += 10;
+    if (aboveMa20) score += 15;
+    if (changePercent !== null && changePercent > 0) score += 5;
+    if (change5d !== null) score += change5d > 0 ? 8 : -6;
+    if (change5d !== null && change5d > 10) score += 4;
+    if (change20d !== null) score += change20d > 0 ? 6 : -4;
+    if (volumeChange !== null && volumeChange > 20) score += 5;
+    if (volumeChange !== null && volumeChange < -20) score -= 3;
+    score = Math.max(0, Math.min(100, Math.round(score)));
+
+    return {
+      score,
+      cards: [
+        {
+          title: isEnglish ? 'Trend setup' : '趋势结构',
+          headline: trendHeadline,
+          details: [
+            `${isEnglish ? 'Last' : '最新价'} ${formatBasicNumber(currentPrice)}`,
+            `MA5 ${formatBasicNumber(ma5)}`,
+            `MA20 ${formatBasicNumber(ma20)}`,
+          ],
+        },
+        {
+          title: isEnglish ? 'Momentum' : '动能节奏',
+          headline: momentumHeadline,
+          details: [
+            `${isEnglish ? 'Day change' : '当日涨跌'} ${formatSignedBasicPercent(changePercent)}`,
+            `${isEnglish ? '5d change' : '5日涨跌'} ${formatSignedBasicPercent(change5d)}`,
+            `${isEnglish ? '20d change' : '20日涨跌'} ${formatSignedBasicPercent(change20d)}`,
+          ],
+        },
+        {
+          title: isEnglish ? 'Volume-price' : '量价配合',
+          headline: volumeHeadline,
+          details: [
+            `${isEnglish ? 'Volume vs MA5' : '量能变化'} ${formatSignedBasicPercent(volumeChange)}`,
+            `${isEnglish ? 'Volume' : '成交量'} ${formatBasicCompactNumber(basicSnapshot.quote.volume)}`,
+          ],
+        },
+        {
+          title: isEnglish ? 'Business profile' : '基本面轮廓',
+          headline: profileHeadline,
+          details: [
+            `${isEnglish ? 'Market cap' : '总市值'} ${formatBasicCompactNumber(profile?.marketCap)}`,
+            `PE ${formatBasicNumber(profile?.peRatio)}`,
+            `${isEnglish ? 'Revenue' : '营收'} ${formatBasicCompactNumber(profile?.revenue)}`,
+          ],
+        },
+        {
+          title: isEnglish ? 'Free-tier boundary' : '免费版边界',
+          headline: isEnglish ? 'No AI quick snapshot' : 'No AI 快照研判',
+          details: [
+            basicSnapshot.aiUsed ? 'AI used' : 'No AI',
+            basicSnapshot.quote.freshness,
+            isEnglish ? 'Information analysis, not investment advice' : '仅作信息分析，不构成投资建议',
+          ],
+        },
+      ],
+    };
   }, [basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
@@ -1029,6 +1140,7 @@ const HomePage: React.FC = () => {
       return null;
     }
 
+    setAutocompleteCloseSignal((current) => current + 1);
     setIsQueryingBasic(true);
     setBasicQueryError(null);
     if (!forceRefresh) {
@@ -1760,6 +1872,7 @@ const HomePage: React.FC = () => {
               </button>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
+                  key={autocompleteInputKey}
                   value={query}
                   onChange={setQuery}
                   onSubmit={(stockCode, stockName) => {
@@ -1768,6 +1881,7 @@ const HomePage: React.FC = () => {
                   placeholder={t('home.placeholder')}
                   disabled={isAnalyzing || isQueryingBasic}
                   className={inputError ? 'border-danger/50' : undefined}
+                  closeSignal={autocompleteCloseSignal}
                 />
               </div>
               {analysisSkills.length > 0 ? (
@@ -2338,6 +2452,50 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {basicFreeReport ? (
+                  <section
+                    data-testid="basic-query-free-report"
+                    className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3"
+                  >
+                    <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-foreground">
+                          {uiLanguage === 'en' ? 'Free no-AI briefing' : '免费轻量研判'}
+                        </h3>
+                        <p className="mt-1 text-xs text-secondary-text">
+                          {uiLanguage === 'en'
+                            ? 'Generated from quote, moving averages, volume-price behavior, and company profile. No AI quota is consumed.'
+                            : '基于行情、均线、量价和公司资料生成，不消耗 AI 次数。'}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+                        <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Signal' : '信号完整度'} {basicFreeReport.score}/100
+                        </span>
+                        <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">
+                          {t('home.noAi')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                      {basicFreeReport.cards.map((card) => (
+                        <div key={card.title} className="min-w-0 rounded-lg border border-subtle bg-background/35 p-3">
+                          <div className="text-xs text-secondary-text">{card.title}</div>
+                          <div className="mt-1 min-h-[2.5rem] text-sm font-semibold leading-snug text-foreground">
+                            {card.headline}
+                          </div>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            {card.details.map((detail) => (
+                              <span key={detail} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                {detail}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
                 <div className="mb-4 grid gap-3 lg:grid-cols-2">
                   <section
                     data-testid="basic-query-quote-details"

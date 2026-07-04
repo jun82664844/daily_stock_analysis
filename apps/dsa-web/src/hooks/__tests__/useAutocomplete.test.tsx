@@ -86,4 +86,33 @@ describe('useAutocomplete', () => {
     expect(result.current.suggestions).toHaveLength(1);
     expect(result.current.highlightedIndex).toBe(-1);
   });
+
+  it('cancels pending search and clears suggestions when closed', () => {
+    searchStocksMock.mockReturnValue([
+      {
+        canonicalCode: '600519.SH',
+        displayCode: '600519',
+        nameZh: '璐靛窞鑼呭彴',
+        market: 'CN',
+        matchType: 'exact',
+        matchField: 'code',
+        score: 100,
+      },
+    ]);
+
+    const { result } = renderHook(() => useAutocomplete(mockIndex, { debounceMs: 10 }));
+
+    act(() => {
+      result.current.setQuery('600519');
+      result.current.close();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(10);
+    });
+
+    expect(searchStocksMock).not.toHaveBeenCalled();
+    expect(result.current.isOpen).toBe(false);
+    expect(result.current.suggestions).toEqual([]);
+  });
 });
