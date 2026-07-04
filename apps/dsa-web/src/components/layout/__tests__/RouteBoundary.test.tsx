@@ -3,7 +3,7 @@ import { lazy } from 'react';
 import type React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { RouteErrorBoundary, RouteOutletBoundary } from '../RouteBoundary';
+import { buildRouteRecoveryUrl, RouteErrorBoundary, RouteOutletBoundary } from '../RouteBoundary';
 import { Shell } from '../Shell';
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -24,6 +24,12 @@ vi.mock('../../../stores/agentChatStore', () => {
 });
 
 describe('RouteOutletBoundary', () => {
+  it('builds a cache-busting route recovery URL for stale frontend bundles', () => {
+    expect(buildRouteRecoveryUrl('http://127.0.0.1:8018/?foo=bar#panel', 12345)).toBe(
+      'http://127.0.0.1:8018/?foo=bar&dsa_route_reload=12345#panel',
+    );
+  });
+
   it('auto reloads once when a lazy route chunk cannot be fetched after a build swap', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const reloadSpy = vi.fn();

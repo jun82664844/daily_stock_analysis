@@ -38,6 +38,7 @@ type RouteErrorBoundaryState = {
 };
 
 const CHUNK_RELOAD_KEY_PREFIX = 'dsa:route-chunk-reload:';
+const ROUTE_RECOVERY_PARAM = 'dsa_route_reload';
 const chunkReloadFallbackAttempts = new Set<string>();
 
 const routeChunkErrorMarkers = [
@@ -83,6 +84,16 @@ const markRouteChunkReloadAttempted = (key: string): void => {
   }
 };
 
+export const buildRouteRecoveryUrl = (currentHref: string, timestamp = Date.now()): string => {
+  const url = new URL(currentHref, window.location.origin);
+  url.searchParams.set(ROUTE_RECOVERY_PARAM, String(timestamp));
+  return url.toString();
+};
+
+const recoverRoutePage = (): void => {
+  window.location.assign(buildRouteRecoveryUrl(window.location.href));
+};
+
 export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
   override state: RouteErrorBoundaryState = {
     hasError: false,
@@ -104,7 +115,7 @@ export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, Route
     }
 
     markRouteChunkReloadAttempted(reloadKey);
-    (this.props.reloadPage ?? (() => window.location.reload()))();
+    (this.props.reloadPage ?? recoverRoutePage)();
   }
 
   override componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
@@ -135,7 +146,7 @@ export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, Route
             <button
               type="button"
               className="btn-primary"
-              onClick={() => (this.props.reloadPage ?? (() => window.location.reload()))()}
+              onClick={() => (this.props.reloadPage ?? recoverRoutePage)()}
             >
               {this.props.text.reload}
             </button>

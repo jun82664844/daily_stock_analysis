@@ -317,3 +317,10 @@ git diff --check
 - Added `apps/dsa-web/src/components/layout/__tests__/RouteBoundary.test.tsx` coverage so chunk-load recovery calls reload once while ordinary route render errors still show the existing recoverable error page.
 - Rebuilt local static assets after the fix. Fresh browser automation on 8018 opens the public homepage, runs an anonymous `AAPL` quick snapshot, and renders `No AI` / `US market data` without the route error page.
 - V32 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
+
+## 2026-07-04 Public Page Recovery V33 gate
+
+- RouteBoundary recovery now navigates to the current URL with `dsa_route_reload=<timestamp>` instead of using a plain browser reload. This forces Chrome to fetch the current local bundle after repeated frontend rebuilds.
+- The manual `重新加载页面` action and one-shot chunk-load recovery share the same cache-busting path.
+- Added test coverage for cache-busting recovery URL construction and rebuilt local static assets. Fresh browser automation on 8018 with a cache-bust query opens the homepage and runs anonymous `AAPL` quick snapshot with `No AI` / `US market data`.
+- V33 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
