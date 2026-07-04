@@ -57,6 +57,14 @@ def _platform_user_path(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in PLATFORM_USER_PATH_PREFIXES)
 
 
+def _public_no_ai_query_path(request: Request) -> bool:
+    """Allow anonymous users to try the public no-AI stock snapshot path."""
+    if request.method.upper() != "GET":
+        return False
+    path = request.url.path.rstrip("/")
+    return path.startswith("/api/v1/stocks/") and path.endswith("/snapshot")
+
+
 def _csrf_failure_response(request: Request) -> JSONResponse | None:
     if not csrf_enabled() or request.method.upper() not in UNSAFE_METHODS:
         return None
@@ -86,6 +94,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if not path.startswith("/api/v1/"):
+            return await call_next(request)
+
+        if _public_no_ai_query_path(request):
             return await call_next(request)
 
         admin_cookie_val = request.cookies.get(COOKIE_NAME)

@@ -38,6 +38,9 @@
 ## Public Entry And Admin Boundary
 
 - The ordinary platform-user entry routes (`/`, `/portfolio`, `/chat`, `/account`, and `/usage`) must remain reachable without an admin cookie so users can register, log in, and query locally.
+- Anonymous visitors may run the public no-AI quick snapshot path, `GET /api/v1/stocks/{symbol}/snapshot`, so the first stock lookup is not blocked by login.
+- Anonymous quick snapshots must remain market-data-only: no AI model call, no AI quota consumption, no BYOK access, no watchlist/history ownership write, and visible degradation warnings when quote or history data is stale or unavailable.
+- Account center, private history, watchlist persistence, BYOK keys, quick/deep AI analysis, billing, and admin/operator data still require the appropriate platform session and permission checks.
 - Admin/operator routes (`/admin` and `/settings`) require an admin session at the frontend route layer, and backend admin APIs remain protected server-side.
 - The admin login page is for operator access only; it must not block the ordinary platform-user query entry.
 - Frontend 401 handling must not globally redirect ordinary platform-user API failures to the admin login page; admin login redirect is only for admin-only browser routes.

@@ -89,6 +89,41 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertFalse(body["ai_used"])
         analysis_service.assert_not_called()
 
+    def test_snapshot_is_public_without_platform_login(self) -> None:
+        quote = {
+            "stock_code": "AAPL",
+            "stock_name": "Apple Inc.",
+            "current_price": 200.0,
+            "change_percent": 1.5,
+            "volume": 1000,
+            "amount": 200000.0,
+            "update_time": "2026-07-01T09:30:00",
+        }
+        history = {
+            "stock_code": "AAPL",
+            "stock_name": "Apple Inc.",
+            "period": "daily",
+            "data": [
+                {"date": f"2026-06-{day:02d}", "close": 180.0 + day, "volume": 1000 + day}
+                for day in range(1, 22)
+            ],
+        }
+
+        anonymous_client = TestClient(create_app(static_dir=self.static_dir))
+        try:
+            with patch("src.services.stock_service.StockService.get_realtime_quote", return_value=quote), \
+                 patch("src.services.stock_service.StockService.get_history_data", return_value=history), \
+                 patch("src.services.analysis_service.AnalysisService") as analysis_service:
+                response = anonymous_client.get("/api/v1/stocks/AAPL/snapshot")
+        finally:
+            anonymous_client.close()
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["stock_code"], "AAPL")
+        self.assertFalse(body["ai_used"])
+        analysis_service.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

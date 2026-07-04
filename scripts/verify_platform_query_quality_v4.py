@@ -16,9 +16,11 @@ OK_MARKER = "DSA_PLATFORM_QUERY_QUALITY_V4_OK"
 REQUIRED_FILES = (
     "src/services/basic_query_service.py",
     "src/services/stock_code_utils.py",
+    "api/middlewares/auth.py",
     "api/v1/endpoints/stocks.py",
     "api/v1/schemas/basic_query.py",
     "tests/test_platform_query_quality_v4.py",
+    "tests/test_basic_query_no_ai.py",
     "apps/dsa-web/src/api/stocks.ts",
     "apps/dsa-web/src/pages/HomePage.tsx",
 )
@@ -97,9 +99,11 @@ def _run_required_files_check(root: Path) -> CheckResult:
 def _run_static_boundary_check(root: Path) -> CheckResult:
     started = time.monotonic()
     basic_query = _read_text(root, "src/services/basic_query_service.py")
+    auth_middleware = _read_text(root, "api/middlewares/auth.py")
     stocks_api = _read_text(root, "api/v1/endpoints/stocks.py")
+    basic_query_tests = _read_text(root, "tests/test_basic_query_no_ai.py")
     frontend = _read_text(root, "apps/dsa-web/src/pages/HomePage.tsx")
-    combined = "\n".join([basic_query, stocks_api, frontend])
+    combined = "\n".join([basic_query, auth_middleware, stocks_api, basic_query_tests, frontend])
     missing_markers = [
         marker
         for marker in (
@@ -110,6 +114,12 @@ def _run_static_boundary_check(root: Path) -> CheckResult:
             "missing_quote",
             "ai_used\": False",
             "basic-query-degradation",
+            "_public_no_ai_query_path",
+            "request.method.upper() != \"GET\"",
+            "path.startswith(\"/api/v1/stocks/\")",
+            "path.endswith(\"/snapshot\")",
+            "test_snapshot_is_public_without_platform_login",
+            "analysis_service.assert_not_called()",
         )
         if marker not in combined
     ]
@@ -135,7 +145,14 @@ def _run_static_boundary_check(root: Path) -> CheckResult:
         "static_query_quality_boundaries",
         "Market lanes and degradation boundaries are present",
         started,
-        metadata={"markers": ["a_share_market_data", "us_market_data", "crypto_market_data"]},
+        metadata={
+            "markers": [
+                "a_share_market_data",
+                "us_market_data",
+                "crypto_market_data",
+                "_public_no_ai_query_path",
+            ]
+        },
     )
 
 

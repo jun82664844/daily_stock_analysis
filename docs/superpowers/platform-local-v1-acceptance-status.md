@@ -302,3 +302,11 @@ git diff --check
 - Report detail search, section jumps, and timeline navigation remain no-AI local read operations and must not consume AI quota.
 - `ReportSummary` exposes stable section anchors through `sectionIdPrefix` for local detail navigation.
 - V30 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
+
+## 2026-07-04 Public Quick Snapshot V31 gate
+
+- Added `tests.test_basic_query_no_ai.BasicQueryNoAiTestCase.test_snapshot_is_public_without_platform_login` so anonymous visitors can run `GET /api/v1/stocks/{symbol}/snapshot` without a platform session.
+- The public snapshot path remains GET-only and no-AI: it must not call `AnalysisService`, consume AI quota, expose BYOK keys, write private watchlist/history ownership state, or hide stale/missing market-data warnings.
+- Account center, private history, watchlist persistence, BYOK save/use, quick/deep AI analysis, sandbox billing, and admin/operator APIs remain login- and permission-protected.
+- `scripts/verify_platform_query_quality_v4.py` now checks the public snapshot boundary markers alongside the existing multi-market no-AI route tests.
+- V31 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
