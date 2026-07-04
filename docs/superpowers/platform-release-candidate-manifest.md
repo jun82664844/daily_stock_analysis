@@ -143,6 +143,7 @@ npm test -- --run src/pages/__tests__/HomePage.test.tsx -t "filters the history 
 npm test -- --run src/pages/__tests__/HomePage.test.tsx -t "restores history center filters"
 npm test -- --run src/pages/__tests__/HomePage.test.tsx -t "exports selected history reports"
 npm test -- --run src/pages/__tests__/HomePage.test.tsx -t "watchlist board"
+npm test -- --run src/components/layout/__tests__/RouteBoundary.test.tsx
 npm run build
 cd ..\..
 ```
@@ -160,6 +161,8 @@ Files:
 - `apps/dsa-web/src/components/history/HistoryList.tsx`
 - `apps/dsa-web/src/components/history/HistoryListItem.tsx`
 - `apps/dsa-web/src/components/report/ReportSummary.tsx`
+- `apps/dsa-web/src/components/layout/RouteBoundary.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/RouteBoundary.test.tsx`
 - `apps/dsa-web/src/components/layout/ShellHeader.tsx`
 - `apps/dsa-web/src/components/layout/SidebarNav.tsx`
 - `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`

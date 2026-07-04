@@ -119,6 +119,8 @@ Files:
 - `apps/dsa-web/src/components/history/HistoryList.tsx`
 - `apps/dsa-web/src/components/history/HistoryListItem.tsx`
 - `apps/dsa-web/src/components/report/ReportSummary.tsx`
+- `apps/dsa-web/src/components/layout/RouteBoundary.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/RouteBoundary.test.tsx`
 - `apps/dsa-web/src/components/layout/ShellHeader.tsx`
 - `apps/dsa-web/src/components/layout/SidebarNav.tsx`
 - `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
@@ -161,6 +163,7 @@ Review focus:
 - V17 HomePage watchlist panel should show private platform-user symbols, add-current action, no-AI refresh summary, degraded count, and route lanes without exposing secrets or implying investment advice.
 - V18 HomePage watchlist board should show code, name, market, price, change percent, freshness, route lane, degradation status, warning codes, and no-AI state; row actions must call the quick snapshot path instead of AI analysis.
 - V19 HomePage query workspace should show current no-AI snapshot state, private watchlist count, separate history report count, and selected AI/BYOK/local mode without calling AI.
+- V32 RouteBoundary should auto-reload exactly once for dynamic-import/chunk-load failures caused by local frontend build swaps, while ordinary route render errors stay on the recoverable error page.
 - V20 public entry should not redirect ordinary platform users to the admin login page.
 - V21 browser/API flow should keep ordinary-user register/login, account, quick-query, and watchlist operations local-only, no-AI where applicable, and admin-hidden.
 - V22 current snapshot refresh should show a manual refresh button, call `snapshot?refresh=true`, render refresh diagnostics, and avoid AI analysis submission.

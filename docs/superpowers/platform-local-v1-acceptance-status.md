@@ -310,3 +310,10 @@ git diff --check
 - Account center, private history, watchlist persistence, BYOK save/use, quick/deep AI analysis, sandbox billing, and admin/operator APIs remain login- and permission-protected.
 - `scripts/verify_platform_query_quality_v4.py` now checks the public snapshot boundary markers alongside the existing multi-market no-AI route tests.
 - V31 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
+
+## 2026-07-04 Public Page Recovery V32 gate
+
+- Added a RouteBoundary guard for local frontend build swaps: if a lazy route chunk fails with a dynamic-import/chunk-load error, the page attempts one automatic reload for that exact chunk signature.
+- Added `apps/dsa-web/src/components/layout/__tests__/RouteBoundary.test.tsx` coverage so chunk-load recovery calls reload once while ordinary route render errors still show the existing recoverable error page.
+- Rebuilt local static assets after the fix. Fresh browser automation on 8018 opens the public homepage, runs an anonymous `AAPL` quick snapshot, and renders `No AI` / `US market data` without the route error page.
+- V32 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.

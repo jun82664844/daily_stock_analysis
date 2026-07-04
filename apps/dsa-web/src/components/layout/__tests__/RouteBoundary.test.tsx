@@ -3,7 +3,7 @@ import { lazy } from 'react';
 import type React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { RouteOutletBoundary } from '../RouteBoundary';
+import { RouteErrorBoundary, RouteOutletBoundary } from '../RouteBoundary';
 import { Shell } from '../Shell';
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -24,6 +24,41 @@ vi.mock('../../../stores/agentChatStore', () => {
 });
 
 describe('RouteOutletBoundary', () => {
+  it('auto reloads once when a lazy route chunk cannot be fetched after a build swap', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reloadSpy = vi.fn();
+    sessionStorage.clear();
+    const BrokenChunkRoute = () => {
+      throw new TypeError(
+        'Failed to fetch dynamically imported module: http://127.0.0.1:8018/assets/HomePage-old.js',
+      );
+    };
+
+    try {
+      render(
+        <RouteErrorBoundary
+          resetKey="/"
+          fullPage={false}
+          reloadPage={reloadSpy}
+          text={{
+            title: '加载页面失败',
+            description: '页面版本已更新。',
+            reload: '重新加载页面',
+            backHome: '返回首页',
+          }}
+        >
+          <BrokenChunkRoute />
+        </RouteErrorBoundary>,
+      );
+
+      expect(await screen.findByRole('heading', { name: '加载页面失败' })).toBeInTheDocument();
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      sessionStorage.clear();
+      consoleError.mockRestore();
+    }
+  });
+
   it('catches rejected lazy route imports inside the shell and resets on navigation', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const BrokenLazyRoute = lazy(() => (

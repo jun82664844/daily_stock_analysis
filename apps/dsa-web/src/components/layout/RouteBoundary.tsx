@@ -24,6 +24,7 @@ type RouteErrorBoundaryProps = {
   children: React.ReactNode;
   resetKey: string;
   fullPage: boolean;
+  reloadPage?: () => void;
   text: {
     title: string;
     description: string;
@@ -36,7 +37,53 @@ type RouteErrorBoundaryState = {
   hasError: boolean;
 };
 
-class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
+const CHUNK_RELOAD_KEY_PREFIX = 'dsa:route-chunk-reload:';
+const chunkReloadFallbackAttempts = new Set<string>();
+
+const routeChunkErrorMarkers = [
+  'failed to fetch dynamically imported module',
+  'error loading dynamically imported module',
+  'importing a module script failed',
+  'chunkloaderror',
+  'loading chunk',
+] as const;
+
+const getErrorText = (error: unknown): string => {
+  if (error instanceof Error) {
+    return `${error.name} ${error.message} ${error.stack ?? ''}`;
+  }
+  return String(error ?? '');
+};
+
+export const isRecoverableRouteChunkError = (error: unknown): boolean => {
+  const message = getErrorText(error).toLowerCase();
+  return routeChunkErrorMarkers.some((marker) => message.includes(marker));
+};
+
+const getRouteChunkReloadKey = (error: unknown): string => {
+  const message = getErrorText(error);
+  const assetMatch = message.match(/\/assets\/[^\s'")]+/i)?.[0];
+  const signature = assetMatch ?? message.slice(0, 180);
+  return `${CHUNK_RELOAD_KEY_PREFIX}${signature}`;
+};
+
+const wasRouteChunkReloadAttempted = (key: string): boolean => {
+  try {
+    return window.sessionStorage.getItem(key) === '1';
+  } catch {
+    return chunkReloadFallbackAttempts.has(key);
+  }
+};
+
+const markRouteChunkReloadAttempted = (key: string): void => {
+  try {
+    window.sessionStorage.setItem(key, '1');
+  } catch {
+    chunkReloadFallbackAttempts.add(key);
+  }
+};
+
+export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
   override state: RouteErrorBoundaryState = {
     hasError: false,
   };
@@ -47,6 +94,17 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Route page failed to render or load', error, errorInfo);
+    if (!isRecoverableRouteChunkError(error)) {
+      return;
+    }
+
+    const reloadKey = getRouteChunkReloadKey(error);
+    if (wasRouteChunkReloadAttempted(reloadKey)) {
+      return;
+    }
+
+    markRouteChunkReloadAttempted(reloadKey);
+    (this.props.reloadPage ?? (() => window.location.reload()))();
   }
 
   override componentDidUpdate(prevProps: RouteErrorBoundaryProps) {
@@ -77,7 +135,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
             <button
               type="button"
               className="btn-primary"
-              onClick={() => window.location.reload()}
+              onClick={() => (this.props.reloadPage ?? (() => window.location.reload()))()}
             >
               {this.props.text.reload}
             </button>
