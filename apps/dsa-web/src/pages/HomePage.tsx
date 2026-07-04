@@ -839,6 +839,28 @@ const HomePage: React.FC = () => {
       { label: isEnglish ? 'Price-volume signal' : '量价信号', value: volumePriceSignalLabel(pickBasicIndicator(indicators, 'volumePriceSignal', 'volume_price_signal'), uiLanguage) },
     ];
   }, [basicSnapshot, uiLanguage]);
+  const basicProfileDetailItems = useMemo(() => {
+    if (!basicSnapshot?.profile) {
+      return [];
+    }
+    const isEnglish = uiLanguage === 'en';
+    const profile = basicSnapshot.profile;
+    return [
+      { label: isEnglish ? 'Sector' : '板块', value: profile.sector || '-' },
+      { label: isEnglish ? 'Industry' : '行业', value: profile.industry || '-' },
+      { label: isEnglish ? 'Exchange' : '交易所', value: profile.exchange || '-' },
+      { label: isEnglish ? 'Currency' : '币种', value: profile.currency || '-' },
+      { label: isEnglish ? 'Country / region' : '国家/地区', value: profile.country || '-' },
+      { label: isEnglish ? 'Market cap' : '总市值', value: formatBasicCompactNumber(profile.marketCap) },
+      { label: isEnglish ? 'PE ratio' : '市盈率', value: formatBasicNumber(profile.peRatio) },
+      { label: isEnglish ? 'PB ratio' : '市净率', value: formatBasicNumber(profile.pbRatio) },
+      { label: isEnglish ? 'Dividend yield' : '股息率', value: formatBasicPercent(profile.dividendYield) },
+      { label: isEnglish ? 'Revenue' : '营收', value: formatBasicCompactNumber(profile.revenue) },
+      { label: isEnglish ? 'Net profit' : '净利润', value: formatBasicCompactNumber(profile.netProfit) },
+      { label: isEnglish ? 'Revenue growth' : '营收增速', value: formatBasicPercent(profile.revenueGrowth) },
+      { label: isEnglish ? 'Earnings growth' : '盈利增速', value: formatBasicPercent(profile.earningsGrowth) },
+    ];
+  }, [basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
@@ -2310,6 +2332,42 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 </div>
+                {basicSnapshot.profile ? (
+                  <section
+                    data-testid="basic-query-company-profile"
+                    className="mb-4 min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
+                  >
+                    <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {uiLanguage === 'en' ? 'Company profile' : '公司资料'}
+                      </h3>
+                      <div className="flex min-w-0 flex-wrap gap-2 text-xs text-secondary-text">
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {basicSnapshot.profile.source}
+                        </span>
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {basicSnapshot.profile.freshness}
+                        </span>
+                        <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">
+                          {t('home.noAi')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {basicProfileDetailItems.map((item) => (
+                        <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                          <div className="text-xs text-secondary-text">{item.label}</div>
+                          <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {basicSnapshot.profile.website ? (
+                      <div className="mt-2 truncate text-xs text-secondary-text">
+                        {uiLanguage === 'en' ? 'Website' : '官网'}: {basicSnapshot.profile.website}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-text">

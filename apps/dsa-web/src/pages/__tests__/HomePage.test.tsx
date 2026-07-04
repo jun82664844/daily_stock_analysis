@@ -1332,6 +1332,19 @@ describe('HomePage', () => {
         volumeChangeVsMa5: 12.5,
         volumePriceSignal: 'price_volume_confirmed',
       },
+      profile: {
+        companyName: 'Apple Inc.',
+        sector: 'Technology',
+        industry: 'Consumer Electronics',
+        exchange: 'NASDAQ',
+        currency: 'USD',
+        country: 'United States',
+        marketCap: 4500000000000,
+        peRatio: 31.2,
+        dividendYield: 0.5,
+        source: 'unit_profile',
+        freshness: 'fresh',
+      },
       diagnostics: {
         elapsedMs: 18,
         quoteElapsedMs: 8,
@@ -1401,6 +1414,13 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('量能变化');
     expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('12.5%');
     expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('价量确认');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('Technology');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('Consumer Electronics');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('NASDAQ');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('USD');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('4.5T');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('31.2');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('unit_profile');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('No AI');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('18ms');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q miss / H miss');

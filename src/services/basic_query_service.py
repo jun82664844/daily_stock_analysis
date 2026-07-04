@@ -21,6 +21,7 @@ _BASIC_QUERY_FETCH_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=max(2, int(os.getenv("BASIC_QUERY_FETCH_MAX_WORKERS", "8")))
 )
 _DEFAULT_FETCH_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_FETCH_TIMEOUT_SEC", "4"))
+_DEFAULT_PROFILE_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_PROFILE_TIMEOUT_SEC", "2"))
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class MarketRoute:
     data_source_lane: str
     quote_sources: tuple[str, ...]
     history_sources: tuple[str, ...]
+    profile_sources: tuple[str, ...] = ()
     ai_required: bool = False
 
     def to_payload(self) -> Dict[str, Any]:
@@ -43,6 +45,7 @@ class MarketRoute:
             "data_source_lane": self.data_source_lane,
             "quote_sources": list(self.quote_sources),
             "history_sources": list(self.history_sources),
+            "profile_sources": list(self.profile_sources),
             "ai_required": self.ai_required,
         }
 
@@ -55,6 +58,7 @@ class BasicQueryService:
         stock_service: Optional[StockService] = None,
         cache: Optional[MarketDataCache] = None,
         fetch_timeout_seconds: Optional[float] = None,
+        profile_timeout_seconds: Optional[float] = None,
         source_health: Optional[MarketSourceHealthRegistry] = None,
     ):
         self.stock_service = stock_service or StockService()
@@ -62,6 +66,9 @@ class BasicQueryService:
         self.source_health = source_health or default_market_source_health
         self.fetch_timeout_seconds = (
             _DEFAULT_FETCH_TIMEOUT_SECONDS if fetch_timeout_seconds is None else max(0.001, float(fetch_timeout_seconds))
+        )
+        self.profile_timeout_seconds = (
+            _DEFAULT_PROFILE_TIMEOUT_SECONDS if profile_timeout_seconds is None else max(0.001, float(profile_timeout_seconds))
         )
 
     def get_snapshot(self, stock_code: str, *, force_refresh: bool = False) -> Dict[str, Any]:
@@ -92,6 +99,18 @@ class BasicQueryService:
             history_health,
             history_cache_origin,
         ) = self._get_history(code, route=route, force_refresh=force_refresh)
+        (
+            profile,
+            profile_freshness,
+            profile_cache,
+            profile_elapsed_ms,
+            profile_source,
+            profile_timeout,
+            profile_fallback,
+            profile_error,
+            profile_health,
+            profile_cache_origin,
+        ) = self._get_profile(code, route=route, quote=quote, force_refresh=force_refresh)
         indicators = self._compute_indicators((history or {}).get("data", []))
         warnings = self._build_warnings(
             quote=quote,
@@ -104,12 +123,17 @@ class BasicQueryService:
 
         return {
             "stock_code": code,
-            "stock_name": self._stock_name(quote, history),
+            "stock_name": self._stock_name(quote, history, profile),
             "market": route.market,
             "quote": self._quote_payload(
                 quote,
                 freshness=quote_freshness,
                 source_fallback=route.quote_sources[0],
+            ),
+            "profile": self._profile_payload(
+                profile,
+                freshness=profile_freshness,
+                source_fallback=profile_source,
             ),
             "indicators": indicators,
             "route": route.to_payload(),
@@ -120,22 +144,31 @@ class BasicQueryService:
                 route=route,
                 quote_elapsed_ms=quote_elapsed_ms,
                 history_elapsed_ms=history_elapsed_ms,
+                profile_elapsed_ms=profile_elapsed_ms,
                 quote_cache=quote_cache,
                 history_cache=history_cache,
+                profile_cache=profile_cache,
                 quote_source=quote_source,
                 history_source=history_source,
+                profile_source=profile_source,
                 quote_freshness=quote_freshness,
                 history_freshness=history_freshness,
+                profile_freshness=profile_freshness,
                 quote_timeout=quote_timeout,
                 history_timeout=history_timeout,
+                profile_timeout=profile_timeout,
                 quote_fallback=quote_fallback,
                 history_fallback=history_fallback,
+                profile_fallback=profile_fallback,
                 quote_error=quote_error,
                 history_error=history_error,
+                profile_error=profile_error,
                 quote_health=quote_health,
                 history_health=history_health,
+                profile_health=profile_health,
                 quote_cache_origin=quote_cache_origin,
                 history_cache_origin=history_cache_origin,
+                profile_cache_origin=profile_cache_origin,
                 force_refresh=force_refresh,
             ),
             "ai_used": False,
@@ -260,6 +293,51 @@ class BasicQueryService:
         fallback = "live" if history else "none"
         return history, "fresh" if history else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
 
+    def _get_profile(
+        self,
+        code: str,
+        *,
+        route: MarketRoute,
+        quote: Optional[Dict[str, Any]],
+        force_refresh: bool = False,
+    ) -> tuple[Optional[Dict[str, Any]], str, str, int, str, bool, str, Optional[str], Dict[str, Any], str]:
+        started = time.perf_counter()
+        source_id = route.profile_sources[0] if route.profile_sources else self._profile_source_for_route(route)
+        cache_key = f"profile:{code}"
+        hit = None if force_refresh else self.cache.get(cache_key)
+        if hit is not None:
+            source = self._payload_source(hit.value, hit.source or source_id)
+            fallback = self._cache_fallback(hit)
+            return hit.value, hit.freshness, "hit", self._elapsed_ms(started), source, False, fallback, None, self.source_health.snapshot(source), hit.origin
+
+        health = self.source_health.snapshot(source_id)
+        if health.get("status") == "cooling_down":
+            profile = self._profile_from_quote(code, quote, source=source_id)
+            freshness = "fresh" if profile else "unavailable"
+            return profile, freshness, "unavailable", self._elapsed_ms(started), source_id, False, "quote", "cooling_down", health, "none"
+
+        profile, error = self._call_with_timeout(
+            lambda: self._fetch_profile_from_stock_service(code, route=route),
+            timeout_seconds=self.profile_timeout_seconds,
+        )
+        if not isinstance(profile, dict):
+            profile = None
+        profile = self._merge_profile_with_quote(code, profile, quote, source_fallback=source_id)
+        elapsed_ms = self._elapsed_ms(started)
+        if profile:
+            profile.setdefault("source", source_id)
+            self.cache.set(cache_key, profile, source=profile.get("source") or source_id)
+            self.source_health.record_success(source_id, elapsed_ms=elapsed_ms)
+        elif error == "timeout":
+            self.source_health.record_timeout(source_id, elapsed_ms=elapsed_ms)
+        elif error == "error":
+            self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+        health = self.source_health.snapshot(source_id)
+        source = self._payload_source(profile, source_id)
+        cache_state = "refresh" if force_refresh and profile else ("miss" if error is None else "unavailable")
+        fallback = "live" if profile else "none"
+        return profile, "fresh" if profile else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
+
     def _quote_payload(
         self,
         quote: Optional[Dict[str, Any]],
@@ -284,11 +362,47 @@ class BasicQueryService:
             "freshness": freshness if freshness in {"cached", "stale"} else quote.get("freshness") or freshness,
         }
 
-    def _stock_name(self, quote: Optional[Dict[str, Any]], history: Optional[Dict[str, Any]]) -> Optional[str]:
+    def _profile_payload(
+        self,
+        profile: Optional[Dict[str, Any]],
+        *,
+        freshness: str = "fresh",
+        source_fallback: str = "profile_unavailable",
+    ) -> Optional[Dict[str, Any]]:
+        if not profile:
+            return None
+        return {
+            "company_name": profile.get("company_name"),
+            "sector": profile.get("sector"),
+            "industry": profile.get("industry"),
+            "exchange": profile.get("exchange"),
+            "currency": profile.get("currency"),
+            "country": profile.get("country"),
+            "website": profile.get("website"),
+            "market_cap": self._float_or_none(profile.get("market_cap")),
+            "pe_ratio": self._float_or_none(profile.get("pe_ratio")),
+            "pb_ratio": self._float_or_none(profile.get("pb_ratio")),
+            "dividend_yield": self._float_or_none(profile.get("dividend_yield")),
+            "revenue": self._float_or_none(profile.get("revenue")),
+            "net_profit": self._float_or_none(profile.get("net_profit")),
+            "revenue_growth": self._float_or_none(profile.get("revenue_growth")),
+            "earnings_growth": self._float_or_none(profile.get("earnings_growth")),
+            "source": profile.get("source") or source_fallback,
+            "freshness": freshness if freshness in {"cached", "stale"} else profile.get("freshness") or freshness,
+        }
+
+    def _stock_name(
+        self,
+        quote: Optional[Dict[str, Any]],
+        history: Optional[Dict[str, Any]],
+        profile: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
         if quote and quote.get("stock_name"):
             return quote.get("stock_name")
         if history and history.get("stock_name"):
             return history.get("stock_name")
+        if profile and profile.get("company_name"):
+            return profile.get("company_name")
         return None
 
     def _diagnostics_payload(
@@ -298,62 +412,80 @@ class BasicQueryService:
         route: MarketRoute,
         quote_elapsed_ms: int,
         history_elapsed_ms: int,
+        profile_elapsed_ms: int,
         quote_cache: str,
         history_cache: str,
+        profile_cache: str,
         quote_source: str,
         history_source: str,
+        profile_source: str,
         quote_freshness: str,
         history_freshness: str,
+        profile_freshness: str,
         quote_timeout: bool,
         history_timeout: bool,
+        profile_timeout: bool,
         quote_fallback: str,
         history_fallback: str,
+        profile_fallback: str,
         quote_error: Optional[str],
         history_error: Optional[str],
+        profile_error: Optional[str],
         quote_health: Dict[str, Any],
         history_health: Dict[str, Any],
+        profile_health: Dict[str, Any],
         quote_cache_origin: str,
         history_cache_origin: str,
+        profile_cache_origin: str,
         force_refresh: bool,
     ) -> Dict[str, Any]:
         elapsed_ms = self._elapsed_ms(started)
         slow_threshold_ms = 3000
-        timed_out = quote_timeout or history_timeout
+        timed_out = quote_timeout or history_timeout or profile_timeout
         return {
             "elapsed_ms": elapsed_ms,
             "quote_elapsed_ms": quote_elapsed_ms,
             "history_elapsed_ms": history_elapsed_ms,
+            "profile_elapsed_ms": profile_elapsed_ms,
             "cache": {
                 "quote": quote_cache,
                 "history": history_cache,
+                "profile": profile_cache,
             },
             "sources": {
                 "quote": quote_source,
                 "history": history_source,
+                "profile": profile_source,
             },
             "freshness": {
                 "quote": quote_freshness,
                 "history": history_freshness,
+                "profile": profile_freshness,
             },
             "timeouts": {
                 "quote": quote_timeout,
                 "history": history_timeout,
+                "profile": profile_timeout,
             },
             "errors": {
                 "quote": quote_error,
                 "history": history_error,
+                "profile": profile_error,
             },
             "fallback": {
                 "quote": quote_fallback,
                 "history": history_fallback,
+                "profile": profile_fallback,
             },
             "source_health": {
                 "quote": quote_health,
                 "history": history_health,
+                "profile": profile_health,
             },
             "persistent_cache": {
                 "quote": quote_cache_origin,
                 "history": history_cache_origin,
+                "profile": profile_cache_origin,
                 "mode": getattr(self.cache, "persistent_mode", "memory"),
                 "storage": getattr(self.cache, "storage_label", "memory"),
             },
@@ -362,6 +494,7 @@ class BasicQueryService:
                 "requested": bool(force_refresh),
                 "quote": bool(force_refresh),
                 "history": bool(force_refresh),
+                "profile": bool(force_refresh),
             },
             "route_lane": route.data_source_lane,
             "performance": {
@@ -370,15 +503,94 @@ class BasicQueryService:
             },
         }
 
-    def _call_with_timeout(self, callback: Callable[[], Optional[Dict[str, Any]]]) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+    def _call_with_timeout(
+        self,
+        callback: Callable[[], Optional[Dict[str, Any]]],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
         future = _BASIC_QUERY_FETCH_EXECUTOR.submit(callback)
         try:
-            return future.result(timeout=self.fetch_timeout_seconds), None
+            timeout = self.fetch_timeout_seconds if timeout_seconds is None else timeout_seconds
+            return future.result(timeout=timeout), None
         except concurrent.futures.TimeoutError:
             future.cancel()
             return None, "timeout"
         except Exception:
             return None, "error"
+
+    def _fetch_profile_from_stock_service(self, code: str, *, route: MarketRoute) -> Optional[Dict[str, Any]]:
+        if route.market not in {"us", "hk"}:
+            return None
+        class_method = getattr(type(self.stock_service), "get_basic_company_profile", None)
+        if not callable(class_method):
+            return None
+        method = getattr(self.stock_service, "get_basic_company_profile", None)
+        if not callable(method):
+            return None
+        profile = method(code)
+        return profile if isinstance(profile, dict) else None
+
+    def _profile_source_for_route(self, route: MarketRoute) -> str:
+        if route.market in {"us", "hk"}:
+            return "yfinance_profile"
+        return "quote_profile"
+
+    def _merge_profile_with_quote(
+        self,
+        code: str,
+        profile: Optional[Dict[str, Any]],
+        quote: Optional[Dict[str, Any]],
+        *,
+        source_fallback: str,
+    ) -> Optional[Dict[str, Any]]:
+        merged: Dict[str, Any] = dict(profile or {})
+        quote_profile = self._profile_from_quote(code, quote, source=source_fallback)
+        for key, value in quote_profile.items():
+            if merged.get(key) in (None, "") and value not in (None, ""):
+                merged[key] = value
+        if not self._has_profile_content(merged):
+            return None
+        merged.setdefault("stock_code", code)
+        merged.setdefault("source", source_fallback)
+        return merged
+
+    def _profile_from_quote(
+        self,
+        code: str,
+        quote: Optional[Dict[str, Any]],
+        *,
+        source: str,
+    ) -> Dict[str, Any]:
+        if not quote:
+            return {"stock_code": code, "source": source}
+        return {
+            "stock_code": code,
+            "company_name": quote.get("stock_name") or quote.get("company_name"),
+            "market_cap": quote.get("market_cap") or quote.get("total_mv"),
+            "pe_ratio": quote.get("pe_ratio"),
+            "pb_ratio": quote.get("pb_ratio"),
+            "source": quote.get("profile_source") or quote.get("source") or source,
+        }
+
+    def _has_profile_content(self, profile: Dict[str, Any]) -> bool:
+        meaningful_keys = {
+            "sector",
+            "industry",
+            "exchange",
+            "currency",
+            "country",
+            "website",
+            "market_cap",
+            "pe_ratio",
+            "pb_ratio",
+            "dividend_yield",
+            "revenue",
+            "net_profit",
+            "revenue_growth",
+            "earnings_growth",
+        }
+        return any(profile.get(key) not in (None, "") for key in meaningful_keys)
 
     def _cache_fallback(self, hit: CacheHit) -> str:
         if hit.origin == "disk":
@@ -476,6 +688,7 @@ class BasicQueryService:
                 data_source_lane="a_share_market_data",
                 quote_sources=("a_share_realtime", "tencent", "akshare_sina", "efinance", "akshare_em"),
                 history_sources=("a_share_history", "akshare", "tushare", "efinance"),
+                profile_sources=("quote_profile",),
             )
         if market == "crypto":
             return MarketRoute(
@@ -486,6 +699,7 @@ class BasicQueryService:
                 data_source_lane="crypto_market_data",
                 quote_sources=("crypto_yahoo_chart", "crypto_cache"),
                 history_sources=("crypto_yahoo_chart", "crypto_cache"),
+                profile_sources=("quote_profile",),
             )
         if market == "hk":
             return MarketRoute(
@@ -496,6 +710,7 @@ class BasicQueryService:
                 data_source_lane="hk_market_data",
                 quote_sources=("hk_realtime", "longbridge", "akshare_hk"),
                 history_sources=("hk_history", "longbridge", "yfinance", "akshare_hk"),
+                profile_sources=("yfinance_profile",),
             )
         return MarketRoute(
             input_code=raw,
@@ -505,6 +720,7 @@ class BasicQueryService:
             data_source_lane="us_market_data",
             quote_sources=("us_realtime", "yfinance", "longbridge", "finnhub", "alphavantage"),
             history_sources=("us_history", "yfinance", "longbridge", "finnhub", "alphavantage"),
+            profile_sources=("yfinance_profile",),
         )
 
     def _build_warnings(

@@ -25,6 +25,28 @@ class BasicQuotePayload(BaseModel):
     freshness: str = Field(..., pattern="^(fresh|cached|stale|unavailable)$")
 
 
+class BasicProfilePayload(BaseModel):
+    """Deterministic company facts for the no-AI query lane."""
+
+    company_name: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    exchange: Optional[str] = None
+    currency: Optional[str] = None
+    country: Optional[str] = None
+    website: Optional[str] = None
+    market_cap: Optional[float] = None
+    pe_ratio: Optional[float] = None
+    pb_ratio: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    revenue: Optional[float] = None
+    net_profit: Optional[float] = None
+    revenue_growth: Optional[float] = None
+    earnings_growth: Optional[float] = None
+    source: str = "profile_unavailable"
+    freshness: str = Field("unavailable", pattern="^(fresh|cached|stale|unavailable)$")
+
+
 class BasicRoutePayload(BaseModel):
     """Resolved deterministic data lane for a no-AI query."""
 
@@ -35,6 +57,7 @@ class BasicRoutePayload(BaseModel):
     data_source_lane: str
     quote_sources: List[str] = Field(default_factory=list)
     history_sources: List[str] = Field(default_factory=list)
+    profile_sources: List[str] = Field(default_factory=list)
     ai_required: bool = False
 
 
@@ -60,6 +83,7 @@ class BasicQueryDiagnosticsPayload(BaseModel):
     elapsed_ms: float = Field(..., ge=0)
     quote_elapsed_ms: float = Field(..., ge=0)
     history_elapsed_ms: float = Field(..., ge=0)
+    profile_elapsed_ms: float = Field(0, ge=0)
     cache: Dict[str, str] = Field(default_factory=dict)
     sources: Dict[str, str] = Field(default_factory=dict)
     freshness: Dict[str, str] = Field(default_factory=dict)
@@ -80,6 +104,7 @@ class BasicStockSnapshot(BaseModel):
     stock_name: Optional[str] = None
     market: str
     quote: BasicQuotePayload
+    profile: Optional[BasicProfilePayload] = None
     indicators: Dict[str, Any] = Field(default_factory=dict)
     route: Optional[BasicRoutePayload] = None
     warnings: List[BasicWarningPayload] = Field(default_factory=list)

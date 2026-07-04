@@ -84,6 +84,11 @@ class StockService:
                 "prev_close": getattr(quote, "pre_close", None),
                 "volume": getattr(quote, "volume", None),
                 "amount": getattr(quote, "amount", None),
+                "pe_ratio": getattr(quote, "pe_ratio", None),
+                "pb_ratio": getattr(quote, "pb_ratio", None),
+                "total_mv": getattr(quote, "total_mv", None),
+                "market_cap": getattr(quote, "total_mv", None),
+                "turnover_rate": getattr(quote, "turnover_rate", None),
                 "update_time": datetime.now().isoformat(),
             }
             
@@ -172,6 +177,110 @@ class StockService:
         except Exception as e:
             logger.error(f"获取历史数据失败: {e}", exc_info=True)
             return {"stock_code": stock_code, "period": period, "data": []}
+
+    def get_basic_company_profile(self, stock_code: str) -> Optional[Dict[str, Any]]:
+        """Fetch lightweight public company facts for the no-AI quick lane."""
+        symbol = self._to_yfinance_profile_symbol(stock_code)
+        if not symbol:
+            return None
+
+        try:
+            import yfinance as yf
+        except Exception as exc:
+            logger.debug("yfinance unavailable for basic company profile: %s", exc)
+            return None
+
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.get_info() if hasattr(ticker, "get_info") else getattr(ticker, "info", {})
+            if not isinstance(info, dict) or not info:
+                return None
+        except Exception as exc:
+            logger.debug("basic company profile fetch failed for %s: %s", stock_code, exc)
+            return None
+
+        profile = {
+            "stock_code": stock_code,
+            "company_name": info.get("longName") or info.get("shortName") or info.get("displayName"),
+            "sector": info.get("sector") or info.get("sectorDisp"),
+            "industry": info.get("industry") or info.get("industryDisp"),
+            "exchange": info.get("exchange") or info.get("fullExchangeName"),
+            "currency": info.get("currency") or info.get("financialCurrency"),
+            "country": info.get("country"),
+            "website": info.get("website"),
+            "market_cap": self._safe_float(info.get("marketCap")),
+            "pe_ratio": self._safe_float(info.get("trailingPE")) or self._safe_float(info.get("forwardPE")),
+            "pb_ratio": self._safe_float(info.get("priceToBook")),
+            "dividend_yield": self._dividend_yield_from_info(info),
+            "revenue": self._safe_float(info.get("totalRevenue")),
+            "net_profit": self._net_profit_from_info(info),
+            "revenue_growth": self._ratio_to_percent(info.get("revenueGrowth")),
+            "earnings_growth": self._ratio_to_percent(info.get("earningsGrowth")),
+            "source": "yfinance_profile",
+        }
+        meaningful = (
+            "sector",
+            "industry",
+            "exchange",
+            "currency",
+            "country",
+            "website",
+            "market_cap",
+            "pe_ratio",
+            "pb_ratio",
+            "dividend_yield",
+            "revenue",
+            "net_profit",
+            "revenue_growth",
+            "earnings_growth",
+        )
+        if not any(profile.get(key) not in (None, "") for key in meaningful):
+            return None
+        return profile
+
+    def _to_yfinance_profile_symbol(self, stock_code: str) -> Optional[str]:
+        code = (stock_code or "").strip().upper()
+        if not code or normalize_crypto_symbol(code) is not None:
+            return None
+        if code.endswith((".SH", ".SZ", ".BJ")):
+            return None
+        if code.startswith("HK") and code[2:].isdigit():
+            return f"{code[2:].zfill(4)}.HK"
+        if code.endswith(".HK"):
+            digits = code[:-3]
+            return f"{digits.zfill(4)}.HK" if digits.isdigit() else code
+        if code.isdigit():
+            return f"{code.zfill(4)}.HK" if len(code) <= 5 else None
+        return code
+
+    def _safe_float(self, value: Any) -> Optional[float]:
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _ratio_to_percent(self, value: Any) -> Optional[float]:
+        numeric = self._safe_float(value)
+        if numeric is None:
+            return None
+        if abs(numeric) <= 1:
+            numeric *= 100.0
+        return round(numeric, 4)
+
+    def _dividend_yield_from_info(self, info: Dict[str, Any]) -> Optional[float]:
+        current_yield = self._safe_float(info.get("dividendYield"))
+        if current_yield is not None:
+            return round(current_yield, 4)
+        return self._ratio_to_percent(info.get("trailingAnnualDividendYield"))
+
+    def _net_profit_from_info(self, info: Dict[str, Any]) -> Optional[float]:
+        revenue = self._safe_float(info.get("totalRevenue"))
+        margin = self._safe_float(info.get("profitMargins"))
+        if revenue is None or margin is None:
+            return None
+        return revenue * margin
 
     def _crypto_yahoo_timeout(self) -> float:
         try:

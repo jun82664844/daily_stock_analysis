@@ -31,6 +31,25 @@ export type BasicStockSnapshot = {
     source: string;
     freshness: string;
   };
+  profile?: {
+    companyName?: string | null;
+    sector?: string | null;
+    industry?: string | null;
+    exchange?: string | null;
+    currency?: string | null;
+    country?: string | null;
+    website?: string | null;
+    marketCap?: number | null;
+    peRatio?: number | null;
+    pbRatio?: number | null;
+    dividendYield?: number | null;
+    revenue?: number | null;
+    netProfit?: number | null;
+    revenueGrowth?: number | null;
+    earningsGrowth?: number | null;
+    source: string;
+    freshness: string;
+  } | null;
   indicators: Record<string, unknown>;
   route?: {
     inputCode?: string | null;
@@ -40,6 +59,7 @@ export type BasicStockSnapshot = {
     dataSourceLane: string;
     quoteSources?: string[];
     historySources?: string[];
+    profileSources?: string[];
     aiRequired: boolean;
   } | null;
   warnings?: Array<{
@@ -56,6 +76,7 @@ export type BasicStockSnapshot = {
     elapsedMs: number;
     quoteElapsedMs: number;
     historyElapsedMs: number;
+    profileElapsedMs?: number;
     cache: Record<string, string>;
     sources: Record<string, string>;
     freshness: Record<string, string>;
