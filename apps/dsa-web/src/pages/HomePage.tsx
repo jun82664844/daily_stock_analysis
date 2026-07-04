@@ -58,6 +58,20 @@ const formatSignedBasicPercent = (value: unknown): string => {
   return numberValue > 0 ? `+${formatted}` : formatted;
 };
 
+const uniqueBasicLevels = (values: Array<number | null>): number[] => {
+  const rounded = new Map<string, number>();
+  values.forEach((value) => {
+    if (value === null || !Number.isFinite(value)) {
+      return;
+    }
+    const key = value.toFixed(4);
+    if (!rounded.has(key)) {
+      rounded.set(key, value);
+    }
+  });
+  return Array.from(rounded.values());
+};
+
 const volumePriceSignalLabel = (value: unknown, language: string): string => {
   const signal = typeof value === 'string' ? value : '';
   const isEnglish = language === 'en';
@@ -900,7 +914,12 @@ const HomePage: React.FC = () => {
     const indicators = basicSnapshot.indicators || {};
     const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
     const ma5 = toFiniteBasicNumber(indicators['ma5']);
+    const ma10 = toFiniteBasicNumber(indicators['ma10']);
     const ma20 = toFiniteBasicNumber(indicators['ma20']);
+    const openPrice = toFiniteBasicNumber(basicSnapshot.quote.open);
+    const highPrice = toFiniteBasicNumber(basicSnapshot.quote.high);
+    const lowPrice = toFiniteBasicNumber(basicSnapshot.quote.low);
+    const prevClose = toFiniteBasicNumber(basicSnapshot.quote.prevClose);
     const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
     const change5d = toFiniteBasicNumber(pickBasicIndicator(indicators, 'priceChange5D', 'priceChange5d', 'price_change_5d'));
     const change20d = toFiniteBasicNumber(pickBasicIndicator(indicators, 'priceChange20D', 'priceChange20d', 'price_change_20d'));
@@ -935,9 +954,59 @@ const HomePage: React.FC = () => {
     if (volumeChange !== null && volumeChange > 20) score += 5;
     if (volumeChange !== null && volumeChange < -20) score -= 3;
     score = Math.max(0, Math.min(100, Math.round(score)));
+    const supportCandidates = uniqueBasicLevels([ma5, ma10, ma20, prevClose, lowPrice, openPrice]);
+    const pressureCandidates = uniqueBasicLevels([highPrice, openPrice, prevClose, ma5, ma10, ma20]);
+    const supportLevels = (
+      currentPrice !== null
+        ? supportCandidates.filter((level) => level <= currentPrice).sort((left, right) => right - left)
+        : supportCandidates.sort((left, right) => right - left)
+    ).slice(0, 2);
+    const pressureLevels = (
+      currentPrice !== null
+        ? pressureCandidates.filter((level) => level >= currentPrice).sort((left, right) => left - right)
+        : pressureCandidates.sort((left, right) => left - right)
+    ).slice(0, 2);
+    const conclusion = score >= 75
+      ? (isEnglish ? 'Trend is constructive with confirmed momentum.' : '趋势偏强，动能和价格结构占优。')
+      : score >= 55
+        ? (isEnglish ? 'Structure is neutral; wait for stronger confirmation.' : '结构偏中性，仍需等待量价继续确认。')
+        : (isEnglish ? 'Structure is defensive; prioritize risk boundary checks.' : '结构偏防守，先看趋势修复和风险边界。');
+    const shortStatus = currentPrice === null || ma5 === null
+      ? (isEnglish ? 'Short-term signal incomplete' : '短线信号不完整')
+      : aboveMa5
+        ? (isEnglish ? 'Short-term above MA5' : '短线站上 MA5')
+        : (isEnglish ? 'Short-term below MA5' : '短线低于 MA5');
+    const midStatus = currentPrice === null || ma20 === null
+      ? (isEnglish ? 'Medium-term signal incomplete' : '中线信号不完整')
+      : aboveMa20
+        ? (isEnglish ? 'Medium-term above MA20' : '中线在 MA20 上方')
+        : (isEnglish ? 'Medium-term below MA20' : '中线低于 MA20');
+    const riskNotes = [
+      basicSnapshot.quote.freshness !== 'fresh'
+        ? (isEnglish ? 'Quote is not fresh; refresh before making comparisons.' : '行情不是 fresh，比较前应先刷新确认。')
+        : null,
+      basicSnapshot.degradation && basicSnapshot.degradation.status !== 'ok'
+        ? basicSnapshot.degradation.message
+        : null,
+      volumeChange !== null && volumeChange < -20
+        ? (isEnglish ? 'Volume is below its short-term average; breakout confidence is limited.' : '量能低于短期均量，突破确认度有限。')
+        : null,
+      isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+    ].filter((note): note is string => Boolean(note));
 
     return {
       score,
+      productBrief: {
+        conclusion,
+        supportLevels: supportLevels.map(formatBasicNumber).join(' / ') || '-',
+        pressureLevels: pressureLevels.map(formatBasicNumber).join(' / ') || '-',
+        shortStatus,
+        midStatus,
+        risks: riskNotes,
+        upgradeText: isEnglish
+          ? 'Unlock news, filings, fundamentals, sector comparison, and a longer AI report.'
+          : '可解锁新闻、公告、基本面、行业对比和 AI 长报告。',
+      },
       cards: [
         {
           title: isEnglish ? 'Trend setup' : '趋势结构',
@@ -2475,6 +2544,85 @@ const HomePage: React.FC = () => {
                         <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">
                           {t('home.noAi')}
                         </span>
+                      </div>
+                    </div>
+                    <div
+                      data-testid="basic-query-product-brief"
+                      className="mb-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5"
+                    >
+                      <div className="min-w-0 rounded-lg border border-primary/35 bg-background/45 p-3 xl:col-span-2">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Key conclusion' : '关键结论'}
+                        </div>
+                        <div className="mt-1 text-sm font-semibold leading-snug text-foreground">
+                          {basicFreeReport.productBrief.conclusion}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          <span className="rounded-md border border-primary/30 px-1.5 py-0.5">No AI</span>
+                          <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                            {basicSnapshot.quote.source}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle bg-background/35 p-3">
+                        <div className="text-xs text-secondary-text">
+                          {uiLanguage === 'en' ? 'Support / resistance' : '支撑 / 压力'}
+                        </div>
+                        <div className="mt-2 space-y-1 text-sm font-medium text-foreground">
+                          <div className="truncate">
+                            {uiLanguage === 'en' ? 'Support' : '支撑'} {basicFreeReport.productBrief.supportLevels}
+                          </div>
+                          <div className="truncate">
+                            {uiLanguage === 'en' ? 'Resistance' : '压力'} {basicFreeReport.productBrief.pressureLevels}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle bg-background/35 p-3">
+                        <div className="text-xs text-secondary-text">
+                          {uiLanguage === 'en' ? 'Short / medium term' : '短线 / 中线'}
+                        </div>
+                        <div className="mt-2 space-y-1 text-sm font-medium text-foreground">
+                          <div className="truncate">
+                            {uiLanguage === 'en' ? 'Short' : '短线'} {basicFreeReport.productBrief.shortStatus}
+                          </div>
+                          <div className="truncate">
+                            {uiLanguage === 'en' ? 'Medium' : '中线'} {basicFreeReport.productBrief.midStatus}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle bg-background/35 p-3">
+                        <div className="text-xs text-secondary-text">
+                          {uiLanguage === 'en' ? 'Risk boundary' : '风险边界'}
+                        </div>
+                        <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          {basicFreeReport.productBrief.risks.slice(0, 3).map((risk) => (
+                            <span key={risk} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {risk}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-primary/25 bg-primary/10 p-3 md:col-span-2 xl:col-span-5">
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">
+                              {uiLanguage === 'en' ? 'Continue with deep analysis' : '继续深度分析'}
+                            </div>
+                            <div className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {basicFreeReport.productBrief.upgradeText}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            disabled={isAnalyzing}
+                            onClick={() => handleSubmitAnalysis(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual', 'deep')}
+                          >
+                            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                            {uiLanguage === 'en' ? 'Deep analysis' : '深度分析'}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">

@@ -1398,6 +1398,15 @@ describe('HomePage', () => {
     expect(freeReport).toHaveTextContent('MA20');
     expect(freeReport).toHaveTextContent('4.5T');
     expect(freeReport).toHaveTextContent('31.2');
+    const productBrief = screen.getByTestId('basic-query-product-brief');
+    expect(productBrief).toHaveTextContent('关键结论');
+    expect(productBrief).toHaveTextContent('支撑');
+    expect(productBrief).toHaveTextContent('压力');
+    expect(productBrief).toHaveTextContent('短线');
+    expect(productBrief).toHaveTextContent('中线');
+    expect(productBrief).toHaveTextContent('风险边界');
+    expect(productBrief).toHaveTextContent('继续深度分析');
+    expect(productBrief).toHaveTextContent('No AI');
     expect(
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
       & Node.DOCUMENT_POSITION_FOLLOWING,
