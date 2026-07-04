@@ -357,6 +357,7 @@ const HomePage: React.FC = () => {
   const [apiKeySaving, setApiKeySaving] = useState(false);
   const marketReviewPollTimer = useRef<number | null>(null);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
+  const basicSnapshotRef = useRef<HTMLDivElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -861,6 +862,19 @@ const HomePage: React.FC = () => {
       { label: isEnglish ? 'Earnings growth' : '盈利增速', value: formatBasicPercent(profile.earningsGrowth) },
     ];
   }, [basicSnapshot, uiLanguage]);
+  const basicProfileSummaryItems = useMemo(() => {
+    if (!basicSnapshot?.profile) {
+      return [];
+    }
+    const isEnglish = uiLanguage === 'en';
+    const profile = basicSnapshot.profile;
+    return [
+      { label: isEnglish ? 'Sector' : '板块', value: profile.sector || '-' },
+      { label: isEnglish ? 'Industry' : '行业', value: profile.industry || '-' },
+      { label: isEnglish ? 'Market cap' : '总市值', value: formatBasicCompactNumber(profile.marketCap) },
+      { label: isEnglish ? 'PE' : '市盈率', value: formatBasicNumber(profile.peRatio) },
+    ].filter((item) => item.value !== '-');
+  }, [basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
@@ -1038,6 +1052,16 @@ const HomePage: React.FC = () => {
       setIsQueryingBasic(false);
     }
   }, [clearMarketReviewState, isQueryingBasic, query, setQuery]);
+
+  useEffect(() => {
+    if (!basicSnapshot || marketReviewReport) {
+      return;
+    }
+    const target = basicSnapshotRef.current;
+    if (typeof target?.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [basicSnapshot, marketReviewReport]);
 
   const markHistoryRecordRefreshed = useCallback((recordId?: number) => {
     if (typeof recordId !== 'number') {
@@ -1868,7 +1892,7 @@ const HomePage: React.FC = () => {
           </div>
         </header>
 
-        {platformEnabled ? (
+        {platformEnabled && !basicSnapshot && !basicQueryError && !marketReviewReport ? (
           <div className="px-3 pb-2 md:px-4">
             <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-xs text-secondary-text md:flex-row md:items-center md:justify-between">
               {platformSession ? (
@@ -2262,7 +2286,7 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {basicSnapshot && !marketReviewReport ? (
-              <div data-testid="basic-query-snapshot" className="mb-4 max-w-4xl rounded-xl border border-subtle bg-surface/75 p-4 shadow-soft-card">
+              <div ref={basicSnapshotRef} data-testid="basic-query-snapshot" className="mb-4 max-w-4xl scroll-mt-4 rounded-xl border border-subtle bg-surface/75 p-4 shadow-soft-card">
                 <div
                   data-testid="basic-query-primary-summary"
                   className="mb-4 flex flex-col gap-3 border-b border-subtle pb-4 lg:flex-row lg:items-end lg:justify-between"
@@ -2278,6 +2302,22 @@ const HomePage: React.FC = () => {
                     </div>
                     <h2 className="truncate text-2xl font-semibold text-foreground">{basicSnapshot.stockName || basicSnapshot.stockCode}</h2>
                     <p className="mt-1 text-sm text-secondary-text">{basicSnapshot.stockCode}</p>
+                    {basicProfileSummaryItems.length > 0 ? (
+                      <div
+                        data-testid="basic-query-profile-highlights"
+                        className="mt-3 flex min-w-0 flex-wrap gap-2 text-xs text-secondary-text"
+                      >
+                        {basicProfileSummaryItems.map((item) => (
+                          <span
+                            key={item.label}
+                            className="inline-flex max-w-full items-center gap-1 rounded-md border border-subtle bg-background/25 px-2 py-1"
+                          >
+                            <span className="shrink-0 text-secondary-text">{item.label}</span>
+                            <span className="min-w-0 truncate font-medium text-foreground">{item.value}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:min-w-[26rem] lg:grid-cols-4">
                     <div className="min-w-0 border-l border-primary/50 pl-3">

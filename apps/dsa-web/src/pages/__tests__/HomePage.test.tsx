@@ -1386,6 +1386,10 @@ describe('HomePage', () => {
     const primarySummary = screen.getByTestId('basic-query-primary-summary');
     expect(primarySummary).toHaveTextContent('Apple Inc.');
     expect(primarySummary).toHaveTextContent('200');
+    expect(primarySummary).toHaveTextContent('Technology');
+    expect(primarySummary).toHaveTextContent('Consumer Electronics');
+    expect(primarySummary).toHaveTextContent('4.5T');
+    expect(primarySummary).toHaveTextContent('31.2');
     expect(
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
       & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1767,6 +1771,7 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Query' }));
 
     expect(await screen.findByTestId('basic-query-user-guardrails')).toHaveTextContent('Current quick snapshot');
+    expect(screen.queryByTestId('platform-query-status')).not.toBeInTheDocument();
     expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('No AI used');
     expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('HK market data');
     expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('Historical reports stay separate');
