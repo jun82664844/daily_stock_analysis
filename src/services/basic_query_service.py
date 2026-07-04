@@ -111,7 +111,12 @@ class BasicQueryService:
             profile_health,
             profile_cache_origin,
         ) = self._get_profile(code, route=route, quote=quote, force_refresh=force_refresh)
-        indicators = self._compute_indicators((history or {}).get("data", []))
+        history_rows = (history or {}).get("data", [])
+        indicators = self._compute_indicators(history_rows)
+        trend = self._trend_payload(
+            history_rows,
+            source=(history or {}).get("source") or history_source,
+        )
         warnings = self._build_warnings(
             quote=quote,
             quote_freshness=quote_freshness,
@@ -136,6 +141,7 @@ class BasicQueryService:
                 source_fallback=profile_source,
             ),
             "indicators": indicators,
+            "trend": trend,
             "route": route.to_payload(),
             "warnings": warnings,
             "degradation": self._degradation_payload(warnings),
@@ -626,6 +632,43 @@ class BasicQueryService:
             "price_change_20d": self._percent_change(closes, 20),
             "volume_change_vs_ma5": self._volume_change_vs_ma(volumes, 5),
             "volume_price_signal": self._volume_price_signal(closes, volumes),
+        }
+
+    def _trend_payload(
+        self,
+        rows: Iterable[Dict[str, Any]],
+        *,
+        source: str = "history",
+        max_points: int = 20,
+    ) -> Optional[Dict[str, Any]]:
+        points: list[Dict[str, Any]] = []
+        for row in rows or []:
+            close = self._float_or_none(row.get("close"))
+            if close is None:
+                continue
+            volume = self._float_or_none(row.get("volume"))
+            raw_date = row.get("date") or row.get("datetime") or row.get("timestamp")
+            points.append({
+                "date": str(raw_date) if raw_date is not None else None,
+                "close": close,
+                "volume": volume,
+            })
+
+        points = points[-max(1, int(max_points)):]
+        if not points:
+            return None
+
+        closes = [point["close"] for point in points]
+        first_close = closes[0]
+        last_close = closes[-1]
+        change_percent = None if first_close == 0 else round(((last_close - first_close) / first_close) * 100, 4)
+        return {
+            "window": len(points),
+            "source": source or "history",
+            "points": points,
+            "min_close": min(closes),
+            "max_close": max(closes),
+            "change_percent": change_percent,
         }
 
     def _moving_average(self, values: list[float], window: int) -> Optional[float]:

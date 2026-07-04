@@ -77,6 +77,25 @@ class BasicDegradationPayload(BaseModel):
     message: str = "Market data ready"
 
 
+class BasicTrendPointPayload(BaseModel):
+    """One compact historical point for the no-AI mini trend chart."""
+
+    date: Optional[str] = None
+    close: float
+    volume: Optional[float] = None
+
+
+class BasicTrendPayload(BaseModel):
+    """Compressed deterministic trend data for a free no-AI snapshot."""
+
+    window: int = Field(0, ge=0)
+    source: str = "history"
+    points: List[BasicTrendPointPayload] = Field(default_factory=list)
+    min_close: Optional[float] = None
+    max_close: Optional[float] = None
+    change_percent: Optional[float] = None
+
+
 class BasicQueryDiagnosticsPayload(BaseModel):
     """Timing, cache, and source diagnostics for the no-AI query lane."""
 
@@ -106,6 +125,7 @@ class BasicStockSnapshot(BaseModel):
     quote: BasicQuotePayload
     profile: Optional[BasicProfilePayload] = None
     indicators: Dict[str, Any] = Field(default_factory=dict)
+    trend: Optional[BasicTrendPayload] = None
     route: Optional[BasicRoutePayload] = None
     warnings: List[BasicWarningPayload] = Field(default_factory=list)
     degradation: BasicDegradationPayload = Field(default_factory=BasicDegradationPayload)

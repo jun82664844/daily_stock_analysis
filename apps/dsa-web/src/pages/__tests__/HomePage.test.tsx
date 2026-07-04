@@ -1345,6 +1345,21 @@ describe('HomePage', () => {
         source: 'unit_profile',
         freshness: 'fresh',
       },
+      trend: {
+        window: 6,
+        source: 'unit_history',
+        changePercent: 6.383,
+        minClose: 188,
+        maxClose: 200,
+        points: [
+          { date: '2026-06-25', close: 188, volume: 70000000 },
+          { date: '2026-06-26', close: 190, volume: 71000000 },
+          { date: '2026-06-29', close: 193, volume: 73000000 },
+          { date: '2026-06-30', close: 196, volume: 74000000 },
+          { date: '2026-07-01', close: 198, volume: 75000000 },
+          { date: '2026-07-02', close: 200, volume: 75352800 },
+        ],
+      },
       diagnostics: {
         elapsedMs: 18,
         quoteElapsedMs: 8,
@@ -1382,7 +1397,7 @@ describe('HomePage', () => {
     });
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByText('Apple Inc.')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThan(0);
     const primarySummary = screen.getByTestId('basic-query-primary-summary');
     expect(primarySummary).toHaveTextContent('Apple Inc.');
     expect(primarySummary).toHaveTextContent('200');
@@ -1407,6 +1422,10 @@ describe('HomePage', () => {
     expect(productBrief).toHaveTextContent('风险边界');
     expect(productBrief).toHaveTextContent('继续深度分析');
     expect(productBrief).toHaveTextContent('No AI');
+    const miniChart = screen.getByTestId('basic-query-mini-chart');
+    expect(miniChart).toHaveTextContent('6日趋势');
+    expect(miniChart).toHaveTextContent('+6.38%');
+    expect(miniChart.querySelector('svg')).toBeInTheDocument();
     expect(
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
       & Node.DOCUMENT_POSITION_FOLLOWING,

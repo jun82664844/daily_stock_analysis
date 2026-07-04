@@ -51,6 +51,18 @@ export type BasicStockSnapshot = {
     freshness: string;
   } | null;
   indicators: Record<string, unknown>;
+  trend?: {
+    window: number;
+    source: string;
+    points: Array<{
+      date?: string | null;
+      close: number;
+      volume?: number | null;
+    }>;
+    minClose?: number | null;
+    maxClose?: number | null;
+    changePercent?: number | null;
+  } | null;
   route?: {
     inputCode?: string | null;
     normalizedCode: string;

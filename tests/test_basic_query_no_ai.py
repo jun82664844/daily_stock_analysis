@@ -69,6 +69,7 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
             "stock_code": "AAPL",
             "stock_name": "Apple Inc.",
             "period": "daily",
+            "source": "unit_history",
             "data": [
                 {"date": f"2026-06-{day:02d}", "close": 180.0 + day, "volume": 1000 + day}
                 for day in range(1, 22)
@@ -103,6 +104,14 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertEqual(body["profile"]["pe_ratio"], 31.2)
         self.assertEqual(body["indicators"]["ma5"], 199.0)
         self.assertEqual(body["indicators"]["ma20"], 191.5)
+        self.assertEqual(body["trend"]["window"], 20)
+        self.assertEqual(body["trend"]["source"], "unit_history")
+        self.assertEqual(len(body["trend"]["points"]), 20)
+        self.assertEqual(body["trend"]["points"][0]["date"], "2026-06-02")
+        self.assertEqual(body["trend"]["points"][-1]["close"], 201.0)
+        self.assertEqual(body["trend"]["min_close"], 182.0)
+        self.assertEqual(body["trend"]["max_close"], 201.0)
+        self.assertEqual(body["trend"]["change_percent"], 10.4396)
         self.assertFalse(body["ai_used"])
         analysis_service.assert_not_called()
 

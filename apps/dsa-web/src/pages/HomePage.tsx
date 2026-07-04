@@ -58,6 +58,15 @@ const formatSignedBasicPercent = (value: unknown): string => {
   return numberValue > 0 ? `+${formatted}` : formatted;
 };
 
+const formatSignedBasicTrendPercent = (value: unknown): string => {
+  const numberValue = toFiniteBasicNumber(value);
+  if (numberValue === null) {
+    return '-';
+  }
+  const formatted = `${numberValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+  return numberValue > 0 ? `+${formatted}` : formatted;
+};
+
 const uniqueBasicLevels = (values: Array<number | null>): number[] => {
   const rounded = new Map<string, number>();
   values.forEach((value) => {
@@ -70,6 +79,43 @@ const uniqueBasicLevels = (values: Array<number | null>): number[] => {
     }
   });
   return Array.from(rounded.values());
+};
+
+const buildBasicSparkline = (
+  points: Array<{ close?: number | null }>,
+): {
+  linePoints: string;
+  areaPoints: string;
+  minClose: number;
+  maxClose: number;
+  changePercent: number | null;
+} | null => {
+  const closes = points
+    .map((point) => toFiniteBasicNumber(point.close))
+    .filter((value): value is number => value !== null);
+  if (closes.length < 2) {
+    return null;
+  }
+  const width = 220;
+  const height = 72;
+  const padding = 6;
+  const minClose = Math.min(...closes);
+  const maxClose = Math.max(...closes);
+  const spread = maxClose - minClose || Math.max(Math.abs(maxClose), 1) * 0.01;
+  const linePoints = closes.map((close, index) => {
+    const x = padding + (index / Math.max(closes.length - 1, 1)) * (width - padding * 2);
+    const y = height - padding - ((close - minClose) / spread) * (height - padding * 2);
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  const firstClose = closes[0];
+  const lastClose = closes[closes.length - 1];
+  return {
+    linePoints,
+    areaPoints: `${padding},${height - padding} ${linePoints} ${width - padding},${height - padding}`,
+    minClose,
+    maxClose,
+    changePercent: firstClose === 0 ? null : ((lastClose - firstClose) / firstClose) * 100,
+  };
 };
 
 const volumePriceSignalLabel = (value: unknown, language: string): string => {
@@ -993,9 +1039,30 @@ const HomePage: React.FC = () => {
         : null,
       isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
     ].filter((note): note is string => Boolean(note));
+    const trendPoints = basicSnapshot.trend?.points ?? [];
+    const fallbackTrendPoints = uniqueBasicLevels([prevClose, ma20, ma10, ma5, currentPrice])
+      .map((close) => ({ close }));
+    const hasHistoricalTrend = trendPoints.length >= 2;
+    const sparkline = buildBasicSparkline(hasHistoricalTrend ? trendPoints : fallbackTrendPoints);
+    const trendWindow = basicSnapshot.trend?.window || (hasHistoricalTrend ? trendPoints.length : fallbackTrendPoints.length);
+    const trendChange = toFiniteBasicNumber(basicSnapshot.trend?.changePercent)
+      ?? sparkline?.changePercent
+      ?? change20d
+      ?? change5d;
 
     return {
       score,
+      miniChart: {
+        title: hasHistoricalTrend
+          ? (isEnglish ? `${trendWindow}d trend` : `${trendWindow}日趋势`)
+          : (isEnglish ? 'Price structure' : '价位结构'),
+        changeText: formatSignedBasicTrendPercent(trendChange),
+        minText: formatBasicNumber(toFiniteBasicNumber(basicSnapshot.trend?.minClose) ?? sparkline?.minClose ?? null),
+        maxText: formatBasicNumber(toFiniteBasicNumber(basicSnapshot.trend?.maxClose) ?? sparkline?.maxClose ?? null),
+        source: hasHistoricalTrend ? basicSnapshot.trend?.source || 'history' : 'price levels',
+        sparkline,
+        isHistorical: hasHistoricalTrend,
+      },
       productBrief: {
         conclusion,
         supportLevels: supportLevels.map(formatBasicNumber).join(' / ') || '-',
@@ -2544,6 +2611,69 @@ const HomePage: React.FC = () => {
                         <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">
                           {t('home.noAi')}
                         </span>
+                      </div>
+                    </div>
+                    <div
+                      data-testid="basic-query-mini-chart"
+                      className="mb-3 grid gap-3 rounded-lg border border-primary/25 bg-background/35 p-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(13rem,0.8fr)]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-xs font-medium text-primary">
+                              {basicFreeReport.miniChart.title}
+                            </div>
+                            <div className="mt-1 text-xl font-semibold text-foreground">
+                              {basicFreeReport.miniChart.changeText}
+                            </div>
+                          </div>
+                          <span className="rounded-md border border-subtle/70 px-2 py-1 text-[11px] text-secondary-text">
+                            {basicFreeReport.miniChart.isHistorical
+                              ? (uiLanguage === 'en' ? 'Historical closes' : '历史收盘')
+                              : (uiLanguage === 'en' ? 'Level fallback' : '价位降级')}
+                          </span>
+                        </div>
+                        <div className="mt-3 h-[5rem] text-primary">
+                          {basicFreeReport.miniChart.sparkline ? (
+                            <svg
+                              aria-label={basicFreeReport.miniChart.title}
+                              className="h-full w-full overflow-visible"
+                              preserveAspectRatio="none"
+                              role="img"
+                              viewBox="0 0 220 72"
+                            >
+                              <polygon
+                                className="fill-primary/10"
+                                points={basicFreeReport.miniChart.sparkline.areaPoints}
+                              />
+                              <polyline
+                                className="fill-none stroke-primary"
+                                points={basicFreeReport.miniChart.sparkline.linePoints}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="3"
+                              />
+                            </svg>
+                          ) : (
+                            <div className="flex h-full items-center justify-center rounded-md border border-dashed border-subtle text-xs text-secondary-text">
+                              {uiLanguage === 'en' ? 'Trend data unavailable' : '趋势数据暂不可用'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                        <div className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                          <div className="text-xs text-secondary-text">{uiLanguage === 'en' ? 'Range low' : '区间低点'}</div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">{basicFreeReport.miniChart.minText}</div>
+                        </div>
+                        <div className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                          <div className="text-xs text-secondary-text">{uiLanguage === 'en' ? 'Range high' : '区间高点'}</div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">{basicFreeReport.miniChart.maxText}</div>
+                        </div>
+                        <div className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                          <div className="text-xs text-secondary-text">{uiLanguage === 'en' ? 'Source' : '来源'}</div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">{basicFreeReport.miniChart.source}</div>
+                        </div>
                       </div>
                     </div>
                     <div
