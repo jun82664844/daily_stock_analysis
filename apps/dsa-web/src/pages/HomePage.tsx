@@ -2177,6 +2177,41 @@ const HomePage: React.FC = () => {
 
             {basicSnapshot && !marketReviewReport ? (
               <div data-testid="basic-query-snapshot" className="mb-4 max-w-4xl rounded-xl border border-subtle bg-surface/75 p-4 shadow-soft-card">
+                <div
+                  data-testid="basic-query-primary-summary"
+                  className="mb-4 flex flex-col gap-3 border-b border-subtle pb-4 lg:flex-row lg:items-end lg:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-text">
+                      <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                        {uiLanguage === 'en' ? 'Queried' : '已查询'}
+                      </span>
+                      <span className="rounded-md border border-subtle px-2 py-1">{basicSnapshot.market.toUpperCase()}</span>
+                      <span className="rounded-md border border-subtle px-2 py-1">{basicSnapshot.quote.freshness}</span>
+                      <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">{t('home.noAi')}</span>
+                    </div>
+                    <h2 className="truncate text-2xl font-semibold text-foreground">{basicSnapshot.stockName || basicSnapshot.stockCode}</h2>
+                    <p className="mt-1 text-sm text-secondary-text">{basicSnapshot.stockCode}</p>
+                  </div>
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:min-w-[26rem] lg:grid-cols-4">
+                    <div className="min-w-0 border-l border-primary/50 pl-3">
+                      <div className="text-xs text-secondary-text">{t('home.basicCurrentPrice')}</div>
+                      <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.quote.currentPrice)}</div>
+                    </div>
+                    <div className="min-w-0 border-l border-subtle pl-3">
+                      <div className="text-xs text-secondary-text">{t('home.basicChangePercent')}</div>
+                      <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.quote.changePercent)}%</div>
+                    </div>
+                    <div className="min-w-0 border-l border-subtle pl-3">
+                      <div className="text-xs text-secondary-text">MA5</div>
+                      <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.indicators['ma5'])}</div>
+                    </div>
+                    <div className="min-w-0 border-l border-subtle pl-3">
+                      <div className="text-xs text-secondary-text">MA20</div>
+                      <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.indicators['ma20'])}</div>
+                    </div>
+                  </div>
+                </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-text">
@@ -2232,8 +2267,6 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <h2 className="truncate text-2xl font-semibold text-foreground">{basicSnapshot.stockName || basicSnapshot.stockCode}</h2>
-                    <p className="mt-1 text-sm text-secondary-text">{basicSnapshot.stockCode}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -2267,24 +2300,6 @@ const HomePage: React.FC = () => {
                       <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                       {t('home.deepAnalyze')}
                     </Button>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-3 border-t border-subtle pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="min-w-0">
-                    <div className="text-xs text-secondary-text">{t('home.basicCurrentPrice')}</div>
-                    <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.quote.currentPrice)}</div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs text-secondary-text">{t('home.basicChangePercent')}</div>
-                    <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.quote.changePercent)}%</div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs text-secondary-text">MA5</div>
-                    <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.indicators['ma5'])}</div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs text-secondary-text">MA20</div>
-                    <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.indicators['ma20'])}</div>
                   </div>
                 </div>
                 <div className="mt-3 text-xs text-secondary-text">

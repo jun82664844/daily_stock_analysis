@@ -1355,6 +1355,17 @@ describe('HomePage', () => {
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByText('Apple Inc.')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
+    const primarySummary = screen.getByTestId('basic-query-primary-summary');
+    expect(primarySummary).toHaveTextContent('Apple Inc.');
+    expect(primarySummary).toHaveTextContent('200');
+    expect(
+      primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-workspace-lanes'))
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('No AI');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('18ms');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q miss / H miss');
