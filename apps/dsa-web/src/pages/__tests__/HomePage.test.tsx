@@ -1312,11 +1312,26 @@ describe('HomePage', () => {
       market: 'us',
       quote: {
         currentPrice: 200,
+        change: 3,
         changePercent: 1.5,
+        open: 198,
+        high: 205,
+        low: 197,
+        prevClose: 197,
+        volume: 75352800,
+        amount: 15070560000,
         source: 'yahoo_chart',
         freshness: 'fresh',
       },
-      indicators: { ma5: 198, ma20: 190 },
+      indicators: {
+        ma5: 198,
+        ma10: 196,
+        ma20: 190,
+        priceChange5D: 4.2,
+        priceChange20D: -1.6,
+        volumeChangeVsMa5: 12.5,
+        volumePriceSignal: 'price_volume_confirmed',
+      },
       diagnostics: {
         elapsedMs: 18,
         quoteElapsedMs: 8,
@@ -1366,6 +1381,26 @@ describe('HomePage', () => {
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-workspace-lanes'))
       & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('开盘');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('198');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('最高');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('205');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('最低');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('197');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('昨收');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('涨跌额');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('3');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('成交量');
+    expect(screen.getByTestId('basic-query-quote-details')).toHaveTextContent('75.35M');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('MA10');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('196');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('5日涨跌');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('4.2%');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('20日涨跌');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('-1.6%');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('量能变化');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('12.5%');
+    expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('价量确认');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('No AI');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('18ms');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q miss / H miss');

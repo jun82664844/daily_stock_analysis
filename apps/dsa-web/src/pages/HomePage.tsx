@@ -34,6 +34,37 @@ const formatBasicNumber = (value: unknown): string => (
     : '-'
 );
 
+const formatBasicCompactNumber = (value: unknown): string => (
+  typeof value === 'number' && Number.isFinite(value)
+    ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(value)
+    : '-'
+);
+
+const formatBasicPercent = (value: unknown): string => {
+  const formatted = formatBasicNumber(value);
+  return formatted === '-' ? '-' : `${formatted}%`;
+};
+
+const volumePriceSignalLabel = (value: unknown, language: string): string => {
+  const signal = typeof value === 'string' ? value : '';
+  const isEnglish = language === 'en';
+  if (signal === 'price_volume_confirmed') return isEnglish ? 'Price-volume confirmed' : '价量确认';
+  if (signal === 'price_above_trend_volume_soft') return isEnglish ? 'Price above trend' : '价在趋势上方';
+  if (signal === 'volume_expanded_price_below_trend') return isEnglish ? 'Volume expanded' : '放量但价弱';
+  if (signal === 'neutral') return isEnglish ? 'Neutral' : '中性';
+  if (signal === 'insufficient_data') return isEnglish ? 'Insufficient data' : '数据不足';
+  return signal || '-';
+};
+
+const pickBasicIndicator = (indicators: Record<string, unknown>, ...keys: string[]): unknown => {
+  for (const key of keys) {
+    if (indicators[key] !== undefined && indicators[key] !== null) {
+      return indicators[key];
+    }
+  }
+  return undefined;
+};
+
 const formatQuotaLeft = (quota?: Pick<PlatformQuota, 'weeklyLimit' | 'remaining' | 'used'> | null): string => {
   if (!quota) {
     return 'unavailable';
@@ -775,6 +806,39 @@ const HomePage: React.FC = () => {
   const recommendedModeText = `Recommended ${apiKeyModeLabel(platformAccount?.recommendedQueryMode)}`;
   const basicSnapshotLane = basicSnapshot?.route?.dataSourceLane || basicSnapshot?.diagnostics?.routeLane || null;
   const basicSnapshotCacheMode = basicSnapshot?.diagnostics?.persistentCache?.mode;
+  const basicQuoteDetailItems = useMemo(() => {
+    if (!basicSnapshot) {
+      return [];
+    }
+    const isEnglish = uiLanguage === 'en';
+    return [
+      { label: isEnglish ? 'Open' : '开盘', value: formatBasicNumber(basicSnapshot.quote.open) },
+      { label: isEnglish ? 'High' : '最高', value: formatBasicNumber(basicSnapshot.quote.high) },
+      { label: isEnglish ? 'Low' : '最低', value: formatBasicNumber(basicSnapshot.quote.low) },
+      { label: isEnglish ? 'Prev close' : '昨收', value: formatBasicNumber(basicSnapshot.quote.prevClose) },
+      { label: isEnglish ? 'Change' : '涨跌额', value: formatBasicNumber(basicSnapshot.quote.change) },
+      { label: isEnglish ? 'Volume' : '成交量', value: formatBasicCompactNumber(basicSnapshot.quote.volume) },
+      { label: isEnglish ? 'Turnover' : '成交额', value: formatBasicCompactNumber(basicSnapshot.quote.amount) },
+      { label: isEnglish ? 'Updated' : '更新时间', value: basicSnapshot.quote.updateTime || '-' },
+    ];
+  }, [basicSnapshot, uiLanguage]);
+  const basicTechnicalDetailItems = useMemo(() => {
+    if (!basicSnapshot) {
+      return [];
+    }
+    const isEnglish = uiLanguage === 'en';
+    const indicators = basicSnapshot.indicators || {};
+    return [
+      { label: 'MA5', value: formatBasicNumber(indicators['ma5']) },
+      { label: 'MA10', value: formatBasicNumber(indicators['ma10']) },
+      { label: 'MA20', value: formatBasicNumber(indicators['ma20']) },
+      { label: isEnglish ? '5d change' : '5日涨跌', value: formatBasicPercent(pickBasicIndicator(indicators, 'priceChange5D', 'priceChange5d', 'price_change_5d')) },
+      { label: isEnglish ? '20d change' : '20日涨跌', value: formatBasicPercent(pickBasicIndicator(indicators, 'priceChange20D', 'priceChange20d', 'price_change_20d')) },
+      { label: isEnglish ? 'Volume vs MA5' : '量能变化', value: formatBasicPercent(pickBasicIndicator(indicators, 'volumeChangeVsMa5', 'volume_change_vs_ma5')) },
+      { label: isEnglish ? 'Volume MA5' : '5日均量', value: formatBasicCompactNumber(pickBasicIndicator(indicators, 'volumeMa5', 'volume_ma5')) },
+      { label: isEnglish ? 'Price-volume signal' : '量价信号', value: volumePriceSignalLabel(pickBasicIndicator(indicators, 'volumePriceSignal', 'volume_price_signal'), uiLanguage) },
+    ];
+  }, [basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
@@ -2211,6 +2275,40 @@ const HomePage: React.FC = () => {
                       <div className="mt-1 text-xl font-semibold text-foreground">{formatBasicNumber(basicSnapshot.indicators['ma20'])}</div>
                     </div>
                   </div>
+                </div>
+                <div className="mb-4 grid gap-3 lg:grid-cols-2">
+                  <section
+                    data-testid="basic-query-quote-details"
+                    className="min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-foreground">
+                      {uiLanguage === 'en' ? 'Quote details' : '行情明细'}
+                    </h3>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {basicQuoteDetailItems.map((item) => (
+                        <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                          <div className="text-xs text-secondary-text">{item.label}</div>
+                          <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                  <section
+                    data-testid="basic-query-technical-details"
+                    className="min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-foreground">
+                      {uiLanguage === 'en' ? 'Technical overview' : '技术概览'}
+                    </h3>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {basicTechnicalDetailItems.map((item) => (
+                        <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                          <div className="text-xs text-secondary-text">{item.label}</div>
+                          <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
