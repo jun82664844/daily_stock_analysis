@@ -107,12 +107,34 @@ class BasicIntelligenceItemPayload(BaseModel):
     updated_at: Optional[str] = None
 
 
+class BasicWatchPointPayload(BaseModel):
+    """One deterministic next observation point for the free no-AI report."""
+
+    category: str
+    title: str
+    detail: str
+    priority: str = Field("medium", pattern="^(high|medium|low)$")
+    source: str = "no_ai_rules"
+
+
+class BasicComparisonTargetPayload(BaseModel):
+    """One deterministic reference target for low-cost comparison context."""
+
+    label: str
+    symbol: str
+    reason: str
+    status: str = "reference_only"
+    source: str = "no_ai_route_rules"
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
     mode: str = "no_ai_low_cost"
     ai_used: bool = False
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
+    watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
+    comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)
     boundary: str = "Information analysis only; not investment advice."
 
 

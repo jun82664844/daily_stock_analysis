@@ -148,6 +148,7 @@ class BasicQueryService:
                 route=route,
                 quote=quote_payload,
                 profile=profile_payload,
+                indicators=indicators,
                 warnings=warnings,
             ),
             "route": route.to_payload(),
@@ -685,6 +686,7 @@ class BasicQueryService:
         route: MarketRoute,
         quote: Dict[str, Any],
         profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
         warnings: list[Dict[str, str]],
     ) -> Dict[str, Any]:
         financial_summary, financial_status = self._financial_intelligence_summary(profile)
@@ -725,8 +727,176 @@ class BasicQueryService:
                     "updated_at": quote_updated_at,
                 },
             ],
+            "watch_points": self._watch_points_payload(
+                route=route,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+                warnings=warnings,
+            ),
+            "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
             "boundary": "Information analysis only; not investment advice.",
         }
+
+    def _watch_points_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
+        warnings: list[Dict[str, str]],
+    ) -> list[Dict[str, str]]:
+        current_price = self._float_or_none(quote.get("current_price"))
+        ma5 = self._float_or_none(indicators.get("ma5"))
+        ma20 = self._float_or_none(indicators.get("ma20"))
+        volume_change = self._float_or_none(indicators.get("volume_change_vs_ma5"))
+        watch_points: list[Dict[str, str]] = []
+
+        if current_price is not None and ma20 is not None:
+            if current_price >= ma20:
+                watch_points.append(
+                    {
+                        "category": "trend",
+                        "title": "Trend confirmation",
+                        "detail": f"Watch whether price can hold above MA20 {self._format_plain_number(ma20)} after the next refresh.",
+                        "priority": "high",
+                        "source": "no_ai_rules",
+                    }
+                )
+            else:
+                watch_points.append(
+                    {
+                        "category": "trend",
+                        "title": "Trend repair",
+                        "detail": f"Watch whether price can reclaim MA20 {self._format_plain_number(ma20)} before treating the structure as repaired.",
+                        "priority": "high",
+                        "source": "no_ai_rules",
+                    }
+                )
+        elif current_price is not None and ma5 is not None:
+            watch_points.append(
+                {
+                    "category": "trend",
+                    "title": "Short trend check",
+                    "detail": f"MA20 is incomplete; watch whether price stays near MA5 {self._format_plain_number(ma5)}.",
+                    "priority": "medium",
+                    "source": "no_ai_rules",
+                }
+            )
+        else:
+            watch_points.append(
+                {
+                    "category": "trend",
+                    "title": "Trend data check",
+                    "detail": "Moving-average context is incomplete; refresh market data before comparing trend structure.",
+                    "priority": "medium",
+                    "source": "no_ai_rules",
+                }
+            )
+
+        if volume_change is None:
+            volume_detail = "Volume confirmation is incomplete; watch the next refresh for volume versus MA5."
+            volume_priority = "medium"
+        elif volume_change >= 20:
+            volume_detail = f"Volume is {self._format_percent_value(volume_change)} versus MA5; watch if price also confirms the move."
+            volume_priority = "high"
+        elif volume_change <= -20:
+            volume_detail = f"Volume is {self._format_percent_value(volume_change)} versus MA5; momentum confirmation is weaker."
+            volume_priority = "medium"
+        else:
+            volume_detail = f"Volume is {self._format_percent_value(volume_change)} versus MA5; watch for expansion before upgrading confidence."
+            volume_priority = "low"
+        watch_points.append(
+            {
+                "category": "volume",
+                "title": "Volume confirmation",
+                "detail": volume_detail,
+                "priority": volume_priority,
+                "source": "no_ai_rules",
+            }
+        )
+
+        if warnings:
+            risk_detail = warnings[0].get("message") or "Market data has a degradation warning; refresh before comparing decisions."
+            risk_priority = "high" if any(item.get("severity") == "error" for item in warnings) else "medium"
+        else:
+            risk_detail = "Keep the analysis informational, confirm source freshness, and treat this as a no-AI quick view."
+            risk_priority = "medium"
+        watch_points.append(
+            {
+                "category": "risk",
+                "title": "Risk boundary",
+                "detail": risk_detail,
+                "priority": risk_priority,
+                "source": "no_ai_rules",
+            }
+        )
+
+        if profile:
+            profile_bits = [profile.get("sector"), profile.get("industry")]
+            profile_context = " / ".join(str(bit) for bit in profile_bits if bit)
+            watch_points.append(
+                {
+                    "category": "fundamentals",
+                    "title": "Profile context",
+                    "detail": profile_context or "Company profile is available; compare valuation fields before relying on price signals alone.",
+                    "priority": "low",
+                    "source": "no_ai_rules",
+                }
+            )
+        else:
+            watch_points.append(
+                {
+                    "category": "fundamentals",
+                    "title": "Profile gap",
+                    "detail": f"{route.channel} company profile is unavailable in quick mode; deep analysis can add fuller fundamentals.",
+                    "priority": "low",
+                    "source": "no_ai_rules",
+                }
+            )
+        return watch_points
+
+    def _comparison_targets_payload(
+        self,
+        *,
+        route: MarketRoute,
+        profile: Optional[Dict[str, Any]],
+    ) -> list[Dict[str, str]]:
+        targets: list[Dict[str, str]]
+        if route.market == "cn":
+            targets = [
+                {"label": "CSI 300", "symbol": "000300.SH", "reason": "A-share broad-market reference."},
+                {"label": "SSE Composite", "symbol": "000001.SH", "reason": "A-share market sentiment reference."},
+            ]
+        elif route.market == "hk":
+            targets = [
+                {"label": "Hang Seng Index", "symbol": "^HSI", "reason": "Hong Kong market reference."},
+                {"label": "Tracker Fund", "symbol": "2800.HK", "reason": "Hong Kong ETF market context."},
+            ]
+        elif route.market == "crypto":
+            targets = [
+                {"label": "Bitcoin", "symbol": "BTC-USD", "reason": "Crypto market beta reference."},
+                {"label": "Ethereum", "symbol": "ETH-USD", "reason": "Large-cap crypto rotation reference."},
+            ]
+        else:
+            targets = [
+                {"label": "QQQ", "symbol": "QQQ", "reason": "US growth and technology benchmark."},
+                {"label": "Nasdaq Composite", "symbol": "^IXIC", "reason": "US market index context."},
+            ]
+            sector = str((profile or {}).get("sector") or "").lower()
+            if "technology" in sector:
+                targets.append(
+                    {"label": "Technology sector ETF", "symbol": "XLK", "reason": "Sector context for Technology names."}
+                )
+        return [
+            {
+                **target,
+                "status": "reference_only",
+                "source": "no_ai_route_rules",
+            }
+            for target in targets
+        ]
 
     def _financial_intelligence_summary(self, profile: Optional[Dict[str, Any]]) -> tuple[str, str]:
         if not profile:

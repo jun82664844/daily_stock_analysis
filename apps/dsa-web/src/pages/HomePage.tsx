@@ -154,6 +154,14 @@ const basicIntelligenceStatusLabel = (status: string, language: string): string 
   return status || '-';
 };
 
+const basicWatchPriorityLabel = (priority: string, language: string): string => {
+  const isEnglish = language === 'en';
+  if (priority === 'high') return isEnglish ? 'high' : '重点';
+  if (priority === 'medium') return isEnglish ? 'medium' : '关注';
+  if (priority === 'low') return isEnglish ? 'low' : '参考';
+  return priority || '-';
+};
+
 const formatQuotaLeft = (quota?: Pick<PlatformQuota, 'weeklyLimit' | 'remaining' | 'used'> | null): string => {
   if (!quota) {
     return 'unavailable';
@@ -2752,6 +2760,60 @@ const HomePage: React.FC = () => {
                             {basicSnapshot.intelligence.boundary}
                           </div>
                         ) : null}
+                      </div>
+                    ) : null}
+                    {(basicSnapshot.intelligence?.watchPoints?.length || basicSnapshot.intelligence?.comparisonTargets?.length) ? (
+                      <div
+                        data-testid="basic-query-watch-points"
+                        className="mb-3 grid gap-3 rounded-lg border border-primary/25 bg-background/35 p-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(14rem,0.75fr)]"
+                      >
+                        <div className="min-w-0">
+                          <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+                            <h4 className="text-sm font-semibold text-foreground">
+                              {uiLanguage === 'en' ? 'Next watch points' : '下一步观察'}
+                            </h4>
+                            <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                              No AI
+                            </span>
+                          </div>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            {(basicSnapshot.intelligence?.watchPoints ?? []).map((item) => (
+                              <div key={`${item.category}-${item.title}`} className="min-w-0 rounded-lg border border-subtle bg-surface/35 p-3">
+                                <div className="flex min-w-0 items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
+                                    <div className="mt-1 text-xs leading-relaxed text-secondary-text">{item.detail}</div>
+                                  </div>
+                                  <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
+                                    {basicWatchPriorityLabel(item.priority, uiLanguage)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded-lg border border-subtle bg-surface/35 p-3">
+                          <div className="text-sm font-semibold text-foreground">
+                            {uiLanguage === 'en' ? 'Compare with' : '对比参照'}
+                          </div>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                            {(basicSnapshot.intelligence?.comparisonTargets ?? []).map((item) => (
+                              <span
+                                key={`${item.symbol}-${item.label}`}
+                                className="max-w-full rounded-md border border-subtle/80 px-2 py-1 text-[11px] text-secondary-text"
+                                title={item.reason}
+                              >
+                                <span className="font-medium text-foreground">{item.symbol}</span>
+                                <span className="ml-1">{item.label}</span>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="mt-3 text-[11px] leading-relaxed text-secondary-text">
+                            {uiLanguage === 'en'
+                              ? 'Reference targets are route-based hints; realtime comparison values are reserved for a later deep view.'
+                              : '对比对象是基于市场通道的参考提示；实时对比数值留给后续深度视图。'}
+                          </div>
+                        </div>
                       </div>
                     ) : null}
                     <div

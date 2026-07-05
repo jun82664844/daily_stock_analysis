@@ -1387,6 +1387,45 @@ describe('HomePage', () => {
             source: 'unit_profile',
           },
         ],
+        watchPoints: [
+          {
+            category: 'trend',
+            title: 'Trend confirmation',
+            detail: 'Watch whether price can hold above MA20.',
+            priority: 'high',
+            source: 'no_ai_rules',
+          },
+          {
+            category: 'volume',
+            title: 'Volume confirmation',
+            detail: 'Volume expansion would improve confirmation quality.',
+            priority: 'medium',
+            source: 'no_ai_rules',
+          },
+          {
+            category: 'risk',
+            title: 'Risk boundary',
+            detail: 'Keep the analysis informational and not investment advice.',
+            priority: 'medium',
+            source: 'no_ai_rules',
+          },
+        ],
+        comparisonTargets: [
+          {
+            label: 'QQQ',
+            symbol: 'QQQ',
+            reason: 'US large-cap technology benchmark.',
+            status: 'reference_only',
+            source: 'no_ai_route_rules',
+          },
+          {
+            label: 'Technology sector ETF',
+            symbol: 'XLK',
+            reason: 'Sector context for Technology names.',
+            status: 'reference_only',
+            source: 'no_ai_route_rules',
+          },
+        ],
       },
       diagnostics: {
         elapsedMs: 18,
@@ -1462,6 +1501,13 @@ describe('HomePage', () => {
     expect(intelligencePanel).toHaveTextContent('No realtime news source');
     expect(intelligencePanel).toHaveTextContent('No AI');
     expect(intelligencePanel).toHaveTextContent('not investment advice');
+    const watchPoints = screen.getByTestId('basic-query-watch-points');
+    expect(watchPoints).toHaveTextContent('下一步观察');
+    expect(watchPoints).toHaveTextContent('Trend confirmation');
+    expect(watchPoints).toHaveTextContent('MA20');
+    expect(watchPoints).toHaveTextContent('Volume confirmation');
+    expect(watchPoints).toHaveTextContent('QQQ');
+    expect(watchPoints).toHaveTextContent('XLK');
     expect(
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
       & Node.DOCUMENT_POSITION_FOLLOWING,

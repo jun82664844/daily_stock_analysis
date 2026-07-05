@@ -116,6 +116,10 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertFalse(body["intelligence"]["ai_used"])
         intelligence_categories = {item["category"] for item in body["intelligence"]["items"]}
         self.assertEqual(intelligence_categories, {"news", "announcements", "financials"})
+        watch_categories = {item["category"] for item in body["intelligence"]["watch_points"]}
+        self.assertTrue({"trend", "volume", "risk"}.issubset(watch_categories))
+        comparison_symbols = {item["symbol"] for item in body["intelligence"]["comparison_targets"]}
+        self.assertIn("QQQ", comparison_symbols)
         self.assertIn("not investment advice", body["intelligence"]["boundary"])
         self.assertFalse(body["ai_used"])
         analysis_service.assert_not_called()

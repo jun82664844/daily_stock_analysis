@@ -75,6 +75,20 @@ export type BasicStockSnapshot = {
       source: string;
       updatedAt?: string | null;
     }>;
+    watchPoints?: Array<{
+      category: string;
+      title: string;
+      detail: string;
+      priority: string;
+      source: string;
+    }>;
+    comparisonTargets?: Array<{
+      label: string;
+      symbol: string;
+      reason: string;
+      status: string;
+      source: string;
+    }>;
   } | null;
   route?: {
     inputCode?: string | null;
