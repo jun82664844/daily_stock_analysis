@@ -149,6 +149,26 @@ class BasicFreeInsightPayload(BaseModel):
     source: str = "no_ai_rules"
 
 
+class BasicPeerComparisonRowPayload(BaseModel):
+    """One no-AI peer or market reference row for the free query view."""
+
+    symbol: str
+    label: str
+    role: str
+    reason: str
+    current_signal: str
+    compare_next: str
+    source: str = "no_ai_route_rules"
+
+
+class BasicPeerComparisonPayload(BaseModel):
+    """Route-based peer and market comparison table for the free query view."""
+
+    title: str
+    summary: str
+    rows: List[BasicPeerComparisonRowPayload] = Field(default_factory=list)
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
@@ -156,6 +176,7 @@ class BasicIntelligencePayload(BaseModel):
     ai_used: bool = False
     market_brief: Optional[BasicMarketBriefPayload] = None
     free_insights: List[BasicFreeInsightPayload] = Field(default_factory=list)
+    peer_comparison: Optional[BasicPeerComparisonPayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)

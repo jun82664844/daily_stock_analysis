@@ -1398,6 +1398,39 @@ describe('HomePage', () => {
             source: 'no_ai_rules',
           },
         ],
+        peerComparison: {
+          title: 'Peer and market comparison',
+          summary: 'Compare AAPL against QQQ and XLK before reading it in isolation.',
+          rows: [
+            {
+              symbol: 'QQQ',
+              label: 'QQQ',
+              role: 'Broad market',
+              reason: 'US large-cap technology benchmark.',
+              currentSignal: 'AAPL is above MA20 with positive change.',
+              compareNext: 'Check whether AAPL confirms faster or weaker than QQQ on the next refresh.',
+              source: 'no_ai_route_rules',
+            },
+            {
+              symbol: '^IXIC',
+              label: 'Nasdaq Composite',
+              role: 'Index lens',
+              reason: 'US market index context.',
+              currentSignal: 'AAPL is above MA20 with positive change.',
+              compareNext: 'Check whether AAPL confirms faster or weaker than ^IXIC on the next refresh.',
+              source: 'no_ai_route_rules',
+            },
+            {
+              symbol: 'XLK',
+              label: 'Technology sector ETF',
+              role: 'Sector lens',
+              reason: 'Sector context for Technology names.',
+              currentSignal: 'AAPL is above MA20 with positive change.',
+              compareNext: 'Check whether AAPL confirms faster or weaker than XLK on the next refresh.',
+              source: 'no_ai_route_rules',
+            },
+          ],
+        },
         items: [
           {
             category: 'news',
@@ -1547,6 +1580,14 @@ describe('HomePage', () => {
     expect(freeInsights).toHaveTextContent('Key risks');
     expect(freeInsights).toHaveTextContent('QQQ');
     expect(freeInsights).toHaveTextContent('No-AI quick view');
+    const peerComparison = screen.getByTestId('basic-query-peer-comparison');
+    expect(peerComparison).toHaveTextContent('同业/大盘对照');
+    expect(peerComparison).toHaveTextContent('AAPL');
+    expect(peerComparison).toHaveTextContent('QQQ');
+    expect(peerComparison).toHaveTextContent('^IXIC');
+    expect(peerComparison).toHaveTextContent('XLK');
+    expect(peerComparison).toHaveTextContent('Sector lens');
+    expect(peerComparison).toHaveTextContent('AAPL is above MA20');
     const watchPoints = screen.getByTestId('basic-query-watch-points');
     expect(watchPoints).toHaveTextContent('下一步观察');
     expect(watchPoints).toHaveTextContent('Trend confirmation');

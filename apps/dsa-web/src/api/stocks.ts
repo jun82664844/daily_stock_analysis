@@ -83,6 +83,19 @@ export type BasicStockSnapshot = {
       bullets: string[];
       source: string;
     }>;
+    peerComparison?: {
+      title: string;
+      summary: string;
+      rows: Array<{
+        symbol: string;
+        label: string;
+        role: string;
+        reason: string;
+        currentSignal: string;
+        compareNext: string;
+        source: string;
+      }>;
+    } | null;
     items: Array<{
       category: string;
       title: string;

@@ -703,6 +703,12 @@ class BasicQueryService:
                 indicators=indicators,
                 warnings=warnings,
             ),
+            "peer_comparison": self._peer_comparison_payload(
+                route=route,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+            ),
             "items": [
                 {
                     "category": "news",
@@ -745,6 +751,68 @@ class BasicQueryService:
             "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
             "boundary": "Information analysis only; not investment advice.",
         }
+
+    def _peer_comparison_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        targets = self._comparison_targets_payload(route=route, profile=profile)
+        current_signal = self._current_signal_summary(route=route, quote=quote, indicators=indicators)
+        target_symbols = ", ".join(target["symbol"] for target in targets) if targets else route.data_source_lane
+        rows = [
+            {
+                "symbol": target["symbol"],
+                "label": target["label"],
+                "role": self._comparison_role_for_target(target=target, route=route),
+                "reason": target["reason"],
+                "current_signal": current_signal,
+                "compare_next": (
+                    f"Check whether {route.normalized_code} confirms faster or weaker than "
+                    f"{target['symbol']} on the next refresh."
+                ),
+                "source": "no_ai_route_rules",
+            }
+            for target in targets
+        ]
+        return {
+            "title": "Peer and market comparison",
+            "summary": f"Compare {route.normalized_code} against {target_symbols} before reading it in isolation.",
+            "rows": rows,
+        }
+
+    def _current_signal_summary(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        indicators: Dict[str, Any],
+    ) -> str:
+        current_price = self._float_or_none(quote.get("current_price"))
+        change_percent = self._float_or_none(quote.get("change_percent"))
+        ma20 = self._float_or_none(indicators.get("ma20"))
+        volume_signal = str(indicators.get("volume_price_signal") or "insufficient_data").replace("_", " ")
+        if current_price is not None and ma20 is not None:
+            trend = "above MA20" if current_price >= ma20 else "below MA20"
+        else:
+            trend = "with incomplete MA20 context"
+        change_text = self._format_signed_percent_value(change_percent) if change_percent is not None else "unknown change"
+        return f"{route.normalized_code} is {trend} with {change_text}; volume signal is {volume_signal}."
+
+    def _comparison_role_for_target(self, *, target: Dict[str, str], route: MarketRoute) -> str:
+        symbol = str(target.get("symbol") or "")
+        label = str(target.get("label") or "").lower()
+        reason = str(target.get("reason") or "").lower()
+        if "sector" in label or "sector" in reason or symbol in {"XLK", "2800.HK"}:
+            return "Sector lens"
+        if symbol.startswith("^") or "index" in label or "composite" in label or "300" in symbol:
+            return "Index lens"
+        if route.market == "crypto" or "crypto" in reason:
+            return "Crypto beta"
+        return "Broad market"
 
     def _free_insights_payload(
         self,

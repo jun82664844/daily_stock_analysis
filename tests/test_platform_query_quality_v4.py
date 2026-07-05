@@ -105,15 +105,29 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
         return int(response.json()["user"]["id"])
 
     def test_basic_query_routes_a_share_us_hk_and_crypto_without_ai(self) -> None:
-        stock_service = MagicMock()
-        stock_service.get_realtime_quote.side_effect = lambda code: _quote(code)
-        stock_service.get_history_data.side_effect = lambda code, **_: {
-            "stock_code": code,
-            "stock_name": code,
-            "data": _history_rows(),
-        }
+        class StockServiceStub:
+            def get_realtime_quote(self, code: str) -> dict:
+                return _quote(code)
+
+            def get_history_data(self, code: str, **_: object) -> dict:
+                return {
+                    "stock_code": code,
+                    "stock_name": code,
+                    "data": _history_rows(),
+                }
+
+            def get_basic_company_profile(self, code: str) -> dict | None:
+                if code == "AAPL":
+                    return {
+                        "company_name": "Apple Inc.",
+                        "sector": "Technology",
+                        "industry": "Consumer Electronics",
+                        "source": "unit_profile",
+                    }
+                return None
+
         service = BasicQueryService(
-            stock_service=stock_service,
+            stock_service=StockServiceStub(),
             cache=MarketDataCache(default_ttl_seconds=60),
         )
 
@@ -146,6 +160,13 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
             "No-AI",
             next(item for item in us_free_insights if item["category"] == "risk")["summary"],
         )
+        us_peer_comparison = us["intelligence"]["peer_comparison"]
+        self.assertIn("AAPL", us_peer_comparison["summary"])
+        self.assertEqual(["QQQ", "^IXIC"], [row["symbol"] for row in us_peer_comparison["rows"][:2]])
+        self.assertTrue(
+            any(row["symbol"] == "XLK" and row["role"] == "Sector lens" for row in us_peer_comparison["rows"])
+        )
+        self.assertTrue(all("AAPL" in row["current_signal"] for row in us_peer_comparison["rows"]))
         self.assertEqual(hk["market"], "hk")
         self.assertEqual(hk["route"]["channel"], "hk_equity")
         self.assertEqual(hk["route"]["data_source_lane"], "hk_market_data")
