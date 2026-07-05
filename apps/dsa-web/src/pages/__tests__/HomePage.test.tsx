@@ -1364,6 +1364,14 @@ describe('HomePage', () => {
         mode: 'no_ai_low_cost',
         aiUsed: false,
         boundary: 'Information analysis only; not investment advice.',
+        marketBrief: {
+          market: 'us',
+          title: 'US equity quick view',
+          summary: 'US equity lane uses quote, history, profile, Nasdaq and sector references without AI.',
+          lane: 'us_market_data',
+          focusPoints: ['Price versus MA20', 'Volume confirmation', 'Nasdaq and sector ETF context'],
+          deepUnlock: 'Deep analysis can add news, filings, sector comparison, and AI report.',
+        },
         items: [
           {
             category: 'news',
@@ -1501,6 +1509,11 @@ describe('HomePage', () => {
     expect(intelligencePanel).toHaveTextContent('No realtime news source');
     expect(intelligencePanel).toHaveTextContent('No AI');
     expect(intelligencePanel).toHaveTextContent('not investment advice');
+    const marketBrief = screen.getByTestId('basic-query-market-brief');
+    expect(marketBrief).toHaveTextContent('市场通道');
+    expect(marketBrief).toHaveTextContent('US equity quick view');
+    expect(marketBrief).toHaveTextContent('us_market_data');
+    expect(marketBrief).toHaveTextContent('Nasdaq and sector ETF context');
     const watchPoints = screen.getByTestId('basic-query-watch-points');
     expect(watchPoints).toHaveTextContent('下一步观察');
     expect(watchPoints).toHaveTextContent('Trend confirmation');

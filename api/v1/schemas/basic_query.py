@@ -127,11 +127,23 @@ class BasicComparisonTargetPayload(BaseModel):
     source: str = "no_ai_route_rules"
 
 
+class BasicMarketBriefPayload(BaseModel):
+    """Market-lane explanation for the free no-AI report."""
+
+    market: str
+    title: str
+    summary: str
+    lane: str
+    focus_points: List[str] = Field(default_factory=list)
+    deep_unlock: str
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
     mode: str = "no_ai_low_cost"
     ai_used: bool = False
+    market_brief: Optional[BasicMarketBriefPayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)

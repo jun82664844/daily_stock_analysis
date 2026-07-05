@@ -2762,6 +2762,44 @@ const HomePage: React.FC = () => {
                         ) : null}
                       </div>
                     ) : null}
+                    {basicSnapshot.intelligence?.marketBrief ? (
+                      <div
+                        data-testid="basic-query-market-brief"
+                        className="mb-3 rounded-lg border border-primary/25 bg-primary/5 p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">
+                              {uiLanguage === 'en' ? 'Market lane' : '市场通道'}
+                            </div>
+                            <h4 className="mt-1 text-sm font-semibold text-foreground">
+                              {basicSnapshot.intelligence.marketBrief.title}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {basicSnapshot.intelligence.marketBrief.summary}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+                            <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary">
+                              {basicSnapshot.intelligence.marketBrief.lane}
+                            </span>
+                            <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
+                              {basicSnapshot.intelligence.marketBrief.market.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          {basicSnapshot.intelligence.marketBrief.focusPoints.map((point) => (
+                            <span key={point} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {point}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-3 text-[11px] leading-relaxed text-secondary-text">
+                          {basicSnapshot.intelligence.marketBrief.deepUnlock}
+                        </div>
+                      </div>
+                    ) : null}
                     {(basicSnapshot.intelligence?.watchPoints?.length || basicSnapshot.intelligence?.comparisonTargets?.length) ? (
                       <div
                         data-testid="basic-query-watch-points"

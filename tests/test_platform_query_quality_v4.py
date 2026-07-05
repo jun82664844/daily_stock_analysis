@@ -104,7 +104,7 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return int(response.json()["user"]["id"])
 
-    def test_basic_query_routes_a_share_us_and_crypto_without_ai(self) -> None:
+    def test_basic_query_routes_a_share_us_hk_and_crypto_without_ai(self) -> None:
         stock_service = MagicMock()
         stock_service.get_realtime_quote.side_effect = lambda code: _quote(code)
         stock_service.get_history_data.side_effect = lambda code, **_: {
@@ -119,18 +119,33 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
 
         cn = service.get_snapshot("600519")
         us = service.get_snapshot("AAPL")
+        hk = service.get_snapshot("00700.HK")
         crypto = service.get_snapshot("BTC-USD")
 
         self.assertEqual(cn["market"], "cn")
         self.assertEqual(cn["route"]["channel"], "a_share")
         self.assertEqual(cn["route"]["data_source_lane"], "a_share_market_data")
+        self.assertEqual(cn["intelligence"]["market_brief"]["market"], "cn")
+        self.assertIn("A-share", cn["intelligence"]["market_brief"]["title"])
+        self.assertIn("000300.SH", {item["symbol"] for item in cn["intelligence"]["comparison_targets"]})
         self.assertEqual(us["market"], "us")
         self.assertEqual(us["route"]["channel"], "us_equity")
         self.assertEqual(us["route"]["data_source_lane"], "us_market_data")
+        self.assertEqual(us["intelligence"]["market_brief"]["market"], "us")
+        self.assertIn("US equity", us["intelligence"]["market_brief"]["title"])
+        self.assertEqual(hk["market"], "hk")
+        self.assertEqual(hk["route"]["channel"], "hk_equity")
+        self.assertEqual(hk["route"]["data_source_lane"], "hk_market_data")
+        self.assertEqual(hk["intelligence"]["market_brief"]["market"], "hk")
+        self.assertIn("Hong Kong", hk["intelligence"]["market_brief"]["title"])
+        self.assertIn("^HSI", {item["symbol"] for item in hk["intelligence"]["comparison_targets"]})
         self.assertEqual(crypto["market"], "crypto")
         self.assertEqual(crypto["stock_code"], "BTC-USD")
         self.assertEqual(crypto["route"]["channel"], "crypto_spot")
         self.assertEqual(crypto["route"]["data_source_lane"], "crypto_market_data")
+        self.assertEqual(crypto["intelligence"]["market_brief"]["market"], "crypto")
+        self.assertIn("Crypto", crypto["intelligence"]["market_brief"]["title"])
+        self.assertIn("not apply", crypto["intelligence"]["items"][2]["summary"])
         self.assertFalse(cn["ai_used"])
         self.assertFalse(us["ai_used"])
         self.assertFalse(crypto["route"]["ai_required"])

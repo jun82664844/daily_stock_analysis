@@ -67,6 +67,14 @@ export type BasicStockSnapshot = {
     mode: string;
     aiUsed: boolean;
     boundary?: string | null;
+    marketBrief?: {
+      market: string;
+      title: string;
+      summary: string;
+      lane: string;
+      focusPoints: string[];
+      deepUnlock: string;
+    } | null;
     items: Array<{
       category: string;
       title: string;

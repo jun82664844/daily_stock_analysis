@@ -689,12 +689,13 @@ class BasicQueryService:
         indicators: Dict[str, Any],
         warnings: list[Dict[str, str]],
     ) -> Dict[str, Any]:
-        financial_summary, financial_status = self._financial_intelligence_summary(profile)
+        financial_summary, financial_status = self._financial_intelligence_summary(profile, route=route)
         quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
         warning_note = " Current market data is degraded." if warnings else ""
         return {
             "mode": "no_ai_low_cost",
             "ai_used": False,
+            "market_brief": self._market_brief_payload(route=route, profile=profile),
             "items": [
                 {
                     "category": "news",
@@ -736,6 +737,70 @@ class BasicQueryService:
             ),
             "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
             "boundary": "Information analysis only; not investment advice.",
+        }
+
+    def _market_brief_payload(
+        self,
+        *,
+        route: MarketRoute,
+        profile: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        if route.market == "cn":
+            return {
+                "market": "cn",
+                "title": "A-share quick view",
+                "summary": "A-share lane focuses on quote, moving averages, volume-price behavior, and broad-market context without AI.",
+                "lane": route.data_source_lane,
+                "focus_points": [
+                    "Price versus MA20",
+                    "Volume confirmation",
+                    "CSI 300 and SSE Composite context",
+                    "Announcements require deep mode or configured sources",
+                ],
+                "deep_unlock": "Deep analysis can add announcements, fundamentals, sector flow, and longer AI report.",
+            }
+        if route.market == "hk":
+            return {
+                "market": "hk",
+                "title": "Hong Kong equity quick view",
+                "summary": "Hong Kong lane focuses on quote, trend, liquidity, and Hang Seng context without AI.",
+                "lane": route.data_source_lane,
+                "focus_points": [
+                    "Price versus MA20",
+                    "Volume confirmation",
+                    "Hang Seng and Hong Kong ETF context",
+                    "Company filings require deep mode or configured sources",
+                ],
+                "deep_unlock": "Deep analysis can add Hong Kong filings, news, sector comparison, and AI interpretation.",
+            }
+        if route.market == "crypto":
+            return {
+                "market": "crypto",
+                "title": "Crypto quick view",
+                "summary": "Crypto lane focuses on 24/7 price action, trend, volume behavior, and BTC/ETH context without stock fundamentals.",
+                "lane": route.data_source_lane,
+                "focus_points": [
+                    "Price versus MA20",
+                    "Volume confirmation",
+                    "BTC and ETH market beta context",
+                    "Equity filings and financial statements do not apply",
+                ],
+                "deep_unlock": "Deep analysis can add crypto news, risk events, liquidity context, and AI interpretation when configured.",
+            }
+        sector = str((profile or {}).get("sector") or "").strip()
+        sector_focus = "Nasdaq and sector ETF context" if sector else "Nasdaq context"
+        return {
+            "market": "us",
+            "title": "US equity quick view",
+            "summary": "US equity lane uses quote, history, profile, Nasdaq and sector references without AI.",
+            "lane": route.data_source_lane,
+            "focus_points": [
+                "Price versus MA20",
+                "Volume confirmation",
+                sector_focus,
+                "Filings and full news require deep mode or configured sources",
+            ],
+            "deep_unlock": "Deep analysis can add news, filings, sector comparison, and AI report.",
         }
 
     def _watch_points_payload(
@@ -898,7 +963,12 @@ class BasicQueryService:
             for target in targets
         ]
 
-    def _financial_intelligence_summary(self, profile: Optional[Dict[str, Any]]) -> tuple[str, str]:
+    def _financial_intelligence_summary(self, profile: Optional[Dict[str, Any]], *, route: MarketRoute) -> tuple[str, str]:
+        if route.market == "crypto":
+            return (
+                "Equity financial statements do not apply to crypto assets; use trend, liquidity, and risk-event context instead.",
+                "unavailable",
+            )
         if not profile:
             return (
                 "Company fundamentals are unavailable in this quick snapshot; free no-AI mode keeps the query fast.",
