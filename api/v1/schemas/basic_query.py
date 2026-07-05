@@ -138,12 +138,24 @@ class BasicMarketBriefPayload(BaseModel):
     deep_unlock: str
 
 
+class BasicFreeInsightPayload(BaseModel):
+    """Structured no-AI insight card for the free query experience."""
+
+    category: str
+    title: str
+    summary: str
+    tone: str = Field("info", pattern="^(positive|neutral|warning|info)$")
+    bullets: List[str] = Field(default_factory=list)
+    source: str = "no_ai_rules"
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
     mode: str = "no_ai_low_cost"
     ai_used: bool = False
     market_brief: Optional[BasicMarketBriefPayload] = None
+    free_insights: List[BasicFreeInsightPayload] = Field(default_factory=list)
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)

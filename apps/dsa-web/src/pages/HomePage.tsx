@@ -2800,6 +2800,56 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                    {basicSnapshot.intelligence?.freeInsights?.length ? (
+                      <div
+                        data-testid="basic-query-free-insights"
+                        className="mb-3 rounded-lg border border-subtle bg-background/35 p-3"
+                      >
+                        <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-semibold text-foreground">
+                              {uiLanguage === 'en' ? 'Free insights' : '免费洞察'}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {uiLanguage === 'en'
+                                ? 'Rule-based movement, peer, and risk context generated from local market data only.'
+                                : '仅基于本地行情规则生成涨跌、参照和风险解释，不调用 AI 或公共搜索。'}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                            No AI
+                          </span>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-3">
+                          {basicSnapshot.intelligence.freeInsights.map((item) => (
+                            <div
+                              key={`${item.category}-${item.title}`}
+                              className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3"
+                            >
+                              <div className="flex min-w-0 items-center justify-between gap-2">
+                                <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
+                                <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
+                                  {item.tone}
+                                </span>
+                              </div>
+                              <div className="mt-2 text-xs leading-relaxed text-secondary-text">
+                                {item.summary}
+                              </div>
+                              <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                                {item.bullets.map((bullet) => (
+                                  <span key={bullet} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                    {bullet}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="mt-2 truncate text-[11px] text-secondary-text">
+                                {item.source}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {(basicSnapshot.intelligence?.watchPoints?.length || basicSnapshot.intelligence?.comparisonTargets?.length) ? (
                       <div
                         data-testid="basic-query-watch-points"

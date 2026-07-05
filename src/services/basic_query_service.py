@@ -696,6 +696,13 @@ class BasicQueryService:
             "mode": "no_ai_low_cost",
             "ai_used": False,
             "market_brief": self._market_brief_payload(route=route, profile=profile),
+            "free_insights": self._free_insights_payload(
+                route=route,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+                warnings=warnings,
+            ),
             "items": [
                 {
                     "category": "news",
@@ -737,6 +744,126 @@ class BasicQueryService:
             ),
             "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
             "boundary": "Information analysis only; not investment advice.",
+        }
+
+    def _free_insights_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
+        warnings: list[Dict[str, str]],
+    ) -> list[Dict[str, Any]]:
+        movement = self._movement_free_insight(quote=quote, indicators=indicators)
+        peer_context = self._peer_context_free_insight(route=route, profile=profile)
+        risk = self._risk_free_insight(route=route, quote=quote, warnings=warnings)
+        return [movement, peer_context, risk]
+
+    def _movement_free_insight(
+        self,
+        *,
+        quote: Dict[str, Any],
+        indicators: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        current_price = self._float_or_none(quote.get("current_price"))
+        change_percent = self._float_or_none(quote.get("change_percent"))
+        ma20 = self._float_or_none(indicators.get("ma20"))
+        volume_change = self._float_or_none(indicators.get("volume_change_vs_ma5"))
+        signal = str(indicators.get("volume_price_signal") or "insufficient_data")
+
+        move_text = (
+            f"price changed {self._format_signed_percent_value(change_percent)}"
+            if change_percent is not None
+            else "latest intraday change is unavailable"
+        )
+        if current_price is not None and ma20 is not None:
+            trend_text = (
+                f"holds above MA20 {self._format_plain_number(ma20)}"
+                if current_price >= ma20
+                else f"stays below MA20 {self._format_plain_number(ma20)}"
+            )
+        else:
+            trend_text = "MA20 context is incomplete"
+
+        if volume_change is None:
+            volume_text = "volume confirmation is incomplete"
+        else:
+            volume_text = f"volume is {self._format_signed_percent_value(volume_change)} versus MA5"
+
+        if signal == "price_volume_confirmed":
+            tone = "positive"
+        elif signal in {"volume_expanded_price_below_trend", "neutral"}:
+            tone = "warning"
+        elif signal == "price_above_trend_volume_soft":
+            tone = "neutral"
+        else:
+            tone = "info"
+
+        return {
+            "category": "movement",
+            "title": "Move explanation",
+            "summary": f"Today's quick read: {move_text}, {trend_text}, and {volume_text}.",
+            "tone": tone,
+            "bullets": [
+                f"Last price {self._format_plain_number(current_price)}",
+                trend_text,
+                volume_text,
+            ],
+            "source": "no_ai_rules",
+        }
+
+    def _peer_context_free_insight(
+        self,
+        *,
+        route: MarketRoute,
+        profile: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        targets = self._comparison_targets_payload(route=route, profile=profile)
+        symbols = [item["symbol"] for item in targets[:3]]
+        sector = str((profile or {}).get("sector") or "").strip()
+        industry = str((profile or {}).get("industry") or "").strip()
+        context_bits = [bit for bit in (sector, industry) if bit]
+        context_text = " / ".join(context_bits) if context_bits else route.channel.replace("_", " ")
+        target_text = ", ".join(symbols) if symbols else route.data_source_lane
+        return {
+            "category": "peer_context",
+            "title": "Peer context",
+            "summary": f"Read this move against {target_text}; quick profile context is {context_text}.",
+            "tone": "info",
+            "bullets": symbols or [route.data_source_lane],
+            "source": "no_ai_route_rules",
+        }
+
+    def _risk_free_insight(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        warnings: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        if warnings:
+            warning_messages = [item.get("message") for item in warnings if item.get("message")]
+            risk_summary = "Data warning: " + " ".join(warning_messages[:2])
+            tone = "warning"
+        else:
+            freshness = quote.get("freshness") or "fresh"
+            risk_summary = (
+                f"No-AI quick view for {route.channel}: quote freshness is {freshness}; "
+                "realtime news, filings, external search, and investment advice are not included."
+            )
+            tone = "info"
+        return {
+            "category": "risk",
+            "title": "Key risks",
+            "summary": risk_summary,
+            "tone": tone,
+            "bullets": [
+                f"Lane {route.data_source_lane}",
+                "No AI used",
+                "Information analysis only",
+            ],
+            "source": "no_ai_rules",
         }
 
     def _market_brief_payload(
@@ -1022,6 +1149,13 @@ class BasicQueryService:
         if number is None:
             return "-"
         return f"{self._format_plain_number(number)}%"
+
+    def _format_signed_percent_value(self, value: Any) -> str:
+        number = self._float_or_none(value)
+        if number is None:
+            return "-"
+        prefix = "+" if number > 0 else ""
+        return f"{prefix}{self._format_plain_number(number)}%"
 
     def _moving_average(self, values: list[float], window: int) -> Optional[float]:
         if len(values) < window:

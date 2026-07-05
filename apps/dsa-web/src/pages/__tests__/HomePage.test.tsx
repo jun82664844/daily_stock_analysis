@@ -1372,6 +1372,32 @@ describe('HomePage', () => {
           focusPoints: ['Price versus MA20', 'Volume confirmation', 'Nasdaq and sector ETF context'],
           deepUnlock: 'Deep analysis can add news, filings, sector comparison, and AI report.',
         },
+        freeInsights: [
+          {
+            category: 'movement',
+            title: 'Move explanation',
+            summary: 'Price is +1.5% and holds above MA20 with positive short-term confirmation.',
+            tone: 'positive',
+            bullets: ['Price versus MA20', 'Volume confirmation'],
+            source: 'no_ai_rules',
+          },
+          {
+            category: 'peer_context',
+            title: 'Peer context',
+            summary: 'Compare this move with QQQ and XLK before reading AAPL in isolation.',
+            tone: 'info',
+            bullets: ['QQQ', 'XLK'],
+            source: 'no_ai_route_rules',
+          },
+          {
+            category: 'risk',
+            title: 'Key risks',
+            summary: 'No-AI quick view does not include realtime news, filings, or external search.',
+            tone: 'warning',
+            bullets: ['No AI', 'not investment advice'],
+            source: 'no_ai_rules',
+          },
+        ],
         items: [
           {
             category: 'news',
@@ -1514,6 +1540,13 @@ describe('HomePage', () => {
     expect(marketBrief).toHaveTextContent('US equity quick view');
     expect(marketBrief).toHaveTextContent('us_market_data');
     expect(marketBrief).toHaveTextContent('Nasdaq and sector ETF context');
+    const freeInsights = screen.getByTestId('basic-query-free-insights');
+    expect(freeInsights).toHaveTextContent('免费洞察');
+    expect(freeInsights).toHaveTextContent('Move explanation');
+    expect(freeInsights).toHaveTextContent('Peer context');
+    expect(freeInsights).toHaveTextContent('Key risks');
+    expect(freeInsights).toHaveTextContent('QQQ');
+    expect(freeInsights).toHaveTextContent('No-AI quick view');
     const watchPoints = screen.getByTestId('basic-query-watch-points');
     expect(watchPoints).toHaveTextContent('下一步观察');
     expect(watchPoints).toHaveTextContent('Trend confirmation');

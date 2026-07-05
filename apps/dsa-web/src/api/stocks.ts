@@ -75,6 +75,14 @@ export type BasicStockSnapshot = {
       focusPoints: string[];
       deepUnlock: string;
     } | null;
+    freeInsights?: Array<{
+      category: string;
+      title: string;
+      summary: string;
+      tone: string;
+      bullets: string[];
+      source: string;
+    }>;
     items: Array<{
       category: string;
       title: string;

@@ -133,6 +133,19 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
         self.assertEqual(us["route"]["data_source_lane"], "us_market_data")
         self.assertEqual(us["intelligence"]["market_brief"]["market"], "us")
         self.assertIn("US equity", us["intelligence"]["market_brief"]["title"])
+        us_free_insights = us["intelligence"]["free_insights"]
+        self.assertEqual(
+            {"movement", "peer_context", "risk"},
+            {item["category"] for item in us_free_insights},
+        )
+        self.assertIn(
+            "QQQ",
+            next(item for item in us_free_insights if item["category"] == "peer_context")["summary"],
+        )
+        self.assertIn(
+            "No-AI",
+            next(item for item in us_free_insights if item["category"] == "risk")["summary"],
+        )
         self.assertEqual(hk["market"], "hk")
         self.assertEqual(hk["route"]["channel"], "hk_equity")
         self.assertEqual(hk["route"]["data_source_lane"], "hk_market_data")
