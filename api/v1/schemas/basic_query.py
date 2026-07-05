@@ -169,6 +169,27 @@ class BasicPeerComparisonPayload(BaseModel):
     rows: List[BasicPeerComparisonRowPayload] = Field(default_factory=list)
 
 
+class BasicSignalScoreComponentPayload(BaseModel):
+    """One deterministic component behind the no-AI quick signal score."""
+
+    key: str
+    label: str
+    score: int = Field(..., ge=0, le=100)
+    status: str = Field("neutral", pattern="^(positive|neutral|warning|missing)$")
+    detail: str
+
+
+class BasicSignalScorePayload(BaseModel):
+    """Deterministic free-tier signal score without AI or public search."""
+
+    score: int = Field(..., ge=0, le=100)
+    label: str
+    summary: str
+    components: List[BasicSignalScoreComponentPayload] = Field(default_factory=list)
+    source: str = "no_ai_rules"
+    ai_used: bool = False
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
@@ -177,6 +198,7 @@ class BasicIntelligencePayload(BaseModel):
     market_brief: Optional[BasicMarketBriefPayload] = None
     free_insights: List[BasicFreeInsightPayload] = Field(default_factory=list)
     peer_comparison: Optional[BasicPeerComparisonPayload] = None
+    signal_score: Optional[BasicSignalScorePayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)

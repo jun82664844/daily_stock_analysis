@@ -96,6 +96,20 @@ export type BasicStockSnapshot = {
         source: string;
       }>;
     } | null;
+    signalScore?: {
+      score: number;
+      label: string;
+      summary: string;
+      components: Array<{
+        key: string;
+        label: string;
+        score: number;
+        status: string;
+        detail: string;
+      }>;
+      source: string;
+      aiUsed?: boolean;
+    } | null;
     items: Array<{
       category: string;
       title: string;

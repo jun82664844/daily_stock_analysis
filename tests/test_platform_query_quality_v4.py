@@ -167,6 +167,17 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
             any(row["symbol"] == "XLK" and row["role"] == "Sector lens" for row in us_peer_comparison["rows"])
         )
         self.assertTrue(all("AAPL" in row["current_signal"] for row in us_peer_comparison["rows"]))
+        us_signal_score = us["intelligence"]["signal_score"]
+        self.assertGreaterEqual(us_signal_score["score"], 0)
+        self.assertLessEqual(us_signal_score["score"], 100)
+        self.assertEqual("no_ai_rules", us_signal_score["source"])
+        self.assertFalse(us_signal_score["ai_used"])
+        self.assertIn("AAPL", us_signal_score["summary"])
+        self.assertEqual(
+            {"trend", "volume", "freshness", "profile"},
+            {component["key"] for component in us_signal_score["components"]},
+        )
+        self.assertTrue(all(0 <= component["score"] <= 100 for component in us_signal_score["components"]))
         self.assertEqual(hk["market"], "hk")
         self.assertEqual(hk["route"]["channel"], "hk_equity")
         self.assertEqual(hk["route"]["data_source_lane"], "hk_market_data")

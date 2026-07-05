@@ -1364,6 +1364,43 @@ describe('HomePage', () => {
         mode: 'no_ai_low_cost',
         aiUsed: false,
         boundary: 'Information analysis only; not investment advice.',
+        signalScore: {
+          score: 82,
+          label: 'Strong quick signal',
+          summary: 'AAPL signal is 82/100 from trend, volume, data freshness, and profile completeness.',
+          components: [
+            {
+              key: 'trend',
+              label: 'Trend',
+              score: 90,
+              status: 'positive',
+              detail: 'Price is above MA20 and short-term trend remains constructive.',
+            },
+            {
+              key: 'volume',
+              label: 'Volume',
+              score: 70,
+              status: 'neutral',
+              detail: 'Volume is above recent average but still needs follow-through.',
+            },
+            {
+              key: 'freshness',
+              label: 'Data freshness',
+              score: 100,
+              status: 'positive',
+              detail: 'Quote and history are fresh.',
+            },
+            {
+              key: 'profile',
+              label: 'Profile completeness',
+              score: 80,
+              status: 'positive',
+              detail: 'Company sector, industry, and valuation fields are available.',
+            },
+          ],
+          source: 'no_ai_rules',
+          aiUsed: false,
+        },
         marketBrief: {
           market: 'us',
           title: 'US equity quick view',
@@ -1547,6 +1584,14 @@ describe('HomePage', () => {
     expect(freeReport).toHaveTextContent('MA20');
     expect(freeReport).toHaveTextContent('4.5T');
     expect(freeReport).toHaveTextContent('31.2');
+    const signalScore = screen.getByTestId('basic-query-signal-score');
+    expect(signalScore).toHaveTextContent('82/100');
+    expect(signalScore).toHaveTextContent('Strong quick signal');
+    expect(signalScore).toHaveTextContent('Trend');
+    expect(signalScore).toHaveTextContent('Volume');
+    expect(signalScore).toHaveTextContent('Data freshness');
+    expect(signalScore).toHaveTextContent('Profile completeness');
+    expect(signalScore).toHaveTextContent('No AI');
     const productBrief = screen.getByTestId('basic-query-product-brief');
     expect(productBrief).toHaveTextContent('关键结论');
     expect(productBrief).toHaveTextContent('支撑');

@@ -49,6 +49,14 @@ const toFiniteBasicNumber = (value: unknown): number | null => (
   typeof value === 'number' && Number.isFinite(value) ? value : null
 );
 
+const clampBasicScore = (value: unknown): number => {
+  const numberValue = toFiniteBasicNumber(value);
+  if (numberValue === null) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(numberValue)));
+};
+
 const formatSignedBasicPercent = (value: unknown): string => {
   const numberValue = toFiniteBasicNumber(value);
   if (numberValue === null) {
@@ -1073,9 +1081,27 @@ const HomePage: React.FC = () => {
       ?? sparkline?.changePercent
       ?? change20d
       ?? change5d;
+    const backendSignalScore = basicSnapshot.intelligence?.signalScore ?? null;
+    const normalizedSignalScore = backendSignalScore
+      ? {
+          score: clampBasicScore(backendSignalScore.score),
+          label: backendSignalScore.label || (isEnglish ? 'Quick signal score' : '快速信号评分'),
+          summary: backendSignalScore.summary || '',
+          source: backendSignalScore.source || 'no_ai_rules',
+          aiUsed: Boolean(backendSignalScore.aiUsed),
+          components: (backendSignalScore.components ?? []).map((component) => ({
+            key: component.key || component.label,
+            label: component.label || component.key || '-',
+            score: clampBasicScore(component.score),
+            status: component.status || 'neutral',
+            detail: component.detail || '',
+          })),
+        }
+      : null;
 
     return {
-      score,
+      score: normalizedSignalScore?.score ?? score,
+      signalScore: normalizedSignalScore,
       miniChart: {
         title: hasHistoricalTrend
           ? (isEnglish ? `${trendWindow}d trend` : `${trendWindow}日趋势`)
@@ -2700,6 +2726,77 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                    {basicFreeReport.signalScore ? (
+                      <div
+                        data-testid="basic-query-signal-score"
+                        className="mb-3 rounded-lg border border-primary/30 bg-background/35 p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">
+                              {uiLanguage === 'en' ? 'Signal score' : '信号评分'}
+                            </div>
+                            <h4 className="mt-1 text-base font-semibold text-foreground">
+                              {basicFreeReport.signalScore.label}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {basicFreeReport.signalScore.summary}
+                            </p>
+                          </div>
+                          <div className="shrink-0 rounded-lg border border-primary/35 bg-primary/10 px-4 py-3 text-center">
+                            <div className="text-2xl font-semibold text-primary">
+                              {basicFreeReport.signalScore.score}/100
+                            </div>
+                            <div className="mt-1 text-[11px] text-secondary-text">No AI</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${basicFreeReport.signalScore.score}%` }}
+                          />
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                          {basicFreeReport.signalScore.components.map((component) => (
+                            <div
+                              key={`${component.key}-${component.label}`}
+                              className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3"
+                            >
+                              <div className="flex min-w-0 items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-foreground">
+                                    {component.label}
+                                  </div>
+                                  <div className="mt-1 truncate text-[11px] text-secondary-text">
+                                    {component.status}
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                  {component.score}
+                                </span>
+                              </div>
+                              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-background">
+                                <div
+                                  className="h-full rounded-full bg-primary/80"
+                                  style={{ width: `${component.score}%` }}
+                                />
+                              </div>
+                              <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                                {component.detail}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                            {basicFreeReport.signalScore.source}
+                          </span>
+                          <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                            {uiLanguage === 'en' ? 'Information analysis only' : '仅作信息分析'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                     {basicSnapshot.intelligence?.items?.length ? (
                       <div
                         data-testid="basic-query-intelligence-panel"

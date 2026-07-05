@@ -709,6 +709,13 @@ class BasicQueryService:
                 profile=profile,
                 indicators=indicators,
             ),
+            "signal_score": self._signal_score_payload(
+                route=route,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+                warnings=warnings,
+            ),
             "items": [
                 {
                     "category": "news",
@@ -782,6 +789,176 @@ class BasicQueryService:
             "title": "Peer and market comparison",
             "summary": f"Compare {route.normalized_code} against {target_symbols} before reading it in isolation.",
             "rows": rows,
+        }
+
+    def _signal_score_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
+        warnings: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        current_price = self._float_or_none(quote.get("current_price"))
+        ma5 = self._float_or_none(indicators.get("ma5"))
+        ma20 = self._float_or_none(indicators.get("ma20"))
+        freshness = str(quote.get("freshness") or "unavailable")
+        signal = str(indicators.get("volume_price_signal") or "insufficient_data")
+        volume_change = self._float_or_none(indicators.get("volume_change_vs_ma5"))
+
+        if current_price is None or ma20 is None:
+            trend_score = 35
+            trend_status = "missing"
+            trend_detail = "Trend score is limited because latest price or MA20 is unavailable."
+        elif ma5 is not None and current_price >= ma5 and current_price >= ma20:
+            trend_score = 90
+            trend_status = "positive"
+            trend_detail = (
+                f"Price {self._format_plain_number(current_price)} is above MA5 "
+                f"{self._format_plain_number(ma5)} and MA20 {self._format_plain_number(ma20)}."
+            )
+        elif current_price >= ma20:
+            trend_score = 74
+            trend_status = "positive"
+            trend_detail = f"Price holds above MA20 {self._format_plain_number(ma20)}, but short-term confirmation is mixed."
+        elif ma5 is not None and current_price >= ma5:
+            trend_score = 58
+            trend_status = "neutral"
+            trend_detail = f"Price is above MA5 {self._format_plain_number(ma5)} but below MA20 {self._format_plain_number(ma20)}."
+        else:
+            trend_score = 42
+            trend_status = "warning"
+            trend_detail = f"Price is below MA20 {self._format_plain_number(ma20)}; trend repair still needs confirmation."
+
+        volume_detail_suffix = (
+            f" Volume is {self._format_signed_percent_value(volume_change)} versus MA5."
+            if volume_change is not None
+            else ""
+        )
+        if signal == "price_volume_confirmed":
+            volume_score = 84
+            volume_status = "positive"
+            volume_detail = "Price and volume confirm each other in the quick rules." + volume_detail_suffix
+        elif signal == "price_above_trend_volume_soft":
+            volume_score = 66
+            volume_status = "neutral"
+            volume_detail = "Price is above trend, while volume confirmation is still soft." + volume_detail_suffix
+        elif signal == "volume_expanded_price_below_trend":
+            volume_score = 54
+            volume_status = "warning"
+            volume_detail = "Volume expanded while price remains below trend, so confirmation is mixed." + volume_detail_suffix
+        elif signal == "neutral":
+            volume_score = 50
+            volume_status = "neutral"
+            volume_detail = "Volume-price behavior is neutral in the quick rules." + volume_detail_suffix
+        else:
+            volume_score = 34
+            volume_status = "missing"
+            volume_detail = "Volume-price score is limited because recent volume history is incomplete."
+
+        freshness_scores = {
+            "fresh": (100, "positive", "Quote data is fresh for this quick snapshot."),
+            "cached": (76, "neutral", "Quote data came from cache; refresh before comparing intraday moves."),
+            "stale": (45, "warning", "Quote data is stale; treat the quick signal as provisional."),
+            "unavailable": (20, "missing", "Latest quote is unavailable; signal confidence is limited."),
+        }
+        freshness_score, freshness_status, freshness_detail = freshness_scores.get(
+            freshness,
+            (40, "warning", f"Quote freshness is {freshness}; confirm data before comparing signals."),
+        )
+        if warnings:
+            freshness_score = max(0, freshness_score - 10)
+            freshness_status = "warning" if freshness_status == "positive" else freshness_status
+            freshness_detail = f"{freshness_detail} {warnings[0].get('message') or 'A data warning is present.'}"
+
+        if route.market == "crypto":
+            profile_score = 72
+            profile_status = "neutral"
+            profile_detail = "Crypto assets do not use stock fundamentals; quick context uses market lane and quote data."
+        elif profile and self._has_profile_content(profile):
+            profile_fields = [
+                "sector",
+                "industry",
+                "market_cap",
+                "pe_ratio",
+                "pb_ratio",
+                "dividend_yield",
+                "revenue",
+                "net_profit",
+            ]
+            available_fields = sum(1 for field in profile_fields if profile.get(field) not in (None, ""))
+            profile_score = min(100, 55 + available_fields * 7)
+            profile_status = "positive" if profile_score >= 76 else "neutral"
+            context = " / ".join(
+                str(value) for value in (profile.get("sector"), profile.get("industry")) if value not in (None, "")
+            )
+            profile_detail = context or "Company profile has usable valuation or financial fields."
+        elif profile:
+            profile_score = 52
+            profile_status = "neutral"
+            profile_detail = "Basic company name is available, but valuation and sector fields are limited."
+        else:
+            profile_score = 34
+            profile_status = "missing"
+            profile_detail = "Company profile is unavailable in quick mode; deep mode can add fuller context."
+
+        components = [
+            {
+                "key": "trend",
+                "label": "Trend",
+                "score": trend_score,
+                "status": trend_status,
+                "detail": trend_detail,
+            },
+            {
+                "key": "volume",
+                "label": "Volume",
+                "score": volume_score,
+                "status": volume_status,
+                "detail": volume_detail,
+            },
+            {
+                "key": "freshness",
+                "label": "Data freshness",
+                "score": freshness_score,
+                "status": freshness_status,
+                "detail": freshness_detail,
+            },
+            {
+                "key": "profile",
+                "label": "Profile completeness",
+                "score": profile_score,
+                "status": profile_status,
+                "detail": profile_detail,
+            },
+        ]
+        weights = {
+            "trend": 0.36,
+            "volume": 0.24,
+            "freshness": 0.25,
+            "profile": 0.15,
+        }
+        score = int(round(sum(component["score"] * weights[component["key"]] for component in components)))
+        score = max(0, min(100, score))
+        if score >= 80:
+            label = "Strong quick signal"
+        elif score >= 65:
+            label = "Constructive quick signal"
+        elif score >= 50:
+            label = "Mixed quick signal"
+        else:
+            label = "Weak quick signal"
+        return {
+            "score": score,
+            "label": label,
+            "summary": (
+                f"{route.normalized_code} signal is {score}/100 from trend, volume, "
+                "data freshness, and profile completeness. No AI or public search was used."
+            ),
+            "components": components,
+            "source": "no_ai_rules",
+            "ai_used": False,
         }
 
     def _current_signal_summary(
