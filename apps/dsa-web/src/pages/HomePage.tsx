@@ -138,6 +138,22 @@ const pickBasicIndicator = (indicators: Record<string, unknown>, ...keys: string
   return undefined;
 };
 
+const basicIntelligenceCategoryLabel = (category: string, fallback: string, language: string): string => {
+  const isEnglish = language === 'en';
+  if (category === 'news') return isEnglish ? 'News' : '新闻';
+  if (category === 'announcements') return isEnglish ? 'Announcements' : '公告';
+  if (category === 'financials') return isEnglish ? 'Financial snapshot' : '财报';
+  return fallback || category || '-';
+};
+
+const basicIntelligenceStatusLabel = (status: string, language: string): string => {
+  const isEnglish = language === 'en';
+  if (status === 'available') return isEnglish ? 'available' : '可用';
+  if (status === 'degraded') return isEnglish ? 'degraded' : '降级';
+  if (status === 'unavailable') return isEnglish ? 'unavailable' : '暂无';
+  return status || '-';
+};
+
 const formatQuotaLeft = (quota?: Pick<PlatformQuota, 'weeklyLimit' | 'remaining' | 'used'> | null): string => {
   if (!quota) {
     return 'unavailable';
@@ -2676,6 +2692,68 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                    {basicSnapshot.intelligence?.items?.length ? (
+                      <div
+                        data-testid="basic-query-intelligence-panel"
+                        className="mb-3 rounded-lg border border-subtle bg-background/35 p-3"
+                      >
+                        <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-semibold text-foreground">
+                              {uiLanguage === 'en' ? 'Information digest' : '资讯摘要'}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {uiLanguage === 'en'
+                                ? 'Low-cost facts from market data and cached company profile; realtime search and AI remain off.'
+                                : '基于行情与公司资料生成的低成本摘要；实时搜索和 AI 仍保持关闭。'}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+                            <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                              No AI
+                            </span>
+                            <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
+                              {basicSnapshot.intelligence.mode}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-3">
+                          {basicSnapshot.intelligence.items.map((item) => (
+                            <div
+                              key={`${item.category}-${item.title}`}
+                              className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3"
+                            >
+                              <div className="flex min-w-0 items-center justify-between gap-2">
+                                <div className="truncate text-xs font-medium text-primary">
+                                  {basicIntelligenceCategoryLabel(item.category, item.title, uiLanguage)}
+                                </div>
+                                <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
+                                  {basicIntelligenceStatusLabel(item.status, uiLanguage)}
+                                </span>
+                              </div>
+                              <div className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                                {item.summary}
+                              </div>
+                              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                                <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                  {item.source}
+                                </span>
+                                {item.updatedAt ? (
+                                  <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                    {item.updatedAt}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {basicSnapshot.intelligence.boundary ? (
+                          <div className="mt-3 text-[11px] leading-relaxed text-secondary-text">
+                            {basicSnapshot.intelligence.boundary}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div
                       data-testid="basic-query-product-brief"
                       className="mb-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5"

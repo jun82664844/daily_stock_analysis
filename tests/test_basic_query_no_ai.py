@@ -112,6 +112,11 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertEqual(body["trend"]["min_close"], 182.0)
         self.assertEqual(body["trend"]["max_close"], 201.0)
         self.assertEqual(body["trend"]["change_percent"], 10.4396)
+        self.assertEqual(body["intelligence"]["mode"], "no_ai_low_cost")
+        self.assertFalse(body["intelligence"]["ai_used"])
+        intelligence_categories = {item["category"] for item in body["intelligence"]["items"]}
+        self.assertEqual(intelligence_categories, {"news", "announcements", "financials"})
+        self.assertIn("not investment advice", body["intelligence"]["boundary"])
         self.assertFalse(body["ai_used"])
         analysis_service.assert_not_called()
 

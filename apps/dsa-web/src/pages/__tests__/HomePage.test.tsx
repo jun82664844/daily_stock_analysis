@@ -1360,6 +1360,34 @@ describe('HomePage', () => {
           { date: '2026-07-02', close: 200, volume: 75352800 },
         ],
       },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+        items: [
+          {
+            category: 'news',
+            title: 'News',
+            summary: 'No realtime news source is enabled in free no-AI mode.',
+            status: 'degraded',
+            source: 'no_ai_quick_snapshot',
+          },
+          {
+            category: 'announcements',
+            title: 'Announcements',
+            summary: 'No filing or announcement source is enabled in free no-AI mode.',
+            status: 'degraded',
+            source: 'no_ai_quick_snapshot',
+          },
+          {
+            category: 'financials',
+            title: 'Financial snapshot',
+            summary: 'Market cap 4.5T; PE 31.2; dividend yield 0.5%.',
+            status: 'available',
+            source: 'unit_profile',
+          },
+        ],
+      },
       diagnostics: {
         elapsedMs: 18,
         quoteElapsedMs: 8,
@@ -1426,6 +1454,14 @@ describe('HomePage', () => {
     expect(miniChart).toHaveTextContent('6日趋势');
     expect(miniChart).toHaveTextContent('+6.38%');
     expect(miniChart.querySelector('svg')).toBeInTheDocument();
+    const intelligencePanel = screen.getByTestId('basic-query-intelligence-panel');
+    expect(intelligencePanel).toHaveTextContent('资讯摘要');
+    expect(intelligencePanel).toHaveTextContent('新闻');
+    expect(intelligencePanel).toHaveTextContent('公告');
+    expect(intelligencePanel).toHaveTextContent('财报');
+    expect(intelligencePanel).toHaveTextContent('No realtime news source');
+    expect(intelligencePanel).toHaveTextContent('No AI');
+    expect(intelligencePanel).toHaveTextContent('not investment advice');
     expect(
       primarySummary.compareDocumentPosition(screen.getByTestId('basic-query-user-guardrails'))
       & Node.DOCUMENT_POSITION_FOLLOWING,

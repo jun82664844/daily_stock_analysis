@@ -63,6 +63,19 @@ export type BasicStockSnapshot = {
     maxClose?: number | null;
     changePercent?: number | null;
   } | null;
+  intelligence?: {
+    mode: string;
+    aiUsed: boolean;
+    boundary?: string | null;
+    items: Array<{
+      category: string;
+      title: string;
+      summary: string;
+      status: string;
+      source: string;
+      updatedAt?: string | null;
+    }>;
+  } | null;
   route?: {
     inputCode?: string | null;
     normalizedCode: string;

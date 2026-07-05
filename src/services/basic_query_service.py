@@ -125,23 +125,31 @@ class BasicQueryService:
             quote_error=quote_error,
             history_error=history_error,
         )
+        quote_payload = self._quote_payload(
+            quote,
+            freshness=quote_freshness,
+            source_fallback=route.quote_sources[0],
+        )
+        profile_payload = self._profile_payload(
+            profile,
+            freshness=profile_freshness,
+            source_fallback=profile_source,
+        )
 
         return {
             "stock_code": code,
             "stock_name": self._stock_name(quote, history, profile),
             "market": route.market,
-            "quote": self._quote_payload(
-                quote,
-                freshness=quote_freshness,
-                source_fallback=route.quote_sources[0],
-            ),
-            "profile": self._profile_payload(
-                profile,
-                freshness=profile_freshness,
-                source_fallback=profile_source,
-            ),
+            "quote": quote_payload,
+            "profile": profile_payload,
             "indicators": indicators,
             "trend": trend,
+            "intelligence": self._intelligence_payload(
+                route=route,
+                quote=quote_payload,
+                profile=profile_payload,
+                warnings=warnings,
+            ),
             "route": route.to_payload(),
             "warnings": warnings,
             "degradation": self._degradation_payload(warnings),
@@ -670,6 +678,110 @@ class BasicQueryService:
             "max_close": max(closes),
             "change_percent": change_percent,
         }
+
+    def _intelligence_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        warnings: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        financial_summary, financial_status = self._financial_intelligence_summary(profile)
+        quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
+        warning_note = " Current market data is degraded." if warnings else ""
+        return {
+            "mode": "no_ai_low_cost",
+            "ai_used": False,
+            "items": [
+                {
+                    "category": "news",
+                    "title": "News",
+                    "summary": (
+                        f"No realtime news source is enabled in free no-AI mode for {route.channel}. "
+                        f"No AI or public search was used.{warning_note}"
+                    ),
+                    "status": "degraded",
+                    "source": "no_ai_quick_snapshot",
+                    "updated_at": quote_updated_at,
+                },
+                {
+                    "category": "announcements",
+                    "title": "Announcements",
+                    "summary": (
+                        f"No filing or announcement source is enabled in free no-AI mode for {route.market.upper()}. "
+                        "Deep analysis can add filings, announcements, and source links when configured."
+                    ),
+                    "status": "degraded",
+                    "source": "no_ai_quick_snapshot",
+                    "updated_at": quote_updated_at,
+                },
+                {
+                    "category": "financials",
+                    "title": "Financial snapshot",
+                    "summary": financial_summary,
+                    "status": financial_status,
+                    "source": (profile or {}).get("source") or route.profile_sources[0] if route.profile_sources else "profile_unavailable",
+                    "updated_at": quote_updated_at,
+                },
+            ],
+            "boundary": "Information analysis only; not investment advice.",
+        }
+
+    def _financial_intelligence_summary(self, profile: Optional[Dict[str, Any]]) -> tuple[str, str]:
+        if not profile:
+            return (
+                "Company fundamentals are unavailable in this quick snapshot; free no-AI mode keeps the query fast.",
+                "unavailable",
+            )
+        parts: list[str] = []
+        market_cap = self._format_compact_number(profile.get("market_cap"))
+        if market_cap != "-":
+            parts.append(f"Market cap {market_cap}")
+        pe_ratio = self._format_plain_number(profile.get("pe_ratio"))
+        if pe_ratio != "-":
+            parts.append(f"PE {pe_ratio}")
+        pb_ratio = self._format_plain_number(profile.get("pb_ratio"))
+        if pb_ratio != "-":
+            parts.append(f"PB {pb_ratio}")
+        dividend_yield = self._format_percent_value(profile.get("dividend_yield"))
+        if dividend_yield != "-":
+            parts.append(f"dividend yield {dividend_yield}")
+        revenue = self._format_compact_number(profile.get("revenue"))
+        if revenue != "-":
+            parts.append(f"revenue {revenue}")
+        net_profit = self._format_compact_number(profile.get("net_profit"))
+        if net_profit != "-":
+            parts.append(f"net profit {net_profit}")
+        if not parts:
+            return (
+                "Company profile exists, but key valuation and financial fields are unavailable in quick mode.",
+                "degraded",
+            )
+        return "; ".join(parts) + ".", "available"
+
+    def _format_compact_number(self, value: Any) -> str:
+        number = self._float_or_none(value)
+        if number is None:
+            return "-"
+        absolute = abs(number)
+        for threshold, suffix in ((1_000_000_000_000, "T"), (1_000_000_000, "B"), (1_000_000, "M")):
+            if absolute >= threshold:
+                return f"{self._format_plain_number(number / threshold)}{suffix}"
+        return self._format_plain_number(number)
+
+    def _format_plain_number(self, value: Any) -> str:
+        number = self._float_or_none(value)
+        if number is None:
+            return "-"
+        text = f"{number:.4f}".rstrip("0").rstrip(".")
+        return text or "0"
+
+    def _format_percent_value(self, value: Any) -> str:
+        number = self._float_or_none(value)
+        if number is None:
+            return "-"
+        return f"{self._format_plain_number(number)}%"
 
     def _moving_average(self, values: list[float], window: int) -> Optional[float]:
         if len(values) < window:

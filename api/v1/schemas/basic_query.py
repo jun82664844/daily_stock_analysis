@@ -96,6 +96,26 @@ class BasicTrendPayload(BaseModel):
     change_percent: Optional[float] = None
 
 
+class BasicIntelligenceItemPayload(BaseModel):
+    """One deterministic low-cost information item for a free no-AI snapshot."""
+
+    category: str
+    title: str
+    summary: str
+    status: str = Field("available", pattern="^(available|degraded|unavailable)$")
+    source: str = "no_ai_quick_snapshot"
+    updated_at: Optional[str] = None
+
+
+class BasicIntelligencePayload(BaseModel):
+    """Low-cost information summary that never invokes AI or public search."""
+
+    mode: str = "no_ai_low_cost"
+    ai_used: bool = False
+    items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
+    boundary: str = "Information analysis only; not investment advice."
+
+
 class BasicQueryDiagnosticsPayload(BaseModel):
     """Timing, cache, and source diagnostics for the no-AI query lane."""
 
@@ -126,6 +146,7 @@ class BasicStockSnapshot(BaseModel):
     profile: Optional[BasicProfilePayload] = None
     indicators: Dict[str, Any] = Field(default_factory=dict)
     trend: Optional[BasicTrendPayload] = None
+    intelligence: Optional[BasicIntelligencePayload] = None
     route: Optional[BasicRoutePayload] = None
     warnings: List[BasicWarningPayload] = Field(default_factory=list)
     degradation: BasicDegradationPayload = Field(default_factory=BasicDegradationPayload)
