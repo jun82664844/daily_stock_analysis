@@ -60,6 +60,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-06-dsa-v54-local-user-acceptance.md",
     "docs/superpowers/plans/2026-07-06-dsa-v55-local-product-experience.md",
     "docs/superpowers/plans/2026-07-06-dsa-v56-user-retention-loop.md",
+    "docs/superpowers/plans/2026-07-06-dsa-v57-news-kline-forecast-lab.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -103,6 +104,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_local_user_acceptance_v54.py",
     "scripts/verify_platform_local_product_experience_v55.py",
     "scripts/verify_platform_local_user_retention_v56.py",
+    "scripts/verify_platform_local_news_kline_v57.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/platform_watchlist.py",
@@ -150,6 +152,7 @@ REQUIRED_FILES = (
     "tests/test_platform_local_user_acceptance_v54.py",
     "tests/test_platform_local_product_experience_v55.py",
     "tests/test_platform_local_user_retention_v56.py",
+    "tests/test_platform_local_news_kline_v57.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -196,6 +199,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_local_user_acceptance_v54.py",
     "scripts/verify_platform_local_product_experience_v55.py",
     "scripts/verify_platform_local_user_retention_v56.py",
+    "scripts/verify_platform_local_news_kline_v57.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

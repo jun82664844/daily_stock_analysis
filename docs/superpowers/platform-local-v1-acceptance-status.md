@@ -409,3 +409,12 @@ git diff --check
 - Playwright mock E2E covers guest AAPL query, registration, save history, add watchlist, logout, login, and saved history/watchlist visibility.
 - Added `tests/test_platform_local_user_retention_v56.py` and `scripts/verify_platform_local_user_retention_v56.py`; the verifier prints `DSA_PLATFORM_LOCAL_USER_RETENTION_V56_OK` only when required local checks pass.
 - V56 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-06 Local News And K-Line Forecast Lab V57 gate
+
+- Free no-AI snapshots now include `intelligence.news_center`, a deterministic local information center for news, announcements, financials, sector context, and data-quality lanes.
+- Free no-AI snapshots now include `intelligence.kline_forecast`, a Kronos-ready K-line forecast lab preview built from quote, moving averages, trend, and volume-price signals.
+- The V57 forecast lab does not run Kronos inference, does not call AI, and does not use public search; it exposes `kronos_model_used=false`, `ai_used=false`, and `public_search_used=false`.
+- HomePage renders `basic-query-news-center`, `basic-query-kline-forecast-lab`, and `basic-query-premium-feature-ladder` so ordinary users can see richer free value and the upgrade boundary.
+- Added `tests/test_platform_local_news_kline_v57.py` and `scripts/verify_platform_local_news_kline_v57.py`; the verifier prints `DSA_PLATFORM_LOCAL_NEWS_KLINE_V57_OK` only when required local checks pass.
+- V57 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

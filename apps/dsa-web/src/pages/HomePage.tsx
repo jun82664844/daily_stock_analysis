@@ -3039,6 +3039,192 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                    {basicSnapshot.intelligence?.newsCenter ? (
+                      <div
+                        data-testid="basic-query-news-center"
+                        className="mb-3 rounded-lg border border-primary/30 bg-background/40 p-3"
+                      >
+                        <div className="mb-3 flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">News center</div>
+                            <h4 className="mt-1 text-base font-semibold text-foreground">
+                              {basicSnapshot.intelligence.newsCenter.title}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {basicSnapshot.intelligence.newsCenter.summary}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px]">
+                            <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary">
+                              {basicSnapshot.intelligence.newsCenter.aiUsed ? 'AI used' : 'No AI'}
+                            </span>
+                            <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
+                              {basicSnapshot.intelligence.newsCenter.publicSearchUsed ? 'Public search' : 'No public search'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                          {basicSnapshot.intelligence.newsCenter.items.map((item) => (
+                            <div
+                              key={`${item.category}-${item.title}`}
+                              className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3"
+                            >
+                              <div className="flex min-w-0 items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-foreground">
+                                    {item.title}
+                                  </div>
+                                  <div className="mt-1 truncate text-[11px] text-primary">
+                                    {item.category}
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
+                                  {item.status}
+                                </span>
+                              </div>
+                              <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                                {item.summary}
+                              </p>
+                              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
+                                {item.action}
+                              </p>
+                              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                                <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                  {item.source}
+                                </span>
+                                {item.updatedAt ? (
+                                  <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                    {item.updatedAt}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
+                          <span className="min-w-0 leading-relaxed">
+                            {basicSnapshot.intelligence.newsCenter.premiumUnlock}
+                          </span>
+                          <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
+                            {basicSnapshot.intelligence.newsCenter.boundary}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                    {basicSnapshot.intelligence?.klineForecast ? (
+                      <div
+                        data-testid="basic-query-kline-forecast-lab"
+                        className="mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3"
+                      >
+                        <div className="mb-3 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">Kronos-ready</div>
+                            <h4 className="mt-1 text-base font-semibold text-foreground">
+                              {basicSnapshot.intelligence.klineForecast.title}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {basicSnapshot.intelligence.klineForecast.adapterStatus}
+                            </p>
+                          </div>
+                          <div className="grid shrink-0 grid-cols-3 gap-2 text-center text-xs">
+                            <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2">
+                              <div className="text-[11px] text-secondary-text">Horizon</div>
+                              <div className="mt-1 font-semibold text-primary">
+                                {basicSnapshot.intelligence.klineForecast.horizon}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2">
+                              <div className="text-[11px] text-secondary-text">Confidence</div>
+                              <div className="mt-1 font-semibold text-primary">
+                                {basicSnapshot.intelligence.klineForecast.confidence}/100
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2">
+                              <div className="text-[11px] text-secondary-text">Direction</div>
+                              <div className="mt-1 font-semibold text-primary">
+                                {basicSnapshot.intelligence.klineForecast.direction}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mb-3 grid gap-2 md:grid-cols-3">
+                          <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
+                            <div className="text-xs text-secondary-text">Support</div>
+                            <div className="mt-1 text-sm font-semibold text-foreground">
+                              {formatBasicNumber(basicSnapshot.intelligence.klineForecast.support)}
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
+                            <div className="text-xs text-secondary-text">Resistance</div>
+                            <div className="mt-1 text-sm font-semibold text-foreground">
+                              {formatBasicNumber(basicSnapshot.intelligence.klineForecast.resistance)}
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
+                            <div className="text-xs text-secondary-text">Source</div>
+                            <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                              {basicSnapshot.intelligence.klineForecast.source}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 lg:grid-cols-3">
+                          {basicSnapshot.intelligence.klineForecast.scenarios.map((scenario) => (
+                            <div
+                              key={`${scenario.label}-${scenario.direction}`}
+                              className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3"
+                            >
+                              <div className="flex min-w-0 items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-foreground">
+                                    {scenario.label}
+                                  </div>
+                                  <div className="mt-1 truncate text-[11px] text-primary">
+                                    {scenario.direction}
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                  {scenario.probability}%
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                                {scenario.trigger}
+                              </p>
+                              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
+                                {scenario.detail}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-background/35 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
+                          <span className="min-w-0 leading-relaxed">
+                            {basicSnapshot.intelligence.klineForecast.premiumUnlock}
+                          </span>
+                          <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
+                            {basicSnapshot.intelligence.klineForecast.boundary}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                    {(basicSnapshot.intelligence?.newsCenter || basicSnapshot.intelligence?.klineForecast) ? (
+                      <div
+                        data-testid="basic-query-premium-feature-ladder"
+                        className="mb-3 grid gap-2 rounded-lg border border-primary/25 bg-background/35 p-3 md:grid-cols-4"
+                      >
+                        {[
+                          ['Free no-AI', 'Quote, MA, volume, profile, local information lanes.'],
+                          ['Premium news', 'Realtime news, filings, source links, sector context.'],
+                          ['Kronos-ready', 'K-line forecast adapter lane after local model approval.'],
+                          ['BYOK or local model', 'Use platform API, user API key, or approved local model quota.'],
+                        ].map(([title, detail]) => (
+                          <div key={title} className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
+                            <div className="truncate text-sm font-semibold text-foreground">{title}</div>
+                            <div className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                              {detail}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                     {basicSnapshot.intelligence?.items?.length ? (
                       <div
                         data-testid="basic-query-intelligence-panel"

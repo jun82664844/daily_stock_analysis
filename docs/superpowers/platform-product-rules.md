@@ -91,6 +91,15 @@
 - Deep/AI analysis remains explicit through quick/deep action buttons and continues to consume platform, BYOK, or local-model quota buckets according to the selected mode.
 - Public search remains disabled by default unless explicitly configured by an operator; search failures must degrade visibly instead of being presented as complete information.
 
+## Local News And Forecast Lab V57
+
+- Free no-AI snapshots may show a local `news_center` with news, announcements, financials, sector context, and data-quality lanes, but it must remain deterministic and must not call AI, public search, or paid APIs.
+- `news_center.public_search_used` must remain `false` unless a future operator-approved source policy explicitly enables public search.
+- Free no-AI snapshots may show a `kline_forecast` lab preview built from quote, moving averages, trend, and volume-price signals.
+- The V57 K-line forecast lab is Kronos-ready but must expose `kronos_model_used=false` until a real Kronos/local-model adapter, model files, data license boundary, and performance gate are approved.
+- The forecast lab is an experimental information view. It must show the `not investment advice` boundary and must not present scenarios as trade instructions.
+- Premium messaging may explain that realtime news, filings, source links, sector comparison, Kronos inference, BYOK, and local-model lanes can be unlocked later, but it must not imply real payment or production readiness in local V1.
+
 ## User Retention V56
 
 - Guest no-AI quick snapshots may be converted into private user retention only after registration or login; anonymous users must not write history or watchlist ownership data.

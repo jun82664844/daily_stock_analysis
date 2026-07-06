@@ -760,3 +760,35 @@ Review focus:
 - Playwright E2E must remain mock-backed and must not use real API keys or real payment.
 - `scripts/verify_platform_local_user_retention_v56.py` must stay visible despite the broad `verify_*.py` ignore rule.
 - V56 remains local-only, not public launch approval, not real payment, and not investment advice.
+
+## V57 Local News And K-Line Forecast Lab Addendum
+
+Purpose: make the free query experience richer without increasing platform cost: no-AI snapshots show local information lanes, a Kronos-ready K-line forecast lab preview, and a premium feature ladder.
+
+Files:
+
+- `api/v1/schemas/basic_query.py`
+- `src/services/basic_query_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_platform_local_news_kline_v57.py`
+- `scripts/verify_platform_local_news_kline_v57.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v57-news-kline-forecast-lab.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Review focus:
+
+- `news_center` and `kline_forecast` must remain no-AI and must not call public search or paid APIs.
+- `kline_forecast.kronos_model_used` must stay `false` until a real Kronos adapter and model/data approval gate exist.
+- HomePage must show `basic-query-news-center`, `basic-query-kline-forecast-lab`, and `basic-query-premium-feature-ladder` without blocking anonymous query.
+- `scripts/verify_platform_local_news_kline_v57.py` must stay visible despite the broad `verify_*.py` ignore rule.
+- V57 remains local-only, not public launch approval, not real payment, and not investment advice.

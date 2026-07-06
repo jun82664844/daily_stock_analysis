@@ -27,6 +27,54 @@ describe('stocksApi', () => {
           freshness: 'fresh',
         },
         indicators: { ma5: 198, ma20: 190 },
+        intelligence: {
+          mode: 'no_ai_low_cost',
+          ai_used: false,
+          news_center: {
+            title: 'Local news center',
+            summary: 'AAPL information lanes for Technology.',
+            source: 'no_ai_news_center_rules',
+            ai_used: false,
+            public_search_used: false,
+            premium_unlock: 'Premium can add realtime news.',
+            boundary: 'Information analysis only; not investment advice.',
+            items: [
+              {
+                category: 'news',
+                title: 'Market-moving news lane',
+                summary: 'Realtime public news/search is off.',
+                status: 'degraded',
+                source: 'no_ai_news_center_rules',
+                action: 'Use deep analysis for realtime links.',
+                updated_at: '2026-07-01T09:30:00',
+              },
+            ],
+          },
+          kline_forecast: {
+            title: 'K-line forecast lab',
+            horizon: 'next_5_bars',
+            direction: 'upside_bias',
+            confidence: 72,
+            support: 190,
+            resistance: 205,
+            adapter_status: 'Kronos adapter ready; local rules preview only.',
+            source: 'local_kline_rules_kronos_ready',
+            ai_used: false,
+            kronos_model_used: false,
+            premium_unlock: 'Premium can run a configured Kronos lane.',
+            boundary: 'Experimental model preview; information analysis only; not investment advice.',
+            scenarios: [
+              {
+                label: 'Upside-biased preview',
+                direction: 'upside_bias',
+                probability: 70,
+                trigger: 'Hold above MA20.',
+                detail: 'Local rules preview only.',
+              },
+            ],
+          },
+          items: [],
+        },
         route: {
           input_code: 'AAPL',
           normalized_code: 'AAPL',
@@ -70,6 +118,10 @@ describe('stocksApi', () => {
     expect(result.stockCode).toBe('AAPL');
     expect(result.quote.currentPrice).toBe(200);
     expect(result.route?.dataSourceLane).toBe('us_market_data');
+    expect(result.intelligence?.newsCenter?.publicSearchUsed).toBe(false);
+    expect(result.intelligence?.newsCenter?.items[0].updatedAt).toBe('2026-07-01T09:30:00');
+    expect(result.intelligence?.klineForecast?.adapterStatus).toContain('Kronos');
+    expect(result.intelligence?.klineForecast?.kronosModelUsed).toBe(false);
     expect(result.warnings?.[0].code).toBe('stale_quote');
     expect(result.degradation?.status).toBe('degraded');
     expect(result.diagnostics?.elapsedMs).toBe(12);

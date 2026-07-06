@@ -202,6 +202,59 @@ class BasicRetentionBriefPayload(BaseModel):
     source: str = "no_ai_retention_rules"
 
 
+class BasicNewsCenterItemPayload(BaseModel):
+    """One no-AI information lane shown in the local news center."""
+
+    category: str
+    title: str
+    summary: str
+    status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
+    source: str = "no_ai_news_center_rules"
+    action: str
+    updated_at: Optional[str] = None
+
+
+class BasicNewsCenterPayload(BaseModel):
+    """Deterministic local information center for free no-AI users."""
+
+    title: str
+    summary: str
+    items: List[BasicNewsCenterItemPayload] = Field(default_factory=list)
+    source: str = "no_ai_news_center_rules"
+    ai_used: bool = False
+    public_search_used: bool = False
+    premium_unlock: str
+    boundary: str = "Information analysis only; not investment advice."
+
+
+class BasicKlineForecastScenarioPayload(BaseModel):
+    """One deterministic scenario in the K-line forecast lab preview."""
+
+    label: str
+    direction: str
+    probability: int = Field(..., ge=0, le=100)
+    trigger: str
+    detail: str
+
+
+class BasicKlineForecastPayload(BaseModel):
+    """Kronos-ready local K-line forecast preview without model inference."""
+
+    title: str
+    horizon: str = "next_5_bars"
+    direction: str
+    confidence: int = Field(..., ge=0, le=100)
+    support: Optional[float] = None
+    resistance: Optional[float] = None
+    scenarios: List[BasicKlineForecastScenarioPayload] = Field(default_factory=list)
+    adapter_status: str
+    source: str = "local_kline_rules_kronos_ready"
+    ai_used: bool = False
+    kronos_model_used: bool = False
+    premium_unlock: str
+    boundary: str = "Experimental model preview; information analysis only; not investment advice."
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
@@ -212,6 +265,8 @@ class BasicIntelligencePayload(BaseModel):
     peer_comparison: Optional[BasicPeerComparisonPayload] = None
     signal_score: Optional[BasicSignalScorePayload] = None
     retention_brief: Optional[BasicRetentionBriefPayload] = None
+    news_center: Optional[BasicNewsCenterPayload] = None
+    kline_forecast: Optional[BasicKlineForecastPayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)

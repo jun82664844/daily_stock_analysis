@@ -166,6 +166,7 @@ class BasicQueryService:
                 quote=quote_payload,
                 profile=profile_payload,
                 indicators=indicators,
+                trend=trend,
                 warnings=warnings,
             ),
             "route": route.to_payload(),
@@ -756,6 +757,7 @@ class BasicQueryService:
         quote: Dict[str, Any],
         profile: Optional[Dict[str, Any]],
         indicators: Dict[str, Any],
+        trend: Optional[Dict[str, Any]],
         warnings: list[Dict[str, str]],
     ) -> Dict[str, Any]:
         financial_summary, financial_status = self._financial_intelligence_summary(profile, route=route)
@@ -790,6 +792,20 @@ class BasicQueryService:
                 quote=quote,
                 profile=profile,
                 indicators=indicators,
+                warnings=warnings,
+            ),
+            "news_center": self._news_center_payload(
+                route=route,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+                warnings=warnings,
+            ),
+            "kline_forecast": self._kline_forecast_payload(
+                route=route,
+                quote=quote,
+                indicators=indicators,
+                trend=trend,
                 warnings=warnings,
             ),
             "items": [
@@ -895,6 +911,229 @@ class BasicQueryService:
             "upgrade_hint": "Login to save history, build a watchlist, keep quota state, and unlock deeper analysis when needed.",
             "boundary": "Information analysis only; not investment advice.",
             "source": "no_ai_retention_rules",
+        }
+
+    def _news_center_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
+        warnings: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
+        sector = str((profile or {}).get("sector") or "").strip()
+        industry = str((profile or {}).get("industry") or "").strip()
+        company_context = " / ".join(bit for bit in (sector, industry) if bit) or route.channel.replace("_", " ")
+        current_price = self._format_plain_number(quote.get("current_price"))
+        change_percent = self._format_signed_percent_value(quote.get("change_percent"))
+        volume_signal = str(indicators.get("volume_price_signal") or "insufficient_data").replace("_", " ")
+        financial_summary, financial_status = self._financial_intelligence_summary(profile, route=route)
+
+        if route.market == "crypto":
+            announcement_title = "Protocol and exchange events"
+            announcement_summary = (
+                "Equity filings do not apply to crypto. Free mode keeps an event lane for exchange notices, "
+                "protocol risk, liquidity shifts, and regulatory headlines when configured."
+            )
+        elif route.market == "cn":
+            announcement_title = "Announcements lane"
+            announcement_summary = (
+                "A-share announcements and exchange filings are reserved for configured deep sources. "
+                "Free mode keeps the lane visible so users know what deeper analysis will add."
+            )
+        elif route.market == "hk":
+            announcement_title = "HKEX filings lane"
+            announcement_summary = (
+                "Hong Kong filings and corporate actions are reserved for configured deep sources. "
+                "Free mode shows the lane without public search calls."
+            )
+        else:
+            announcement_title = "SEC filings lane"
+            announcement_summary = (
+                "SEC filings, earnings call notes, and source links are reserved for deep mode or configured feeds. "
+                "Free mode avoids public search and AI cost."
+            )
+
+        items: list[Dict[str, Any]] = [
+            {
+                "category": "news",
+                "title": "Market-moving news lane",
+                "summary": (
+                    f"{route.normalized_code} is at {current_price} with {change_percent}. "
+                    "Realtime public news/search is off in free local mode, so this lane is a checklist placeholder."
+                ),
+                "status": "degraded",
+                "source": "no_ai_news_center_rules",
+                "action": "Use deep analysis or configured news feeds for realtime links.",
+                "updated_at": quote_updated_at,
+            },
+            {
+                "category": "announcements",
+                "title": announcement_title,
+                "summary": announcement_summary,
+                "status": "degraded",
+                "source": "no_ai_news_center_rules",
+                "action": "Upgrade or configure a filings source when source links are required.",
+                "updated_at": quote_updated_at,
+            },
+            {
+                "category": "financials",
+                "title": "Financial snapshot lane",
+                "summary": financial_summary,
+                "status": financial_status,
+                "source": (profile or {}).get("source") or "profile_unavailable",
+                "action": "Compare valuation and fundamentals before relying on price action alone.",
+                "updated_at": quote_updated_at,
+            },
+            {
+                "category": "sector",
+                "title": "Sector and peer lane",
+                "summary": (
+                    f"Context is {company_context}. Current volume-price signal is {volume_signal}. "
+                    "Compare against route-based peers before reading this symbol in isolation."
+                ),
+                "status": "available" if company_context else "degraded",
+                "source": "no_ai_news_center_rules",
+                "action": "Open peer comparison or deep sector view for richer cross-asset context.",
+                "updated_at": quote_updated_at,
+            },
+        ]
+        if warnings:
+            items.append(
+                {
+                    "category": "data_quality",
+                    "title": "Data quality lane",
+                    "summary": warnings[0].get("message") or "Market data is degraded; refresh before comparing signals.",
+                    "status": "degraded",
+                    "source": "no_ai_news_center_rules",
+                    "action": "Refresh market data before treating the quick snapshot as current.",
+                    "updated_at": quote_updated_at,
+                }
+            )
+        return {
+            "title": "Local news center",
+            "summary": (
+                f"{route.normalized_code} information lanes for {company_context}: news, announcements, "
+                "financials, sector context, and data quality. No AI or public search was used."
+            ),
+            "items": items,
+            "source": "no_ai_news_center_rules",
+            "ai_used": False,
+            "public_search_used": False,
+            "premium_unlock": "Premium can add realtime news, filings, source links, sector comparison, and AI summaries.",
+            "boundary": "Information analysis only; not investment advice.",
+        }
+
+    def _kline_forecast_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        indicators: Dict[str, Any],
+        trend: Optional[Dict[str, Any]],
+        warnings: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        current_price = self._float_or_none(quote.get("current_price"))
+        ma5 = self._float_or_none(indicators.get("ma5"))
+        ma10 = self._float_or_none(indicators.get("ma10"))
+        ma20 = self._float_or_none(indicators.get("ma20"))
+        low = self._float_or_none(quote.get("low"))
+        high = self._float_or_none(quote.get("high"))
+        change_percent = self._float_or_none(quote.get("change_percent"))
+        change_5d = self._float_or_none(indicators.get("price_change_5d"))
+        change_20d = self._float_or_none(indicators.get("price_change_20d"))
+        volume_change = self._float_or_none(indicators.get("volume_change_vs_ma5"))
+        trend_change = self._float_or_none((trend or {}).get("change_percent"))
+        score = 50
+
+        if current_price is None:
+            score -= 18
+        if current_price is not None and ma20 is not None:
+            score += 14 if current_price >= ma20 else -14
+        if current_price is not None and ma5 is not None:
+            score += 8 if current_price >= ma5 else -8
+        if change_percent is not None:
+            score += 6 if change_percent > 0 else -6
+        if change_5d is not None:
+            score += 8 if change_5d > 0 else -7
+        if change_20d is not None:
+            score += 6 if change_20d > 0 else -5
+        if trend_change is not None:
+            score += 5 if trend_change > 0 else -4
+        if volume_change is not None:
+            score += 5 if volume_change >= 20 else (-3 if volume_change <= -20 else 0)
+        if warnings:
+            score -= 10
+        score = max(5, min(95, int(round(score))))
+
+        if current_price is None or ma20 is None:
+            direction = "insufficient_data"
+            label = "Insufficient K-line context"
+        elif score >= 62:
+            direction = "upside_bias"
+            label = "Upside-biased preview"
+        elif score <= 38:
+            direction = "downside_risk"
+            label = "Downside-risk preview"
+        else:
+            direction = "range_watch"
+            label = "Range-watch preview"
+
+        confidence = max(35, min(85, 40 + abs(score - 50)))
+        support_candidates = [value for value in (low, ma20, ma10, ma5) if value is not None]
+        resistance_candidates = [value for value in (high, current_price, ma5, ma10, ma20) if value is not None]
+        support = min(support_candidates) if support_candidates else None
+        resistance = max(resistance_candidates) if resistance_candidates else None
+        support_text = self._format_plain_number(support)
+        resistance_text = self._format_plain_number(resistance)
+        ma20_text = self._format_plain_number(ma20)
+        volume_text = self._format_signed_percent_value(volume_change)
+
+        bullish_probability = max(10, min(80, score))
+        bearish_probability = max(10, min(75, 100 - score))
+        range_probability = max(20, min(70, 100 - abs(score - 50)))
+        scenarios = [
+            {
+                "label": label,
+                "direction": direction,
+                "probability": int(bullish_probability if direction == "upside_bias" else range_probability),
+                "trigger": f"Hold above MA20 {ma20_text} and keep volume change near {volume_text}.",
+                "detail": (
+                    f"Local rules read support near {support_text} and resistance near {resistance_text}. "
+                    "This is not Kronos inference."
+                ),
+            },
+            {
+                "label": "Breakout confirmation",
+                "direction": "upside_bias",
+                "probability": int(max(15, min(75, score + 8))),
+                "trigger": f"Price closes above resistance {resistance_text} with expanding volume.",
+                "detail": "Treat this as a checklist for the next refresh, not a trade instruction.",
+            },
+            {
+                "label": "Pullback risk",
+                "direction": "downside_risk",
+                "probability": int(bearish_probability),
+                "trigger": f"Price loses support {support_text} or data freshness degrades.",
+                "detail": "Recheck source freshness and broad-market references before interpreting weakness.",
+            },
+        ]
+        return {
+            "title": "K-line forecast lab",
+            "horizon": "next_5_bars",
+            "direction": direction,
+            "confidence": int(confidence),
+            "support": support,
+            "resistance": resistance,
+            "scenarios": scenarios,
+            "adapter_status": "Kronos adapter ready; local rules preview only; Kronos model not installed or invoked.",
+            "source": "local_kline_rules_kronos_ready",
+            "ai_used": False,
+            "kronos_model_used": False,
+            "premium_unlock": "Premium can run a configured Kronos or local-model forecast lane after model/data approval.",
+            "boundary": "Experimental model preview; information analysis only; not investment advice.",
         }
 
     def _peer_comparison_payload(

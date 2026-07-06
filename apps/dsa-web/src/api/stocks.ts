@@ -119,6 +119,45 @@ export type BasicStockSnapshot = {
       boundary: string;
       source: string;
     } | null;
+    newsCenter?: {
+      title: string;
+      summary: string;
+      items: Array<{
+        category: string;
+        title: string;
+        summary: string;
+        status: string;
+        source: string;
+        action: string;
+        updatedAt?: string | null;
+      }>;
+      source: string;
+      aiUsed: boolean;
+      publicSearchUsed: boolean;
+      premiumUnlock: string;
+      boundary: string;
+    } | null;
+    klineForecast?: {
+      title: string;
+      horizon: string;
+      direction: string;
+      confidence: number;
+      support?: number | null;
+      resistance?: number | null;
+      scenarios: Array<{
+        label: string;
+        direction: string;
+        probability: number;
+        trigger: string;
+        detail: string;
+      }>;
+      adapterStatus: string;
+      source: string;
+      aiUsed: boolean;
+      kronosModelUsed: boolean;
+      premiumUnlock: string;
+      boundary: string;
+    } | null;
     items: Array<{
       category: string;
       title: string;

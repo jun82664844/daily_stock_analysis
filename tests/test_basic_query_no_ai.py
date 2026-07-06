@@ -232,6 +232,83 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertIn("not investment advice", retention["boundary"])
         analysis_service.assert_not_called()
 
+    def test_no_ai_snapshot_includes_news_center_and_kline_forecast_lab(self) -> None:
+        class NewsKlineStockService:
+            def get_realtime_quote(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "Apple Inc.",
+                    "current_price": 200.0,
+                    "change_percent": 1.5,
+                    "open": 198.0,
+                    "high": 205.0,
+                    "low": 197.0,
+                    "prev_close": 197.0,
+                    "volume": 1200000,
+                    "source": "unit_quote",
+                    "freshness": "fresh",
+                }
+
+            def get_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "Apple Inc.",
+                    "source": "unit_history",
+                    "data": [
+                        {
+                            "date": f"2026-06-{day:02d}",
+                            "open": 178.0 + day,
+                            "high": 181.0 + day,
+                            "low": 176.0 + day,
+                            "close": 180.0 + day,
+                            "volume": 1000 + day * 10,
+                        }
+                        for day in range(1, 22)
+                    ],
+                }
+
+            def get_basic_company_profile(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "company_name": "Apple Inc.",
+                    "sector": "Technology",
+                    "industry": "Consumer Electronics",
+                    "market_cap": 4500000000000,
+                    "pe_ratio": 31.2,
+                    "source": "unit_profile",
+                }
+
+        with patch("src.services.analysis_service.AnalysisService") as analysis_service:
+            snapshot = BasicQueryService(
+                stock_service=NewsKlineStockService(),
+                cache=MarketDataCache(default_ttl_seconds=60),
+            ).get_snapshot("AAPL")
+
+        intelligence = snapshot["intelligence"]
+        news_center = intelligence["news_center"]
+        kline_forecast = intelligence["kline_forecast"]
+
+        self.assertFalse(snapshot["ai_used"])
+        self.assertFalse(news_center["ai_used"])
+        self.assertFalse(news_center["public_search_used"])
+        self.assertEqual(news_center["source"], "no_ai_news_center_rules")
+        self.assertIn("AAPL", news_center["summary"])
+        self.assertIn("Technology", news_center["summary"])
+        news_categories = {item["category"] for item in news_center["items"]}
+        self.assertTrue({"news", "announcements", "financials", "sector"}.issubset(news_categories))
+        self.assertIn("Premium", news_center["premium_unlock"])
+
+        self.assertFalse(kline_forecast["ai_used"])
+        self.assertFalse(kline_forecast["kronos_model_used"])
+        self.assertEqual(kline_forecast["source"], "local_kline_rules_kronos_ready")
+        self.assertIn("Kronos", kline_forecast["adapter_status"])
+        self.assertEqual(kline_forecast["horizon"], "next_5_bars")
+        self.assertGreaterEqual(len(kline_forecast["scenarios"]), 3)
+        self.assertIn(kline_forecast["direction"], {"upside_bias", "range_watch", "downside_risk", "insufficient_data"})
+        self.assertIn("not investment advice", kline_forecast["boundary"])
+        self.assertIn("Premium", kline_forecast["premium_unlock"])
+        analysis_service.assert_not_called()
+
     def test_yfinance_profile_keeps_dividend_yield_percent_units(self) -> None:
         class FakeTicker:
             def get_info(self):

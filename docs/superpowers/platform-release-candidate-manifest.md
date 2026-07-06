@@ -916,3 +916,46 @@ Review boundary:
 - Playwright coverage is mock-backed; it is not proof of public production deployment.
 - Keep `scripts/verify_platform_local_user_retention_v56.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V57 Local News And K-Line Forecast Lab Manifest Addendum
+
+Status: local-only free-query product enrichment, no production launch approval.
+
+New/updated files:
+
+- `api/v1/schemas/basic_query.py`
+- `src/services/basic_query_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_platform_local_news_kline_v57.py`
+- `scripts/verify_platform_local_news_kline_v57.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v57-news-kline-forecast-lab.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_LOCAL_NEWS_KLINE_V57_OK`
+
+Suggested review/commit position:
+
+- After V56 user retention loop and before any real Kronos model installation, market-data licensing, or production payment work.
+
+Rollback notes:
+
+- Reverting this slice removes the `news_center` and `kline_forecast` payloads, HomePage V57 panels, V57 verifier, and V57 docs. Existing quick snapshot, retention brief, save-history, watchlist, and billing sandbox behavior should remain unaffected.
+
+Review boundary:
+
+- `news_center` is deterministic no-AI content and must not call public search or paid APIs.
+- `kline_forecast` is a Kronos-ready preview only; `kronos_model_used=false` until a real adapter and approval gate exist.
+- Keep `scripts/verify_platform_local_news_kline_v57.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

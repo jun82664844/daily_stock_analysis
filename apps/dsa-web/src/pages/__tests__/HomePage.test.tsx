@@ -1725,6 +1725,87 @@ describe('HomePage', () => {
           boundary: 'Information analysis only; not investment advice.',
           source: 'no_ai_retention_rules',
         },
+        newsCenter: {
+          title: 'Local news center',
+          summary: 'AAPL information lanes for Technology / Consumer Electronics: news, announcements, financials, sector context, and data quality. No AI or public search was used.',
+          source: 'no_ai_news_center_rules',
+          aiUsed: false,
+          publicSearchUsed: false,
+          premiumUnlock: 'Premium can add realtime news, filings, source links, sector comparison, and AI summaries.',
+          boundary: 'Information analysis only; not investment advice.',
+          items: [
+            {
+              category: 'news',
+              title: 'Market-moving news lane',
+              summary: 'Realtime public news/search is off in free local mode, so this lane is a checklist placeholder.',
+              status: 'degraded',
+              source: 'no_ai_news_center_rules',
+              action: 'Use deep analysis or configured news feeds for realtime links.',
+              updatedAt: '2026-07-02T16:00:00',
+            },
+            {
+              category: 'announcements',
+              title: 'SEC filings lane',
+              summary: 'SEC filings, earnings call notes, and source links are reserved for deep mode or configured feeds.',
+              status: 'degraded',
+              source: 'no_ai_news_center_rules',
+              action: 'Upgrade or configure a filings source when source links are required.',
+            },
+            {
+              category: 'financials',
+              title: 'Financial snapshot lane',
+              summary: 'Market cap 4.5T; PE 31.2.',
+              status: 'available',
+              source: 'unit_profile',
+              action: 'Compare valuation and fundamentals before relying on price action alone.',
+            },
+            {
+              category: 'sector',
+              title: 'Sector and peer lane',
+              summary: 'Context is Technology / Consumer Electronics. Current volume-price signal is price volume confirmed.',
+              status: 'available',
+              source: 'no_ai_news_center_rules',
+              action: 'Open peer comparison or deep sector view for richer cross-asset context.',
+            },
+          ],
+        },
+        klineForecast: {
+          title: 'K-line forecast lab',
+          horizon: 'next_5_bars',
+          direction: 'upside_bias',
+          confidence: 72,
+          support: 190,
+          resistance: 205,
+          adapterStatus: 'Kronos adapter ready; local rules preview only; Kronos model not installed or invoked.',
+          source: 'local_kline_rules_kronos_ready',
+          aiUsed: false,
+          kronosModelUsed: false,
+          premiumUnlock: 'Premium can run a configured Kronos or local-model forecast lane after model/data approval.',
+          boundary: 'Experimental model preview; information analysis only; not investment advice.',
+          scenarios: [
+            {
+              label: 'Upside-biased preview',
+              direction: 'upside_bias',
+              probability: 70,
+              trigger: 'Hold above MA20 190 and keep volume change near +12.5%.',
+              detail: 'Local rules read support near 190 and resistance near 205. This is not Kronos inference.',
+            },
+            {
+              label: 'Breakout confirmation',
+              direction: 'upside_bias',
+              probability: 78,
+              trigger: 'Price closes above resistance 205 with expanding volume.',
+              detail: 'Treat this as a checklist for the next refresh, not a trade instruction.',
+            },
+            {
+              label: 'Pullback risk',
+              direction: 'downside_risk',
+              probability: 30,
+              trigger: 'Price loses support 190 or data freshness degrades.',
+              detail: 'Recheck source freshness and broad-market references before interpreting weakness.',
+            },
+          ],
+        },
         marketBrief: {
           market: 'us',
           title: 'US equity quick view',
@@ -1923,6 +2004,29 @@ describe('HomePage', () => {
     expect(retentionBrief).toHaveTextContent('Compare this move with QQQ');
     expect(retentionBrief).toHaveTextContent('Login to save history');
     expect(retentionBrief).toHaveTextContent('not investment advice');
+    const newsCenter = screen.getByTestId('basic-query-news-center');
+    expect(newsCenter).toHaveTextContent('Local news center');
+    expect(newsCenter).toHaveTextContent('Market-moving news lane');
+    expect(newsCenter).toHaveTextContent('SEC filings lane');
+    expect(newsCenter).toHaveTextContent('Financial snapshot lane');
+    expect(newsCenter).toHaveTextContent('Sector and peer lane');
+    expect(newsCenter).toHaveTextContent('No AI');
+    expect(newsCenter).toHaveTextContent('No public search');
+    expect(newsCenter).toHaveTextContent('Premium can add realtime news');
+    const klineForecast = screen.getByTestId('basic-query-kline-forecast-lab');
+    expect(klineForecast).toHaveTextContent('K-line forecast lab');
+    expect(klineForecast).toHaveTextContent('next_5_bars');
+    expect(klineForecast).toHaveTextContent('72/100');
+    expect(klineForecast).toHaveTextContent('Kronos adapter ready');
+    expect(klineForecast).toHaveTextContent('Upside-biased preview');
+    expect(klineForecast).toHaveTextContent('Breakout confirmation');
+    expect(klineForecast).toHaveTextContent('Pullback risk');
+    expect(klineForecast).toHaveTextContent('not investment advice');
+    const premiumFeatureLadder = screen.getByTestId('basic-query-premium-feature-ladder');
+    expect(premiumFeatureLadder).toHaveTextContent('Free no-AI');
+    expect(premiumFeatureLadder).toHaveTextContent('Premium news');
+    expect(premiumFeatureLadder).toHaveTextContent('Kronos-ready');
+    expect(premiumFeatureLadder).toHaveTextContent('BYOK or local model');
     const productBrief = screen.getByTestId('basic-query-product-brief');
     expect(productBrief).toHaveTextContent('关键结论');
     expect(productBrief).toHaveTextContent('支撑');
