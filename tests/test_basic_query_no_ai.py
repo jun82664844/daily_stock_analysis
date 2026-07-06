@@ -233,6 +233,59 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertFalse(body["ai_used"])
         analysis_service.assert_not_called()
 
+    def test_hk_snapshot_uses_history_close_when_realtime_quote_is_missing(self) -> None:
+        class HkHistoryOnlyStockService:
+            def get_realtime_quote(self, stock_code: str):
+                return None
+
+            def get_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "Tencent Holdings",
+                    "source": "unit_hk_history",
+                    "data": [
+                        {
+                            "date": "2026-07-01",
+                            "open": 420.0,
+                            "high": 430.0,
+                            "low": 418.0,
+                            "close": 425.0,
+                            "volume": 1000000,
+                            "amount": 425000000.0,
+                        },
+                        {
+                            "date": "2026-07-02",
+                            "open": 426.0,
+                            "high": 436.0,
+                            "low": 422.0,
+                            "close": 431.2,
+                            "volume": 1200000,
+                            "amount": 517440000.0,
+                        },
+                    ],
+                }
+
+            def get_basic_company_profile(self, stock_code: str):
+                return None
+
+        snapshot = BasicQueryService(
+            stock_service=HkHistoryOnlyStockService(),
+            cache=MarketDataCache(default_ttl_seconds=60),
+        ).get_snapshot("00700.HK")
+
+        self.assertFalse(snapshot["ai_used"])
+        self.assertEqual(snapshot["market"], "hk")
+        self.assertEqual(snapshot["quote"]["current_price"], 431.2)
+        self.assertEqual(snapshot["quote"]["prev_close"], 425.0)
+        self.assertAlmostEqual(snapshot["quote"]["change"], 6.2)
+        self.assertAlmostEqual(snapshot["quote"]["change_percent"], 1.4588)
+        self.assertEqual(snapshot["quote"]["source"], "unit_hk_history_last_close")
+        self.assertEqual(snapshot["quote"]["freshness"], "cached")
+        self.assertEqual(snapshot["diagnostics"]["fallback"]["quote"], "history_last_close")
+        warning_codes = {item["code"] for item in snapshot["warnings"]}
+        self.assertIn("quote_from_history_close", warning_codes)
+        self.assertNotIn("missing_quote", warning_codes)
+
 
 if __name__ == "__main__":
     unittest.main()

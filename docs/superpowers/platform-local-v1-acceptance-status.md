@@ -382,3 +382,11 @@ git diff --check
 - Frontend API/tests now cover camelCase mapping for `/api/v1/platform/admin/ops-health`.
 - Added `scripts/verify_platform_ops_health_panel_v53.py`; the verifier prints `DSA_PLATFORM_OPS_HEALTH_PANEL_V53_OK` only when required local UI/API checks pass.
 - V53 remains local-only. It is not public launch approval, not production monitoring approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-06 Local User Acceptance V54 gate
+
+- Anonymous users can continue using `GET /api/v1/stocks/{code}/snapshot` without platform login; no-AI snapshots do not call `AnalysisService`.
+- The free no-AI report remains rich enough for local user acceptance: primary summary, mini trend chart, signal score, information digest, market lane, free insights, peer comparison, watch points, product brief, quote details, technical details, and company profile.
+- Hong Kong quick snapshots now use the latest historical close as a clearly marked fallback when realtime quote is unavailable, so `00700.HK` can still show a display price without invoking AI.
+- Added `tests/test_platform_local_user_acceptance_v54.py` and `scripts/verify_platform_local_user_acceptance_v54.py`; the verifier prints `DSA_PLATFORM_LOCAL_USER_ACCEPTANCE_V54_OK` only when required local checks pass.
+- V54 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

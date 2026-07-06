@@ -117,6 +117,22 @@ class BasicQueryService:
             history_rows,
             source=(history or {}).get("source") or history_source,
         )
+        if not quote and route.market == "hk":
+            history_quote = self._quote_from_history_close_fallback(
+                code=code,
+                route=route,
+                history=history,
+                history_rows=history_rows,
+                history_source=history_source,
+            )
+            if history_quote:
+                quote = history_quote
+                quote_freshness = "stale" if history_freshness == "stale" else "cached"
+                quote_cache = "fallback"
+                quote_source = str(history_quote.get("source") or history_source)
+                quote_fallback = "history_last_close"
+                quote_health = history_health
+                quote_cache_origin = history_cache_origin
         warnings = self._build_warnings(
             quote=quote,
             quote_freshness=quote_freshness,
@@ -124,6 +140,7 @@ class BasicQueryService:
             route=route,
             quote_error=quote_error,
             history_error=history_error,
+            quote_fallback=quote_fallback,
         )
         quote_payload = self._quote_payload(
             quote,
@@ -678,6 +695,58 @@ class BasicQueryService:
             "min_close": min(closes),
             "max_close": max(closes),
             "change_percent": change_percent,
+        }
+
+    def _quote_from_history_close_fallback(
+        self,
+        *,
+        code: str,
+        route: MarketRoute,
+        history: Optional[Dict[str, Any]],
+        history_rows: Iterable[Dict[str, Any]],
+        history_source: str,
+    ) -> Optional[Dict[str, Any]]:
+        rows = [row for row in (history_rows or []) if isinstance(row, dict)]
+        if not rows:
+            return None
+        latest = None
+        for row in reversed(rows):
+            if self._float_or_none(row.get("close")) is not None:
+                latest = row
+                break
+        if latest is None:
+            return None
+        previous = None
+        for row in reversed(rows[: rows.index(latest)]):
+            if self._float_or_none(row.get("close")) is not None:
+                previous = row
+                break
+
+        current_price = self._float_or_none(latest.get("close"))
+        prev_close = self._float_or_none(previous.get("close")) if previous else None
+        change = None
+        change_percent = None
+        if current_price is not None and prev_close not in (None, 0):
+            change = round(current_price - prev_close, 4)
+            change_percent = round((change / prev_close) * 100, 4)
+
+        source_base = str((history or {}).get("source") or history_source or route.history_sources[0])
+        update_time = latest.get("date") or latest.get("datetime") or latest.get("timestamp")
+        return {
+            "stock_code": code,
+            "stock_name": (history or {}).get("stock_name"),
+            "current_price": current_price,
+            "change": change,
+            "change_percent": change_percent,
+            "open": self._float_or_none(latest.get("open")),
+            "high": self._float_or_none(latest.get("high")),
+            "low": self._float_or_none(latest.get("low")),
+            "prev_close": prev_close,
+            "volume": self._float_or_none(latest.get("volume")),
+            "amount": self._float_or_none(latest.get("amount")),
+            "update_time": str(update_time) if update_time is not None else None,
+            "source": f"{source_base}_last_close",
+            "freshness": "cached",
         }
 
     def _intelligence_payload(
@@ -1506,9 +1575,21 @@ class BasicQueryService:
         route: MarketRoute,
         quote_error: Optional[str] = None,
         history_error: Optional[str] = None,
+        quote_fallback: str = "none",
     ) -> list[Dict[str, str]]:
         warnings: list[Dict[str, str]] = []
         history_rows = (history or {}).get("data", [])
+        if quote_fallback == "history_last_close":
+            warnings.append(
+                {
+                    "code": "quote_from_history_close",
+                    "severity": "warning",
+                    "message": (
+                        f"{route.channel} realtime quote is unavailable; quick view uses the latest historical close "
+                        "without invoking AI."
+                    ),
+                }
+            )
         if quote_freshness == "stale":
             warnings.append(
                 {

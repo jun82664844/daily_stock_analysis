@@ -811,3 +811,33 @@ Review boundary:
 - This is not production monitoring, alerting, WAF/CDN, incident response, or public-launch approval.
 - Keep `scripts/verify_platform_ops_health_panel_v53.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V54 Local User Acceptance Manifest Addendum
+
+Status: local-only anonymous/free query acceptance, no production launch approval.
+
+New/updated files:
+
+- `src/services/basic_query_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_platform_local_user_acceptance_v54.py`
+- `scripts/verify_platform_local_user_acceptance_v54.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v54-local-user-acceptance.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_LOCAL_USER_ACCEPTANCE_V54_OK`
+
+Review boundary:
+
+- Anonymous users can query free no-AI snapshots without login.
+- Free reports should show rich deterministic sections before upselling quick/deep AI analysis.
+- HK realtime quote failures should degrade to latest historical close for display, with an explicit warning and no AI call.
+- Keep `scripts/verify_platform_local_user_acceptance_v54.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

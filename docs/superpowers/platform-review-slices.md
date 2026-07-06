@@ -673,3 +673,29 @@ Review focus:
 - It must remain read-only and not trigger AI, payment processing, or market-data fetches.
 - `.gitignore` must keep `scripts/verify_platform_ops_health_panel_v53.py` visible.
 - V53 remains local-only, not production monitoring approval, not public launch approval, and not investment advice.
+
+## V54 Local User Acceptance Addendum
+
+Purpose: verify the local anonymous/free query journey before handing the browser back to the user.
+
+Files:
+
+- `src/services/basic_query_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_platform_local_user_acceptance_v54.py`
+- `scripts/verify_platform_local_user_acceptance_v54.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v54-local-user-acceptance.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- Anonymous snapshot queries must remain no-AI and must not require platform login.
+- The free report UI must keep the rich no-AI sections visible for user retention.
+- `00700.HK` must get a clearly marked latest-historical-close fallback when realtime HK quote is unavailable.
+- `scripts/verify_platform_local_user_acceptance_v54.py` must stay visible despite the broad `verify_*.py` ignore rule.
+- V54 remains local-only, not public launch approval, not real payment, and not investment advice.
