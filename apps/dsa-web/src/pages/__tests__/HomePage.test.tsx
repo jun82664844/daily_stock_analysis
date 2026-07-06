@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
@@ -385,7 +385,7 @@ describe('HomePage', () => {
     expect(screen.getByTestId('history-center-filters')).toBeInTheDocument();
   });
 
-  it('lets guests query first and then shows a non-blocking login guide', async () => {
+  it('lets guests query first and keeps only the top account entry for login and register', async () => {
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
@@ -445,17 +445,12 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledWith('AAPL');
     });
     expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
-    const guide = await screen.findByTestId('guest-conversion-guide');
-    expect(guide).toHaveTextContent('登录可选');
-    expect(guide).toHaveTextContent('保存历史');
-    expect(guide).toHaveTextContent('自选');
-    expect(guide).toHaveTextContent('每周额度');
+    expect(screen.queryByTestId('guest-conversion-guide')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('guest-guide-login')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('guest-guide-register')).not.toBeInTheDocument();
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('200');
-    expect(within(guide).queryByTestId('guest-auth-email')).not.toBeInTheDocument();
-    expect(within(guide).queryByTestId('guest-auth-password')).not.toBeInTheDocument();
-    expect(within(guide).queryByTestId('guest-auth-submit')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('guest-guide-register'));
+    fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
 
     expect(screen.getByTestId('platform-auth-register-tab')).toHaveClass('bg-primary');
     expect(screen.getByTestId('platform-auth-email')).toBeInTheDocument();
@@ -916,7 +911,7 @@ describe('HomePage', () => {
     fireEvent.click(await screen.findByTestId('guest-example-AAPL'));
     expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
 
-    fireEvent.click(screen.getByTestId('guest-guide-register'));
+    fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
     fireEvent.change(screen.getByTestId('platform-auth-email'), { target: { value: 'v56-user@example.com' } });
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));

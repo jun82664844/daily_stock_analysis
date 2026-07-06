@@ -1096,15 +1096,6 @@ const HomePage: React.FC = () => {
     }
   }, [authEmail, authMode, authPassword, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery, uiLanguage]);
 
-  const handleGuestAuthModeRequest = useCallback((mode: 'login' | 'register') => {
-    setAuthMode(mode);
-    setAuthError('');
-    window.setTimeout(() => {
-      platformAuthPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
-    }, 0);
-  }, []);
-
   const handlePlatformAuthModeChange = useCallback((mode: 'login' | 'register') => {
     setAuthMode(mode);
     setAuthError('');
@@ -3242,62 +3233,6 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {!platformSession ? (
-                  <section
-                    data-testid="guest-conversion-guide"
-                    className="mb-4 rounded-lg border border-subtle bg-background/35 p-3"
-                  >
-                    <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
-                            {uiLanguage === 'en' ? 'Login is optional' : '登录可选'}
-                          </span>
-                          <span className="rounded-md border border-subtle px-2 py-1">
-                            {uiLanguage === 'en' ? 'No AI quick result stays visible' : '免费快照会保留'}
-                          </span>
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-foreground">
-                          {uiLanguage === 'en'
-                            ? 'Log in to save history, add to watchlist, and keep weekly quota state.'
-                            : '登录后可保存历史、加入自选，并保留每周额度状态。'}
-                        </div>
-                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                          {uiLanguage === 'en'
-                            ? 'The current query is not blocked; register or log in only for long-term history, watchlist, and quota state.'
-                            : '当前查询不会被阻断；注册或登录只用于长期保存记录、自选股和额度状态。'}
-                        </p>
-                      </div>
-                      <div className="flex min-w-0 flex-wrap gap-2">
-                        <button
-                          type="button"
-                          data-testid="guest-guide-login"
-                          onClick={() => handleGuestAuthModeRequest('login')}
-                          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'login' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
-                        >
-                          {uiLanguage === 'en' ? 'Login' : '登录'}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="guest-guide-register"
-                          onClick={() => handleGuestAuthModeRequest('register')}
-                          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'register' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
-                        >
-                          {uiLanguage === 'en' ? 'Register' : '注册'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-3 rounded-lg border border-subtle bg-surface/35 px-3 py-2 text-xs text-secondary-text">
-                      {platformEnabled
-                        ? (uiLanguage === 'en'
-                          ? 'Use the account entry above to log in or register. The current no-AI query remains available without login.'
-                          : '请使用上方账号入口登录或注册；当前免费查询不需要登录也能继续使用。')
-                        : (uiLanguage === 'en'
-                          ? 'Account features can be enabled locally; the current no-AI query remains available without login.'
-                          : '账户功能可在本地启用；当前免费查询不需要登录也能继续使用。')}
-                    </div>
-                  </section>
-                ) : null}
                 {basicFreeReport ? (
                   <section
                     data-testid="basic-query-free-report"
