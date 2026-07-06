@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, CreditCard, Gauge, RefreshCw, RotateCcw, Server, ShieldCheck, Users, Zap } from 'lucide-react';
-import { platformApi, type PlatformAuditEvent, type PlatformBillingEvent, type PlatformLocalStatusResponse, type PlatformUsageBucket, type PlatformUser } from '../api/platform';
+import { Activity, CreditCard, Gauge, RefreshCw, RotateCcw, Server, ShieldAlert, ShieldCheck, Users, Zap } from 'lucide-react';
+import { platformApi, type PlatformAuditEvent, type PlatformBillingEvent, type PlatformLocalStatusResponse, type PlatformOpsHealthResponse, type PlatformProductionReadinessResponse, type PlatformUsageBucket, type PlatformUser } from '../api/platform';
 import { stocksApi, type BasicPrewarmResponse, type MarketSourceHealthResponse, type MarketSourceRecoveryResponse } from '../api/stocks';
 import type { ParsedApiError } from '../api/error';
 import { ApiErrorAlert, AppPage, Card, EmptyState, PageHeader, StatCard } from '../components/common';
@@ -139,6 +139,8 @@ const AdminPage: React.FC = () => {
   const [auditEvents, setAuditEvents] = useState<PlatformAuditEvent[]>([]);
   const [billingEvents, setBillingEvents] = useState<PlatformBillingEvent[]>([]);
   const [localStatus, setLocalStatus] = useState<PlatformLocalStatusResponse | null>(null);
+  const [productionReadiness, setProductionReadiness] = useState<PlatformProductionReadinessResponse | null>(null);
+  const [opsHealth, setOpsHealth] = useState<PlatformOpsHealthResponse | null>(null);
   const [marketSourceHealth, setMarketSourceHealth] = useState<MarketSourceHealthResponse | null>(null);
   const [prewarmResult, setPrewarmResult] = useState<BasicPrewarmResponse | null>(null);
   const [recoveryResult, setRecoveryResult] = useState<MarketSourceRecoveryResponse | null>(null);
@@ -156,11 +158,13 @@ const AdminPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [usersResponse, usageResponse, billingResponse, localStatusResponse, marketSourceResponse] = await Promise.all([
+      const [usersResponse, usageResponse, billingResponse, localStatusResponse, productionReadinessResponse, opsHealthResponse, marketSourceResponse] = await Promise.all([
         platformApi.adminUsers(),
         platformApi.adminUsage(),
         platformApi.adminBillingEvents(),
         platformApi.adminLocalStatus(),
+        platformApi.adminProductionReadiness(),
+        platformApi.adminOpsHealth(),
         stocksApi.marketSourceHealth(),
       ]);
       if (requestSeq !== requestSeqRef.current) {
@@ -171,6 +175,8 @@ const AdminPage: React.FC = () => {
       setAuditEvents(usageResponse.auditEvents ?? []);
       setBillingEvents(billingResponse.events ?? []);
       setLocalStatus(localStatusResponse);
+      setProductionReadiness(productionReadinessResponse);
+      setOpsHealth(opsHealthResponse);
       setMarketSourceHealth(marketSourceResponse);
     } catch (err) {
       if (requestSeq !== requestSeqRef.current) {
@@ -334,6 +340,170 @@ const AdminPage: React.FC = () => {
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+        </Card>
+
+        <Card title="Ops health" subtitle="Read-only local operations health; not production monitoring" className="rounded-lg">
+          {loading && !opsHealth ? (
+            <div className="h-28 animate-pulse rounded-lg bg-hover/70" />
+          ) : !opsHealth ? (
+            <EmptyState title="No ops health" description="Refresh to load the local operations health snapshot." />
+          ) : (
+            <div className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-secondary-text">Overall</div>
+                  <div className={cn(
+                    'mt-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold',
+                    opsHealth.overallStatus === 'ok'
+                      ? 'border-emerald-500/30 text-emerald-500'
+                      : opsHealth.overallStatus === 'failed'
+                        ? 'border-rose-500/30 text-rose-500'
+                        : 'border-amber-500/30 text-amber-500',
+                  )}>
+                    <Server className="h-4 w-4" />
+                    {String(opsHealth.overallStatus).toUpperCase()}
+                  </div>
+                  <div className="mt-2 text-xs leading-relaxed text-secondary-text">
+                    {opsHealth.aiUsed ? 'AI used' : 'No AI used'}
+                    {' / '}
+                    {opsHealth.mode}
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Total</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground">{formatNumber(opsHealth.summary.total, language)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">OK</div>
+                    <div className="mt-1 text-lg font-semibold text-emerald-500">{formatNumber(opsHealth.summary.ok, language)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Degraded</div>
+                    <div className="mt-1 text-lg font-semibold text-amber-500">{formatNumber(opsHealth.summary.degraded, language)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Critical</div>
+                    <div className="mt-1 text-lg font-semibold text-rose-500">{formatNumber(opsHealth.summary.criticalDegraded, language)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-xs text-secondary-text">
+                {opsHealth.checks.map((check) => (
+                  <span
+                    key={check.id}
+                    className={cn(
+                      'rounded-full border px-2 py-1',
+                      check.status === 'ok'
+                        ? 'border-emerald-500/25 text-emerald-500'
+                        : 'border-amber-500/25 text-amber-500',
+                    )}
+                    title={check.title}
+                  >
+                    {check.category}
+                  </span>
+                ))}
+              </div>
+              {opsHealth.checks.some((check) => check.status !== 'ok') ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {opsHealth.checks.filter((check) => check.status !== 'ok').slice(0, 4).map((check) => (
+                    <div key={check.id} className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-foreground">{check.title}</div>
+                          <div className="mt-1 text-xs leading-relaxed text-secondary-text">{check.message}</div>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-amber-500/25 px-2 py-1 text-[11px] text-amber-500">
+                          {check.category}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Production readiness" subtitle="Machine-checkable launch preflight; external approvals still block public launch" className="rounded-lg">
+          {loading && !productionReadiness ? (
+            <div className="h-32 animate-pulse rounded-lg bg-hover/70" />
+          ) : !productionReadiness ? (
+            <EmptyState title="No production readiness" description="Refresh to load production readiness preflight." />
+          ) : (
+            <div className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-secondary-text">Launch decision</div>
+                  <div className={cn(
+                    'mt-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold',
+                    productionReadiness.productionReady
+                      ? 'border-emerald-500/30 text-emerald-500'
+                      : 'border-amber-500/30 text-amber-500',
+                  )}>
+                    <ShieldAlert className="h-4 w-4" />
+                    {productionReadiness.launchDecision.toUpperCase()}
+                  </div>
+                  <div className="mt-2 text-xs leading-relaxed text-secondary-text">
+                    {productionReadiness.analysisBoundary}
+                    {' / '}
+                    {productionReadiness.aiUsed ? 'AI used' : 'No AI used'}
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Total</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground">{formatNumber(productionReadiness.summary.total, language)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Passed</div>
+                    <div className="mt-1 text-lg font-semibold text-emerald-500">{formatNumber(productionReadiness.summary.passed, language)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Blocked</div>
+                    <div className="mt-1 text-lg font-semibold text-amber-500">{formatNumber(productionReadiness.summary.blocked, language)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                    <div className="text-xs text-secondary-text">Manual</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground">{formatNumber(productionReadiness.summary.manualActions, language)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-xs text-secondary-text">
+                {productionReadiness.checks.map((check) => (
+                  <span
+                    key={check.id}
+                    className={cn(
+                      'rounded-full border px-2 py-1',
+                      check.status === 'passed'
+                        ? 'border-emerald-500/25 text-emerald-500'
+                        : 'border-amber-500/25 text-amber-500',
+                    )}
+                    title={check.title}
+                  >
+                    {check.category}
+                  </span>
+                ))}
+              </div>
+              {productionReadiness.checks.some((check) => check.status === 'blocked') ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {productionReadiness.checks.filter((check) => check.status === 'blocked').slice(0, 4).map((check) => (
+                    <div key={check.id} className="rounded-lg border border-border/70 bg-hover/35 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-foreground">{check.title}</div>
+                          <div className="mt-1 text-xs leading-relaxed text-secondary-text">{check.message}</div>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-amber-500/25 px-2 py-1 text-[11px] text-amber-500">
+                          {check.category}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
         </Card>

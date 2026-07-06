@@ -9,6 +9,7 @@ import json
 import os
 import secrets
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,86 @@ class PaymentProvider:
 
     def verify_webhook(self, *, body: bytes, signature: str) -> dict:
         raise NotImplementedError
+
+
+REAL_PROVIDER_REQUIREMENTS = {
+    "stripe": (
+        "BILLING_STRIPE_SECRET_KEY",
+        "BILLING_STRIPE_WEBHOOK_SECRET",
+        "BILLING_STRIPE_PRICE_PRO",
+    )
+}
+
+
+def _env_enabled(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_provider() -> str:
+    return os.getenv("BILLING_PROVIDER", "disabled").strip().lower() or "disabled"
+
+
+def get_payment_provider_status() -> dict[str, Any]:
+    """Return sanitized provider readiness without exposing secret values."""
+
+    billing_enabled = _env_enabled("BILLING_ENABLED")
+    provider = _env_provider()
+    if not billing_enabled:
+        return {
+            "billing_enabled": False,
+            "provider": provider,
+            "mode": "disabled",
+            "configuration_ready": False,
+            "adapter_implemented": False,
+            "ready_for_checkout": False,
+            "required_config": [],
+            "missing_config": [],
+            "copy": "Billing is disabled; no real payment processing is available.",
+        }
+
+    if provider == "sandbox":
+        return {
+            "billing_enabled": True,
+            "provider": "sandbox",
+            "mode": "local_sandbox",
+            "configuration_ready": True,
+            "adapter_implemented": True,
+            "ready_for_checkout": True,
+            "required_config": ["BILLING_SANDBOX_SECRET"],
+            "missing_config": [],
+            "copy": "Local sandbox billing only; not real payment processing.",
+        }
+
+    required = list(REAL_PROVIDER_REQUIREMENTS.get(provider, ()))
+    if not required:
+        return {
+            "billing_enabled": True,
+            "provider": provider,
+            "mode": "unsupported_provider",
+            "configuration_ready": False,
+            "adapter_implemented": False,
+            "ready_for_checkout": False,
+            "required_config": [],
+            "missing_config": [],
+            "copy": "Payment provider is not supported by the local adapter boundary.",
+        }
+
+    missing = [key for key in required if not os.getenv(key, "").strip()]
+    configuration_ready = not missing
+    return {
+        "billing_enabled": True,
+        "provider": provider,
+        "mode": "real_provider_configured_not_implemented" if configuration_ready else "real_provider_missing_config",
+        "configuration_ready": configuration_ready,
+        "adapter_implemented": False,
+        "ready_for_checkout": False,
+        "required_config": required,
+        "missing_config": missing,
+        "copy": (
+            "Real payment provider configuration is recognized, but the live adapter is not implemented "
+            "and must not process real payments in local mode."
+        ),
+    }
 
 
 class SandboxPaymentProvider(PaymentProvider):

@@ -18,10 +18,25 @@ ENABLE_CHIP_DISTRIBUTION=false
 DAILY_MARKET_CONTEXT_ENABLED=false
 REALTIME_CACHE_TTL=600
 BILLING_ENABLED=false
+BILLING_PROVIDER=disabled
+BILLING_STRIPE_SECRET_KEY=
+BILLING_STRIPE_WEBHOOK_SECRET=
+BILLING_STRIPE_PRICE_PRO=
 DEBUG=false
 CORS_ALLOW_ALL=false
 LOCAL_LLM_ENABLED=false
 LOCAL_LLM_MAX_CONCURRENT=2
+DSA_REAL_PAYMENT_APPROVED=false
+DSA_PAYMENT_WEBHOOK_APPROVED=false
+DSA_PRODUCTION_DOMAIN_APPROVED=false
+DSA_PRODUCTION_HTTPS_APPROVED=false
+DSA_PRODUCTION_WAF_APPROVED=false
+DSA_MARKET_DATA_LICENSE_APPROVED=false
+DSA_LEGAL_TERMS_APPROVED=false
+DSA_PRIVACY_POLICY_APPROVED=false
+DSA_MONITORING_APPROVED=false
+DSA_BACKUP_RESTORE_DRILL_APPROVED=false
+DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 """
 
 
@@ -61,6 +76,12 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v28: bool = True,
         include_v29: bool = True,
         include_v30: bool = True,
+        include_v48: bool = True,
+        include_v49: bool = True,
+        include_v50: bool = True,
+        include_v51: bool = True,
+        include_v52: bool = True,
+        include_v53: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -201,6 +222,36 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "owner-scoped\nexisting history list\nno-AI\n"
                 "DSA_PLATFORM_LOCAL_HISTORY_DETAIL_V30_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-05-dsa-production-readiness-v48.md": (
+                "No-go\nGO/NO-GO\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nProduction readiness\nNo real payment\n"
+                "DSA_PLATFORM_PRODUCTION_READINESS_V48_OK\n"
+            ),
+            "docs/superpowers/plans/2026-07-05-dsa-billing-provider-boundary-v49.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo real payment\n"
+                "DSA_PLATFORM_BILLING_PROVIDER_BOUNDARY_V49_OK\n"
+            ),
+            "docs/superpowers/plans/2026-07-05-dsa-production-env-gates-v50.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nsafe defaults\n"
+                "DSA_PLATFORM_PRODUCTION_ENV_GATES_V50_OK\n"
+            ),
+            "docs/superpowers/plans/2026-07-05-dsa-backup-restore-drill-v51.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\ndoes not delete\nNo AI calls\n"
+                "DSA_PLATFORM_BACKUP_RESTORE_DRILL_V51_OK\n"
+            ),
+            "docs/superpowers/plans/2026-07-05-dsa-ops-health-v52.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nAdmin-only\nRead-only\n"
+                "DSA_PLATFORM_OPS_HEALTH_V52_OK\n"
+            ),
+            "docs/superpowers/plans/2026-07-05-dsa-ops-health-panel-v53.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nsecret-free\n"
+                "DSA_PLATFORM_OPS_HEALTH_PANEL_V53_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -249,10 +300,20 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_local_history_state_v28.py",
             "scripts/verify_platform_local_history_ops_v29.py",
             "scripts/verify_platform_local_history_detail_v30.py",
+            "scripts/verify_platform_production_readiness_v48.py",
+            "scripts/verify_platform_billing_provider_boundary_v49.py",
+            "scripts/verify_platform_production_env_gates_v50.py",
+            "scripts/verify_platform_backup_restore_drill_v51.py",
+            "scripts/verify_platform_ops_health_v52.py",
+            "scripts/verify_platform_ops_health_panel_v53.py",
+            "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
             "src/services/market_source_ops.py",
             "src/services/local_functional_status.py",
+            "src/services/production_readiness.py",
+            "src/services/platform_backup.py",
+            "src/services/platform_ops_health.py",
             "tests/test_platform_release_candidate_package.py",
             "tests/test_platform_user_e2e_safety.py",
             "tests/test_billing_subscription_lifecycle.py",
@@ -284,6 +345,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_local_history_state_v28.py",
             "tests/test_platform_local_history_ops_v29.py",
             "tests/test_platform_local_history_detail_v30.py",
+            "tests/test_platform_production_readiness_v48.py",
+            "tests/test_billing_provider_boundary_v49.py",
+            "tests/test_platform_production_env_gates_v50.py",
+            "tests/test_platform_backup_restore_drill_v51.py",
+            "tests/test_platform_ops_health_v52.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -414,6 +480,39 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v30 and rel_path in {
                 "scripts/verify_platform_local_history_detail_v30.py",
                 "tests/test_platform_local_history_detail_v30.py",
+            }:
+                continue
+            if not include_v48 and rel_path in {
+                "scripts/verify_platform_production_readiness_v48.py",
+                "src/services/production_readiness.py",
+                "tests/test_platform_production_readiness_v48.py",
+            }:
+                continue
+            if not include_v49 and rel_path in {
+                "scripts/verify_platform_billing_provider_boundary_v49.py",
+                "tests/test_billing_provider_boundary_v49.py",
+            }:
+                continue
+            if not include_v50 and rel_path in {
+                "scripts/verify_platform_production_env_gates_v50.py",
+                "tests/test_platform_production_env_gates_v50.py",
+            }:
+                continue
+            if not include_v51 and rel_path in {
+                "scripts/verify_platform_backup_restore_drill_v51.py",
+                "scripts/run_platform_backup_restore_dry_run.py",
+                "src/services/platform_backup.py",
+                "tests/test_platform_backup_restore_drill_v51.py",
+            }:
+                continue
+            if not include_v52 and rel_path in {
+                "scripts/verify_platform_ops_health_v52.py",
+                "src/services/platform_ops_health.py",
+                "tests/test_platform_ops_health_v52.py",
+            }:
+                continue
+            if not include_v53 and rel_path in {
+                "scripts/verify_platform_ops_health_panel_v53.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -588,6 +687,48 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v30:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-04-dsa-local-v30-history-detail.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v48:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-05-dsa-production-readiness-v48.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v49:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-05-dsa-billing-provider-boundary-v49.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v50:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-05-dsa-production-env-gates-v50.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v51:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-05-dsa-backup-restore-drill-v51.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v52:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-05-dsa-ops-health-v52.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v53:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-05-dsa-ops-health-panel-v53.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1024,6 +1165,105 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             by_id["required_files_present"].metadata["missing_files"],
         )
 
+    def test_reports_missing_production_readiness_v48_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v48=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn("scripts/verify_platform_production_readiness_v48.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("src/services/production_readiness.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("tests/test_platform_production_readiness_v48.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-05-dsa-production-readiness-v48.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
+    def test_reports_missing_billing_provider_boundary_v49_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v49=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn("scripts/verify_platform_billing_provider_boundary_v49.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("tests/test_billing_provider_boundary_v49.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-05-dsa-billing-provider-boundary-v49.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
+    def test_reports_missing_production_env_gates_v50_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v50=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn("scripts/verify_platform_production_env_gates_v50.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("tests/test_platform_production_env_gates_v50.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-05-dsa-production-env-gates-v50.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
+    def test_reports_missing_backup_restore_drill_v51_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v51=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn("scripts/verify_platform_backup_restore_drill_v51.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("scripts/run_platform_backup_restore_dry_run.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("src/services/platform_backup.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("tests/test_platform_backup_restore_drill_v51.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-05-dsa-backup-restore-drill-v51.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
+    def test_reports_missing_ops_health_v52_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v52=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn("scripts/verify_platform_ops_health_v52.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("src/services/platform_ops_health.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn("tests/test_platform_ops_health_v52.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-05-dsa-ops-health-v52.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
+    def test_reports_missing_ops_health_panel_v53_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v53=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn("scripts/verify_platform_ops_health_panel_v53.py", by_id["required_files_present"].metadata["missing_files"])
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-05-dsa-ops-health-panel-v53.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             root = Path(temp_dir)
@@ -1072,6 +1312,14 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertEqual(
             classify_dirty_path("apps/dsa-web/index.html"),
             "frontend-platform-experience",
+        )
+
+    def test_classifies_backup_restore_runner(self):
+        from scripts.verify_platform_release_candidate_package import classify_dirty_path
+
+        self.assertEqual(
+            classify_dirty_path("scripts/run_platform_backup_restore_dry_run.py"),
+            "tests-and-verifiers",
         )
 
 

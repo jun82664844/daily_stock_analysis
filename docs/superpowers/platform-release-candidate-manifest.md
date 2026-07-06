@@ -620,3 +620,194 @@ Review boundary:
 - `ReportSummary` section anchors are display-only and must not rewrite historical report content.
 - Keep `scripts/verify_platform_local_history_detail_v30.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V48 Production Readiness Manifest Addendum
+
+Status: local-only production preflight, no public launch approval.
+
+New/updated files:
+
+- `api/v1/endpoints/platform.py`
+- `src/services/production_readiness.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AdminPage.test.tsx`
+- `tests/test_platform_production_readiness_v48.py`
+- `scripts/verify_platform_production_readiness_v48.py`
+- `docs/superpowers/plans/2026-07-05-dsa-production-readiness-v48.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_PRODUCTION_READINESS_V48_OK`
+
+Review boundary:
+
+- Production readiness is an admin-only local preflight, not a public launch switch.
+- `launch_decision` must remain blocked until real payment, production domain, HTTPS/WAF, data-source commercial license, legal terms, privacy policy, monitoring, and backup/restore evidence are approved.
+- The endpoint and verifier must not call AI, consume model quota, fetch live market data, or expose real API keys.
+- Keep `scripts/verify_platform_production_readiness_v48.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, do not treat this as production deployment, and do not treat this as investment advice.
+
+## V49 Billing Provider Boundary Manifest Addendum
+
+Status: local-only payment-provider boundary, no real payment approval.
+
+New/updated files:
+
+- `api/v1/endpoints/billing.py`
+- `src/billing/payment_provider.py`
+- `src/services/production_readiness.py`
+- `tests/test_billing_provider_boundary_v49.py`
+- `scripts/verify_platform_billing_provider_boundary_v49.py`
+- `docs/superpowers/plans/2026-07-05-dsa-billing-provider-boundary-v49.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_BILLING_PROVIDER_BOUNDARY_V49_OK`
+
+Review boundary:
+
+- Billing provider readiness must be sanitized and must not expose secret values from env.
+- `BILLING_PROVIDER=stripe` is only a recognized boundary in this local stage, not a live Stripe integration.
+- Missing real-provider config must fail closed as `billing_provider_not_ready`.
+- Complete placeholder config must still fail closed as `billing_provider_adapter_not_implemented` until a real adapter is deliberately built and reviewed.
+- Keep `scripts/verify_platform_billing_provider_boundary_v49.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, do not treat this as production deployment, and do not treat this as investment advice.
+
+## V50 Production Env Gates Manifest Addendum
+
+Status: local-only production configuration hardening, no public launch approval.
+
+New/updated files:
+
+- `docs/superpowers/platform-production-env.example`
+- `scripts/verify_platform_v2_readiness.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_production_env_gates_v50.py`
+- `scripts/verify_platform_production_env_gates_v50.py`
+- `docs/superpowers/plans/2026-07-05-dsa-production-env-gates-v50.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_PRODUCTION_ENV_GATES_V50_OK`
+
+Review boundary:
+
+- Production env defaults must remain launch-blocking and secret-free.
+- Real payment, production infrastructure, data-source license, legal/privacy, monitoring, and backup gates are explicit `false` until humans approve evidence.
+- Stripe-like provider placeholders are blank and must not be treated as working credentials.
+- Keep `scripts/verify_platform_production_env_gates_v50.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, do not treat this as production deployment, and do not treat this as investment advice.
+
+## V51 Backup Restore Drill Manifest Addendum
+
+Status: local-only backup/restore drill tooling, no production backup approval.
+
+New/updated files:
+
+- `src/services/platform_backup.py`
+- `scripts/run_platform_backup_restore_dry_run.py`
+- `tests/test_platform_backup_restore_drill_v51.py`
+- `scripts/verify_platform_backup_restore_drill_v51.py`
+- `docs/superpowers/plans/2026-07-05-dsa-backup-restore-drill-v51.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_BACKUP_RESTORE_DRILL_V51_OK`
+
+Review boundary:
+
+- Backup/restore drill uses temporary databases in verifier mode and must not delete or overwrite live data.
+- Operational runner creates separate backup/restored copies and reports integrity, hash, row-count, `source_unchanged`, `destructive=false`, and `ai_used=false`.
+- Production/staging restore approval is still a human gate before public launch.
+- Keep `scripts/verify_platform_backup_restore_drill_v51.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, do not treat this as production deployment, and do not treat this as investment advice.
+
+## V52 Ops Health Manifest Addendum
+
+Status: local-only operations health status, no production monitoring approval.
+
+New/updated files:
+
+- `api/v1/endpoints/platform.py`
+- `src/services/platform_ops_health.py`
+- `tests/test_platform_ops_health_v52.py`
+- `scripts/verify_platform_ops_health_v52.py`
+- `docs/superpowers/plans/2026-07-05-dsa-ops-health-v52.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_OPS_HEALTH_V52_OK`
+
+Review boundary:
+
+- Ops health is admin-only and read-only.
+- Payloads must not expose database absolute paths, real API keys, webhook secrets, or tokens.
+- This is not production monitoring, alerting, incident response, WAF/CDN, or public-launch approval.
+- Keep `scripts/verify_platform_ops_health_v52.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, do not treat this as production deployment, and do not treat this as investment advice.
+
+## V53 Ops Health Panel Manifest Addendum
+
+Status: local-only admin UI wiring, no production monitoring approval.
+
+New/updated files:
+
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AdminPage.test.tsx`
+- `scripts/verify_platform_ops_health_panel_v53.py`
+- `docs/superpowers/plans/2026-07-05-dsa-ops-health-panel-v53.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_OPS_HEALTH_PANEL_V53_OK`
+
+Review boundary:
+
+- AdminPage ops health panel is read-only and must not trigger AI, payment processing, or market-data fetches.
+- It must not expose API keys, webhook secrets, tokens, or database absolute paths.
+- This is not production monitoring, alerting, WAF/CDN, incident response, or public-launch approval.
+- Keep `scripts/verify_platform_ops_health_panel_v53.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

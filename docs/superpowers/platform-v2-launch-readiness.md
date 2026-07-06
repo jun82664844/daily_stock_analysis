@@ -30,12 +30,14 @@ Scope: release-candidate preparation for platform evaluation only. This package 
 - No public launch if `ADMIN_AUTH_ENABLED`, `PLATFORM_USER_AUTH_ENABLED`, or `PLATFORM_CSRF_ENABLED` is false.
 - No public launch if `BILLING_ENABLED=true` without a real provider contract, signed webhook validation, reconciliation tests, and rollback plan.
 - No public launch by treating the local sandbox payment provider as production payment. Sandbox billing is test-only.
+- No public launch by treating `BILLING_PROVIDER=stripe` config detection as a live payment adapter. The local boundary must still fail closed until the real adapter and merchant controls are reviewed.
 - No public launch with real API keys committed to the repository, docs, screenshots, logs, or frontend state.
 - No public launch with public SearXNG auto-discovery enabled by default.
 - No public launch if quick-query market routing can silently call AI, hide stale/missing market data, or consume paid model quota without explicit user action.
 - No public launch without database backup/restore proof on a staging copy.
 - No public launch without legal, privacy, and not investment advice copy approved by humans.
 - No public launch while dirty/untracked V1 platform files remain unreviewed and uncommitted.
+- No public launch while the admin production-readiness preflight reports `launch_decision=blocked`.
 
 ## Manual decisions
 
@@ -51,6 +53,12 @@ Scope: release-candidate preparation for platform evaluation only. This package 
 - V2 readiness verifier passes with the production-evaluation env template.
 - Query Quality V4 verifier passes and prints `DSA_PLATFORM_QUERY_QUALITY_V4_OK`.
 - Local History Center V24 verifier passes and prints `DSA_PLATFORM_LOCAL_HISTORY_CENTER_V24_OK`.
+- Production Readiness V48 verifier passes and prints `DSA_PLATFORM_PRODUCTION_READINESS_V48_OK`, while still reporting blocked launch until external approvals are complete.
+- Billing Provider Boundary V49 verifier passes and prints `DSA_PLATFORM_BILLING_PROVIDER_BOUNDARY_V49_OK`, while real provider config remains fail-closed until a live adapter is implemented.
+- Production Env Gates V50 verifier passes and prints `DSA_PLATFORM_PRODUCTION_ENV_GATES_V50_OK`, while all public-launch approval gates remain explicit safe defaults until humans approve evidence.
+- Backup Restore Drill V51 verifier passes and prints `DSA_PLATFORM_BACKUP_RESTORE_DRILL_V51_OK` on temporary databases; a staging-copy restore record is still required before public launch.
+- Ops Health V52 verifier passes and prints `DSA_PLATFORM_OPS_HEALTH_V52_OK`, while real production monitoring/alerting remains a human No-go item.
+- Ops Health Panel V53 verifier passes and prints `DSA_PLATFORM_OPS_HEALTH_PANEL_V53_OK`, showing local ops health in AdminPage without treating it as production monitoring.
 - Backup/restore dry-run passes and staging-copy restore is scheduled before launch.
 - Migration schema check confirms platform tables and `analysis_history.platform_user_id`.
 - Dirty handoff is reviewed and split into intentional commits before any release tag.

@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from api.v1.schemas.billing import CheckoutRequest
 from src.auth import COOKIE_NAME, verify_session
 from src.billing.lifecycle import BillingLifecycleService
-from src.billing.payment_provider import SandboxPaymentProvider
+from src.billing.payment_provider import SandboxPaymentProvider, get_payment_provider_status
 from src.csrf import require_csrf
 from src.platform_accounts import PlatformAccountService, PlatformIdentity, platform_identity_from_request
 from src.platform_rate_limit import check_platform_rate_limit
@@ -69,7 +69,8 @@ async def create_checkout(request: Request, body: CheckoutRequest):
             status_code=400,
             content={"error": "billing_disabled", "message": "Billing is disabled in local V1"},
         )
-    if _billing_provider_name() == "sandbox":
+    provider_status = get_payment_provider_status()
+    if provider_status["provider"] == "sandbox":
         try:
             session = SandboxPaymentProvider().create_checkout(user_id=user_id, plan=body.plan)
             BillingLifecycleService().record_checkout_created(
@@ -88,6 +89,29 @@ async def create_checkout(request: Request, body: CheckoutRequest):
             "status": "created",
             "mode": "local_sandbox",
         }
+    if provider_status["mode"] == "real_provider_missing_config":
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "billing_provider_not_ready",
+                "provider": provider_status["provider"],
+                "mode": provider_status["mode"],
+                "missing_config": provider_status["missing_config"],
+                "adapter_implemented": provider_status["adapter_implemented"],
+                "message": "Payment provider configuration is incomplete; no real payment was attempted.",
+            },
+        )
+    if provider_status["mode"] == "real_provider_configured_not_implemented":
+        return JSONResponse(
+            status_code=501,
+            content={
+                "error": "billing_provider_adapter_not_implemented",
+                "provider": provider_status["provider"],
+                "mode": provider_status["mode"],
+                "adapter_implemented": provider_status["adapter_implemented"],
+                "message": "Real payment adapter is not implemented; no real payment was attempted.",
+            },
+        )
     return JSONResponse(
         status_code=501,
         content={"error": "billing_provider_not_configured", "message": "Payment provider is not configured"},
@@ -97,11 +121,13 @@ async def create_checkout(request: Request, body: CheckoutRequest):
 @router.get("/account")
 async def billing_account(request: Request):
     user_id = _require_platform_user(request)
-    return BillingLifecycleService().get_user_billing_summary(
+    summary = BillingLifecycleService().get_user_billing_summary(
         user_id=user_id,
         billing_enabled=_billing_enabled(),
         provider=_billing_provider_name(),
     )
+    summary["provider_readiness"] = get_payment_provider_status()
+    return summary
 
 
 @router.get("/admin/events")
@@ -124,7 +150,8 @@ async def billing_webhook(request: Request):
         return JSONResponse(status_code=400, content={"error": "invalid_signature"})
     if not _billing_enabled():
         return JSONResponse(status_code=400, content={"error": "billing_disabled"})
-    if _billing_provider_name() == "sandbox":
+    provider_status = get_payment_provider_status()
+    if provider_status["provider"] == "sandbox":
         body = await request.body()
         try:
             payload = SandboxPaymentProvider().verify_webhook(body=body, signature=signature)
@@ -145,4 +172,24 @@ async def billing_webhook(request: Request):
                 "status": user.status,
             }
         return response
+    if provider_status["mode"] == "real_provider_missing_config":
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "billing_provider_not_ready",
+                "provider": provider_status["provider"],
+                "mode": provider_status["mode"],
+                "missing_config": provider_status["missing_config"],
+            },
+        )
+    if provider_status["mode"] == "real_provider_configured_not_implemented":
+        return JSONResponse(
+            status_code=501,
+            content={
+                "error": "billing_provider_adapter_not_implemented",
+                "provider": provider_status["provider"],
+                "mode": provider_status["mode"],
+                "adapter_implemented": provider_status["adapter_implemented"],
+            },
+        )
     return JSONResponse(status_code=501, content={"error": "billing_provider_not_configured"})

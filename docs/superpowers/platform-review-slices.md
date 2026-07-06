@@ -498,3 +498,178 @@ Review focus:
 - `.gitignore` must keep `scripts/verify_platform_local_history_detail_v30.py` visible.
 - `scripts/verify_platform_local_history_detail_v30.py` must print `DSA_PLATFORM_LOCAL_HISTORY_DETAIL_V30_OK` only when report detail search, search navigation, section jumps, same-stock timeline, no-AI guard, docs safety, and focused HomePage test pass.
 - V30 remains local-only, not real payment, not public launch approval, and not investment advice.
+
+## V48 Production Readiness Addendum
+
+Purpose: add a local-only, machine-checkable production readiness preflight that makes public-launch blockers visible to admins without connecting real payment, real secrets, public infrastructure, or AI.
+
+Files:
+
+- `api/v1/endpoints/platform.py`
+- `src/services/production_readiness.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AdminPage.test.tsx`
+- `tests/test_platform_production_readiness_v48.py`
+- `scripts/verify_platform_production_readiness_v48.py`
+- `docs/superpowers/plans/2026-07-05-dsa-production-readiness-v48.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- `GET /api/v1/platform/admin/production-readiness` must remain admin-only and must not call AI or live market data sources.
+- The readiness payload must keep `launch_decision=blocked` until real payment, domain, HTTPS/WAF, data-source commercial license, legal terms, privacy policy, monitoring, and backup/restore approvals are present.
+- Secret-like environment values must be redacted from payloads, tests, docs, and frontend rendering.
+- AdminPage should show the blocked production preflight clearly without implying the platform is publicly ready.
+- `.gitignore` must keep `scripts/verify_platform_production_readiness_v48.py` visible.
+- `scripts/verify_platform_production_readiness_v48.py` must print `DSA_PLATFORM_PRODUCTION_READINESS_V48_OK` only when service, endpoint, frontend API/UI, docs, secret redaction, and V48 backend tests pass.
+- V48 remains local-only, not real payment, not production deployment, not legal approval, not data-source license approval, and not investment advice.
+
+## V49 Billing Provider Boundary Addendum
+
+Purpose: recognize real payment provider configuration requirements while failing closed locally until a live adapter, merchant approval, webhook reconciliation, refunds, invoices, and rollback are implemented.
+
+Files:
+
+- `api/v1/endpoints/billing.py`
+- `src/billing/payment_provider.py`
+- `src/services/production_readiness.py`
+- `tests/test_billing_provider_boundary_v49.py`
+- `scripts/verify_platform_billing_provider_boundary_v49.py`
+- `docs/superpowers/plans/2026-07-05-dsa-billing-provider-boundary-v49.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- `get_payment_provider_status()` must expose only config-key names and readiness booleans, never secret values.
+- Stripe-like real provider configuration must fail closed as `billing_provider_not_ready` when required config is missing.
+- Even with all local placeholder config present, checkout must return `billing_provider_adapter_not_implemented` and must not perform a real payment or network call.
+- `/api/v1/billing/account` may show sanitized provider readiness, but must not show real secret values.
+- Production readiness must keep real payment blocked until configuration, adapter, merchant, webhook, reconciliation, refund, invoice, and rollback approval exist.
+- `.gitignore` must keep `scripts/verify_platform_billing_provider_boundary_v49.py` visible.
+- `scripts/verify_platform_billing_provider_boundary_v49.py` must print `DSA_PLATFORM_BILLING_PROVIDER_BOUNDARY_V49_OK` only when provider status, endpoint failures, production readiness linkage, secret redaction, and V49 tests pass.
+- V49 remains local-only, not real payment, not public launch approval, and not investment advice.
+
+## V50 Production Env Gates Addendum
+
+Purpose: make launch-blocking production approvals explicit in the env template and verifier stack.
+
+Files:
+
+- `docs/superpowers/platform-production-env.example`
+- `scripts/verify_platform_v2_readiness.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_production_env_gates_v50.py`
+- `scripts/verify_platform_production_env_gates_v50.py`
+- `docs/superpowers/plans/2026-07-05-dsa-production-env-gates-v50.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+
+Review focus:
+
+- `platform-production-env.example` must keep auth/CSRF enabled and debug/CORS/public search/expensive enrichment disabled by default.
+- Real payment, payment webhook, domain, HTTPS, WAF, market-data license, legal terms, privacy policy, monitoring, and backup/restore gates must be explicit `false`.
+- `DSA_ANALYSIS_NOT_INVESTMENT_ADVICE` must remain explicit `true`.
+- Stripe-like provider placeholders must be present but blank, so template placeholders cannot be mistaken for working credentials.
+- V2 readiness and release package verifiers must reject missing or unsafe production gate defaults.
+- `.gitignore` must keep `scripts/verify_platform_production_env_gates_v50.py` visible.
+- V50 remains local-only, not production deployment, not real payment, and not investment advice.
+
+## V51 Backup Restore Drill Addendum
+
+Purpose: add a repeatable local SQLite backup/restore dry-run tool with machine-readable evidence.
+
+Files:
+
+- `src/services/platform_backup.py`
+- `scripts/run_platform_backup_restore_dry_run.py`
+- `tests/test_platform_backup_restore_drill_v51.py`
+- `scripts/verify_platform_backup_restore_drill_v51.py`
+- `docs/superpowers/plans/2026-07-05-dsa-backup-restore-drill-v51.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- The backup service must use separate backup/restored files and must not mutate the source database.
+- The runner must default to a timestamped `local/backups/dry-runs` output path and must fail if no database is supplied.
+- Verification must run on temporary databases by default, not the user's live database.
+- The payload must report `destructive=false`, `ai_used=false`, integrity checks, source unchanged, and row-count match.
+- `.gitignore` must keep `scripts/verify_platform_backup_restore_drill_v51.py` visible.
+- V51 remains local-only, not production backup approval, not public launch approval, not real payment, and not investment advice.
+
+## V52 Ops Health Addendum
+
+Purpose: add an admin-only, read-only local operations health status for database, safety config, billing readiness, backup tooling, and verifier availability.
+
+Files:
+
+- `api/v1/endpoints/platform.py`
+- `src/services/platform_ops_health.py`
+- `tests/test_platform_ops_health_v52.py`
+- `scripts/verify_platform_ops_health_v52.py`
+- `docs/superpowers/plans/2026-07-05-dsa-ops-health-v52.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-v2-launch-readiness.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- `GET /api/v1/platform/admin/ops-health` must remain admin-only.
+- Ops health must be read-only, no-AI, no live market-data, and no payment processing.
+- Payloads must not expose database absolute paths, API keys, webhook secrets, or tokens.
+- Checks should cover database reachability, safe config flags, billing provider readiness, backup runner/verifier availability, and production readiness verifier availability.
+- `.gitignore` must keep `scripts/verify_platform_ops_health_v52.py` visible.
+- V52 remains local-only, not production monitoring approval, not public launch approval, not real payment, and not investment advice.
+
+## V53 Ops Health Panel Addendum
+
+Purpose: show V52 ops health in AdminPage so local operators can review health status from the UI.
+
+Files:
+
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AdminPage.test.tsx`
+- `scripts/verify_platform_ops_health_panel_v53.py`
+- `docs/superpowers/plans/2026-07-05-dsa-ops-health-panel-v53.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- AdminPage must call `adminOpsHealth()` with the other admin snapshots and refresh it on manual refresh.
+- The panel must show overall status, summary counts, category chips, and degraded check details without exposing secrets.
+- It must remain read-only and not trigger AI, payment processing, or market-data fetches.
+- `.gitignore` must keep `scripts/verify_platform_ops_health_panel_v53.py` visible.
+- V53 remains local-only, not production monitoring approval, not public launch approval, and not investment advice.

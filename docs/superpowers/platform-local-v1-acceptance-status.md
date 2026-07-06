@@ -332,3 +332,53 @@ git diff --check
 - Updated the frontend HTML template to `lang="zh-CN"`, `translate="no"`, and `notranslate` metadata to reduce Chrome Translate DOM mutation risk on the local React page.
 - Live 8018 verification opened `/reset-ui`, redirected to the refreshed homepage, ran anonymous `AAPL` quick snapshot, and rendered `No AI` / `US market data` without the route error page.
 - V34 remains local-only. It is not public launch approval, not real payment, not production secret handling, do not commit real API Key, do not delete history reports, and not investment advice.
+
+## 2026-07-05 Production Readiness V48 gate
+
+- Added `src/services/production_readiness.py`, admin endpoint `GET /api/v1/platform/admin/production-readiness`, and AdminPage production readiness panel.
+- The preflight is read-only, admin-only, no-AI, secret-redacted, and explicitly reports `launch_decision=blocked` until external public-launch approvals are completed.
+- Blocking checks include real payment, production domain, HTTPS/WAF, data-source commercial license, legal terms, privacy policy, monitoring, and backup/restore proof.
+- Added `tests/test_platform_production_readiness_v48.py` and `scripts/verify_platform_production_readiness_v48.py`; the verifier prints `DSA_PLATFORM_PRODUCTION_READINESS_V48_OK` only when required local checks pass.
+- V48 remains local-only. It is not public launch approval, not real payment, not production deployment, not legal approval, not data-source license approval, do not commit real API Key, and not investment advice.
+
+## 2026-07-05 Billing Provider Boundary V49 gate
+
+- Added sanitized provider-readiness helpers in `src/billing/payment_provider.py` for disabled, sandbox, unsupported, and Stripe-like real-provider boundary states.
+- `/api/v1/billing/checkout` now fails closed with `billing_provider_not_ready` when a real provider is missing required config, and `billing_provider_adapter_not_implemented` when placeholder config exists but no live adapter is implemented.
+- `/api/v1/billing/account` returns sanitized `provider_readiness` metadata without exposing secret values.
+- Production readiness now reuses provider readiness so real payment remains blocked until config, adapter, merchant, webhook, reconciliation, refund, invoice, and rollback approval exist.
+- Added `tests/test_billing_provider_boundary_v49.py` and `scripts/verify_platform_billing_provider_boundary_v49.py`; the verifier prints `DSA_PLATFORM_BILLING_PROVIDER_BOUNDARY_V49_OK` only when required local checks pass.
+- V49 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-05 Production Env Gates V50 gate
+
+- `docs/superpowers/platform-production-env.example` now explicitly lists production approval gates for real payment, webhook, domain, HTTPS, WAF, market-data license, legal terms, privacy policy, monitoring, and backup/restore, all defaulting to `false`.
+- Stripe-like provider placeholders are present but blank, so the template cannot be mistaken for working payment credentials.
+- `scripts/verify_platform_v2_readiness.py` and `scripts/verify_platform_release_candidate_package.py` now require those safe gate defaults.
+- Added `tests/test_platform_production_env_gates_v50.py` and `scripts/verify_platform_production_env_gates_v50.py`; the verifier prints `DSA_PLATFORM_PRODUCTION_ENV_GATES_V50_OK` only when required local checks pass.
+- V50 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-05 Backup Restore Drill V51 gate
+
+- Added `src/services/platform_backup.py` with a non-destructive SQLite backup/restore dry-run that creates separate backup and restored copies.
+- Added `scripts/run_platform_backup_restore_dry_run.py` for operator dry-runs; it requires a database path and defaults output to timestamped `local/backups/dry-runs/...`.
+- The dry-run reports integrity checks, file hashes, row-count comparison, `source_unchanged`, `destructive=false`, and `ai_used=false`.
+- Added `tests/test_platform_backup_restore_drill_v51.py` and `scripts/verify_platform_backup_restore_drill_v51.py`; the verifier prints `DSA_PLATFORM_BACKUP_RESTORE_DRILL_V51_OK` only when required local checks pass on temporary databases.
+- V51 remains local-only. It is not public launch approval, not production backup approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-05 Ops Health V52 gate
+
+- Added `src/services/platform_ops_health.py` and admin endpoint `GET /api/v1/platform/admin/ops-health`.
+- Ops health reports database reachability, safe config flags, billing provider readiness, backup runner/verifier availability, and production readiness verifier availability.
+- The endpoint is admin-only, read-only, no-AI, no live market-data, and no payment processing.
+- Payloads avoid database absolute paths and do not expose API keys, webhook secrets, or tokens.
+- Added `tests/test_platform_ops_health_v52.py` and `scripts/verify_platform_ops_health_v52.py`; the verifier prints `DSA_PLATFORM_OPS_HEALTH_V52_OK` only when required local checks pass.
+- V52 remains local-only. It is not public launch approval, not production monitoring approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-05 Ops Health Panel V53 gate
+
+- AdminPage now loads `adminOpsHealth()` alongside other admin snapshots and shows an `Ops health` panel.
+- The panel shows overall status, total/OK/degraded/critical counts, category chips, and degraded check summaries.
+- Frontend API/tests now cover camelCase mapping for `/api/v1/platform/admin/ops-health`.
+- Added `scripts/verify_platform_ops_health_panel_v53.py`; the verifier prints `DSA_PLATFORM_OPS_HEALTH_PANEL_V53_OK` only when required local UI/API checks pass.
+- V53 remains local-only. It is not public launch approval, not production monitoring approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

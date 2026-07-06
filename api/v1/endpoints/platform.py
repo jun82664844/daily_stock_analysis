@@ -46,6 +46,8 @@ from src.platform_audit import PlatformAuditLogger
 from src.platform_rate_limit import check_platform_rate_limit
 from src.platform_watchlist import PlatformWatchlistService
 from src.services.local_functional_status import build_local_functional_status
+from src.services.platform_ops_health import build_platform_ops_health_status
+from src.services.production_readiness import build_production_readiness_status
 from src.csrf import (
     CSRF_COOKIE_NAME as PLATFORM_CSRF_COOKIE,
     CSRF_HEADER_NAME as PLATFORM_CSRF_HEADER,
@@ -378,6 +380,20 @@ async def platform_admin_local_status(request: Request):
     identity = _require_admin_identity(request)
     _audit(user_id=identity.user_id, action="admin_local_status_viewed", metadata={})
     return build_local_functional_status()
+
+
+@router.get("/admin/production-readiness")
+async def platform_admin_production_readiness(request: Request):
+    identity = _require_admin_identity(request)
+    _audit(user_id=identity.user_id, action="admin_production_readiness_viewed", metadata={})
+    return build_production_readiness_status()
+
+
+@router.get("/admin/ops-health")
+async def platform_admin_ops_health(request: Request):
+    identity = _require_admin_identity(request)
+    _audit(user_id=identity.user_id, action="admin_ops_health_viewed", metadata={})
+    return build_platform_ops_health_status()
 
 
 @router.patch("/admin/users/{user_id}/plan", response_model=PlatformAuthResponse)

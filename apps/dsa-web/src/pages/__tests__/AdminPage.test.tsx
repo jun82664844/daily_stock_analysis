@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import AdminPage from '../AdminPage';
 
-const { adminUsers, adminUsage, adminBillingEvents, adminLocalStatus } = vi.hoisted(() => ({
+const { adminUsers, adminUsage, adminBillingEvents, adminLocalStatus, adminProductionReadiness, adminOpsHealth } = vi.hoisted(() => ({
   adminUsers: vi.fn(),
   adminUsage: vi.fn(),
   adminBillingEvents: vi.fn(),
   adminLocalStatus: vi.fn(),
+  adminProductionReadiness: vi.fn(),
+  adminOpsHealth: vi.fn(),
 }));
 
 const { marketSourceHealth, prewarm, recoverMarketSources } = vi.hoisted(() => ({
@@ -22,6 +24,8 @@ vi.mock('../../api/platform', () => ({
     adminUsage,
     adminBillingEvents,
     adminLocalStatus,
+    adminProductionReadiness,
+    adminOpsHealth,
   },
 }));
 
@@ -126,6 +130,91 @@ beforeEach(() => {
     },
     safety: { noAiStatus: true, secretsRedacted: true, realPaymentEnabled: false },
   });
+  adminProductionReadiness.mockResolvedValue({
+    mode: 'production_preflight',
+    aiUsed: false,
+    generatedAt: '2026-07-05T08:00:00Z',
+    launchDecision: 'blocked',
+    productionReady: false,
+    analysisBoundary: 'not_investment_advice',
+    summary: { total: 9, passed: 3, blocked: 6, manualActions: 6 },
+    checks: [
+      {
+        id: 'cors_locked_down',
+        category: 'security',
+        title: 'CORS wildcard disabled',
+        status: 'passed',
+        severity: 'info',
+        message: 'Ready for launch review.',
+        evidence: { configured: true },
+      },
+      {
+        id: 'real_payment_disabled',
+        category: 'billing',
+        title: 'Real payment provider approved',
+        status: 'blocked',
+        severity: 'critical',
+        message: 'No real payment provider is enabled; paid public launch remains blocked.',
+        evidence: { providerMode: 'disabled', webhookApproved: false },
+      },
+      {
+        id: 'legal_terms_not_approved',
+        category: 'legal',
+        title: 'Legal terms approved',
+        status: 'blocked',
+        severity: 'critical',
+        message: 'Terms must be reviewed by humans before public launch.',
+        evidence: { configured: false },
+      },
+      {
+        id: 'market_data_license_not_approved',
+        category: 'data_sources',
+        title: 'Market data commercial license approved',
+        status: 'blocked',
+        severity: 'critical',
+        message: 'Commercial data license approval is missing.',
+        evidence: { configured: false },
+      },
+    ],
+    blockingChecks: [],
+    manualActions: [],
+  });
+  adminOpsHealth.mockResolvedValue({
+    mode: 'local_ops_health',
+    aiUsed: false,
+    generatedAt: '2026-07-05T10:00:00Z',
+    overallStatus: 'degraded',
+    summary: { total: 8, ok: 6, degraded: 2, criticalDegraded: 0 },
+    checks: [
+      {
+        id: 'database_reachable',
+        category: 'database',
+        title: 'Database reachable',
+        status: 'ok',
+        severity: 'info',
+        message: 'Database is reachable and quick_check is ok.',
+        evidence: { reachable: true, quickCheck: 'ok' },
+      },
+      {
+        id: 'billing_provider_readiness',
+        category: 'billing',
+        title: 'Billing provider readiness',
+        status: 'degraded',
+        severity: 'warning',
+        message: 'Billing provider readiness is visible and sanitized.',
+        evidence: { provider: 'stripe', adapterImplemented: false },
+      },
+      {
+        id: 'backup_runner_available',
+        category: 'backup',
+        title: 'Backup restore dry-run runner available',
+        status: 'ok',
+        severity: 'info',
+        message: 'Backup restore dry-run runner and verifier are available.',
+        evidence: { runnerExists: true },
+      },
+    ],
+  });
   marketSourceHealth.mockResolvedValue({
     mode: 'local_only',
     aiUsed: false,
@@ -213,6 +302,17 @@ describe('AdminPage', () => {
     expect(screen.getByText('BYOK supported')).toBeInTheDocument();
     expect(screen.getByText('Public search off')).toBeInTheDocument();
     expect(screen.getByText('Real payment off')).toBeInTheDocument();
+    expect(screen.getByText('Production readiness')).toBeInTheDocument();
+    expect(screen.getByText('Ops health')).toBeInTheDocument();
+    expect(screen.getByText('DEGRADED')).toBeInTheDocument();
+    expect(screen.getByText('Billing provider readiness')).toBeInTheDocument();
+    expect(screen.getAllByText('backup').length).toBeGreaterThan(0);
+    expect(screen.getByText('BLOCKED')).toBeInTheDocument();
+    expect(screen.getAllByText('security').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('billing').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('legal').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('data_sources').length).toBeGreaterThan(0);
+    expect(screen.getByText('No real payment provider is enabled; paid public launch remains blocked.')).toBeInTheDocument();
     expect(screen.getByText('Market source health')).toBeInTheDocument();
     expect(screen.getAllByText('hk_market_data').length).toBeGreaterThan(0);
     expect(screen.getByText('hk_realtime')).toBeInTheDocument();
@@ -231,6 +331,8 @@ describe('AdminPage', () => {
       expect(adminUsage).toHaveBeenCalledTimes(2);
       expect(adminBillingEvents).toHaveBeenCalledTimes(2);
       expect(adminLocalStatus).toHaveBeenCalledTimes(2);
+      expect(adminProductionReadiness).toHaveBeenCalledTimes(2);
+      expect(adminOpsHealth).toHaveBeenCalledTimes(2);
       expect(marketSourceHealth).toHaveBeenCalledTimes(2);
     });
   });

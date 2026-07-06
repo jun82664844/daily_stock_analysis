@@ -178,6 +178,64 @@ export interface PlatformLocalStatusResponse {
   };
 }
 
+export interface PlatformProductionReadinessCheck {
+  id: string;
+  category: string;
+  title: string;
+  status: 'passed' | 'blocked' | string;
+  severity: 'info' | 'critical' | string;
+  message: string;
+  evidence?: Record<string, unknown> | null;
+}
+
+export interface PlatformProductionReadinessAction {
+  id: string;
+  category: string;
+  action: string;
+}
+
+export interface PlatformProductionReadinessResponse {
+  mode: string;
+  aiUsed: boolean;
+  generatedAt?: string | null;
+  launchDecision: 'ready' | 'blocked' | string;
+  productionReady: boolean;
+  analysisBoundary: string;
+  checks: PlatformProductionReadinessCheck[];
+  blockingChecks: PlatformProductionReadinessCheck[];
+  manualActions: PlatformProductionReadinessAction[];
+  summary: {
+    total: number;
+    passed: number;
+    blocked: number;
+    manualActions: number;
+  };
+}
+
+export interface PlatformOpsHealthCheck {
+  id: string;
+  category: string;
+  title: string;
+  status: 'ok' | 'degraded' | string;
+  severity: 'info' | 'warning' | 'critical' | string;
+  message: string;
+  evidence?: Record<string, unknown> | null;
+}
+
+export interface PlatformOpsHealthResponse {
+  mode: string;
+  aiUsed: boolean;
+  generatedAt?: string | null;
+  overallStatus: 'ok' | 'degraded' | 'failed' | string;
+  summary: {
+    total: number;
+    ok: number;
+    degraded: number;
+    criticalDegraded: number;
+  };
+  checks: PlatformOpsHealthCheck[];
+}
+
 export interface PlatformWatchlistItem {
   id?: number | null;
   stockCode: string;
@@ -329,6 +387,14 @@ export const platformApi = {
   adminLocalStatus: async (): Promise<PlatformLocalStatusResponse> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/admin/local-status');
     return toCamelCase<PlatformLocalStatusResponse>(response.data);
+  },
+  adminProductionReadiness: async (): Promise<PlatformProductionReadinessResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/admin/production-readiness');
+    return toCamelCase<PlatformProductionReadinessResponse>(response.data);
+  },
+  adminOpsHealth: async (): Promise<PlatformOpsHealthResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/admin/ops-health');
+    return toCamelCase<PlatformOpsHealthResponse>(response.data);
   },
   updateUserPlan: async (userId: number, plan: PlatformPlan): Promise<PlatformAuthPayload> => {
     const response = await apiClient.patch<Record<string, unknown>>(

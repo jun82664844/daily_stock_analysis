@@ -261,6 +261,97 @@ describe('platformApi', () => {
     expect(result.users[1].plan).toBe('free');
   });
 
+  it('loads production readiness preflight as camelCase', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        mode: 'production_preflight',
+        ai_used: false,
+        launch_decision: 'blocked',
+        production_ready: false,
+        analysis_boundary: 'not_investment_advice',
+        summary: { total: 2, passed: 1, blocked: 1, manual_actions: 1 },
+        checks: [
+          {
+            id: 'real_payment_disabled',
+            category: 'billing',
+            title: 'Real payment provider approved',
+            status: 'blocked',
+            severity: 'critical',
+            message: 'No real payment provider is enabled.',
+            evidence: { provider_mode: 'disabled', webhook_approved: false },
+          },
+        ],
+        blocking_checks: [
+          {
+            id: 'real_payment_disabled',
+            category: 'billing',
+            title: 'Real payment provider approved',
+            status: 'blocked',
+            severity: 'critical',
+            message: 'No real payment provider is enabled.',
+            evidence: { provider_mode: 'disabled', webhook_approved: false },
+          },
+        ],
+        manual_actions: [
+          {
+            id: 'real_payment_disabled',
+            category: 'billing',
+            action: 'No real payment provider is enabled.',
+          },
+        ],
+      },
+    });
+
+    const result = await platformApi.adminProductionReadiness();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/platform/admin/production-readiness');
+    expect(result.aiUsed).toBe(false);
+    expect(result.launchDecision).toBe('blocked');
+    expect(result.productionReady).toBe(false);
+    expect(result.summary.manualActions).toBe(1);
+    expect(result.checks[0].evidence?.providerMode).toBe('disabled');
+    expect(result.blockingChecks[0].id).toBe('real_payment_disabled');
+  });
+
+  it('loads admin ops health as camelCase', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        mode: 'local_ops_health',
+        ai_used: false,
+        generated_at: '2026-07-05T10:00:00Z',
+        overall_status: 'degraded',
+        summary: {
+          total: 3,
+          ok: 2,
+          degraded: 1,
+          critical_degraded: 0,
+        },
+        checks: [
+          {
+            id: 'billing_provider_readiness',
+            category: 'billing',
+            title: 'Billing provider readiness',
+            status: 'degraded',
+            severity: 'warning',
+            message: 'Billing provider readiness is visible and sanitized.',
+            evidence: {
+              adapter_implemented: false,
+              missing_config: ['BILLING_STRIPE_WEBHOOK_SECRET'],
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await platformApi.adminOpsHealth();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/platform/admin/ops-health');
+    expect(result.aiUsed).toBe(false);
+    expect(result.overallStatus).toBe('degraded');
+    expect(result.summary.criticalDegraded).toBe(0);
+    expect(result.checks[0].evidence?.adapterImplemented).toBe(false);
+  });
+
   it('loads admin usage buckets and audit events as camelCase', async () => {
     get.mockResolvedValueOnce({
       data: {
