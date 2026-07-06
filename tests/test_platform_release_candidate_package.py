@@ -84,6 +84,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v53: bool = True,
         include_v54: bool = True,
         include_v55: bool = True,
+        include_v56: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -264,6 +265,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "Do not commit real API Key\nguest-query-entry\nretention_brief\n"
                 "guest-conversion-guide\nDSA_PLATFORM_LOCAL_PRODUCT_EXPERIENCE_V55_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-06-dsa-v56-user-retention-loop.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nguest AAPL\nsave history\nwatchlist\n"
+                "DSA_PLATFORM_LOCAL_USER_RETENTION_V56_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -320,6 +326,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_ops_health_panel_v53.py",
             "scripts/verify_platform_local_user_acceptance_v54.py",
             "scripts/verify_platform_local_product_experience_v55.py",
+            "scripts/verify_platform_local_user_retention_v56.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -366,6 +373,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_ops_health_v52.py",
             "tests/test_platform_local_user_acceptance_v54.py",
             "tests/test_platform_local_product_experience_v55.py",
+            "tests/test_platform_local_user_retention_v56.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -539,6 +547,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v55 and rel_path in {
                 "scripts/verify_platform_local_product_experience_v55.py",
                 "tests/test_platform_local_product_experience_v55.py",
+            }:
+                continue
+            if not include_v56 and rel_path in {
+                "scripts/verify_platform_local_user_retention_v56.py",
+                "tests/test_platform_local_user_retention_v56.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -769,6 +782,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v55:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-06-dsa-v55-local-product-experience.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v56:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-06-dsa-v56-user-retention-loop.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1345,6 +1365,28 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         )
         self.assertIn(
             "docs/superpowers/plans/2026-07-06-dsa-v55-local-product-experience.md",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+
+    def test_reports_missing_local_user_retention_v56_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v56=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        self.assertIn(
+            "scripts/verify_platform_local_user_retention_v56.py",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+        self.assertIn(
+            "tests/test_platform_local_user_retention_v56.py",
+            by_id["required_files_present"].metadata["missing_files"],
+        )
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-06-dsa-v56-user-retention-loop.md",
             by_id["required_files_present"].metadata["missing_files"],
         )
 

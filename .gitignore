@@ -116,6 +116,7 @@ verify_*.py
 !scripts/verify_platform_ops_health_panel_v53.py
 !scripts/verify_platform_local_user_acceptance_v54.py
 !scripts/verify_platform_local_product_experience_v55.py
+!scripts/verify_platform_local_user_retention_v56.py
 
 # ignore Claude workspace artifacts, but keep shared repo skills versioned
 .claude/*

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import os
+import time
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
@@ -26,6 +28,8 @@ from api.v1.schemas.platform import (
     PlatformPlanUpdateRequest,
     PlatformQuotaResponse,
     PlatformRegisterRequest,
+    PlatformSnapshotHistorySaveRequest,
+    PlatformSnapshotHistorySaveResponse,
     PlatformStatusResponse,
     PlatformUserResponse,
     PlatformWatchlistRefreshResponse,
@@ -42,9 +46,10 @@ from src.platform_accounts import (
     is_platform_user_auth_enabled,
     platform_identity_from_request,
 )
-from src.platform_audit import PlatformAuditLogger
+from src.platform_audit import PlatformAuditLogger, redact_metadata
 from src.platform_rate_limit import check_platform_rate_limit
 from src.platform_watchlist import PlatformWatchlistService
+from src.storage import DatabaseManager
 from src.services.local_functional_status import build_local_functional_status
 from src.services.platform_ops_health import build_platform_ops_health_status
 from src.services.production_readiness import build_production_readiness_status
@@ -136,6 +141,52 @@ def _account_payload(service: PlatformAccountService, user: Any) -> Dict[str, An
         "api_keys": api_keys,
         "recommended_query_mode": recommended_query_mode,
     }
+
+
+def _snapshot_get(snapshot: Dict[str, Any], *keys: str, default: Any = None) -> Any:
+    for key in keys:
+        if key in snapshot:
+            return snapshot.get(key)
+    return default
+
+
+def _nested_get(mapping: Dict[str, Any] | None, *keys: str, default: Any = None) -> Any:
+    if not isinstance(mapping, dict):
+        return default
+    return _snapshot_get(mapping, *keys, default=default)
+
+
+def _coerce_signal_score(snapshot: Dict[str, Any]) -> int:
+    intelligence = _snapshot_get(snapshot, "intelligence", default={})
+    if not isinstance(intelligence, dict):
+        return 50
+    signal = _snapshot_get(intelligence, "signal_score", "signalScore", default={})
+    if not isinstance(signal, dict):
+        return 50
+    try:
+        score = int(round(float(signal.get("score", 50))))
+    except (TypeError, ValueError):
+        return 50
+    return max(0, min(100, score))
+
+
+def _snapshot_retention_headline(snapshot: Dict[str, Any], stock_code: str) -> str:
+    intelligence = _snapshot_get(snapshot, "intelligence", default={})
+    if isinstance(intelligence, dict):
+        retention = _snapshot_get(intelligence, "retention_brief", "retentionBrief", default={})
+        if isinstance(retention, dict):
+            headline = retention.get("headline")
+            if isinstance(headline, str) and headline.strip():
+                return headline.strip()
+    quote = _snapshot_get(snapshot, "quote", default={})
+    price = _nested_get(quote, "current_price", "currentPrice")
+    change_pct = _nested_get(quote, "change_percent", "changePercent")
+    parts = [f"{stock_code} no-AI quick snapshot saved"]
+    if price is not None:
+        parts.append(f"price {price}")
+    if change_pct is not None:
+        parts.append(f"change {change_pct}%")
+    return "; ".join(parts)
 
 
 def _require_identity(request: Request) -> PlatformIdentity:
@@ -306,6 +357,81 @@ async def platform_watchlist_remove(request: Request, stock_code: str):
 async def platform_watchlist_refresh(request: Request):
     identity = _require_identity(request)
     return PlatformWatchlistService().refresh(int(identity.user_id))
+
+
+@router.post("/history/snapshot", response_model=PlatformSnapshotHistorySaveResponse)
+async def platform_save_snapshot_to_history(request: Request, body: PlatformSnapshotHistorySaveRequest):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "history_snapshot", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+
+    snapshot = body.snapshot or {}
+    if not isinstance(snapshot, dict):
+        return JSONResponse(status_code=400, content={"error": "invalid_request", "message": "snapshot must be an object"})
+    ai_used = bool(_snapshot_get(snapshot, "ai_used", "aiUsed", default=False))
+    route = _snapshot_get(snapshot, "route", default={})
+    route_ai_required = bool(_nested_get(route, "ai_required", "aiRequired", default=False))
+    if ai_used or route_ai_required:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "invalid_request",
+                "message": "Only no-AI quick snapshots can be saved by this local retention endpoint.",
+            },
+        )
+
+    stock_code = str(_snapshot_get(snapshot, "stock_code", "stockCode", default="")).strip().upper()
+    if not stock_code:
+        return JSONResponse(status_code=400, content={"error": "invalid_request", "message": "stock_code is required"})
+    stock_name = _snapshot_get(snapshot, "stock_name", "stockName", default=stock_code)
+    if stock_name is not None:
+        stock_name = str(stock_name).strip() or stock_code
+    summary = _snapshot_retention_headline(snapshot, stock_code)
+    result = SimpleNamespace(
+        code=stock_code,
+        name=stock_name or stock_code,
+        sentiment_score=_coerce_signal_score(snapshot),
+        operation_advice="informational_no_ai_snapshot",
+        trend_prediction="no_ai_quick_snapshot_saved",
+        analysis_summary=summary,
+    )
+    context_snapshot = redact_metadata(
+        {
+            "source": "platform_snapshot_save_v56",
+            "ai_used": False,
+            "snapshot": snapshot,
+            "note": body.note,
+            "boundary": "Local informational analysis only; not investment advice.",
+        }
+    )
+    query_id = f"platform-basic-snapshot-{int(identity.user_id)}-{stock_code}-{int(time.time() * 1000)}"
+    record_id = DatabaseManager().save_analysis_history(
+        result=result,
+        query_id=query_id,
+        report_type="basic_snapshot",
+        news_content=None,
+        context_snapshot=context_snapshot,
+        save_snapshot=True,
+        platform_user_id=int(identity.user_id),
+    )
+    if record_id <= 0:
+        return JSONResponse(status_code=500, content={"error": "history_save_failed", "message": "Failed to save snapshot"})
+
+    _audit(
+        user_id=int(identity.user_id),
+        action="snapshot_saved_to_history",
+        metadata={"stock_code": stock_code, "record_id": record_id, "ai_used": False},
+    )
+    return {
+        "record_id": record_id,
+        "stock_code": stock_code,
+        "stock_name": stock_name or stock_code,
+        "report_type": "basic_snapshot",
+        "saved_to_history": True,
+        "ai_used": False,
+    }
 
 
 @router.get("/api-keys", response_model=List[PlatformApiKeyItem])

@@ -92,6 +92,7 @@ vi.mock('../../api/platform', () => ({
     addWatchlistItem: vi.fn(),
     removeWatchlistItem: vi.fn(),
     refreshWatchlist: vi.fn(),
+    saveSnapshotToHistory: vi.fn(),
   },
 }));
 
@@ -243,6 +244,13 @@ describe('HomePage', () => {
       refreshed: 0,
       degraded: 0,
       items: [],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.saveSnapshotToHistory).mockResolvedValue({
+      recordId: 0,
+      stockCode: 'AAPL',
+      reportType: 'basic_snapshot',
+      savedToHistory: true,
       aiUsed: false,
     });
     vi.mocked(historyApi.getDiagnostics).mockResolvedValue({
@@ -403,6 +411,209 @@ describe('HomePage', () => {
 
     expect(screen.getByTestId('guest-conversion-guide')).toHaveTextContent('Register');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+  });
+
+  it('keeps a guest AAPL snapshot through register and saves it to history and watchlist', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(platformApi.register).mockResolvedValue({
+      user: {
+        id: 56,
+        email: 'v56-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 56,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-06',
+      },
+    });
+    vi.mocked(platformApi.account).mockResolvedValue({
+      user: {
+        id: 56,
+        email: 'v56-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 56,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-06',
+      },
+      quotaBuckets: [
+        {
+          userId: 56,
+          plan: 'free',
+          weeklyLimit: 10,
+          used: 1,
+          remaining: 9,
+          periodStart: '2026-07-06',
+          quotaBucket: 'basic_query',
+        },
+        {
+          userId: 56,
+          plan: 'free',
+          weeklyLimit: 3,
+          used: 0,
+          remaining: 3,
+          periodStart: '2026-07-06',
+          quotaBucket: 'ai_quick',
+        },
+        {
+          userId: 56,
+          plan: 'free',
+          weeklyLimit: 3,
+          used: 0,
+          remaining: 3,
+          periodStart: '2026-07-06',
+          quotaBucket: 'ai_quick_user_key',
+        },
+        {
+          userId: 56,
+          plan: 'free',
+          weeklyLimit: 1,
+          used: 0,
+          remaining: 1,
+          periodStart: '2026-07-06',
+          quotaBucket: 'ai_local',
+        },
+      ],
+      apiKeys: [
+        {
+          provider: 'deepseek',
+          model: 'deepseek/deepseek-v4-flash',
+          maskedKey: 'sk-...safe',
+          enabled: true,
+        },
+      ],
+      recommendedQueryMode: 'user',
+    });
+    vi.mocked(platformApi.watchlist).mockResolvedValue({
+      userId: 56,
+      total: 0,
+      aiUsed: false,
+      items: [],
+    });
+    vi.mocked(platformApi.addWatchlistItem).mockResolvedValue({
+      userId: 56,
+      total: 1,
+      aiUsed: false,
+      items: [{ id: 1, stockCode: 'AAPL', market: 'us' }],
+    });
+    vi.mocked(platformApi.saveSnapshotToHistory).mockResolvedValue({
+      recordId: 5601,
+      stockCode: 'AAPL',
+      reportType: 'basic_snapshot',
+      savedToHistory: true,
+      aiUsed: false,
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 200,
+        changePercent: 1.5,
+        source: 'unit_quote',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 198, ma20: 190 },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+        retentionBrief: {
+          headline: 'AAPL quick read: +1.5%, above MA20 190.',
+          whyItMatters: 'Free no-AI checklist.',
+          supportResistance: 'support 190; resistance 200',
+          nextSteps: ['Register, save history, and add to watchlist'],
+          upgradeHint: 'Login to save history and watchlist.',
+          boundary: 'Information analysis only; not investment advice.',
+          source: 'no_ai_retention_rules',
+        },
+        items: [],
+      },
+      route: {
+        inputCode: 'AAPL',
+        normalizedCode: 'AAPL',
+        market: 'us',
+        channel: 'us_equity',
+        dataSourceLane: 'us_market_data',
+        quoteSources: ['unit_quote'],
+        historySources: ['unit_history'],
+        aiRequired: false,
+      },
+      diagnostics: {
+        elapsedMs: 5,
+        quoteElapsedMs: 2,
+        historyElapsedMs: 3,
+        cache: { quote: 'miss', history: 'miss' },
+        sources: { quote: 'unit_quote', history: 'unit_history' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        fallback: { quote: 'live', history: 'live' },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok' },
+      },
+      aiUsed: false,
+    });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    fireEvent.click(await screen.findByTestId('guest-example-AAPL'));
+    expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+
+    fireEvent.click(screen.getByTestId('guest-guide-register'));
+    fireEvent.change(screen.getByTestId('guest-auth-email'), { target: { value: 'v56-user@example.com' } });
+    fireEvent.change(screen.getByTestId('guest-auth-password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('guest-auth-submit'));
+
+    await waitFor(() => {
+      expect(platformApi.register).toHaveBeenCalledWith('v56-user@example.com', 'password123');
+    });
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+    const modeGuide = await screen.findByTestId('basic-query-retention-mode-guide');
+    expect(modeGuide).toHaveTextContent('Free no-AI');
+    expect(modeGuide).toHaveTextContent('Platform API');
+    expect(modeGuide).toHaveTextContent('BYOK');
+    expect(modeGuide).toHaveTextContent('Local model');
+    expect(modeGuide).toHaveTextContent('sk-...safe');
+    expect(modeGuide).not.toHaveTextContent('sk-live');
+
+    fireEvent.click(screen.getByTestId('basic-query-save-current-history'));
+    await waitFor(() => {
+      expect(platformApi.saveSnapshotToHistory).toHaveBeenCalledWith(expect.objectContaining({
+        stockCode: 'AAPL',
+        aiUsed: false,
+      }));
+    });
+    expect(await screen.findByTestId('basic-query-retention-status')).toHaveTextContent('Saved to history');
+
+    fireEvent.click(screen.getByTestId('basic-query-add-current-watchlist'));
+    await waitFor(() => {
+      expect(platformApi.addWatchlistItem).toHaveBeenCalledWith('AAPL');
+    });
+    expect(screen.getByTestId('basic-query-retention-status')).toHaveTextContent('Added to watchlist');
   });
 
   it('renders the dashboard workspace and auto-loads the first report', async () => {

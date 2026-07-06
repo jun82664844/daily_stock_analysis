@@ -874,3 +874,45 @@ Review boundary:
 - The free report includes `retention_brief`, `basic-query-retention-brief`, and `guest-conversion-guide` while keeping no-AI cost control.
 - Keep `scripts/verify_platform_local_product_experience_v55.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V56 Local User Retention Manifest Addendum
+
+Status: local-only ordinary-user retention loop, no production launch approval.
+
+New/updated files:
+
+- `api/v1/schemas/platform.py`
+- `api/v1/endpoints/platform.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `tests/test_platform_local_user_retention_v56.py`
+- `scripts/verify_platform_local_user_retention_v56.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v56-user-retention-loop.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_LOCAL_USER_RETENTION_V56_OK`
+
+Suggested review/commit position:
+
+- After V55 guest-first product experience and before broader production-readiness or payment/provider work.
+
+Rollback notes:
+
+- Reverting this slice removes the snapshot-to-history endpoint, HomePage retention actions, V56 E2E path, and V56 verifier without touching existing saved history tables or previous V55 no-AI snapshot behavior.
+
+Review boundary:
+
+- Snapshot saves must remain login-required, no-AI only, and scoped to `platform_user_id`.
+- Watchlist and history actions must not expose plaintext API keys or global platform secrets.
+- Playwright coverage is mock-backed; it is not proof of public production deployment.
+- Keep `scripts/verify_platform_local_user_retention_v56.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

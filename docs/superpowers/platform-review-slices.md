@@ -729,3 +729,34 @@ Review focus:
 - The guest conversion guide must not clear the current snapshot or force registration before query.
 - `scripts/verify_platform_local_product_experience_v55.py` must stay visible despite the broad `verify_*.py` ignore rule.
 - V55 remains local-only, not public launch approval, not real payment, and not investment advice.
+
+## V56 Local User Retention Addendum
+
+Purpose: close the local ordinary-user retention loop after the V55 guest-first query: a guest can query AAPL, register/login, save the current no-AI result, add it to watchlist, logout/login, and still see private history/watchlist state.
+
+Files:
+
+- `api/v1/schemas/platform.py`
+- `api/v1/endpoints/platform.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `tests/test_platform_local_user_retention_v56.py`
+- `scripts/verify_platform_local_user_retention_v56.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v56-user-retention-loop.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Review focus:
+
+- `/api/v1/platform/history/snapshot` must require a platform session, reject AI-used snapshots, write `platform_user_id`, and avoid secret leakage in audit/context data.
+- HomePage must preserve the current guest snapshot through register/login and use the snapshot symbol for save/watchlist actions even when the search input is reset.
+- The snapshot retention panel must expose free no-AI, platform API, BYOK, and local-model quota/mode boundaries without plaintext keys.
+- Playwright E2E must remain mock-backed and must not use real API keys or real payment.
+- `scripts/verify_platform_local_user_retention_v56.py` must stay visible despite the broad `verify_*.py` ignore rule.
+- V56 remains local-only, not public launch approval, not real payment, and not investment advice.

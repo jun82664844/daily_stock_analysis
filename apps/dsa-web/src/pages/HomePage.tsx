@@ -446,6 +446,9 @@ const HomePage: React.FC = () => {
   const [historyReportSectionStatus, setHistoryReportSectionStatus] = useState('');
   const [isQueryingBasic, setIsQueryingBasic] = useState(false);
   const [basicQueryError, setBasicQueryError] = useState<ParsedApiError | null>(null);
+  const [basicRetentionBusy, setBasicRetentionBusy] = useState(false);
+  const [basicRetentionStatus, setBasicRetentionStatus] = useState('');
+  const [basicRetentionError, setBasicRetentionError] = useState('');
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -642,12 +645,16 @@ const HomePage: React.FC = () => {
     setAuthBusy(true);
     setAuthError('');
     try {
+      const retainedQuery = basicSnapshot?.stockCode || query;
       const payload = authMode === 'register'
         ? await platformApi.register(authEmail.trim(), authPassword)
         : await platformApi.login(authEmail.trim(), authPassword);
       await loadPlatformAccount(payload);
       setAuthPassword('');
       resetDashboardState();
+      if (retainedQuery.trim()) {
+        setQuery(retainedQuery.trim());
+      }
       await Promise.all([
         loadInitialHistory(),
         loadStockBar(),
@@ -659,7 +666,7 @@ const HomePage: React.FC = () => {
     } finally {
       setAuthBusy(false);
     }
-  }, [authEmail, authMode, authPassword, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, refreshActiveTasks, resetDashboardState]);
+  }, [authEmail, authMode, authPassword, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery]);
 
   const handlePlatformLogout = useCallback(async () => {
     await platformApi.logout();
@@ -670,6 +677,9 @@ const HomePage: React.FC = () => {
     setPlatformWatchlistRefresh(null);
     setPlatformWatchlistError('');
     setApiKeyMode('platform');
+    setBasicSnapshot(null);
+    setBasicRetentionStatus('');
+    setBasicRetentionError('');
     resetDashboardState();
   }, [resetDashboardState, setApiKeyMode]);
 
@@ -696,22 +706,53 @@ const HomePage: React.FC = () => {
   }, [apiKeyDraft, apiKeyModel, apiKeyProvider, loadPlatformAccount, platformSession, setApiKeyMode]);
 
   const handleAddCurrentQueryToPlatformWatchlist = useCallback(async () => {
-    const target = query.trim();
+    const target = (basicSnapshot?.stockCode || query).trim();
     if (!target || platformWatchlistBusy) {
       return;
     }
     setPlatformWatchlistBusy(true);
     setPlatformWatchlistError('');
+    setBasicRetentionError('');
     try {
       const list = await platformApi.addWatchlistItem(target);
       setPlatformWatchlist(list);
       setPlatformWatchlistRefresh(null);
+      setBasicRetentionStatus('Added to watchlist');
     } catch (err: unknown) {
-      setPlatformWatchlistError(getParsedApiError(err).message || 'Watchlist update failed');
+      const message = getParsedApiError(err).message || 'Watchlist update failed';
+      setPlatformWatchlistError(message);
+      setBasicRetentionError(message);
     } finally {
       setPlatformWatchlistBusy(false);
     }
-  }, [platformWatchlistBusy, query]);
+  }, [basicSnapshot?.stockCode, platformWatchlistBusy, query]);
+
+  const handleSaveCurrentBasicSnapshotToHistory = useCallback(async () => {
+    if (!basicSnapshot || basicRetentionBusy) {
+      return;
+    }
+    if (!platformSession) {
+      setAuthMode('register');
+      setBasicRetentionStatus('');
+      setBasicRetentionError('Register or login to save this no-AI snapshot.');
+      return;
+    }
+    setBasicRetentionBusy(true);
+    setBasicRetentionStatus('');
+    setBasicRetentionError('');
+    try {
+      await platformApi.saveSnapshotToHistory(basicSnapshot);
+      setBasicRetentionStatus('Saved to history');
+      await Promise.all([
+        refreshHistory(),
+        loadStockBar(),
+      ]);
+    } catch (err: unknown) {
+      setBasicRetentionError(getParsedApiError(err).message || 'Snapshot save failed');
+    } finally {
+      setBasicRetentionBusy(false);
+    }
+  }, [basicRetentionBusy, basicSnapshot, loadStockBar, platformSession, refreshHistory]);
 
   const handleRefreshPlatformWatchlist = useCallback(async () => {
     if (platformWatchlistBusy) {
@@ -911,8 +952,14 @@ const HomePage: React.FC = () => {
   const primaryApiKey = platformKeys.find((key) => key.enabled);
   const baseQuota = platformAccount?.quota ?? platformSession?.quota ?? null;
   const basicQueryQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'basic_query');
+  const platformAiQuickQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_quick');
+  const byokAiQuickQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_quick_user_key');
+  const localAiQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_local');
   const accountQuotaText = platformSession ? formatQuotaLeft(baseQuota) : 'unavailable';
   const basicQuotaText = basicQueryQuota ? formatQuotaLeft(basicQueryQuota) : 'unmetered locally';
+  const platformAiQuotaText = platformAiQuickQuota ? formatQuotaLeft(platformAiQuickQuota) : accountQuotaText;
+  const byokAiQuotaText = byokAiQuickQuota ? formatQuotaLeft(byokAiQuickQuota) : 'available after saving a user key';
+  const localModelQuotaText = localAiQuota ? formatQuotaLeft(localAiQuota) : 'local capacity gate';
   const byokStatusText = primaryApiKey
     ? `BYOK ready ${primaryApiKey.maskedKey}`
     : 'BYOK not set';
@@ -1342,6 +1389,8 @@ const HomePage: React.FC = () => {
     setAutocompleteCloseSignal((current) => current + 1);
     setIsQueryingBasic(true);
     setBasicQueryError(null);
+    setBasicRetentionStatus('');
+    setBasicRetentionError('');
     if (!forceRefresh) {
       setBasicSnapshot(null);
     }
@@ -3467,6 +3516,97 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                    {platformSession ? (
+                      <div
+                        data-testid="basic-query-retention-mode-guide"
+                        className="mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-secondary-text"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                            Free no-AI {basicQuotaText}
+                          </span>
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            Platform API quick AI {platformAiQuotaText}
+                          </span>
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            BYOK {byokStatusText}; quick bucket {byokAiQuotaText}
+                          </span>
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            Local model {localModelQuotaText}
+                          </span>
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            Informational only; not investment advice
+                          </span>
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
+                          <div className="inline-flex overflow-hidden rounded-lg border border-subtle">
+                            <button
+                              type="button"
+                              onClick={() => handleApiKeyModeChange('platform')}
+                              data-testid="platform-mode-platform"
+                              className={`px-2.5 py-1 ${apiKeyMode === 'platform' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
+                            >
+                              Platform API
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!hasUserApiKey}
+                              onClick={() => handleApiKeyModeChange('user')}
+                              data-testid="platform-mode-user"
+                              className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'user' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
+                            >
+                              BYOK
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApiKeyModeChange('local')}
+                              data-testid="platform-mode-local"
+                              className={`px-2.5 py-1 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
+                            >
+                              Local model
+                            </button>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid="basic-query-save-current-history"
+                            isLoading={basicRetentionBusy}
+                            disabled={!basicSnapshot || basicSnapshot.aiUsed || basicRetentionBusy}
+                            onClick={() => void handleSaveCurrentBasicSnapshotToHistory()}
+                          >
+                            <Save className="h-4 w-4" aria-hidden="true" />
+                            Save to history
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid="basic-query-add-current-watchlist"
+                            isLoading={platformWatchlistBusy}
+                            disabled={!basicSnapshot || platformWatchlistBusy}
+                            onClick={() => void handleAddCurrentQueryToPlatformWatchlist()}
+                          >
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                            Add to watchlist
+                          </Button>
+                          <Button type="button" variant="secondary" size="sm" onClick={() => void handlePlatformLogout()} data-testid="platform-logout-button">
+                            <LogOut className="h-4 w-4" aria-hidden="true" />
+                            Logout
+                          </Button>
+                          {basicRetentionStatus ? (
+                            <span data-testid="basic-query-retention-status" className="text-xs font-medium text-success">
+                              {basicRetentionStatus}
+                            </span>
+                          ) : null}
+                          {basicRetentionError ? (
+                            <span data-testid="basic-query-retention-status" className="text-xs font-medium text-danger">
+                              {basicRetentionError}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button

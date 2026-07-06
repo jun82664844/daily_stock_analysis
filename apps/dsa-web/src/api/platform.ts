@@ -275,6 +275,15 @@ export interface PlatformWatchlistRefreshResponse {
   aiUsed: boolean;
 }
 
+export interface PlatformSnapshotHistorySaveResponse {
+  recordId: number;
+  stockCode: string;
+  stockName?: string | null;
+  reportType: string;
+  savedToHistory: boolean;
+  aiUsed: boolean;
+}
+
 export const platformApi = {
   status: async (): Promise<{ platformAuthEnabled: boolean }> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/status');
@@ -349,6 +358,13 @@ export const platformApi = {
   refreshWatchlist: async (): Promise<PlatformWatchlistRefreshResponse> => {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/watchlist/refresh');
     return toCamelCase<PlatformWatchlistRefreshResponse>(response.data);
+  },
+
+  saveSnapshotToHistory: async (snapshot: unknown): Promise<PlatformSnapshotHistorySaveResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/history/snapshot', {
+      snapshot,
+    });
+    return toCamelCase<PlatformSnapshotHistorySaveResponse>(response.data);
   },
 
   listApiKeys: async (): Promise<PlatformApiKeyItem[]> => {

@@ -399,3 +399,13 @@ git diff --check
 - After a guest query, HomePage shows `guest-conversion-guide`: login is optional, the snapshot remains visible, and registration is positioned as saving history, watchlist, and weekly quota state.
 - Added `tests/test_platform_local_product_experience_v55.py` and `scripts/verify_platform_local_product_experience_v55.py`; the verifier prints `DSA_PLATFORM_LOCAL_PRODUCT_EXPERIENCE_V55_OK` only when required local checks pass.
 - V55 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-06 Local User Retention V56 gate
+
+- A guest can run an `AAPL` no-AI quick snapshot first, then register or log in without losing the current snapshot.
+- Signed-in ordinary users can save the current no-AI snapshot to private platform history through `/api/v1/platform/history/snapshot`; AI-used payloads are rejected and history remains scoped by `platform_user_id`.
+- The current snapshot panel now offers `Save to history`, `Add to watchlist`, BYOK/platform/local mode switching, and logout without leaving the result view.
+- The snapshot retention panel shows free no-AI quota, platform API AI quota, BYOK quota/readiness, local-model quota/capacity, and the `not investment advice` boundary without exposing plaintext keys.
+- Playwright mock E2E covers guest AAPL query, registration, save history, add watchlist, logout, login, and saved history/watchlist visibility.
+- Added `tests/test_platform_local_user_retention_v56.py` and `scripts/verify_platform_local_user_retention_v56.py`; the verifier prints `DSA_PLATFORM_LOCAL_USER_RETENTION_V56_OK` only when required local checks pass.
+- V56 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

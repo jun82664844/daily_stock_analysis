@@ -91,6 +91,15 @@
 - Deep/AI analysis remains explicit through quick/deep action buttons and continues to consume platform, BYOK, or local-model quota buckets according to the selected mode.
 - Public search remains disabled by default unless explicitly configured by an operator; search failures must degrade visibly instead of being presented as complete information.
 
+## User Retention V56
+
+- Guest no-AI quick snapshots may be converted into private user retention only after registration or login; anonymous users must not write history or watchlist ownership data.
+- Saving the current snapshot to history is a no-AI local operation and must reject payloads that declare `ai_used=true` or route `ai_required=true`.
+- Snapshot-to-history writes must be scoped to the current `platform_user_id`; another ordinary user must not see the saved record.
+- Adding the current snapshot to watchlist must use the current snapshot symbol when the search input is empty after login state refresh.
+- The current snapshot UI may show free no-AI quota, platform API AI quota, BYOK quota/readiness, and local-model quota/capacity together, but must not expose plaintext API keys, tokens, secrets, or passwords.
+- Logout and login should reload private history/watchlist state. Saved records remain informational analysis only and are not investment advice.
+
 ## Local V1 Billing Boundary
 
 - Billing routes exist for contract testing.

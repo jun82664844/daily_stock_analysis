@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -108,4 +108,18 @@ class PlatformWatchlistRefreshResponse(BaseModel):
     refreshed: int = 0
     degraded: int = 0
     items: List[PlatformWatchlistRefreshItem] = Field(default_factory=list)
+    ai_used: bool = False
+
+
+class PlatformSnapshotHistorySaveRequest(BaseModel):
+    snapshot: Dict[str, Any] = Field(default_factory=dict)
+    note: Optional[str] = Field(default=None, max_length=512)
+
+
+class PlatformSnapshotHistorySaveResponse(BaseModel):
+    record_id: int
+    stock_code: str
+    stock_name: Optional[str] = None
+    report_type: str = "basic_snapshot"
+    saved_to_history: bool = True
     ai_used: bool = False

@@ -45,6 +45,7 @@ type MockUser = {
   apiKeys: MockApiKey[];
   usage: Record<QuotaBucket, number>;
   histories: MockHistory[];
+  watchlist: string[];
 };
 
 type MockBackend = {
@@ -345,6 +346,7 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
         apiKeys: [],
         usage: createUsage(),
         histories: [],
+        watchlist: [],
       };
       users.set(email, user);
       currentUserId = user.id;
@@ -393,6 +395,55 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
         updated_at: item.updatedAt,
       });
     }
+    if (path === '/api/v1/platform/watchlist' && method === 'GET') {
+      if (!currentUser) {
+        return json(route, { error: 'unauthorized', message: 'Login required' }, 401);
+      }
+      const items = currentUser.watchlist.map((stockCode, index) => {
+        const meta = snapshotMetaFor(stockCode);
+        return {
+          id: index + 1,
+          stock_code: stockCode,
+          input_code: stockCode,
+          market: meta.market,
+          created_at: '2026-07-06T10:00:00Z',
+          updated_at: '2026-07-06T10:00:00Z',
+        };
+      });
+      return json(route, {
+        user_id: currentUser.id,
+        items,
+        total: items.length,
+        ai_used: false,
+      });
+    }
+    if (path === '/api/v1/platform/watchlist' && method === 'POST') {
+      if (!currentUser) {
+        return json(route, { error: 'unauthorized', message: 'Login required' }, 401);
+      }
+      const body = await readJson(route);
+      const stockCode = String(body.stockCode || body.stock_code || '').trim().toUpperCase();
+      if (stockCode && !currentUser.watchlist.includes(stockCode)) {
+        currentUser.watchlist.push(stockCode);
+      }
+      const items = currentUser.watchlist.map((item, index) => {
+        const meta = snapshotMetaFor(item);
+        return {
+          id: index + 1,
+          stock_code: item,
+          input_code: item,
+          market: meta.market,
+          created_at: '2026-07-06T10:00:00Z',
+          updated_at: '2026-07-06T10:00:00Z',
+        };
+      });
+      return json(route, {
+        user_id: currentUser.id,
+        items,
+        total: items.length,
+        ai_used: false,
+      });
+    }
     if (path === '/api/v1/platform/account') {
       return currentUser ? json(route, accountPayload(currentUser)) : json(route, { error: 'unauthorized', message: 'Login required' }, 401);
     }
@@ -401,6 +452,40 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
     }
     if (path.startsWith('/api/v1/platform/admin/')) {
       return json(route, { error: 'forbidden', message: 'Admin role required' }, 403);
+    }
+    if (path === '/api/v1/platform/history/snapshot' && method === 'POST') {
+      if (!currentUser) {
+        return json(route, { error: 'unauthorized', message: 'Login required' }, 401);
+      }
+      const body = await readJson(route);
+      const snapshot = (body.snapshot || {}) as Record<string, unknown>;
+      if (snapshot.aiUsed === true || snapshot.ai_used === true) {
+        return json(route, { error: 'invalid_request', message: 'Only no-AI snapshots can be saved.' }, 400);
+      }
+      const stockCode = String(snapshot.stockCode || snapshot.stock_code || 'AAPL').trim().toUpperCase();
+      const stockName = String(snapshot.stockName || snapshot.stock_name || snapshotMetaFor(stockCode).stockName);
+      const history: MockHistory = {
+        id: nextHistoryId++,
+        queryId: `snapshot_${currentUser.id}_${Date.now()}`,
+        stockCode,
+        stockName,
+        reportType: 'basic_snapshot',
+        createdAt: new Date().toISOString(),
+        sentimentScore: 61,
+        operationAdvice: 'informational_no_ai_snapshot',
+        action: 'watch',
+        actionLabel: 'Watch',
+        analysisSummary: `${stockCode} no-AI snapshot saved. Informational only; not investment advice.`,
+      };
+      currentUser.histories = [history, ...currentUser.histories];
+      return json(route, {
+        record_id: history.id,
+        stock_code: history.stockCode,
+        stock_name: history.stockName,
+        report_type: history.reportType,
+        saved_to_history: true,
+        ai_used: false,
+      });
     }
     if (path === '/api/v1/billing/checkout' && method === 'POST') {
       if (!currentUser) {
@@ -672,5 +757,49 @@ test.describe('platform user local E2E', () => {
     await page.getByTestId('platform-auth-submit').click();
     await expect(page.getByTestId('platform-query-status')).toContainText(`Signed in ${userAEmail}`);
     await expect(page.getByTestId('home-stock-bar-scroll')).toContainText('Kweichow Moutai');
+  });
+
+  test('retains a guest AAPL snapshot after register and reloads saved history after login', async ({ page }) => {
+    const backend = await installMockBackend(page);
+    const timestamp = Date.now();
+    const email = `e2e+retention-${timestamp}@example.test`;
+    const password = 'password123';
+
+    await page.goto('/');
+    await expect(page.getByTestId('guest-query-entry')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId('guest-example-AAPL').click();
+    await expect(page.getByTestId('basic-query-snapshot')).toContainText('Apple');
+    await expect(page.getByTestId('guest-conversion-guide')).toContainText('Login is optional');
+
+    await page.getByTestId('guest-guide-register').click();
+    await page.getByTestId('guest-auth-email').fill(email);
+    await page.getByTestId('guest-auth-password').fill(password);
+    await page.getByTestId('guest-auth-submit').click();
+
+    await expect(page.getByTestId('basic-query-snapshot')).toContainText('Apple');
+    await expect(page.getByTestId('basic-query-retention-mode-guide')).toContainText('Free no-AI');
+    await expect(page.getByTestId('basic-query-retention-mode-guide')).toContainText('Platform API');
+    await expect(page.getByTestId('basic-query-retention-mode-guide')).toContainText('BYOK');
+    await expect(page.getByTestId('basic-query-retention-mode-guide')).toContainText('Local model');
+
+    await page.getByTestId('basic-query-save-current-history').click();
+    await expect(page.getByTestId('basic-query-retention-status')).toContainText('Saved to history');
+    expect(backend.getUserByEmail(email)?.histories.map((item) => item.stockCode)).toContain('AAPL');
+
+    await page.getByTestId('basic-query-add-current-watchlist').click();
+    await expect(page.getByTestId('basic-query-retention-status')).toContainText('Added to watchlist');
+    expect(backend.getUserByEmail(email)?.watchlist).toContain('AAPL');
+
+    await page.getByTestId('platform-logout-button').click();
+    await page.getByTestId('platform-auth-login-tab').click();
+    await page.getByTestId('platform-auth-email').fill(email);
+    await page.getByTestId('platform-auth-password').fill(password);
+    await page.getByTestId('platform-auth-submit').click();
+
+    await expect(page.getByTestId('platform-query-status')).toContainText(`Signed in ${email}`);
+    await expect(page.getByTestId('home-stock-bar-scroll')).toContainText('Apple');
+    await expect(page.getByTestId('platform-watchlist-panel')).toContainText('AAPL');
+    await expect(page.locator('body')).not.toContainText('sk-live');
   });
 });
