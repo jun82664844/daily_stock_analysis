@@ -373,7 +373,7 @@ describe('HomePage', () => {
     );
 
     const entry = await screen.findByTestId('guest-query-entry');
-    expect(entry).toHaveTextContent('No login required');
+    expect(entry).toHaveTextContent('无需登录');
     expect(entry).toHaveTextContent('AAPL');
     expect(entry).toHaveTextContent('600519');
     expect(entry).toHaveTextContent('00700.HK');
@@ -446,16 +446,174 @@ describe('HomePage', () => {
     });
     expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
     const guide = await screen.findByTestId('guest-conversion-guide');
-    expect(guide).toHaveTextContent('Login is optional');
-    expect(guide).toHaveTextContent('save history');
-    expect(guide).toHaveTextContent('watchlist');
-    expect(guide).toHaveTextContent('weekly quota');
+    expect(guide).toHaveTextContent('登录可选');
+    expect(guide).toHaveTextContent('保存历史');
+    expect(guide).toHaveTextContent('自选');
+    expect(guide).toHaveTextContent('每周额度');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('200');
 
     fireEvent.click(screen.getByTestId('guest-guide-register'));
 
-    expect(screen.getByTestId('guest-conversion-guide')).toHaveTextContent('Register');
+    expect(screen.getByTestId('guest-conversion-guide')).toHaveTextContent('注册');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+  });
+
+  it('localizes structured no-AI query content when UI language is Chinese', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      market: 'cn',
+      quote: {
+        currentPrice: 1181.28,
+        changePercent: -1.1,
+        source: 'a_share_realtime',
+        freshness: 'stale',
+      },
+      indicators: { ma20: 1212.965, volumeChangeVsMa5: -75.1617, volumePriceSignal: 'neutral' },
+      profile: { marketCap: 1476700000000, peRatio: 17.85, source: 'a_share_realtime', freshness: 'stale' },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+        signalScore: {
+          score: 47,
+          label: 'Weak quick signal',
+          summary: '600519 signal is 47/100 from trend, volume, data freshness, and profile completeness. No AI or public search was used.',
+          components: [
+            { key: 'trend', label: 'Trend', score: 42, status: 'warning', detail: 'Price is below MA20 1212.965; trend repair still needs confirmation.' },
+            { key: 'volume', label: 'Volume', score: 50, status: 'neutral', detail: 'Volume-price behavior is neutral in the quick rules. Volume is -75.1617% versus MA5.' },
+            { key: 'freshness', label: 'Data freshness', score: 35, status: 'warning', detail: 'Quote data is stale; treat the quick signal as provisional. Quote is stale; quick view uses cached quote and latest available history.' },
+            { key: 'profile', label: 'Profile completeness', score: 76, status: 'positive', detail: 'Company profile has usable valuation or financial fields.' },
+          ],
+          source: 'no_ai_rules',
+          aiUsed: false,
+        },
+        retentionBrief: {
+          headline: '600519 quick read: -1.1%, below MA20 1212.965.',
+          whyItMatters: 'This free snapshot turns quote, moving averages, volume and a share context into a first-pass checklist without spending AI quota.',
+          supportResistance: 'support 1181.28; resistance 1212.965',
+          nextSteps: [
+            'Resolve data warning first: Quote is stale; quick view uses cached quote and latest available history.',
+            'Compare this move with 000300.SH instead of reading it alone.',
+            'Use deep analysis only when you need news, filings, fundamentals, or a longer AI-written report.',
+          ],
+          upgradeHint: 'Login to save history, build a watchlist, keep quota state, and unlock deeper analysis when needed.',
+          boundary: 'Information analysis only; not investment advice.',
+          source: 'no_ai_retention_rules',
+        },
+        newsCenter: {
+          title: 'Local news center',
+          summary: '600519 information lanes for a share: news, announcements, financials, sector context, and data quality. No AI or public search was used.',
+          source: 'no_ai_news_center_rules',
+          aiUsed: false,
+          publicSearchUsed: false,
+          premiumUnlock: 'Premium can add realtime news, filings, source links, sector comparison, and AI summaries.',
+          boundary: 'Information analysis only; not investment advice.',
+          items: [
+            { category: 'news', title: 'Market-moving news lane', summary: 'Realtime public news/search is off in free local mode, so this lane is a checklist placeholder.', status: 'degraded', source: 'no_ai_news_center_rules', action: 'Use deep analysis or configured news feeds for realtime links.' },
+            { category: 'financials', title: 'Financial snapshot lane', summary: 'Market cap 1.4767T; PE 17.85; PB 6.34.', status: 'available', source: 'a_share_realtime', action: 'Compare valuation and fundamentals before relying on price action alone.' },
+          ],
+        },
+        klineForecast: {
+          title: 'K-line forecast lab',
+          horizon: 'next_5_bars',
+          direction: 'downside_risk',
+          confidence: 82,
+          support: 1181.28,
+          resistance: 1212.965,
+          adapterStatus: 'Kronos adapter ready; local rules preview only; Kronos model not installed or invoked.',
+          source: 'local_kline_rules_kronos_ready',
+          aiUsed: false,
+          kronosModelUsed: false,
+          premiumUnlock: 'Premium can run a configured Kronos or local-model forecast lane after model/data approval.',
+          boundary: 'Experimental model preview; information analysis only; not investment advice.',
+          scenarios: [
+            { label: 'Downside-risk preview', direction: 'downside_risk', probability: 58, trigger: 'Hold above MA20 1212.965 and keep volume change near -75.1617%.', detail: 'Local rules read support near 1181.28 and resistance near 1212.965. This is not Kronos inference.' },
+            { label: 'Breakout confirmation', direction: 'upside_bias', probability: 16, trigger: 'Price closes above resistance 1212.965 with expanding volume.', detail: 'Treat this as a checklist for the next refresh, not a trade instruction.' },
+          ],
+        },
+        items: [],
+      },
+      diagnostics: {
+        elapsedMs: 4,
+        quoteElapsedMs: 2,
+        historyElapsedMs: 2,
+        cache: { quote: 'hit', history: 'hit' },
+        sources: { quote: 'a_share_realtime', history: 'a_share_history' },
+        freshness: { quote: 'stale', history: 'stale' },
+        fallback: { quote: 'cache', history: 'cache' },
+        routeLane: 'a_share_market_data',
+        performance: { status: 'ok' },
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('history-center-market-filter')).toHaveTextContent('全部市场');
+    expect(screen.getByTestId('history-center-code-filter')).toHaveAttribute('placeholder', '代码或名称');
+    expect(screen.getByTestId('history-center-filters')).not.toHaveTextContent('All markets');
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: '600519.SH' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519.SH');
+    });
+
+    const freeReport = await screen.findByTestId('basic-query-free-report');
+    expect(freeReport).toHaveTextContent('未用 AI');
+    expect(freeReport).not.toHaveTextContent('No AI');
+
+    const guardrails = screen.getByTestId('basic-query-user-guardrails');
+    expect(guardrails).toHaveTextContent('当前快速快照');
+    expect(guardrails).toHaveTextContent('历史报告单独保留');
+    expect(guardrails).toHaveTextContent('A股行情数据');
+    expect(guardrails).not.toHaveTextContent('Current quick snapshot');
+
+    const workspace = screen.getByTestId('basic-query-workspace-lanes');
+    expect(workspace).toHaveTextContent('当前快照');
+    expect(workspace).toHaveTextContent('自选');
+    expect(workspace).toHaveTextContent('历史报告');
+    expect(workspace).toHaveTextContent('AI 分析');
+    expect(workspace).not.toHaveTextContent('Current Snapshot');
+
+    const signalScore = await screen.findByTestId('basic-query-signal-score');
+    expect(signalScore).toHaveTextContent('趋势');
+    expect(signalScore).toHaveTextContent('量价');
+    expect(signalScore).toHaveTextContent('数据新鲜度');
+    expect(signalScore).toHaveTextContent('资料完整度');
+    expect(signalScore).not.toHaveTextContent('Trend');
+    expect(signalScore).not.toHaveTextContent('Data freshness');
+
+    const newsCenter = screen.getByTestId('basic-query-news-center');
+    expect(newsCenter).toHaveTextContent('本地资讯中心');
+    expect(newsCenter).toHaveTextContent('影响行情的资讯通道');
+    expect(newsCenter).toHaveTextContent('未用公共搜索');
+    expect(newsCenter).not.toHaveTextContent('News center');
+    expect(newsCenter).not.toHaveTextContent('Market-moving news lane');
+
+    const klineForecast = screen.getByTestId('basic-query-kline-forecast-lab');
+    expect(klineForecast).toHaveTextContent('K线预测实验室');
+    expect(klineForecast).toHaveTextContent('方向');
+    expect(klineForecast).toHaveTextContent('下行风险');
+    expect(klineForecast).toHaveTextContent('运行 Kronos 模型');
+    expect(klineForecast).not.toHaveTextContent('K-line forecast lab');
+    expect(klineForecast).not.toHaveTextContent('Kronos model not installed');
   });
 
   it('keeps a guest AAPL snapshot through register and saves it to history and watchlist', async () => {
@@ -1114,7 +1272,7 @@ describe('HomePage', () => {
     expect(createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:dsa-history-export-v27');
-    expect(screen.getByTestId('history-center-export-status')).toHaveTextContent('Exported 1 local reports');
+    expect(screen.getByTestId('history-center-export-status')).toHaveTextContent('已导出 1 份本地报告');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     clickSpy.mockRestore();
   });
@@ -1207,7 +1365,7 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(historyApi.batchUpdateState).toHaveBeenCalledWith([8], { archived: true });
     });
-    expect(screen.getByTestId('history-center-state-status')).toHaveTextContent('Archived 1 local reports');
+    expect(screen.getByTestId('history-center-state-status')).toHaveTextContent('已归档 1 份本地报告');
 
     fireEvent.click(screen.getByTestId('history-center-item-8'));
     await waitFor(() => {
@@ -1226,7 +1384,7 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(historyApi.updateState).toHaveBeenCalledWith(8, { note: 'Watch after earnings' });
     });
-    expect(screen.getByTestId('history-state-status')).toHaveTextContent('Saved local history state');
+    expect(screen.getByTestId('history-state-status')).toHaveTextContent('已保存本地历史状态');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
@@ -1320,7 +1478,7 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(historyApi.batchUpdateState).toHaveBeenCalledWith([10], { important: true });
     });
-    expect(screen.getByTestId('history-center-state-status')).toHaveTextContent('Marked important 1 local reports');
+    expect(screen.getByTestId('history-center-state-status')).toHaveTextContent('已标为重要 1 份本地报告');
 
     fireEvent.click(screen.getByTestId('history-center-read-selected'));
     await waitFor(() => {
@@ -1423,7 +1581,7 @@ describe('HomePage', () => {
     expect(await screen.findByText('Apple margin expansion remains visible')).toBeInTheDocument();
     expect(screen.getByTestId('history-report-tools')).toBeInTheDocument();
     expect(screen.getByTestId('history-report-stock-timeline')).toHaveTextContent('AAPL');
-    expect(screen.getByTestId('history-report-timeline-30')).toHaveTextContent('Current');
+    expect(screen.getByTestId('history-report-timeline-30')).toHaveTextContent('当前');
     expect(screen.getByTestId('history-report-timeline-31')).toHaveTextContent('2026-07-01');
     expect(screen.queryByTestId('history-report-timeline-32')).not.toBeInTheDocument();
 
@@ -2027,7 +2185,7 @@ describe('HomePage', () => {
     expect(primarySummary).toHaveTextContent('4.5T');
     expect(primarySummary).toHaveTextContent('31.2');
     const freeReport = screen.getByTestId('basic-query-free-report');
-    expect(freeReport).toHaveTextContent('No AI');
+    expect(freeReport).toHaveTextContent('未用 AI');
     expect(freeReport).toHaveTextContent('Technology');
     expect(freeReport).toHaveTextContent('Consumer Electronics');
     expect(freeReport).toHaveTextContent('MA5');
@@ -2036,37 +2194,37 @@ describe('HomePage', () => {
     expect(freeReport).toHaveTextContent('31.2');
     const signalScore = screen.getByTestId('basic-query-signal-score');
     expect(signalScore).toHaveTextContent('82/100');
-    expect(signalScore).toHaveTextContent('Strong quick signal');
-    expect(signalScore).toHaveTextContent('Trend');
-    expect(signalScore).toHaveTextContent('Volume');
-    expect(signalScore).toHaveTextContent('Data freshness');
-    expect(signalScore).toHaveTextContent('Profile completeness');
-    expect(signalScore).toHaveTextContent('No AI');
+    expect(signalScore).toHaveTextContent('快速信号较强');
+    expect(signalScore).toHaveTextContent('趋势');
+    expect(signalScore).toHaveTextContent('量价');
+    expect(signalScore).toHaveTextContent('数据新鲜度');
+    expect(signalScore).toHaveTextContent('资料完整度');
+    expect(signalScore).toHaveTextContent('未用 AI');
     const retentionBrief = screen.getByTestId('basic-query-retention-brief');
-    expect(retentionBrief).toHaveTextContent('AAPL quick read');
+    expect(retentionBrief).toHaveTextContent('AAPL 快速解读');
     expect(retentionBrief).toHaveTextContent('Technology / Consumer Electronics');
-    expect(retentionBrief).toHaveTextContent('support 190; resistance 205');
-    expect(retentionBrief).toHaveTextContent('Compare this move with QQQ');
-    expect(retentionBrief).toHaveTextContent('Login to save history');
-    expect(retentionBrief).toHaveTextContent('not investment advice');
+    expect(retentionBrief).toHaveTextContent('支撑 190；压力 205');
+    expect(retentionBrief).toHaveTextContent('与 QQQ 对比');
+    expect(retentionBrief).toHaveTextContent('登录后可保存历史');
+    expect(retentionBrief).toHaveTextContent('不构成投资建议');
     const newsCenter = screen.getByTestId('basic-query-news-center');
-    expect(newsCenter).toHaveTextContent('Local news center');
-    expect(newsCenter).toHaveTextContent('Market-moving news lane');
-    expect(newsCenter).toHaveTextContent('SEC filings lane');
-    expect(newsCenter).toHaveTextContent('Financial snapshot lane');
-    expect(newsCenter).toHaveTextContent('Sector and peer lane');
-    expect(newsCenter).toHaveTextContent('No AI');
-    expect(newsCenter).toHaveTextContent('No public search');
-    expect(newsCenter).toHaveTextContent('Premium can add realtime news');
+    expect(newsCenter).toHaveTextContent('本地资讯中心');
+    expect(newsCenter).toHaveTextContent('影响行情的资讯通道');
+    expect(newsCenter).toHaveTextContent('SEC 文件通道');
+    expect(newsCenter).toHaveTextContent('财务快照通道');
+    expect(newsCenter).toHaveTextContent('板块与同业通道');
+    expect(newsCenter).toHaveTextContent('未用 AI');
+    expect(newsCenter).toHaveTextContent('未用公共搜索');
+    expect(newsCenter).toHaveTextContent('高级版可增加实时新闻');
     const klineForecast = screen.getByTestId('basic-query-kline-forecast-lab');
-    expect(klineForecast).toHaveTextContent('K-line forecast lab');
-    expect(klineForecast).toHaveTextContent('next_5_bars');
+    expect(klineForecast).toHaveTextContent('K线预测实验室');
+    expect(klineForecast).toHaveTextContent('未来 5 根K线');
     expect(klineForecast).toHaveTextContent('72/100');
-    expect(klineForecast).toHaveTextContent('Kronos adapter ready');
-    expect(klineForecast).toHaveTextContent('Upside-biased preview');
-    expect(klineForecast).toHaveTextContent('Breakout confirmation');
-    expect(klineForecast).toHaveTextContent('Pullback risk');
-    expect(klineForecast).toHaveTextContent('not investment advice');
+    expect(klineForecast).toHaveTextContent('Kronos 适配器已就绪');
+    expect(klineForecast).toHaveTextContent('上行倾向预览');
+    expect(klineForecast).toHaveTextContent('突破确认');
+    expect(klineForecast).toHaveTextContent('回落风险');
+    expect(klineForecast).toHaveTextContent('不构成投资建议');
     fireEvent.click(screen.getByTestId('basic-query-kronos-run'));
     await waitFor(() => {
       expect(stocksApi.kronosForecast).toHaveBeenCalledWith('AAPL', {
@@ -2076,15 +2234,15 @@ describe('HomePage', () => {
       });
     });
     const kronosResult = await screen.findByTestId('basic-query-kronos-live-result');
-    expect(kronosResult).toHaveTextContent('model_unavailable');
-    expect(kronosResult).toHaveTextContent('Local rules fallback');
-    expect(screen.getByTestId('basic-query-kronos-dependency-status')).toHaveTextContent('torch: missing');
-    expect(screen.getByTestId('basic-query-kronos-backtest-summary')).toHaveTextContent('1 records');
+    expect(kronosResult).toHaveTextContent('模型不可用');
+    expect(kronosResult).toHaveTextContent('本地规则兜底');
+    expect(screen.getByTestId('basic-query-kronos-dependency-status')).toHaveTextContent('torch: 缺失');
+    expect(screen.getByTestId('basic-query-kronos-backtest-summary')).toHaveTextContent('1 条记录');
     const premiumFeatureLadder = screen.getByTestId('basic-query-premium-feature-ladder');
-    expect(premiumFeatureLadder).toHaveTextContent('Free no-AI');
-    expect(premiumFeatureLadder).toHaveTextContent('Premium news');
-    expect(premiumFeatureLadder).toHaveTextContent('Kronos-ready');
-    expect(premiumFeatureLadder).toHaveTextContent('BYOK or local model');
+    expect(premiumFeatureLadder).toHaveTextContent('免费无AI');
+    expect(premiumFeatureLadder).toHaveTextContent('高级资讯');
+    expect(premiumFeatureLadder).toHaveTextContent('Kronos 已就绪');
+    expect(premiumFeatureLadder).toHaveTextContent('自带Key或本地模型');
     const productBrief = screen.getByTestId('basic-query-product-brief');
     expect(productBrief).toHaveTextContent('关键结论');
     expect(productBrief).toHaveTextContent('支撑');
@@ -2093,7 +2251,7 @@ describe('HomePage', () => {
     expect(productBrief).toHaveTextContent('中线');
     expect(productBrief).toHaveTextContent('风险边界');
     expect(productBrief).toHaveTextContent('继续深度分析');
-    expect(productBrief).toHaveTextContent('No AI');
+    expect(productBrief).toHaveTextContent('未用 AI');
     const miniChart = screen.getByTestId('basic-query-mini-chart');
     expect(miniChart).toHaveTextContent('6日趋势');
     expect(miniChart).toHaveTextContent('+6.38%');
@@ -2103,34 +2261,34 @@ describe('HomePage', () => {
     expect(intelligencePanel).toHaveTextContent('新闻');
     expect(intelligencePanel).toHaveTextContent('公告');
     expect(intelligencePanel).toHaveTextContent('财报');
-    expect(intelligencePanel).toHaveTextContent('No realtime news source');
-    expect(intelligencePanel).toHaveTextContent('No AI');
-    expect(intelligencePanel).toHaveTextContent('not investment advice');
+    expect(intelligencePanel).toHaveTextContent('免费未用 AI 模式未启用实时新闻源');
+    expect(intelligencePanel).toHaveTextContent('未用 AI');
+    expect(intelligencePanel).toHaveTextContent('不构成投资建议');
     const marketBrief = screen.getByTestId('basic-query-market-brief');
     expect(marketBrief).toHaveTextContent('市场通道');
-    expect(marketBrief).toHaveTextContent('US equity quick view');
-    expect(marketBrief).toHaveTextContent('us_market_data');
-    expect(marketBrief).toHaveTextContent('Nasdaq and sector ETF context');
+    expect(marketBrief).toHaveTextContent('美股快速视图');
+    expect(marketBrief).toHaveTextContent('美股行情数据');
+    expect(marketBrief).toHaveTextContent('纳指与行业 ETF 背景');
     const freeInsights = screen.getByTestId('basic-query-free-insights');
     expect(freeInsights).toHaveTextContent('免费洞察');
-    expect(freeInsights).toHaveTextContent('Move explanation');
-    expect(freeInsights).toHaveTextContent('Peer context');
-    expect(freeInsights).toHaveTextContent('Key risks');
+    expect(freeInsights).toHaveTextContent('波动解释');
+    expect(freeInsights).toHaveTextContent('同业背景');
+    expect(freeInsights).toHaveTextContent('关键风险');
     expect(freeInsights).toHaveTextContent('QQQ');
-    expect(freeInsights).toHaveTextContent('No-AI quick view');
+    expect(freeInsights).toHaveTextContent('未用 AI 快速视图');
     const peerComparison = screen.getByTestId('basic-query-peer-comparison');
     expect(peerComparison).toHaveTextContent('同业/大盘对照');
     expect(peerComparison).toHaveTextContent('AAPL');
     expect(peerComparison).toHaveTextContent('QQQ');
     expect(peerComparison).toHaveTextContent('^IXIC');
     expect(peerComparison).toHaveTextContent('XLK');
-    expect(peerComparison).toHaveTextContent('Sector lens');
-    expect(peerComparison).toHaveTextContent('AAPL is above MA20');
+    expect(peerComparison).toHaveTextContent('行业参照');
+    expect(peerComparison).toHaveTextContent('AAPL 当前高于 MA20');
     const watchPoints = screen.getByTestId('basic-query-watch-points');
     expect(watchPoints).toHaveTextContent('下一步观察');
-    expect(watchPoints).toHaveTextContent('Trend confirmation');
+    expect(watchPoints).toHaveTextContent('趋势确认');
     expect(watchPoints).toHaveTextContent('MA20');
-    expect(watchPoints).toHaveTextContent('Volume confirmation');
+    expect(watchPoints).toHaveTextContent('量能确认');
     expect(watchPoints).toHaveTextContent('QQQ');
     expect(watchPoints).toHaveTextContent('XLK');
     expect(
@@ -2167,13 +2325,13 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('USD');
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('4.5T');
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('31.2');
-    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('unit_profile');
-    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('No AI');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('公司资料');
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('未用 AI');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('18ms');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q miss / H miss');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q live / H live');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q ok / H ok');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q memory / H memory');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 未命中 / H 未命中');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 实时 / H 实时');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 正常 / H 正常');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 内存 / H 内存');
   });
 
   it('force-refreshes the current no-AI snapshot without submitting AI analysis', async () => {
@@ -2326,10 +2484,10 @@ describe('HomePage', () => {
     fireEvent.change(input, { target: { value: 'BTC-USD' } });
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
 
-    expect(await screen.findByTestId('basic-query-route')).toHaveTextContent('crypto_market_data');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q hit / H hit');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q stale_cache / H cache');
-    expect(screen.getByTestId('basic-query-degradation')).toHaveTextContent('stale_quote');
+    expect(await screen.findByTestId('basic-query-route')).toHaveTextContent('加密货币行情数据');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 命中 / H 命中');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 过期缓存 / H 缓存');
+    expect(screen.getByTestId('basic-query-degradation')).toHaveTextContent('行情过期');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
@@ -2503,10 +2661,10 @@ describe('HomePage', () => {
     expect(screen.getByTestId('platform-watchlist-panel')).toHaveTextContent('BTC-USD');
 
     fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
-    expect(await screen.findByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('No AI used');
+    expect(await screen.findByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('No AI');
     expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('refreshed 4/4');
     expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('degraded 1');
-    expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('hk_market_data');
+    expect(screen.getByTestId('platform-watchlist-refresh-summary')).toHaveTextContent('HK market data');
 
     fireEvent.change(screen.getByPlaceholderText('Enter a stock code or name, e.g. 600519, Kweichow Moutai, AAPL'), {
       target: { value: 'HK00700' },
@@ -2515,11 +2673,11 @@ describe('HomePage', () => {
 
     expect(await screen.findByTestId('basic-query-user-guardrails')).toHaveTextContent('Current quick snapshot');
     expect(screen.queryByTestId('platform-query-status')).not.toBeInTheDocument();
-    expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('No AI used');
+    expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('No AI');
     expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('HK market data');
     expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('Historical reports stay separate');
     expect(screen.getByTestId('basic-query-user-guardrails')).toHaveTextContent('Cache local_json');
-    expect(screen.getByTestId('basic-query-route')).toHaveTextContent('hk_market_data');
+    expect(screen.getByTestId('basic-query-route')).toHaveTextContent('HK market data');
     const workspace = screen.getByTestId('basic-query-workspace-lanes');
     expect(workspace).toHaveTextContent('Current Snapshot');
     expect(workspace).toHaveTextContent('No AI');
@@ -2712,12 +2870,12 @@ describe('HomePage', () => {
     expect(board).toHaveTextContent('HK00700');
     expect(board).toHaveTextContent('390.2');
     expect(board).toHaveTextContent('0.8%');
-    expect(board).toHaveTextContent('hk_market_data');
+    expect(board).toHaveTextContent('HK market data');
     expect(board).toHaveTextContent('degraded');
     expect(board).toHaveTextContent('missing_history');
     expect(board).toHaveTextContent('Apple Inc.');
     expect(board).toHaveTextContent('AAPL');
-    expect(board).toHaveTextContent('us_market_data');
+    expect(board).toHaveTextContent('US market data');
     expect(board).toHaveTextContent('fresh');
     expect(board).toHaveTextContent('No AI');
 
@@ -2726,7 +2884,7 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(stocksApi.snapshot).toHaveBeenCalledWith('HK00700');
     });
-    expect(await screen.findByTestId('basic-query-route')).toHaveTextContent('hk_market_data');
+    expect(await screen.findByTestId('basic-query-route')).toHaveTextContent('HK market data');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 

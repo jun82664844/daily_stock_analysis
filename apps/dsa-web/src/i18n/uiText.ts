@@ -242,7 +242,7 @@ const zh = {
   'home.basicSourceHealth': '源状态',
   'home.basicPersistentCache': '持久缓存',
   'home.basicPerformance': '性能',
-  'home.noAi': 'No AI',
+  'home.noAi': '未用 AI',
   'home.defaultStrategyDescription': '沿用系统默认分析框架',
   'home.defaultStrategyName': '默认策略',
   'home.duplicateTask': '任务已存在',

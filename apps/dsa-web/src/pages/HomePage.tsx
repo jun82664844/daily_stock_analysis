@@ -170,28 +170,366 @@ const basicWatchPriorityLabel = (priority: string, language: string): string => 
   return priority || '-';
 };
 
-const formatQuotaLeft = (quota?: Pick<PlatformQuota, 'weeklyLimit' | 'remaining' | 'used'> | null): string => {
+const GENERATED_TEXT_ZH: Record<string, string> = {
+  'Weak quick signal': '快速信号偏弱',
+  'Strong quick signal': '快速信号较强',
+  Trend: '趋势',
+  Volume: '量价',
+  'Data freshness': '数据新鲜度',
+  'Profile completeness': '资料完整度',
+  warning: '警示',
+  neutral: '中性',
+  positive: '正面',
+  available: '可用',
+  degraded: '降级',
+  unavailable: '不可用',
+  'Local news center': '本地资讯中心',
+  'Market-moving news lane': '影响行情的资讯通道',
+  'Announcements lane': '公告通道',
+  'SEC filings lane': 'SEC 文件通道',
+  'Financial snapshot lane': '财务快照通道',
+  'Sector and peer lane': '板块与同业通道',
+  'Data quality lane': '数据质量通道',
+  'Premium news': '高级资讯',
+  'BYOK or local model': 'BYOK 或本地模型',
+  'Move explanation': '波动解释',
+  'Peer context': '同业背景',
+  'Key risks': '关键风险',
+  'US equity quick view': '美股快速视图',
+  'A-share quick view': 'A股快速视图',
+  'Price versus MA20': '价格相对 MA20',
+  'Volume confirmation': '量能确认',
+  'Nasdaq and sector ETF context': '纳指与行业 ETF 背景',
+  'CSI 300 and SSE Composite context': '沪深300与上证指数背景',
+  'Announcements require deep mode or configured sources': '公告需要深度模式或已配置的数据源',
+  'Broad market': '大盘',
+  'Index lens': '指数参照',
+  'Sector lens': '行业参照',
+  'CSI 300': '沪深300',
+  'SSE Composite': '上证指数',
+  'Profile context': '资料背景',
+  'A-share broad-market reference.': 'A股大盘参照。',
+  'A-share market sentiment reference.': 'A股市场情绪参照。',
+  'Trend confirmation': '趋势确认',
+  'Trend repair': '趋势修复',
+  'Risk boundary': '风险边界',
+  'No AI': '未用 AI',
+  'No AI used': '未用 AI',
+  'Information analysis only': '仅作信息分析',
+  'not investment advice': '不构成投资建议',
+  info: '信息',
+  news: '资讯',
+  announcements: '公告',
+  financials: '财务',
+  sector: '板块',
+  data_quality: '数据质量',
+  'K-line forecast lab': 'K线预测实验室',
+  'Kronos-ready': 'Kronos 已就绪',
+  Horizon: '周期',
+  Confidence: '置信度',
+  Direction: '方向',
+  Support: '支撑',
+  Resistance: '压力',
+  Source: '来源',
+  'Downside-risk preview': '下行风险预览',
+  'Upside-biased preview': '上行倾向预览',
+  'Breakout confirmation': '突破确认',
+  'Pullback risk': '回落风险',
+  downside_risk: '下行风险',
+  upside_bias: '上行倾向',
+  model_ready: '模型已就绪',
+  model_unavailable: '模型不可用',
+  model_disabled: '模型未启用',
+  model_error: '模型错误',
+  premium_required: '需要高级权限',
+  'Real Kronos model': '真实 Kronos 模型',
+  'Local rules fallback': '本地规则兜底',
+  ready: '已就绪',
+  missing: '缺失',
+  Model: '模型',
+  Forecast: '预测',
+  'Backtest records': '回测记录',
+};
+
+const SOURCE_ZH: Record<string, string> = {
+  no_ai_rules: '免费规则',
+  no_ai_retention_rules: '免费留存规则',
+  no_ai_news_center_rules: '免费资讯规则',
+  no_ai_quick_snapshot: '免费快照',
+  no_ai_route_rules: '免费市场通道规则',
+  local_kline_rules_kronos_ready: '本地K线规则',
+  local_kline_rules_kronos_unavailable: '本地K线规则兜底',
+  local_kline_rules_kronos_error: '本地K线错误兜底',
+  kronos_model_local: '本地Kronos模型',
+  a_share_realtime: 'A股实时行情',
+  a_share_history: 'A股历史行情',
+  us_realtime: '美股实时行情',
+  yahoo_chart: 'Yahoo行情',
+  yfinance: 'Yahoo历史行情',
+  unit_profile: '公司资料',
+};
+
+const localizeGeneratedStatus = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (language === 'en') return text || '-';
+  return GENERATED_TEXT_ZH[text] || text || '-';
+};
+
+const localizeGeneratedSource = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (language === 'en') return text || '-';
+  return SOURCE_ZH[text] || GENERATED_TEXT_ZH[text] || text || '-';
+};
+
+const localizeGeneratedHorizon = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (language === 'en') return text || '-';
+  const match = text.match(/^next_(\d+)_bars$/);
+  return match ? `未来 ${match[1]} 根K线` : text || '-';
+};
+
+const localizeGeneratedText = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (language === 'en' || !text) return text;
+  if (GENERATED_TEXT_ZH[text]) return GENERATED_TEXT_ZH[text];
+  if (SOURCE_ZH[text]) return SOURCE_ZH[text];
+
+  let match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\. No AI or public search was used\.$/);
+  if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度；未使用 AI 或公共搜索。`;
+  match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\.$/);
+  if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度。`;
+  match = text.match(/^(.+?) quick read: ([^,]+), (below|above|低于|高于) MA20 (.+?)\.?$/);
+  if (match) return `${match[1]} 快速解读：${match[2]}，${match[3] === 'below' || match[3] === '低于' ? '低于' : '高于'} MA20 ${match[4]}。`;
+  match = text.match(/^support ([^;]+); resistance (.+)$/);
+  if (match) return `支撑 ${match[1]}；压力 ${match[2]}`;
+  match = text.match(/^Price is below MA20 ([^;]+); trend repair still needs confirmation\.$/);
+  if (match) return `价格低于 MA20 ${match[1]}，趋势修复仍需确认。`;
+  match = text.match(/^Price closes above resistance ([^ ]+) with expanding volume\.$/);
+  if (match) return `价格放量收在压力位 ${match[1]} 上方。`;
+  match = text.match(/^Hold above MA20 ([^ ]+) and keep volume change near ([^.]+)\.$/);
+  if (match) return `守住 MA20 ${match[1]}，并观察量能变化是否维持在 ${match[2]} 附近。`;
+  match = text.match(/^Local rules read support near ([^ ]+) and resistance near (.+?)\. This is not Kronos inference\.$/);
+  if (match) return `本地规则读取到支撑约 ${match[1]}、压力约 ${match[2]}。这不是 Kronos 模型推理。`;
+  match = text.match(/^Market cap ([^;]+); PE ([^;]+); PB (.+?)\.?$/);
+  if (match) return `总市值 ${match[1]}；市盈率 ${match[2]}；市净率 ${match[3]}。`;
+  match = text.match(/^Market cap ([^;]+); PE ([^;]+); dividend yield (.+?)\.?$/);
+  if (match) return `总市值 ${match[1]}；市盈率 ${match[2]}；股息率 ${match[3]}。`;
+  match = text.match(/^Refresh once before market action and confirm whether price stays (below|above|低于|高于) MA20 (.+?)\.?$/);
+  if (match) return `先刷新一次行情，并确认价格是否仍然${match[1] === 'below' || match[1] === '低于' ? '低于' : '高于'} MA20 ${match[2]}。`;
+  match = text.match(/^Price is ([^ ]+) and holds (below|above) MA20 with positive short-term confirmation\.$/);
+  if (match) return `价格为 ${match[1]}，并保持${match[2] === 'below' ? '低于' : '高于'} MA20，短期确认偏积极。`;
+  match = text.match(/^Hold above MA20 ([^ ]+) and keep volume change near (.+?)\.?$/);
+  if (match) return `守住 MA20 ${match[1]}，并观察量能变化是否维持在 ${match[2]} 附近。`;
+  match = text.match(/^Compare (.+?) against (.+?) and (.+?) before reading it in isolation\.$/);
+  if (match) return `解读 ${match[1]} 前，先对比 ${match[2]} 和 ${match[3]}。`;
+  match = text.match(/^(.+?) is (below|above) MA20 with positive change\.$/);
+  if (match) return `${match[1]} 当前${match[2] === 'below' ? '低于' : '高于'} MA20，且涨跌表现为正。`;
+  match = text.match(/^Check whether (.+?) confirms faster or weaker than (.+?) on the next refresh\.$/);
+  if (match) return `下次刷新时，检查 ${match[1]} 相对 ${match[2]} 是更强确认还是转弱。`;
+  match = text.match(/^Watch whether price can hold (below|above) MA20\.$/);
+  if (match) return `观察价格能否守住${match[1] === 'below' ? '低于' : '高于'} MA20 的位置。`;
+  match = text.match(/^Compare (.+?) against (.+?) before reading it in isolation\.$/);
+  if (match) return `解读 ${match[1]} 前，先对比 ${match[2]}。`;
+  match = text.match(/^Context is (.+?)\. Current volume-price signal is (.+?)\. Compare against route-based peers before reading this symbol in isolation\.?$/);
+  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : match[1]}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。解读该标的前，先与市场通道给出的同类参照对比。`;
+  match = text.match(/^Context is (.+?)\. Current volume-price signal is ([^.]+)\.$/);
+  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : match[1]}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。`;
+  match = text.match(/^Today's quick read: price changed (.+?), stays (.+?), and volume is (.+?) versus MA5\.$/);
+  if (match) return `今日快速解读：价格变化 ${match[1]}，当前 ${match[2].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}，成交量相对 MA5 为 ${match[3]}。`;
+  match = text.match(/^Today's quick read: price changed (.+?), stays (.+?), and volume is (.+?)\.$/);
+  if (match) return `今日快速解读：价格变化 ${match[1]}，当前 ${match[2].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}，成交量 ${match[3]}。`;
+  match = text.match(/^Last price (.+?)$/);
+  if (match) return `最新价 ${match[1]}`;
+  match = text.match(/^stays (.+?)$/);
+  if (match) return `当前${match[1].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}`;
+  match = text.match(/^volume is (.+?) versus MA5$/);
+  if (match) return `成交量相对 MA5 为 ${match[1]}`;
+  match = text.match(/^Read this move against (.+?); quick profile context is (.+?)\.$/);
+  if (match) return `结合 ${match[1]} 阅读本次波动；快速资料背景为 ${match[2] === 'a share' ? 'A股' : match[2]}。`;
+  match = text.match(/^Data warning: Quote is stale; quick view uses cached quote and latest available history\.$/);
+  if (match) return '数据警示：行情已过期；快速视图使用缓存行情和最新可用历史。';
+  match = text.match(/^Lane (.+?)$/);
+  if (match) return `通道 ${marketLaneLabel(match[1], language)}`;
+  match = text.match(/^(.+?) is (.+?) with (.+?); volume signal is (.+?)\.$/);
+  if (match) return `${match[1]} 当前${match[2].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}，涨跌幅 ${match[3]}；量价信号为 ${volumePriceSignalLabel(match[4], language)}。`;
+  match = text.match(/^Watch whether price can reclaim MA20 (.+?) before treating the structure as repaired\.$/);
+  if (match) return `观察价格能否重新站回 MA20 ${match[1]}，再判断结构是否修复。`;
+  match = text.match(/^Company profile is available; compare valuation fields before relying on price signals alone\.$/);
+  if (match) return '公司资料可用；不要只依赖价格信号，还要对比估值字段。';
+
+  return text
+    .replace(/^Price is above MA20 and short-term trend remains constructive\.$/, '价格位于 MA20 上方，短期趋势结构仍偏积极。')
+    .replace(/^Volume-price behavior is neutral in the quick rules\. Volume is ([^ ]+) versus MA5\.$/, '量价行为在快速规则中为中性；成交量相对 MA5 为 $1。')
+    .replace(/^Volume is above recent average but still needs follow-through\.$/, '成交量高于近期均量，但仍需要后续确认。')
+    .replace(/^Volume is ([^ ]+) versus MA5; momentum confirmation is weaker\.$/, '成交量相对 MA5 为 $1，动能确认偏弱。')
+    .replace(/^Quote data is stale; treat the quick signal as provisional\. Quote is stale; quick view uses cached quote and latest available history\.$/, '行情数据偏旧；快速信号仅作临时参考。当前使用缓存行情和最新可用历史数据。')
+    .replace(/^Quote and history are fresh\.$/, '行情和历史数据均为最新。')
+    .replace(/^Company profile has usable valuation or financial fields\.$/, '公司资料包含可用的估值或财务字段。')
+    .replace(/^Company sector, industry, and valuation fields are available\.$/, '公司板块、行业和估值字段可用。')
+    .replace(/^This free snapshot turns quote, moving averages, volume and a share context into a first-pass checklist without spending AI quota\.$/, '这个免费快照把行情、均线、量价和A股背景整理成初筛清单，不消耗 AI 额度。')
+    .replace(/^This free snapshot turns quote, moving averages, volume and (.+?) context into a first-pass checklist without spending AI quota\.$/, '这个免费快照把行情、均线、量价和 $1 背景整理成初筛清单，不消耗 AI 额度。')
+    .replace(/^Resolve data warning first: Quote is stale; quick view uses cached quote and latest available history\.$/, '先处理数据警示：当前使用缓存行情和最新可用历史数据。')
+    .replace(/^Refresh once$/, '先刷新一次行情。')
+    .replace(/^Refresh once before market action and confirm whether price stays (below|above) MA20\.$/, (_, direction: string) => `先刷新一次行情，并确认价格是否仍然${direction === 'below' ? '低于' : '高于'} MA20。`)
+    .replace(/^Refresh once before market action and confirm whether price stays (below|above) MA20 ([^.]+)\.$/, '先刷新一次行情，并确认价格是否仍然$1 MA20 $2。')
+    .replace('below MA20', '低于 MA20')
+    .replace('above MA20', '高于 MA20')
+    .replace(/^Compare this move with (.+?) instead of reading it alone\.$/, '把这次波动与 $1 对比，不要孤立解读。')
+    .replace(/^Compare this move with (.+?) and (.+?) before reading (.+?) in isolation\.$/, '解读 $3 前，先把这次波动与 $1 和 $2 对比。')
+    .replace(/^No-AI quick view does not include realtime news, filings, or external search\.$/, '未用 AI 快速视图不包含实时新闻、公告文件或外部搜索。')
+    .replace(/^US equity lane uses quote, history, profile, Nasdaq and sector references without AI\.$/, '美股通道使用行情、历史、公司资料、纳指和行业参照，不调用 AI。')
+    .replace(/^Deep analysis can add news, filings, sector comparison, and AI report\.$/, '深度分析可增加新闻、公告文件、行业对比和 AI 报告。')
+    .replace(/^Deep analysis can add announcements, fundamentals, sector flow, and longer AI report\.$/, '深度分析可增加公告、基本面、板块资金流和更完整的 AI 报告。')
+    .replace(/^Volume expansion would improve confirmation quality\.$/, '放量会提高确认质量。')
+    .replace(/^Keep the analysis informational and not investment advice\.$/, '保持信息分析边界，不构成投资建议。')
+    .replace(/^Use deep analysis only when you need news, filings, fundamentals, or a longer AI-written report\.$/, '只有需要新闻、公告、基本面或更长 AI 报告时，再使用深度分析。')
+    .replace(/^Use deep analysis only when you need filings or a longer AI-written report\.$/, '只有需要公告文件或更长 AI 报告时，再使用深度分析。')
+    .replace(/^Login to save history, build a watchlist, keep quota state, and unlock deeper analysis when needed\.$/, '登录后可保存历史、建立自选股、保留额度状态，并在需要时解锁更深分析。')
+    .replace(/^Information analysis only; not investment advice\.$/, '仅作信息分析，不构成投资建议。')
+    .replace(/^Experimental model preview; information analysis only; not investment advice\.$/, '实验性模型预览；仅作信息分析，不构成投资建议。')
+    .replace(/^(.+?) information lanes for a share: news, announcements, financials, sector context, and data quality\. No AI or public search was used\.$/, '$1 的A股信息通道：资讯、公告、财务、板块背景和数据质量。未使用 AI 或公共搜索。')
+    .replace(/^(.+?) information lanes for (.+?): news, announcements, financials, sector context, and data quality\. No AI or public search was used\.$/, '$1 的 $2 信息通道：资讯、公告、财务、板块背景和数据质量。未使用 AI 或公共搜索。')
+    .replace(/^Realtime public news\/search is off in free local mode, so this lane is a checklist placeholder\.$/, '免费本地模式未开启实时公共新闻/搜索，此通道作为检查清单占位。')
+    .replace(/^(.+?) is at (.+?) with (.+?)\. Realtime public news\/search is off in free local mode, so this lane is a checklist placeholder\.$/, '$1 当前价格 $2，涨跌幅 $3。免费本地模式未开启实时公共新闻/搜索，此通道作为检查清单占位。')
+    .replace(/^A-share announcements and exchange filings are reserved for configured deep sources\. Free mode keeps the lane visible so users know what deeper analysis will add\.$/, 'A股公告和交易所文件保留给已配置的深度数据源；免费模式保留此通道，让用户知道深度分析会补充什么。')
+    .replace(/^Use deep analysis or configured news feeds for realtime links\.$/, '如需实时链接，请使用深度分析或配置资讯源。')
+    .replace(/^SEC filings, earnings call notes, and source links are reserved for deep mode or configured feeds\.$/, 'SEC 文件、业绩会纪要和来源链接保留给深度模式或已配置资讯源。')
+    .replace(/^Upgrade or configure a filings source when source links are required\.$/, '需要来源链接时，请升级或配置公告/文件来源。')
+    .replace(/^Compare valuation and fundamentals before relying on price action alone\.$/, '不要只看价格波动，还要对比估值和基本面。')
+    .replace(/^Context is (.+?)\. Current volume-price signal is (.+?)\.$/, (_, context: string, signal: string) => `当前背景为 ${context}；量价信号为 ${volumePriceSignalLabel(signal, language)}。`)
+    .replace(/^Context is (.+?)\. Current volume-price signal is (.+?)\. Compare against route-based peers before reading this symbol in isolation\.?$/, (_, context: string, signal: string) => `当前背景为 ${context}；量价信号为 ${volumePriceSignalLabel(signal, language)}。解读该标的前，先与市场通道给出的同类参照对比。`)
+    .replace(/^Open peer comparison or deep sector view for richer cross-asset context\.$/, '可打开同业对比或深度板块视图，获得更完整的跨资产背景。')
+    .replace(/^No realtime news source is enabled in free no-AI mode\.$/, '免费未用 AI 模式未启用实时新闻源。')
+    .replace(/^No realtime news source is enabled in free no-AI mode for (.+?)\. No AI or public search was used\. Current market data is degraded\.$/, '免费未用 AI 模式暂未启用 $1 实时新闻源；未使用 AI 或公共搜索，当前行情数据存在降级。')
+    .replace(/^No filing or announcement source is enabled in free no-AI mode\.$/, '免费未用 AI 模式未启用公告或文件来源。')
+    .replace(/^No filing or announcement source is enabled in free no-AI mode for (.+?)\. Deep analysis can add filings, announcements, and source links when configured\.$/, '免费未用 AI 模式暂未启用 $1 公告或文件来源；配置后深度分析可补充公告、文件和来源链接。')
+    .replace(/^Quote is stale; quick view uses cached quote and latest available history\.$/, '行情已过期；快速视图使用缓存行情和最新可用历史。')
+    .replace(/^Refresh market data before treating the quick snapshot as current\.$/, '先刷新行情，再把快速快照当作当前数据解读。')
+    .replace(/^Premium can add realtime news, filings, source links, sector comparison, and AI summaries\.$/, '高级版可增加实时新闻、公告、来源链接、板块对比和 AI 摘要。')
+    .replace(/^Kronos adapter ready; local rules preview only; Kronos model not installed or invoked\.$/, 'Kronos 适配器已就绪；当前是本地规则预览，尚未运行 Kronos 模型。')
+    .replace(/^Kronos adapter ready; local rules preview only\.$/, 'Kronos 适配器已就绪；当前是本地规则预览。')
+    .replace(/^Kronos adapter ready; model not invoked because dependencies are missing: (.+)\.$/, 'Kronos 适配器已就绪；因依赖缺失尚未运行模型：$1。')
+    .replace(/^Kronos model unavailable; missing dependencies: (.+)\.$/, 'Kronos 模型不可用；缺失依赖：$1。')
+    .replace(/^Premium can run a configured Kronos or local-model forecast lane after model\/data approval\.$/, '高级版可在模型和数据确认后运行 Kronos 或本地模型预测通道。')
+    .replace(/^A-share lane focuses on quote, moving averages, volume-price behavior, and broad-market context without AI\.$/, 'A股通道聚焦行情、均线、量价行为和大盘背景，不调用 AI。')
+    .replace(/^Today's quick read: price changed (.+?), stays (.+?), and volume is (.+?)\.$/, '今日快速解读：价格变化 $1，当前 $2，成交量 $3。')
+    .replace(/^Lane (.+?) No AI used Information analysis only$/, (_, lane: string) => `通道 ${marketLaneLabel(lane, language)}；未用 AI；仅作信息分析`)
+    .replace(/^Run the local adapter probe\. If the real Kronos runtime is unavailable, this stays on the local rules fallback\.$/, '运行本地 Kronos 模型检查；如果模型运行环境不可用，则保持本地规则兜底。')
+    .replace(/^Treat this as a checklist for the next refresh, not a trade instruction\.$/, '把它作为下一次刷新时的检查清单，不是交易指令。')
+    .replace(/^Price loses support ([^ ]+) or data freshness degrades\.$/, '价格跌破支撑 $1，或数据新鲜度继续下降。')
+    .replace(/^Recheck source freshness and broad-market references before interpreting weakness\.$/, '解读走弱前，先复核数据新鲜度和大盘参照。')
+    .replace(/^Forecast lab output is experimental information analysis only; not investment advice\.$/, '预测实验室输出仅作实验性信息分析，不构成投资建议。');
+};
+
+const historyCenterMarketLabel = (value: HistoryCenterMarketFilter, language: string): string => {
+  if (language === 'en') {
+    return ({ all: 'All markets', cn: 'A-share', us: 'US', hk: 'HK', crypto: 'Crypto' } as Record<HistoryCenterMarketFilter, string>)[value];
+  }
+  return ({ all: '全部市场', cn: 'A股', us: '美股', hk: '港股', crypto: '加密货币' } as Record<HistoryCenterMarketFilter, string>)[value];
+};
+
+const historyCenterReportLabel = (value: HistoryCenterReportFilter, language: string): string => {
+  const en: Record<HistoryCenterReportFilter, string> = { all: 'All stock reports', stock: 'Stock reports', simple: 'Simple', detailed: 'Detailed', full: 'Full', brief: 'Brief', market_review: 'Market review' };
+  const zh: Record<HistoryCenterReportFilter, string> = { all: '全部个股报告', stock: '个股报告', simple: '简版', detailed: '详细', full: '完整版', brief: '简报', market_review: '大盘复盘' };
+  return (language === 'en' ? en : zh)[value];
+};
+
+const historyCenterRangeLabel = (value: HistoryCenterRangeFilter, language: string): string => {
+  const en: Record<HistoryCenterRangeFilter, string> = { all: 'Any time', '7d': 'Last 7d', '30d': 'Last 30d', '90d': 'Last 90d' };
+  const zh: Record<HistoryCenterRangeFilter, string> = { all: '任意时间', '7d': '近7天', '30d': '近30天', '90d': '近90天' };
+  return (language === 'en' ? en : zh)[value];
+};
+
+const historyCenterSortLabel = (value: HistoryCenterSort, language: string): string => {
+  const en: Record<HistoryCenterSort, string> = { newest: 'Newest first', oldest: 'Oldest first' };
+  const zh: Record<HistoryCenterSort, string> = { newest: '最新优先', oldest: '最早优先' };
+  return (language === 'en' ? en : zh)[value];
+};
+
+const historyCenterRefreshLabel = (value: HistoryCenterRefreshFilter, language: string): string => {
+  const en: Record<HistoryCenterRefreshFilter, string> = { all: 'All refresh states', refreshed: 'Refreshed current quote', not_refreshed: 'Not refreshed' };
+  const zh: Record<HistoryCenterRefreshFilter, string> = { all: '全部刷新状态', refreshed: '已刷新当前行情', not_refreshed: '未刷新' };
+  return (language === 'en' ? en : zh)[value];
+};
+
+const historyCenterStateLabel = (value: HistoryCenterStateFilter, language: string): string => {
+  const en: Record<HistoryCenterStateFilter, string> = { all: 'All report states', favorite: 'Favorite', important: 'Important', active: 'Active', archived: 'Archived', has_note: 'Has note', unread: 'Unread', read: 'Read' };
+  const zh: Record<HistoryCenterStateFilter, string> = { all: '全部报告状态', favorite: '收藏', important: '重要', active: '有效', archived: '已归档', has_note: '有备注', unread: '未读', read: '已读' };
+  return (language === 'en' ? en : zh)[value];
+};
+
+const formatQuotaLeft = (quota?: Pick<PlatformQuota, 'weeklyLimit' | 'remaining' | 'used'> | null, language = 'en'): string => {
+  const isEnglish = language === 'en';
   if (!quota) {
-    return 'unavailable';
+    return isEnglish ? 'unavailable' : '暂不可用';
   }
   if (quota.weeklyLimit === null) {
-    return `${quota.used}/unlimited used`;
+    return isEnglish ? `${quota.used}/unlimited used` : `已用 ${quota.used}/不限`;
   }
-  return `${quota.remaining ?? 0}/${quota.weeklyLimit} left`;
+  return isEnglish ? `${quota.remaining ?? 0}/${quota.weeklyLimit} left` : `剩余 ${quota.remaining ?? 0}/${quota.weeklyLimit}`;
 };
 
-const apiKeyModeLabel = (mode?: string | null): string => {
+const apiKeyModeLabel = (mode?: string | null, language = 'en'): string => {
+  const isEnglish = language === 'en';
   if (mode === 'user') return 'BYOK';
-  if (mode === 'local') return 'local model';
-  return 'platform API';
+  if (mode === 'local') return isEnglish ? 'local model' : '本地模型';
+  return isEnglish ? 'platform API' : '平台 API';
 };
 
-const marketLaneLabel = (lane?: string | null): string => {
-  if (lane === 'a_share_market_data') return 'A-share market data';
-  if (lane === 'us_market_data') return 'US market data';
-  if (lane === 'hk_market_data') return 'HK market data';
-  if (lane === 'crypto_market_data') return 'Crypto market data';
-  return lane || 'market data';
+const marketLaneLabel = (lane?: string | null, language = 'en'): string => {
+  const isEnglish = language === 'en';
+  if (lane === 'a_share_market_data') return isEnglish ? 'A-share market data' : 'A股行情数据';
+  if (lane === 'us_market_data') return isEnglish ? 'US market data' : '美股行情数据';
+  if (lane === 'hk_market_data') return isEnglish ? 'HK market data' : '港股行情数据';
+  if (lane === 'crypto_market_data') return isEnglish ? 'Crypto market data' : '加密货币行情数据';
+  return lane || (isEnglish ? 'market data' : '行情数据');
+};
+
+const localizeRuntimeLabel = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (language === 'en' || !text) return text || '-';
+  const zh: Record<string, string> = {
+    fresh: '新鲜',
+    stale: '过期',
+    stale_cache: '过期缓存',
+    stale_quote: '行情过期',
+    delayed: '延迟',
+    missing: '缺失',
+    ok: '正常',
+    warning: '警告',
+    degraded: '降级',
+    available: '可用',
+    unavailable: '不可用',
+    hit: '命中',
+    miss: '未命中',
+    cache: '缓存',
+    live: '实时',
+    memory: '内存',
+    disk: '磁盘',
+    local_json: '本地缓存',
+    local_disk: '本地磁盘',
+    private: '私有',
+    separate: '独立',
+    unknown_lane: '未知通道',
+    no_ai_low_cost: '低成本未用 AI',
+    'AI used': '已使用 AI',
+    'No AI': '未用 AI',
+    'No AI used': '未用 AI',
+    'Platform API': '平台 API',
+    'Selected Platform API': '已选择平台 API',
+    'Selected local model': '已选择本地模型',
+    'Selected BYOK': '已选择 BYOK',
+    'BYOK ready': 'BYOK 已就绪',
+    'BYOK not set': 'BYOK 未设置',
+  };
+  if (zh[text]) return zh[text];
+  const reports = text.match(/^(\d+) reports$/);
+  if (reports) return `${reports[1]} 份报告`;
+  const symbols = text.match(/^(\d+) symbols$/);
+  if (symbols) return `${symbols[1]} 只标的`;
+  const cache = text.match(/^Cache (.+)$/);
+  if (cache) return `缓存 ${localizeRuntimeLabel(cache[1], language)}`;
+  return localizeGeneratedSource(text, language);
 };
 
 type HistoryCenterMarketFilter = 'all' | 'cn' | 'us' | 'hk' | 'crypto';
@@ -720,15 +1058,15 @@ const HomePage: React.FC = () => {
       const list = await platformApi.addWatchlistItem(target);
       setPlatformWatchlist(list);
       setPlatformWatchlistRefresh(null);
-      setBasicRetentionStatus('Added to watchlist');
+      setBasicRetentionStatus(uiLanguage === 'en' ? 'Added to watchlist' : '已加入自选');
     } catch (err: unknown) {
-      const message = getParsedApiError(err).message || 'Watchlist update failed';
+      const message = getParsedApiError(err).message || (uiLanguage === 'en' ? 'Watchlist update failed' : '自选更新失败');
       setPlatformWatchlistError(message);
       setBasicRetentionError(message);
     } finally {
       setPlatformWatchlistBusy(false);
     }
-  }, [basicSnapshot?.stockCode, platformWatchlistBusy, query]);
+  }, [basicSnapshot?.stockCode, platformWatchlistBusy, query, uiLanguage]);
 
   const handleSaveCurrentBasicSnapshotToHistory = useCallback(async () => {
     if (!basicSnapshot || basicRetentionBusy) {
@@ -737,7 +1075,7 @@ const HomePage: React.FC = () => {
     if (!platformSession) {
       setAuthMode('register');
       setBasicRetentionStatus('');
-      setBasicRetentionError('Register or login to save this no-AI snapshot.');
+      setBasicRetentionError(uiLanguage === 'en' ? 'Register or login to save this no-AI snapshot.' : '注册或登录后可保存这份未用 AI 快照。');
       return;
     }
     setBasicRetentionBusy(true);
@@ -745,17 +1083,17 @@ const HomePage: React.FC = () => {
     setBasicRetentionError('');
     try {
       await platformApi.saveSnapshotToHistory(basicSnapshot);
-      setBasicRetentionStatus('Saved to history');
+      setBasicRetentionStatus(uiLanguage === 'en' ? 'Saved to history' : '已保存到历史');
       await Promise.all([
         refreshHistory(),
         loadStockBar(),
       ]);
     } catch (err: unknown) {
-      setBasicRetentionError(getParsedApiError(err).message || 'Snapshot save failed');
+      setBasicRetentionError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Snapshot save failed' : '快照保存失败'));
     } finally {
       setBasicRetentionBusy(false);
     }
-  }, [basicRetentionBusy, basicSnapshot, loadStockBar, platformSession, refreshHistory]);
+  }, [basicRetentionBusy, basicSnapshot, loadStockBar, platformSession, refreshHistory, uiLanguage]);
 
   const handleRefreshPlatformWatchlist = useCallback(async () => {
     if (platformWatchlistBusy) {
@@ -767,11 +1105,11 @@ const HomePage: React.FC = () => {
       const summary = await platformApi.refreshWatchlist();
       setPlatformWatchlistRefresh(summary);
     } catch (err: unknown) {
-      setPlatformWatchlistError(getParsedApiError(err).message || 'Watchlist refresh failed');
+      setPlatformWatchlistError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Watchlist refresh failed' : '自选刷新失败'));
     } finally {
       setPlatformWatchlistBusy(false);
     }
-  }, [platformWatchlistBusy]);
+  }, [platformWatchlistBusy, uiLanguage]);
 
   useEffect(() => {
     let active = true;
@@ -958,15 +1296,17 @@ const HomePage: React.FC = () => {
   const platformAiQuickQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_quick');
   const byokAiQuickQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_quick_user_key');
   const localAiQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_local');
-  const accountQuotaText = platformSession ? formatQuotaLeft(baseQuota) : 'unavailable';
-  const basicQuotaText = basicQueryQuota ? formatQuotaLeft(basicQueryQuota) : 'unmetered locally';
-  const platformAiQuotaText = platformAiQuickQuota ? formatQuotaLeft(platformAiQuickQuota) : accountQuotaText;
-  const byokAiQuotaText = byokAiQuickQuota ? formatQuotaLeft(byokAiQuickQuota) : 'available after saving a user key';
-  const localModelQuotaText = localAiQuota ? formatQuotaLeft(localAiQuota) : 'local capacity gate';
+  const accountQuotaText = platformSession ? formatQuotaLeft(baseQuota, uiLanguage) : localizeRuntimeLabel('unavailable', uiLanguage);
+  const basicQuotaText = basicQueryQuota ? formatQuotaLeft(basicQueryQuota, uiLanguage) : (uiLanguage === 'en' ? 'unmetered locally' : '本地不限量');
+  const platformAiQuotaText = platformAiQuickQuota ? formatQuotaLeft(platformAiQuickQuota, uiLanguage) : accountQuotaText;
+  const byokAiQuotaText = byokAiQuickQuota ? formatQuotaLeft(byokAiQuickQuota, uiLanguage) : (uiLanguage === 'en' ? 'available after saving a user key' : '保存用户 API Key 后可用');
+  const localModelQuotaText = localAiQuota ? formatQuotaLeft(localAiQuota, uiLanguage) : (uiLanguage === 'en' ? 'local capacity gate' : '本地算力限制');
   const byokStatusText = primaryApiKey
-    ? `BYOK ready ${primaryApiKey.maskedKey}`
-    : 'BYOK not set';
-  const recommendedModeText = `Recommended ${apiKeyModeLabel(platformAccount?.recommendedQueryMode)}`;
+    ? (uiLanguage === 'en' ? `BYOK ready ${primaryApiKey.maskedKey}` : `BYOK 已就绪 ${primaryApiKey.maskedKey}`)
+    : localizeRuntimeLabel('BYOK not set', uiLanguage);
+  const recommendedModeText = uiLanguage === 'en'
+    ? `Recommended ${apiKeyModeLabel(platformAccount?.recommendedQueryMode, uiLanguage)}`
+    : `推荐 ${apiKeyModeLabel(platformAccount?.recommendedQueryMode, uiLanguage)}`;
   const basicSnapshotLane = basicSnapshot?.route?.dataSourceLane || basicSnapshot?.diagnostics?.routeLane || null;
   const basicSnapshotCacheMode = basicSnapshot?.diagnostics?.persistentCache?.mode;
   const autocompleteInputKey = basicSnapshot
@@ -1141,16 +1481,16 @@ const HomePage: React.FC = () => {
     const normalizedSignalScore = backendSignalScore
       ? {
           score: clampBasicScore(backendSignalScore.score),
-          label: backendSignalScore.label || (isEnglish ? 'Quick signal score' : '快速信号评分'),
-          summary: backendSignalScore.summary || '',
-          source: backendSignalScore.source || 'no_ai_rules',
+          label: localizeGeneratedText(backendSignalScore.label || (isEnglish ? 'Quick signal score' : '快速信号评分'), uiLanguage),
+          summary: localizeGeneratedText(backendSignalScore.summary || '', uiLanguage),
+          source: localizeGeneratedSource(backendSignalScore.source || 'no_ai_rules', uiLanguage),
           aiUsed: Boolean(backendSignalScore.aiUsed),
           components: (backendSignalScore.components ?? []).map((component) => ({
             key: component.key || component.label,
-            label: component.label || component.key || '-',
+            label: localizeGeneratedText(component.label || component.key || '-', uiLanguage),
             score: clampBasicScore(component.score),
-            status: component.status || 'neutral',
-            detail: component.detail || '',
+            status: localizeGeneratedStatus(component.status || 'neutral', uiLanguage),
+            detail: localizeGeneratedText(component.detail || '', uiLanguage),
           })),
         }
       : null;
@@ -1218,10 +1558,10 @@ const HomePage: React.FC = () => {
         },
         {
           title: isEnglish ? 'Free-tier boundary' : '免费版边界',
-          headline: isEnglish ? 'No AI quick snapshot' : 'No AI 快照研判',
+          headline: isEnglish ? 'No AI quick snapshot' : '未用 AI 快照研判',
           details: [
-            basicSnapshot.aiUsed ? 'AI used' : 'No AI',
-            basicSnapshot.quote.freshness,
+            basicSnapshot.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi'),
+            localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage),
             isEnglish ? 'Information analysis, not investment advice' : '仅作信息分析，不构成投资建议',
           ],
         },
@@ -1232,13 +1572,17 @@ const HomePage: React.FC = () => {
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
   const platformWatchlistCount = platformWatchlist?.total ?? platformWatchlistItems.length;
-  const workspaceHistoryCountText = `${stockHistoryTotal ?? 0} reports`;
+  const workspaceHistoryCountText = uiLanguage === 'en'
+    ? `${stockHistoryTotal ?? 0} reports`
+    : `${stockHistoryTotal ?? 0} 份报告`;
   const workspaceAiModeText = apiKeyMode === 'user'
-    ? 'Selected BYOK'
+    ? (uiLanguage === 'en' ? 'Selected BYOK' : '已选择 BYOK')
     : apiKeyMode === 'local'
-      ? 'Selected local model'
-      : 'Selected Platform API';
-  const workspaceByokText = primaryApiKey ? 'BYOK ready' : 'BYOK not set';
+      ? (uiLanguage === 'en' ? 'Selected local model' : '已选择本地模型')
+      : (uiLanguage === 'en' ? 'Selected Platform API' : '已选择平台 API');
+  const workspaceByokText = primaryApiKey
+    ? (uiLanguage === 'en' ? 'BYOK ready' : 'BYOK 已就绪')
+    : localizeRuntimeLabel('BYOK not set', uiLanguage);
   const showGuestQueryEntry = !platformSession
     && !basicSnapshot
     && !marketReviewReport
@@ -1540,14 +1884,16 @@ const HomePage: React.FC = () => {
     try {
       const bundle = await historyApi.exportReports(recordIds, 'markdown');
       downloadTextFile(bundle.filename, bundle.content, 'text/markdown;charset=utf-8');
-      setHistoryExportStatus(`Exported ${bundle.recordCount} local reports`);
+      setHistoryExportStatus(uiLanguage === 'en'
+        ? `Exported ${bundle.recordCount} local reports`
+        : `已导出 ${bundle.recordCount} 份本地报告`);
     } catch (exportError) {
       const parsed = getParsedApiError(exportError);
-      setHistoryExportStatus(parsed.message || 'History export failed');
+      setHistoryExportStatus(parsed.message || (uiLanguage === 'en' ? 'History export failed' : '历史导出失败'));
     } finally {
       setIsExportingHistory(false);
     }
-  }, [isExportingHistory, selectedIds]);
+  }, [isExportingHistory, selectedIds, uiLanguage]);
 
   const handleBatchHistoryState = useCallback(async (
     payload: Omit<HistoryStateUpdatePayload, 'note'>,
@@ -1562,14 +1908,22 @@ const HomePage: React.FC = () => {
     setHistoryStateStatus('');
     try {
       const result = await historyApi.batchUpdateState(recordIds, payload);
-      setHistoryStateStatus(`${successLabel} ${result.updated} local reports`);
+      const zhAction = ({
+        'Marked important': '已标为重要',
+        'Marked read': '已标为已读',
+        Archived: '已归档',
+        Unarchived: '已恢复',
+      } as Record<string, string>)[successLabel] || successLabel;
+      setHistoryStateStatus(uiLanguage === 'en'
+        ? `${successLabel} ${result.updated} local reports`
+        : `${zhAction} ${result.updated} 份本地报告`);
       await refreshHistory(true);
       if (historyCenterFilters.reportType === 'market_review') {
         await refreshMarketReviewHistory(false);
       }
     } catch (stateError) {
       const parsed = getParsedApiError(stateError);
-      setHistoryStateStatus(parsed.message || 'History state update failed');
+      setHistoryStateStatus(parsed.message || (uiLanguage === 'en' ? 'History state update failed' : '历史状态更新失败'));
     } finally {
       setIsUpdatingHistoryState(false);
     }
@@ -1579,6 +1933,7 @@ const HomePage: React.FC = () => {
     refreshHistory,
     refreshMarketReviewHistory,
     selectedIds,
+    uiLanguage,
   ]);
 
   const handleUpdateSelectedHistoryState = useCallback(async (payload: HistoryStateUpdatePayload) => {
@@ -1591,14 +1946,14 @@ const HomePage: React.FC = () => {
     setHistoryStateStatus('');
     try {
       await historyApi.updateState(recordId, payload);
-      setHistoryStateStatus('Saved local history state');
+      setHistoryStateStatus(uiLanguage === 'en' ? 'Saved local history state' : '已保存本地历史状态');
       await refreshHistory(true);
       if (selectedReport?.meta.reportType === 'market_review') {
         await refreshMarketReviewHistory(false);
       }
     } catch (stateError) {
       const parsed = getParsedApiError(stateError);
-      setHistoryStateStatus(parsed.message || 'History state update failed');
+      setHistoryStateStatus(parsed.message || (uiLanguage === 'en' ? 'History state update failed' : '历史状态更新失败'));
     } finally {
       setIsUpdatingHistoryState(false);
     }
@@ -1608,37 +1963,39 @@ const HomePage: React.FC = () => {
     refreshMarketReviewHistory,
     selectedReport?.meta.id,
     selectedReport?.meta.reportType,
+    uiLanguage,
   ]);
 
   const historyCenterControls = useMemo(() => {
     const selectClass = 'h-8 min-w-0 rounded-lg border border-subtle bg-surface px-2 text-[11px] text-foreground';
     const textClass = 'h-8 min-w-0 rounded-lg border border-subtle bg-surface px-2 text-[11px] text-foreground placeholder:text-muted-text';
     const selectedCount = selectedIds.size;
+    const isEnglish = uiLanguage === 'en';
 
     return (
       <div className="space-y-2">
         <div data-testid="history-center-filters" className="grid grid-cols-2 gap-2 text-[11px]">
           <label className="col-span-2 flex min-w-0 items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2">
             <Search className="h-3.5 w-3.5 flex-shrink-0 text-muted-text" aria-hidden="true" />
-            <span className="sr-only">Filter history by code or name</span>
+            <span className="sr-only">{isEnglish ? 'Filter history by code or name' : '按代码或名称筛选历史报告'}</span>
             <input
               type="search"
               value={historyCenterFilters.code}
               onChange={(event) => updateHistoryCenterFilter('code', event.target.value)}
               data-testid="history-center-code-filter"
-              placeholder="Code or name"
+              placeholder={isEnglish ? 'Code or name' : '代码或名称'}
               className="h-8 min-w-0 flex-1 bg-transparent text-[11px] text-foreground outline-none placeholder:text-muted-text"
             />
           </label>
           <label className="col-span-2 flex min-w-0 items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2">
             <Search className="h-3.5 w-3.5 flex-shrink-0 text-muted-text" aria-hidden="true" />
-            <span className="sr-only">Filter history by local note</span>
+            <span className="sr-only">{isEnglish ? 'Filter history by local note' : '按本地备注筛选历史报告'}</span>
             <input
               type="search"
               value={historyCenterFilters.noteSearch}
               onChange={(event) => updateHistoryCenterFilter('noteSearch', event.target.value)}
               data-testid="history-center-note-filter"
-              placeholder="Search local notes"
+              placeholder={isEnglish ? 'Search local notes' : '搜索本地备注'}
               className="h-8 min-w-0 flex-1 bg-transparent text-[11px] text-foreground outline-none placeholder:text-muted-text"
             />
           </label>
@@ -1646,77 +2003,67 @@ const HomePage: React.FC = () => {
             value={historyCenterFilters.market}
             onChange={(event) => updateHistoryCenterFilter('market', event.target.value)}
             data-testid="history-center-market-filter"
-            aria-label="Filter history by market"
+            aria-label={isEnglish ? 'Filter history by market' : '按市场筛选历史报告'}
             className={selectClass}
           >
-            <option value="all">All markets</option>
-            <option value="cn">A-share</option>
-            <option value="us">US</option>
-            <option value="hk">HK</option>
-            <option value="crypto">Crypto</option>
+            {HISTORY_CENTER_MARKET_FILTERS.map((value) => (
+              <option key={value} value={value}>{historyCenterMarketLabel(value, uiLanguage)}</option>
+            ))}
           </select>
           <select
             value={historyCenterFilters.reportType}
             onChange={(event) => updateHistoryCenterFilter('reportType', event.target.value)}
             data-testid="history-center-report-type-filter"
-            aria-label="Filter history by report type"
+            aria-label={isEnglish ? 'Filter history by report type' : '按报告类型筛选历史报告'}
             className={selectClass}
           >
-            <option value="all">All stock reports</option>
-            <option value="simple">Simple</option>
-            <option value="detailed">Detailed</option>
-            <option value="full">Full</option>
-            <option value="brief">Brief</option>
-            <option value="market_review">Market review</option>
+            {HISTORY_CENTER_REPORT_FILTERS.map((value) => (
+              <option key={value} value={value}>{historyCenterReportLabel(value, uiLanguage)}</option>
+            ))}
           </select>
           <select
             value={historyCenterFilters.range}
             onChange={(event) => updateHistoryCenterFilter('range', event.target.value)}
             data-testid="history-center-range-filter"
-            aria-label="Filter history by generated time range"
+            aria-label={isEnglish ? 'Filter history by generated time range' : '按生成时间筛选历史报告'}
             className={selectClass}
           >
-            <option value="all">Any time</option>
-            <option value="7d">Last 7d</option>
-            <option value="30d">Last 30d</option>
-            <option value="90d">Last 90d</option>
+            {HISTORY_CENTER_RANGE_FILTERS.map((value) => (
+              <option key={value} value={value}>{historyCenterRangeLabel(value, uiLanguage)}</option>
+            ))}
           </select>
           <select
             value={historyCenterFilters.sort}
             onChange={(event) => updateHistoryCenterFilter('sort', event.target.value)}
             data-testid="history-center-time-filter"
-            aria-label="Sort history by generated time"
+            aria-label={isEnglish ? 'Sort history by generated time' : '按生成时间排序历史报告'}
             className={selectClass}
           >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
+            {HISTORY_CENTER_SORT_FILTERS.map((value) => (
+              <option key={value} value={value}>{historyCenterSortLabel(value, uiLanguage)}</option>
+            ))}
           </select>
           <select
             value={historyCenterFilters.refreshStatus}
             onChange={(event) => updateHistoryCenterFilter('refreshStatus', event.target.value)}
             data-testid="history-center-refresh-filter"
-            aria-label="Filter history by current quote refresh status"
+            aria-label={isEnglish ? 'Filter history by current quote refresh status' : '按当前行情刷新状态筛选历史报告'}
             className={selectClass}
           >
-            <option value="all">All refresh states</option>
-            <option value="refreshed">Refreshed current quote</option>
-            <option value="not_refreshed">Not refreshed</option>
+            {HISTORY_CENTER_REFRESH_FILTERS.map((value) => (
+              <option key={value} value={value}>{historyCenterRefreshLabel(value, uiLanguage)}</option>
+            ))}
           </select>
           <select
             value={historyCenterFilters.state}
             onChange={(event) => updateHistoryCenterFilter('state', event.target.value)}
             data-testid="history-center-state-filter"
-            aria-label="Filter history by local state"
+            aria-label={isEnglish ? 'Filter history by local state' : '按本地状态筛选历史报告'}
             className={selectClass}
           >
-            <option value="all">All report states</option>
-            <option value="favorite">Favorite</option>
-            <option value="important">Important</option>
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="has_note">Has note</option>
-            <option value="unread">Unread</option>
-            <option value="read">Read</option>
+            {HISTORY_CENTER_STATE_FILTERS.map((value) => (
+              <option key={value} value={value}>{historyCenterStateLabel(value, uiLanguage)}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -1724,7 +2071,7 @@ const HomePage: React.FC = () => {
             data-testid="history-center-reset-filters"
             className={`${textClass} inline-flex items-center justify-center font-medium text-secondary-text hover:text-foreground`}
           >
-            Reset filters
+            {isEnglish ? 'Reset filters' : '重置筛选'}
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -1736,7 +2083,9 @@ const HomePage: React.FC = () => {
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 font-medium text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            {isExportingHistory ? 'Exporting' : 'Export selected'}
+            {isExportingHistory
+              ? (isEnglish ? 'Exporting' : '导出中')
+              : (isEnglish ? 'Export selected' : '导出已选')}
           </button>
           <button
             type="button"
@@ -1746,7 +2095,7 @@ const HomePage: React.FC = () => {
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 font-medium text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Flag className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            Important
+            {isEnglish ? 'Important' : '标为重要'}
           </button>
           <button
             type="button"
@@ -1756,7 +2105,7 @@ const HomePage: React.FC = () => {
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 font-medium text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Eye className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            Mark read
+            {isEnglish ? 'Mark read' : '标为已读'}
           </button>
           <button
             type="button"
@@ -1766,7 +2115,9 @@ const HomePage: React.FC = () => {
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 font-medium text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Archive className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            {isUpdatingHistoryState ? 'Updating' : 'Archive'}
+            {isUpdatingHistoryState
+              ? (isEnglish ? 'Updating' : '更新中')
+              : (isEnglish ? 'Archive' : '归档')}
           </button>
           <button
             type="button"
@@ -1776,7 +2127,7 @@ const HomePage: React.FC = () => {
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 font-medium text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ArchiveRestore className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            Restore
+            {isEnglish ? 'Restore' : '恢复'}
           </button>
           {historyExportStatus ? (
             <span data-testid="history-center-export-status" className="min-w-0 flex-1 text-muted-text">
@@ -1801,6 +2152,7 @@ const HomePage: React.FC = () => {
     resetHistoryCenterFilters,
     selectedIds,
     historyStateStatus,
+    uiLanguage,
     updateHistoryCenterFilter,
   ]);
 
@@ -2081,8 +2433,8 @@ const HomePage: React.FC = () => {
           controls={historyCenterControls}
           selectable
           refreshedRecordIds={refreshedHistoryRecordIds}
-          emptyTitle="No matching reports"
-          emptyDescription="Adjust filters or load more local history."
+          emptyTitle={uiLanguage === 'en' ? 'No matching reports' : '没有匹配的报告'}
+          emptyDescription={uiLanguage === 'en' ? 'Adjust filters or load more local history.' : '可以调整筛选条件，或加载更多本地历史。'}
           className="min-h-[18rem] flex-[1.15] overflow-hidden"
         />
         <StockBar
@@ -2303,14 +2655,18 @@ const HomePage: React.FC = () => {
                       data-testid="platform-ai-cost-warning"
                       className="text-xs text-secondary-text"
                     >
-                      Quick snapshot stays no-AI. Quick/Deep AI uses selected quota: platform API, BYOK, or local model. Historical reports stay separate from current snapshots.
+                      {uiLanguage === 'en'
+                        ? 'Quick snapshot stays no-AI. Quick/Deep AI uses selected quota: platform API, BYOK, or local model. Historical reports stay separate from current snapshots.'
+                        : '快速快照保持未用 AI；快速/深度 AI 会使用所选额度：平台 API、BYOK 或本地模型。历史报告和当前快照单独保存。'}
                     </div>
                     <div
                       data-testid="platform-watchlist-panel"
                       className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-secondary-text"
                     >
                       <span className="rounded-md border border-subtle px-2 py-1 font-medium text-foreground">
-                        Watchlist {platformWatchlist?.total ?? platformWatchlistItems.length}
+                        {uiLanguage === 'en'
+                          ? `Watchlist ${platformWatchlist?.total ?? platformWatchlistItems.length}`
+                          : `自选 ${platformWatchlist?.total ?? platformWatchlistItems.length}`}
                       </span>
                       {platformWatchlistPreview.length > 0 ? platformWatchlistPreview.map((item) => (
                         <button
@@ -2340,12 +2696,12 @@ const HomePage: React.FC = () => {
                         variant="secondary"
                         size="sm"
                         isLoading={platformWatchlistBusy}
-                        loadingText="Refreshing"
+                        loadingText={uiLanguage === 'en' ? 'Refreshing' : '刷新中'}
                         onClick={() => void handleRefreshPlatformWatchlist()}
                         data-testid="platform-watchlist-refresh"
                       >
                         <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                        Refresh watchlist
+                        {uiLanguage === 'en' ? 'Refresh watchlist' : '刷新自选'}
                       </Button>
                     </div>
                     {platformWatchlistRefresh ? (
@@ -2353,15 +2709,21 @@ const HomePage: React.FC = () => {
                         data-testid="platform-watchlist-refresh-summary"
                         className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-secondary-text"
                       >
-                        <span className="rounded-md border border-subtle px-2 py-1">No AI used</span>
+                        <span className="rounded-md border border-subtle px-2 py-1">{t('home.noAi')}</span>
                         <span className="rounded-md border border-subtle px-2 py-1">
-                          refreshed {platformWatchlistRefresh.refreshed}/{platformWatchlistRefresh.requested}
+                          {uiLanguage === 'en'
+                            ? `refreshed ${platformWatchlistRefresh.refreshed}/${platformWatchlistRefresh.requested}`
+                            : `已刷新 ${platformWatchlistRefresh.refreshed}/${platformWatchlistRefresh.requested}`}
                         </span>
                         <span className="rounded-md border border-subtle px-2 py-1">
-                          degraded {platformWatchlistRefresh.degraded}
+                          {uiLanguage === 'en'
+                            ? `degraded ${platformWatchlistRefresh.degraded}`
+                            : `降级 ${platformWatchlistRefresh.degraded}`}
                         </span>
                         {platformWatchlistLanes.map((lane) => (
-                          <span key={lane} className="rounded-md border border-subtle px-2 py-1">{lane}</span>
+                          <span key={lane} className="rounded-md border border-subtle px-2 py-1">
+                            {marketLaneLabel(lane, uiLanguage)}
+                          </span>
                         ))}
                       </div>
                     ) : null}
@@ -2396,17 +2758,17 @@ const HomePage: React.FC = () => {
                             </div>
                             <div className="mt-2 grid grid-cols-2 gap-1 text-[11px]">
                               <span className="rounded-md border border-subtle px-1.5 py-1">
-                                Price {formatBasicNumber(item.currentPrice)}
+                                {uiLanguage === 'en' ? 'Price' : '价格'} {formatBasicNumber(item.currentPrice)}
                               </span>
                               <span className="rounded-md border border-subtle px-1.5 py-1">
-                                Chg {formatBasicNumber(item.changePercent)}%
+                                {uiLanguage === 'en' ? 'Chg' : '涨跌'} {formatBasicNumber(item.changePercent)}%
                               </span>
                             </div>
                             <div className="mt-2 flex min-w-0 flex-wrap gap-1">
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{item.routeLane || 'unknown_lane'}</span>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{item.freshness}</span>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{item.degradationStatus}</span>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{item.aiUsed ? 'AI used' : 'No AI'}</span>
+                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{marketLaneLabel(item.routeLane || 'unknown_lane', uiLanguage)}</span>
+                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{localizeRuntimeLabel(item.freshness, uiLanguage)}</span>
+                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{localizeRuntimeLabel(item.degradationStatus, uiLanguage)}</span>
+                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{item.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi')}</span>
                               {item.warningCodes.map((warning) => (
                                 <span key={warning} className="rounded-md border border-warning/40 px-1.5 py-0.5 text-warning">
                                   {warning}
@@ -2614,10 +2976,14 @@ const HomePage: React.FC = () => {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
-                      No login required
+                      {uiLanguage === 'en' ? 'No login required' : '无需登录'}
                     </span>
-                    <span className="rounded-md border border-subtle px-2 py-1">No AI quick check</span>
-                    <span className="rounded-md border border-subtle px-2 py-1">A股 / 美股 / 港股 / Crypto</span>
+                    <span className="rounded-md border border-subtle px-2 py-1">
+                      {uiLanguage === 'en' ? 'No AI quick check' : '免费快速查询'}
+                    </span>
+                    <span className="rounded-md border border-subtle px-2 py-1">
+                      {uiLanguage === 'en' ? 'A-share / US / HK / Crypto' : 'A股 / 美股 / 港股 / 加密货币'}
+                    </span>
                   </div>
                   <div className="mt-2 text-base font-semibold text-foreground">
                     先免费查一只标的，再决定是否登录保存历史和自选。
@@ -2731,7 +3097,7 @@ const HomePage: React.FC = () => {
                         {uiLanguage === 'en' ? 'Queried' : '已查询'}
                       </span>
                       <span className="rounded-md border border-subtle px-2 py-1">{basicSnapshot.market.toUpperCase()}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">{basicSnapshot.quote.freshness}</span>
+                      <span className="rounded-md border border-subtle px-2 py-1">{localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage)}</span>
                       <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">{t('home.noAi')}</span>
                     </div>
                     <h2 className="truncate text-2xl font-semibold text-foreground">{basicSnapshot.stockName || basicSnapshot.stockCode}</h2>
@@ -2781,15 +3147,21 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
-                            Login is optional
+                            {uiLanguage === 'en' ? 'Login is optional' : '登录可选'}
                           </span>
-                          <span className="rounded-md border border-subtle px-2 py-1">No AI quick result stays visible</span>
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            {uiLanguage === 'en' ? 'No AI quick result stays visible' : '免费快照会保留'}
+                          </span>
                         </div>
                         <div className="mt-2 text-sm font-semibold text-foreground">
-                          登录后可 save history、加入 watchlist、保留 weekly quota 状态。
+                          {uiLanguage === 'en'
+                            ? 'Log in to save history, add to watchlist, and keep weekly quota state.'
+                            : '登录后可保存历史、加入自选，并保留每周额度状态。'}
                         </div>
                         <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                          当前查询不会被阻断；注册或登录只用于长期保存记录、自选股和额度状态。
+                          {uiLanguage === 'en'
+                            ? 'The current query is not blocked; register or log in only for long-term history, watchlist, and quota state.'
+                            : '当前查询不会被阻断；注册或登录只用于长期保存记录、自选股和额度状态。'}
                         </p>
                       </div>
                       <div className="flex min-w-0 flex-wrap gap-2">
@@ -2799,7 +3171,7 @@ const HomePage: React.FC = () => {
                           onClick={() => setAuthMode('login')}
                           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'login' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
                         >
-                          Login
+                          {uiLanguage === 'en' ? 'Login' : '登录'}
                         </button>
                         <button
                           type="button"
@@ -2807,7 +3179,7 @@ const HomePage: React.FC = () => {
                           onClick={() => setAuthMode('register')}
                           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'register' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
                         >
-                          Register
+                          {uiLanguage === 'en' ? 'Register' : '注册'}
                         </button>
                       </div>
                     </div>
@@ -2818,7 +3190,7 @@ const HomePage: React.FC = () => {
                           value={authEmail}
                           onChange={(event) => setAuthEmail(event.target.value)}
                           data-testid="guest-auth-email"
-                          placeholder="Email"
+                          placeholder={uiLanguage === 'en' ? 'Email' : '邮箱'}
                           className="h-8 w-48 rounded-lg border border-subtle bg-surface px-2 text-xs text-foreground placeholder:text-muted-text"
                         />
                         <input
@@ -2826,7 +3198,7 @@ const HomePage: React.FC = () => {
                           value={authPassword}
                           onChange={(event) => setAuthPassword(event.target.value)}
                           data-testid="guest-auth-password"
-                          placeholder="Password"
+                          placeholder={uiLanguage === 'en' ? 'Password' : '密码'}
                           className="h-8 w-40 rounded-lg border border-subtle bg-surface px-2 text-xs text-foreground placeholder:text-muted-text"
                         />
                         <Button
@@ -2838,13 +3210,17 @@ const HomePage: React.FC = () => {
                           onClick={() => void handlePlatformAuth()}
                           data-testid="guest-auth-submit"
                         >
-                          {authMode === 'register' ? 'Register' : 'Login'}
+                          {authMode === 'register'
+                            ? (uiLanguage === 'en' ? 'Register' : '注册')
+                            : (uiLanguage === 'en' ? 'Login' : '登录')}
                         </Button>
                         {authError ? <span className="text-xs text-danger">{authError}</span> : null}
                       </div>
                     ) : (
                       <div className="mt-3 rounded-lg border border-subtle bg-surface/35 px-3 py-2 text-xs text-secondary-text">
-                        Account features can be enabled locally; the current no-AI query remains available without login.
+                        {uiLanguage === 'en'
+                          ? 'Account features can be enabled locally; the current no-AI query remains available without login.'
+                          : '账户功能可在本地启用；当前免费查询不需要登录也能继续使用。'}
                       </div>
                     )}
                   </section>
@@ -2933,7 +3309,7 @@ const HomePage: React.FC = () => {
                         </div>
                         <div className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
                           <div className="text-xs text-secondary-text">{uiLanguage === 'en' ? 'Source' : '来源'}</div>
-                          <div className="mt-1 truncate text-sm font-semibold text-foreground">{basicFreeReport.miniChart.source}</div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">{localizeGeneratedSource(basicFreeReport.miniChart.source, uiLanguage)}</div>
                         </div>
                       </div>
                     </div>
@@ -2958,7 +3334,7 @@ const HomePage: React.FC = () => {
                             <div className="text-2xl font-semibold text-primary">
                               {basicFreeReport.signalScore.score}/100
                             </div>
-                            <div className="mt-1 text-[11px] text-secondary-text">No AI</div>
+                            <div className="mt-1 text-[11px] text-secondary-text">{t('home.noAi')}</div>
                           </div>
                         </div>
                         <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface">
@@ -3019,14 +3395,14 @@ const HomePage: React.FC = () => {
                               {uiLanguage === 'en' ? 'Why keep reading' : '为什么值得继续看'}
                             </div>
                             <h4 className="mt-1 text-base font-semibold text-foreground">
-                              {basicSnapshot.intelligence.retentionBrief.headline}
+                              {localizeGeneratedText(basicSnapshot.intelligence.retentionBrief.headline, uiLanguage)}
                             </h4>
                             <p className="mt-2 text-xs leading-relaxed text-secondary-text">
-                              {basicSnapshot.intelligence.retentionBrief.whyItMatters}
+                              {localizeGeneratedText(basicSnapshot.intelligence.retentionBrief.whyItMatters, uiLanguage)}
                             </p>
                           </div>
                           <div className="shrink-0 rounded-lg border border-primary/35 bg-primary/10 px-3 py-2 text-xs text-primary">
-                            No AI
+                            {t('home.noAi')}
                           </div>
                         </div>
                         <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)]">
@@ -3035,10 +3411,10 @@ const HomePage: React.FC = () => {
                               {uiLanguage === 'en' ? 'Support / resistance' : '支撑 / 压力'}
                             </div>
                             <div className="mt-1 text-sm font-semibold text-foreground">
-                              {basicSnapshot.intelligence.retentionBrief.supportResistance}
+                              {localizeGeneratedText(basicSnapshot.intelligence.retentionBrief.supportResistance, uiLanguage)}
                             </div>
                             <div className="mt-2 text-[11px] text-secondary-text">
-                              {basicSnapshot.intelligence.retentionBrief.source}
+                              {localizeGeneratedSource(basicSnapshot.intelligence.retentionBrief.source, uiLanguage)}
                             </div>
                           </div>
                           <div className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
@@ -3048,7 +3424,7 @@ const HomePage: React.FC = () => {
                             <div className="mt-2 grid gap-1.5 text-xs leading-relaxed text-secondary-text md:grid-cols-3">
                               {basicSnapshot.intelligence.retentionBrief.nextSteps.map((step) => (
                                 <div key={step} className="rounded-md border border-subtle/70 px-2 py-1.5">
-                                  {step}
+                                  {localizeGeneratedText(step, uiLanguage)}
                                 </div>
                               ))}
                             </div>
@@ -3056,10 +3432,10 @@ const HomePage: React.FC = () => {
                         </div>
                         <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
                           <span className="min-w-0 leading-relaxed">
-                            {basicSnapshot.intelligence.retentionBrief.upgradeHint}
+                            {localizeGeneratedText(basicSnapshot.intelligence.retentionBrief.upgradeHint, uiLanguage)}
                           </span>
                           <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
-                            {basicSnapshot.intelligence.retentionBrief.boundary}
+                            {localizeGeneratedText(basicSnapshot.intelligence.retentionBrief.boundary, uiLanguage)}
                           </span>
                         </div>
                       </div>
@@ -3071,20 +3447,26 @@ const HomePage: React.FC = () => {
                       >
                         <div className="mb-3 flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0">
-                            <div className="text-xs font-medium text-primary">News center</div>
+                            <div className="text-xs font-medium text-primary">
+                              {uiLanguage === 'en' ? 'News center' : '资讯中心'}
+                            </div>
                             <h4 className="mt-1 text-base font-semibold text-foreground">
-                              {basicSnapshot.intelligence.newsCenter.title}
+                              {localizeGeneratedText(basicSnapshot.intelligence.newsCenter.title, uiLanguage)}
                             </h4>
                             <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                              {basicSnapshot.intelligence.newsCenter.summary}
+                              {localizeGeneratedText(basicSnapshot.intelligence.newsCenter.summary, uiLanguage)}
                             </p>
                           </div>
                           <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px]">
                             <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary">
-                              {basicSnapshot.intelligence.newsCenter.aiUsed ? 'AI used' : 'No AI'}
+                              {basicSnapshot.intelligence.newsCenter.aiUsed
+                                ? (uiLanguage === 'en' ? 'AI used' : '已使用 AI')
+                                : t('home.noAi')}
                             </span>
                             <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
-                              {basicSnapshot.intelligence.newsCenter.publicSearchUsed ? 'Public search' : 'No public search'}
+                              {basicSnapshot.intelligence.newsCenter.publicSearchUsed
+                                ? (uiLanguage === 'en' ? 'Public search' : '公共搜索')
+                                : (uiLanguage === 'en' ? 'No public search' : '未用公共搜索')}
                             </span>
                           </div>
                         </div>
@@ -3097,25 +3479,25 @@ const HomePage: React.FC = () => {
                               <div className="flex min-w-0 items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <div className="truncate text-sm font-semibold text-foreground">
-                                    {item.title}
+                                    {localizeGeneratedText(item.title, uiLanguage)}
                                   </div>
                                   <div className="mt-1 truncate text-[11px] text-primary">
-                                    {item.category}
+                                    {localizeGeneratedText(item.category, uiLanguage)}
                                   </div>
                                 </div>
                                 <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
-                                  {item.status}
+                                  {localizeGeneratedStatus(item.status, uiLanguage)}
                                 </span>
                               </div>
                               <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
-                                {item.summary}
+                                {localizeGeneratedText(item.summary, uiLanguage)}
                               </p>
                               <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
-                                {item.action}
+                                {localizeGeneratedText(item.action, uiLanguage)}
                               </p>
                               <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
                                 <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                  {item.source}
+                                  {localizeGeneratedSource(item.source, uiLanguage)}
                                 </span>
                                 {item.updatedAt ? (
                                   <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
@@ -3128,10 +3510,10 @@ const HomePage: React.FC = () => {
                         </div>
                         <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
                           <span className="min-w-0 leading-relaxed">
-                            {basicSnapshot.intelligence.newsCenter.premiumUnlock}
+                            {localizeGeneratedText(basicSnapshot.intelligence.newsCenter.premiumUnlock, uiLanguage)}
                           </span>
                           <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
-                            {basicSnapshot.intelligence.newsCenter.boundary}
+                            {localizeGeneratedText(basicSnapshot.intelligence.newsCenter.boundary, uiLanguage)}
                           </span>
                         </div>
                       </div>
@@ -3143,52 +3525,54 @@ const HomePage: React.FC = () => {
                       >
                         <div className="mb-3 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0">
-                            <div className="text-xs font-medium text-primary">Kronos-ready</div>
+                            <div className="text-xs font-medium text-primary">
+                              {localizeGeneratedText('Kronos-ready', uiLanguage)}
+                            </div>
                             <h4 className="mt-1 text-base font-semibold text-foreground">
-                              {basicSnapshot.intelligence.klineForecast.title}
+                              {localizeGeneratedText(basicSnapshot.intelligence.klineForecast.title, uiLanguage)}
                             </h4>
                             <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                              {basicSnapshot.intelligence.klineForecast.adapterStatus}
+                              {localizeGeneratedText(basicSnapshot.intelligence.klineForecast.adapterStatus, uiLanguage)}
                             </p>
                           </div>
                           <div className="grid shrink-0 grid-cols-3 gap-2 text-center text-xs">
                             <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2">
-                              <div className="text-[11px] text-secondary-text">Horizon</div>
+                              <div className="text-[11px] text-secondary-text">{localizeGeneratedText('Horizon', uiLanguage)}</div>
                               <div className="mt-1 font-semibold text-primary">
-                                {basicSnapshot.intelligence.klineForecast.horizon}
+                                {localizeGeneratedHorizon(basicSnapshot.intelligence.klineForecast.horizon, uiLanguage)}
                               </div>
                             </div>
                             <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2">
-                              <div className="text-[11px] text-secondary-text">Confidence</div>
+                              <div className="text-[11px] text-secondary-text">{localizeGeneratedText('Confidence', uiLanguage)}</div>
                               <div className="mt-1 font-semibold text-primary">
                                 {basicSnapshot.intelligence.klineForecast.confidence}/100
                               </div>
                             </div>
                             <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2">
-                              <div className="text-[11px] text-secondary-text">Direction</div>
+                              <div className="text-[11px] text-secondary-text">{localizeGeneratedText('Direction', uiLanguage)}</div>
                               <div className="mt-1 font-semibold text-primary">
-                                {basicSnapshot.intelligence.klineForecast.direction}
+                                {localizeGeneratedStatus(basicSnapshot.intelligence.klineForecast.direction, uiLanguage)}
                               </div>
                             </div>
                           </div>
                         </div>
                         <div className="mb-3 grid gap-2 md:grid-cols-3">
                           <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
-                            <div className="text-xs text-secondary-text">Support</div>
+                            <div className="text-xs text-secondary-text">{localizeGeneratedText('Support', uiLanguage)}</div>
                             <div className="mt-1 text-sm font-semibold text-foreground">
                               {formatBasicNumber(basicSnapshot.intelligence.klineForecast.support)}
                             </div>
                           </div>
                           <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
-                            <div className="text-xs text-secondary-text">Resistance</div>
+                            <div className="text-xs text-secondary-text">{localizeGeneratedText('Resistance', uiLanguage)}</div>
                             <div className="mt-1 text-sm font-semibold text-foreground">
                               {formatBasicNumber(basicSnapshot.intelligence.klineForecast.resistance)}
                             </div>
                           </div>
                           <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
-                            <div className="text-xs text-secondary-text">Source</div>
+                            <div className="text-xs text-secondary-text">{localizeGeneratedText('Source', uiLanguage)}</div>
                             <div className="mt-1 truncate text-sm font-semibold text-foreground">
-                              {basicSnapshot.intelligence.klineForecast.source}
+                              {localizeGeneratedSource(basicSnapshot.intelligence.klineForecast.source, uiLanguage)}
                             </div>
                           </div>
                         </div>
@@ -3201,10 +3585,10 @@ const HomePage: React.FC = () => {
                               <div className="flex min-w-0 items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <div className="truncate text-sm font-semibold text-foreground">
-                                    {scenario.label}
+                                    {localizeGeneratedText(scenario.label, uiLanguage)}
                                   </div>
                                   <div className="mt-1 truncate text-[11px] text-primary">
-                                    {scenario.direction}
+                                    {localizeGeneratedStatus(scenario.direction, uiLanguage)}
                                   </div>
                                 </div>
                                 <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
@@ -3212,10 +3596,10 @@ const HomePage: React.FC = () => {
                                 </span>
                               </div>
                               <p className="mt-2 text-xs leading-relaxed text-secondary-text">
-                                {scenario.trigger}
+                                {localizeGeneratedText(scenario.trigger, uiLanguage)}
                               </p>
                               <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
-                                {scenario.detail}
+                                {localizeGeneratedText(scenario.detail, uiLanguage)}
                               </p>
                             </div>
                           ))}
@@ -3223,9 +3607,11 @@ const HomePage: React.FC = () => {
                         <div className="mt-3 rounded-lg border border-primary/25 bg-background/35 p-3" data-testid="basic-query-kronos-sandbox">
                           <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0">
-                              <div className="text-xs font-medium text-primary">Kronos sandbox</div>
+                              <div className="text-xs font-medium text-primary">
+                                {uiLanguage === 'en' ? 'Kronos sandbox' : 'Kronos 沙箱'}
+                              </div>
                               <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                                Run the local adapter probe. If the real Kronos runtime is unavailable, this stays on the local rules fallback.
+                                {localizeGeneratedText('Run the local adapter probe. If the real Kronos runtime is unavailable, this stays on the local rules fallback.', uiLanguage)}
                               </p>
                             </div>
                             <Button
@@ -3234,11 +3620,11 @@ const HomePage: React.FC = () => {
                               size="sm"
                               onClick={() => void handleRunKronosForecast(false)}
                               isLoading={isRunningKronosForecast}
-                              loadingText="Checking Kronos"
+                              loadingText={uiLanguage === 'en' ? 'Checking Kronos' : '正在运行 Kronos'}
                               data-testid="basic-query-kronos-run"
                             >
                               <Sparkles className="h-4 w-4" />
-                              Check Kronos
+                              {uiLanguage === 'en' ? 'Check Kronos' : '运行 Kronos 模型'}
                             </Button>
                           </div>
                           {kronosForecastError ? (
@@ -3250,13 +3636,13 @@ const HomePage: React.FC = () => {
                             <div data-testid="basic-query-kronos-live-result" className="mt-3 space-y-3">
                               <div className="flex min-w-0 flex-wrap gap-2 text-xs text-secondary-text">
                                 <span className="rounded-md border border-subtle/70 px-2 py-1">
-                                  {kronosForecast.status}
+                                  {localizeGeneratedStatus(kronosForecast.status, uiLanguage)}
                                 </span>
                                 <span className="rounded-md border border-subtle/70 px-2 py-1">
-                                  {kronosForecast.kronosModelUsed ? 'Real Kronos model' : 'Local rules fallback'}
+                                  {localizeGeneratedText(kronosForecast.kronosModelUsed ? 'Real Kronos model' : 'Local rules fallback', uiLanguage)}
                                 </span>
                                 <span className="rounded-md border border-subtle/70 px-2 py-1">
-                                  {kronosForecast.source}
+                                  {localizeGeneratedSource(kronosForecast.source, uiLanguage)}
                                 </span>
                                 <span className="rounded-md border border-subtle/70 px-2 py-1">
                                   {kronosForecast.elapsedMs.toLocaleString(undefined, { maximumFractionDigits: 1 })}ms
@@ -3264,7 +3650,7 @@ const HomePage: React.FC = () => {
                               </div>
                               <div className="grid gap-2 md:grid-cols-3">
                                 <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3">
-                                  <div className="text-xs text-secondary-text">Model</div>
+                                  <div className="text-xs text-secondary-text">{localizeGeneratedText('Model', uiLanguage)}</div>
                                   <div className="mt-1 truncate text-sm font-semibold text-foreground">
                                     {kronosForecast.modelId}
                                   </div>
@@ -3273,21 +3659,24 @@ const HomePage: React.FC = () => {
                                   </div>
                                 </div>
                                 <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3">
-                                  <div className="text-xs text-secondary-text">Forecast</div>
+                                  <div className="text-xs text-secondary-text">{localizeGeneratedText('Forecast', uiLanguage)}</div>
                                   <div className="mt-1 text-sm font-semibold text-foreground">
-                                    {kronosForecast.direction} / {kronosForecast.confidence}/100
+                                    {localizeGeneratedStatus(kronosForecast.direction, uiLanguage)} / {kronosForecast.confidence}/100
                                   </div>
                                   <div className="mt-1 text-[11px] text-secondary-text">
-                                    {kronosForecast.horizon}, lookback {kronosForecast.lookback}
+                                    {localizeGeneratedHorizon(kronosForecast.horizon, uiLanguage)}
+                                    {uiLanguage === 'en' ? `, lookback ${kronosForecast.lookback}` : `，回看 ${kronosForecast.lookback} 根`}
                                   </div>
                                 </div>
                                 <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3" data-testid="basic-query-kronos-backtest-summary">
-                                  <div className="text-xs text-secondary-text">Backtest records</div>
+                                  <div className="text-xs text-secondary-text">{localizeGeneratedText('Backtest records', uiLanguage)}</div>
                                   <div className="mt-1 text-sm font-semibold text-foreground">
-                                    {kronosForecast.backtestSummary.records} records
+                                    {uiLanguage === 'en'
+                                      ? `${kronosForecast.backtestSummary.records} records`
+                                      : `${kronosForecast.backtestSummary.records} 条记录`}
                                   </div>
                                   <div className="mt-1 text-[11px] text-secondary-text">
-                                    hit rate {kronosForecast.backtestSummary.hitRate ?? '-'}
+                                    {uiLanguage === 'en' ? 'hit rate' : '命中率'} {kronosForecast.backtestSummary.hitRate ?? '-'}
                                   </div>
                                 </div>
                               </div>
@@ -3297,13 +3686,13 @@ const HomePage: React.FC = () => {
                                     key={name}
                                     className={`rounded-md border px-2 py-1 ${available ? 'border-success/40 bg-success/10 text-success' : 'border-warning/40 bg-warning/10 text-warning'}`}
                                   >
-                                    {name}: {available ? 'ready' : 'missing'}
+                                    {localizeGeneratedSource(name, uiLanguage)}: {localizeGeneratedText(available ? 'ready' : 'missing', uiLanguage)}
                                   </span>
                                 ))}
                               </div>
                               {kronosForecast.missingDependencies.length ? (
                                 <div className="rounded-lg border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-warning">
-                                  Missing: {kronosForecast.missingDependencies.join(', ')}
+                                  {uiLanguage === 'en' ? 'Missing' : '缺失'}: {kronosForecast.missingDependencies.join(', ')}
                                 </div>
                               ) : null}
                               {kronosForecast.forecastPoints.length ? (
@@ -3322,7 +3711,7 @@ const HomePage: React.FC = () => {
                                 <div className="space-y-1 text-xs text-secondary-text">
                                   {kronosForecast.warnings.slice(0, 3).map((warning) => (
                                     <div key={warning} className="rounded-md border border-subtle/70 px-2 py-1">
-                                      {warning}
+                                      {localizeGeneratedText(warning, uiLanguage)}
                                     </div>
                                   ))}
                                 </div>
@@ -3332,10 +3721,10 @@ const HomePage: React.FC = () => {
                         </div>
                         <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-background/35 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
                           <span className="min-w-0 leading-relaxed">
-                            {basicSnapshot.intelligence.klineForecast.premiumUnlock}
+                            {localizeGeneratedText(basicSnapshot.intelligence.klineForecast.premiumUnlock, uiLanguage)}
                           </span>
                           <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
-                            {basicSnapshot.intelligence.klineForecast.boundary}
+                            {localizeGeneratedText(basicSnapshot.intelligence.klineForecast.boundary, uiLanguage)}
                           </span>
                         </div>
                       </div>
@@ -3346,10 +3735,22 @@ const HomePage: React.FC = () => {
                         className="mb-3 grid gap-2 rounded-lg border border-primary/25 bg-background/35 p-3 md:grid-cols-4"
                       >
                         {[
-                          ['Free no-AI', 'Quote, MA, volume, profile, local information lanes.'],
-                          ['Premium news', 'Realtime news, filings, source links, sector context.'],
-                          ['Kronos-ready', 'K-line forecast adapter lane after local model approval.'],
-                          ['BYOK or local model', 'Use platform API, user API key, or approved local model quota.'],
+                          [
+                            uiLanguage === 'en' ? 'Free no-AI' : '免费无AI',
+                            uiLanguage === 'en' ? 'Quote, MA, volume, profile, local information lanes.' : '行情、均线、成交量、公司资料和本地信息通道。',
+                          ],
+                          [
+                            uiLanguage === 'en' ? 'Premium news' : '高级资讯',
+                            uiLanguage === 'en' ? 'Realtime news, filings, source links, sector context.' : '实时资讯、公告、来源链接和板块背景。',
+                          ],
+                          [
+                            localizeGeneratedText('Kronos-ready', uiLanguage),
+                            uiLanguage === 'en' ? 'K-line forecast adapter lane after local model approval.' : '本地模型确认后可使用K线预测适配通道。',
+                          ],
+                          [
+                            uiLanguage === 'en' ? 'BYOK or local model' : '自带Key或本地模型',
+                            uiLanguage === 'en' ? 'Use platform API, user API key, or approved local model quota.' : '可使用平台 API、用户自带 API Key 或已批准的本地模型额度。',
+                          ],
                         ].map(([title, detail]) => (
                           <div key={title} className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
                             <div className="truncate text-sm font-semibold text-foreground">{title}</div>
@@ -3378,10 +3779,10 @@ const HomePage: React.FC = () => {
                           </div>
                           <div className="flex shrink-0 flex-wrap gap-2 text-xs">
                             <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
-                              No AI
+                              {t('home.noAi')}
                             </span>
                             <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
-                              {basicSnapshot.intelligence.mode}
+                              {localizeRuntimeLabel(basicSnapshot.intelligence.mode, uiLanguage)}
                             </span>
                           </div>
                         </div>
@@ -3400,11 +3801,11 @@ const HomePage: React.FC = () => {
                                 </span>
                               </div>
                               <div className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
-                                {item.summary}
+                                {localizeGeneratedText(item.summary, uiLanguage)}
                               </div>
                               <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
                                 <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                  {item.source}
+                                  {localizeGeneratedSource(item.source, uiLanguage)}
                                 </span>
                                 {item.updatedAt ? (
                                   <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
@@ -3417,7 +3818,7 @@ const HomePage: React.FC = () => {
                         </div>
                         {basicSnapshot.intelligence.boundary ? (
                           <div className="mt-3 text-[11px] leading-relaxed text-secondary-text">
-                            {basicSnapshot.intelligence.boundary}
+                            {localizeGeneratedText(basicSnapshot.intelligence.boundary, uiLanguage)}
                           </div>
                         ) : null}
                       </div>
@@ -3433,15 +3834,15 @@ const HomePage: React.FC = () => {
                               {uiLanguage === 'en' ? 'Market lane' : '市场通道'}
                             </div>
                             <h4 className="mt-1 text-sm font-semibold text-foreground">
-                              {basicSnapshot.intelligence.marketBrief.title}
+                              {localizeGeneratedText(basicSnapshot.intelligence.marketBrief.title, uiLanguage)}
                             </h4>
                             <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                              {basicSnapshot.intelligence.marketBrief.summary}
+                              {localizeGeneratedText(basicSnapshot.intelligence.marketBrief.summary, uiLanguage)}
                             </p>
                           </div>
                           <div className="flex shrink-0 flex-wrap gap-2 text-xs">
                             <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary">
-                              {basicSnapshot.intelligence.marketBrief.lane}
+                              {marketLaneLabel(basicSnapshot.intelligence.marketBrief.lane, uiLanguage)}
                             </span>
                             <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
                               {basicSnapshot.intelligence.marketBrief.market.toUpperCase()}
@@ -3449,14 +3850,14 @@ const HomePage: React.FC = () => {
                           </div>
                         </div>
                         <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
-                          {basicSnapshot.intelligence.marketBrief.focusPoints.map((point) => (
+                              {basicSnapshot.intelligence.marketBrief.focusPoints.map((point) => (
                             <span key={point} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
-                              {point}
+                              {localizeGeneratedText(point, uiLanguage)}
                             </span>
                           ))}
                         </div>
                         <div className="mt-3 text-[11px] leading-relaxed text-secondary-text">
-                          {basicSnapshot.intelligence.marketBrief.deepUnlock}
+                          {localizeGeneratedText(basicSnapshot.intelligence.marketBrief.deepUnlock, uiLanguage)}
                         </div>
                       </div>
                     ) : null}
@@ -3477,7 +3878,7 @@ const HomePage: React.FC = () => {
                             </p>
                           </div>
                           <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
-                            No AI
+                            {t('home.noAi')}
                           </span>
                         </div>
                         <div className="grid gap-2 md:grid-cols-3">
@@ -3487,23 +3888,23 @@ const HomePage: React.FC = () => {
                               className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3"
                             >
                               <div className="flex min-w-0 items-center justify-between gap-2">
-                                <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
+                                <div className="truncate text-sm font-semibold text-foreground">{localizeGeneratedText(item.title, uiLanguage)}</div>
                                 <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
-                                  {item.tone}
+                                  {localizeGeneratedStatus(item.tone, uiLanguage)}
                                 </span>
                               </div>
                               <div className="mt-2 text-xs leading-relaxed text-secondary-text">
-                                {item.summary}
+                                {localizeGeneratedText(item.summary, uiLanguage)}
                               </div>
                               <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
                                 {item.bullets.map((bullet) => (
                                   <span key={bullet} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                    {bullet}
+                                    {localizeGeneratedText(bullet, uiLanguage)}
                                   </span>
                                 ))}
                               </div>
                               <div className="mt-2 truncate text-[11px] text-secondary-text">
-                                {item.source}
+                                {localizeGeneratedSource(item.source, uiLanguage)}
                               </div>
                             </div>
                           ))}
@@ -3521,11 +3922,11 @@ const HomePage: React.FC = () => {
                               {uiLanguage === 'en' ? 'Peer / market comparison' : '同业/大盘对照'}
                             </h4>
                             <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                              {basicSnapshot.intelligence.peerComparison.summary}
+                              {localizeGeneratedText(basicSnapshot.intelligence.peerComparison.summary, uiLanguage)}
                             </p>
                           </div>
                           <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
-                            No AI
+                            {t('home.noAi')}
                           </span>
                         </div>
                         <div className="overflow-hidden rounded-lg border border-subtle/70">
@@ -3543,16 +3944,16 @@ const HomePage: React.FC = () => {
                               >
                                 <div className="min-w-0">
                                   <div className="font-semibold text-foreground">{row.symbol}</div>
-                                  <div className="mt-0.5 truncate text-[11px] text-secondary-text">{row.label}</div>
+                                  <div className="mt-0.5 truncate text-[11px] text-secondary-text">{localizeGeneratedText(row.label, uiLanguage)}</div>
                                 </div>
                                 <div className="min-w-0 text-secondary-text">
-                                  <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">{row.role}</span>
+                                  <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">{localizeGeneratedText(row.role, uiLanguage)}</span>
                                 </div>
                                 <div className="min-w-0 leading-relaxed text-secondary-text">
-                                  {row.currentSignal}
+                                  {localizeGeneratedText(row.currentSignal, uiLanguage)}
                                 </div>
                                 <div className="min-w-0 leading-relaxed text-secondary-text">
-                                  {row.compareNext}
+                                  {localizeGeneratedText(row.compareNext, uiLanguage)}
                                 </div>
                               </div>
                             ))}
@@ -3571,7 +3972,7 @@ const HomePage: React.FC = () => {
                               {uiLanguage === 'en' ? 'Next watch points' : '下一步观察'}
                             </h4>
                             <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
-                              No AI
+                              {t('home.noAi')}
                             </span>
                           </div>
                           <div className="grid gap-2 md:grid-cols-2">
@@ -3579,8 +3980,8 @@ const HomePage: React.FC = () => {
                               <div key={`${item.category}-${item.title}`} className="min-w-0 rounded-lg border border-subtle bg-surface/35 p-3">
                                 <div className="flex min-w-0 items-start justify-between gap-2">
                                   <div className="min-w-0">
-                                    <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
-                                    <div className="mt-1 text-xs leading-relaxed text-secondary-text">{item.detail}</div>
+                                    <div className="truncate text-sm font-semibold text-foreground">{localizeGeneratedText(item.title, uiLanguage)}</div>
+                                    <div className="mt-1 text-xs leading-relaxed text-secondary-text">{localizeGeneratedText(item.detail, uiLanguage)}</div>
                                   </div>
                                   <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
                                     {basicWatchPriorityLabel(item.priority, uiLanguage)}
@@ -3599,10 +4000,10 @@ const HomePage: React.FC = () => {
                               <span
                                 key={`${item.symbol}-${item.label}`}
                                 className="max-w-full rounded-md border border-subtle/80 px-2 py-1 text-[11px] text-secondary-text"
-                                title={item.reason}
+                                title={localizeGeneratedText(item.reason, uiLanguage)}
                               >
                                 <span className="font-medium text-foreground">{item.symbol}</span>
-                                <span className="ml-1">{item.label}</span>
+                                <span className="ml-1">{localizeGeneratedText(item.label, uiLanguage)}</span>
                               </span>
                             ))}
                           </div>
@@ -3623,12 +4024,12 @@ const HomePage: React.FC = () => {
                           {uiLanguage === 'en' ? 'Key conclusion' : '关键结论'}
                         </div>
                         <div className="mt-1 text-sm font-semibold leading-snug text-foreground">
-                          {basicFreeReport.productBrief.conclusion}
+                          {localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage)}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-secondary-text">
-                          <span className="rounded-md border border-primary/30 px-1.5 py-0.5">No AI</span>
+                          <span className="rounded-md border border-primary/30 px-1.5 py-0.5">{t('home.noAi')}</span>
                           <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
-                            {basicSnapshot.quote.source}
+                            {localizeGeneratedSource(basicSnapshot.quote.source, uiLanguage)}
                           </span>
                         </div>
                       </div>
@@ -3638,10 +4039,10 @@ const HomePage: React.FC = () => {
                         </div>
                         <div className="mt-2 space-y-1 text-sm font-medium text-foreground">
                           <div className="truncate">
-                            {uiLanguage === 'en' ? 'Support' : '支撑'} {basicFreeReport.productBrief.supportLevels}
+                            {uiLanguage === 'en' ? 'Support' : '支撑'} {localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}
                           </div>
                           <div className="truncate">
-                            {uiLanguage === 'en' ? 'Resistance' : '压力'} {basicFreeReport.productBrief.pressureLevels}
+                            {uiLanguage === 'en' ? 'Resistance' : '压力'} {localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}
                           </div>
                         </div>
                       </div>
@@ -3651,10 +4052,10 @@ const HomePage: React.FC = () => {
                         </div>
                         <div className="mt-2 space-y-1 text-sm font-medium text-foreground">
                           <div className="truncate">
-                            {uiLanguage === 'en' ? 'Short' : '短线'} {basicFreeReport.productBrief.shortStatus}
+                            {uiLanguage === 'en' ? 'Short' : '短线'} {localizeGeneratedText(basicFreeReport.productBrief.shortStatus, uiLanguage)}
                           </div>
                           <div className="truncate">
-                            {uiLanguage === 'en' ? 'Medium' : '中线'} {basicFreeReport.productBrief.midStatus}
+                            {uiLanguage === 'en' ? 'Medium' : '中线'} {localizeGeneratedText(basicFreeReport.productBrief.midStatus, uiLanguage)}
                           </div>
                         </div>
                       </div>
@@ -3665,7 +4066,7 @@ const HomePage: React.FC = () => {
                         <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
                           {basicFreeReport.productBrief.risks.slice(0, 3).map((risk) => (
                             <span key={risk} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                              {risk}
+                              {localizeGeneratedText(risk, uiLanguage)}
                             </span>
                           ))}
                         </div>
@@ -3757,10 +4158,10 @@ const HomePage: React.FC = () => {
                       </h3>
                       <div className="flex min-w-0 flex-wrap gap-2 text-xs text-secondary-text">
                         <span className="rounded-md border border-subtle px-2 py-1">
-                          {basicSnapshot.profile.source}
+                          {localizeGeneratedSource(basicSnapshot.profile.source, uiLanguage)}
                         </span>
                         <span className="rounded-md border border-subtle px-2 py-1">
-                          {basicSnapshot.profile.freshness}
+                          {localizeRuntimeLabel(basicSnapshot.profile.freshness, uiLanguage)}
                         </span>
                         <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">
                           {t('home.noAi')}
@@ -3787,21 +4188,29 @@ const HomePage: React.FC = () => {
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-text">
                       <span className="rounded-md border border-subtle px-2 py-1">{t('home.basicSnapshotTitle')}</span>
                       <span className="rounded-md border border-subtle px-2 py-1">{basicSnapshot.market.toUpperCase()}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">{basicSnapshot.quote.freshness}</span>
+                      <span className="rounded-md border border-subtle px-2 py-1">{localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage)}</span>
                       <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-primary">{t('home.noAi')}</span>
                     </div>
                     <div
                       data-testid="basic-query-user-guardrails"
                       className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-text"
                     >
-                      <span className="rounded-md border border-subtle px-2 py-1">Current quick snapshot</span>
                       <span className="rounded-md border border-subtle px-2 py-1">
-                        {basicSnapshot.aiUsed ? 'AI used' : 'No AI used'}
+                        {uiLanguage === 'en' ? 'Current quick snapshot' : '当前快速快照'}
                       </span>
-                      <span className="rounded-md border border-subtle px-2 py-1">{marketLaneLabel(basicSnapshotLane)}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">Historical reports stay separate</span>
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {basicSnapshot.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi')}
+                      </span>
+                      <span className="rounded-md border border-subtle px-2 py-1">{marketLaneLabel(basicSnapshotLane, uiLanguage)}</span>
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {uiLanguage === 'en' ? 'Historical reports stay separate' : '历史报告单独保留'}
+                      </span>
                       {basicSnapshotCacheMode ? (
-                        <span className="rounded-md border border-subtle px-2 py-1">Cache {String(basicSnapshotCacheMode)}</span>
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {uiLanguage === 'en'
+                            ? `Cache ${String(basicSnapshotCacheMode)}`
+                            : `缓存 ${localizeRuntimeLabel(basicSnapshotCacheMode, uiLanguage)}`}
+                        </span>
                       ) : null}
                     </div>
                     <div
@@ -3809,28 +4218,30 @@ const HomePage: React.FC = () => {
                       className="mb-3 grid min-w-0 gap-2 border-y border-subtle py-2 text-xs text-secondary-text sm:grid-cols-2 lg:grid-cols-4"
                     >
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">Current Snapshot</div>
+                        <div className="font-medium text-foreground">{uiLanguage === 'en' ? 'Current Snapshot' : '当前快照'}</div>
                         <div className="mt-1 flex min-w-0 flex-wrap gap-1">
-                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{basicSnapshot.aiUsed ? 'AI used' : 'No AI'}</span>
-                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{marketLaneLabel(basicSnapshotLane)}</span>
+                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{basicSnapshot.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi')}</span>
+                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{marketLaneLabel(basicSnapshotLane, uiLanguage)}</span>
                         </div>
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">Watchlist</div>
+                        <div className="font-medium text-foreground">{uiLanguage === 'en' ? 'Watchlist' : '自选'}</div>
                         <div className="mt-1 flex min-w-0 flex-wrap gap-1">
-                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{platformWatchlistCount} symbols</span>
-                          <span className="rounded-md border border-subtle px-1.5 py-0.5">private</span>
+                          <span className="rounded-md border border-subtle px-1.5 py-0.5">
+                            {uiLanguage === 'en' ? `${platformWatchlistCount} symbols` : `${platformWatchlistCount} 只标的`}
+                          </span>
+                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{localizeRuntimeLabel('private', uiLanguage)}</span>
                         </div>
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">History Reports</div>
+                        <div className="font-medium text-foreground">{uiLanguage === 'en' ? 'History Reports' : '历史报告'}</div>
                         <div className="mt-1 flex min-w-0 flex-wrap gap-1">
                           <span className="rounded-md border border-subtle px-1.5 py-0.5">{workspaceHistoryCountText}</span>
-                          <span className="rounded-md border border-subtle px-1.5 py-0.5">separate</span>
+                          <span className="rounded-md border border-subtle px-1.5 py-0.5">{localizeRuntimeLabel('separate', uiLanguage)}</span>
                         </div>
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">AI Analysis</div>
+                        <div className="font-medium text-foreground">{uiLanguage === 'en' ? 'AI Analysis' : 'AI 分析'}</div>
                         <div className="mt-1 flex min-w-0 flex-wrap gap-1">
                           <span className="rounded-md border border-subtle px-1.5 py-0.5">{workspaceAiModeText}</span>
                           <span className="rounded-md border border-subtle px-1.5 py-0.5">{workspaceByokText}</span>
@@ -3844,19 +4255,19 @@ const HomePage: React.FC = () => {
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
-                            Free no-AI {basicQuotaText}
+                            {uiLanguage === 'en' ? `Free no-AI ${basicQuotaText}` : `免费查询 ${basicQuotaText}`}
                           </span>
                           <span className="rounded-md border border-subtle px-2 py-1">
-                            Platform API quick AI {platformAiQuotaText}
+                            {uiLanguage === 'en' ? `Platform API quick AI ${platformAiQuotaText}` : `平台 API 快速 AI ${platformAiQuotaText}`}
                           </span>
                           <span className="rounded-md border border-subtle px-2 py-1">
-                            BYOK {byokStatusText}; quick bucket {byokAiQuotaText}
+                            {uiLanguage === 'en' ? `BYOK ${byokStatusText}; quick bucket ${byokAiQuotaText}` : `BYOK ${byokStatusText}；快速额度 ${byokAiQuotaText}`}
                           </span>
                           <span className="rounded-md border border-subtle px-2 py-1">
-                            Local model {localModelQuotaText}
+                            {uiLanguage === 'en' ? `Local model ${localModelQuotaText}` : `本地模型 ${localModelQuotaText}`}
                           </span>
                           <span className="rounded-md border border-subtle px-2 py-1">
-                            Informational only; not investment advice
+                            {uiLanguage === 'en' ? 'Informational only; not investment advice' : '仅作信息分析，不构成投资建议'}
                           </span>
                         </div>
                         <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
@@ -3867,7 +4278,7 @@ const HomePage: React.FC = () => {
                               data-testid="platform-mode-platform"
                               className={`px-2.5 py-1 ${apiKeyMode === 'platform' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                             >
-                              Platform API
+                              {uiLanguage === 'en' ? 'Platform API' : '平台 API'}
                             </button>
                             <button
                               type="button"
@@ -3884,7 +4295,7 @@ const HomePage: React.FC = () => {
                               data-testid="platform-mode-local"
                               className={`px-2.5 py-1 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                             >
-                              Local model
+                              {uiLanguage === 'en' ? 'Local model' : '本地模型'}
                             </button>
                           </div>
                           <Button
@@ -3897,7 +4308,7 @@ const HomePage: React.FC = () => {
                             onClick={() => void handleSaveCurrentBasicSnapshotToHistory()}
                           >
                             <Save className="h-4 w-4" aria-hidden="true" />
-                            Save to history
+                            {uiLanguage === 'en' ? 'Save to history' : '保存到历史'}
                           </Button>
                           <Button
                             type="button"
@@ -3909,11 +4320,11 @@ const HomePage: React.FC = () => {
                             onClick={() => void handleAddCurrentQueryToPlatformWatchlist()}
                           >
                             <Plus className="h-4 w-4" aria-hidden="true" />
-                            Add to watchlist
+                            {uiLanguage === 'en' ? 'Add to watchlist' : '加入自选'}
                           </Button>
                           <Button type="button" variant="secondary" size="sm" onClick={() => void handlePlatformLogout()} data-testid="platform-logout-button">
                             <LogOut className="h-4 w-4" aria-hidden="true" />
-                            Logout
+                            {uiLanguage === 'en' ? 'Logout' : '退出登录'}
                           </Button>
                           {basicRetentionStatus ? (
                             <span data-testid="basic-query-retention-status" className="text-xs font-medium text-success">
@@ -3964,10 +4375,10 @@ const HomePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-3 text-xs text-secondary-text">
-                  {t('home.basicSource')}: {basicSnapshot.quote.source}
+                  {t('home.basicSource')}: {localizeGeneratedSource(basicSnapshot.quote.source, uiLanguage)}
                   {basicSnapshot.route ? (
                     <span data-testid="basic-query-route" className="ml-2">
-                      Lane: {basicSnapshot.route.dataSourceLane} / {basicSnapshot.route.channel}
+                      {uiLanguage === 'en' ? 'Lane' : '通道'}: {marketLaneLabel(basicSnapshot.route.dataSourceLane, uiLanguage)} / {basicSnapshot.route.channel}
                     </span>
                   ) : null}
                 </div>
@@ -3977,24 +4388,24 @@ const HomePage: React.FC = () => {
                       {t('home.basicDiagnostics')}: {formatBasicNumber(basicSnapshot.diagnostics.elapsedMs)}ms
                     </span>
                     <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicCache')}: Q {basicSnapshot.diagnostics.cache.quote || '-'} / H {basicSnapshot.diagnostics.cache.history || '-'}
+                      {t('home.basicCache')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.cache.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.cache.history || '-', uiLanguage)}
                     </span>
                     <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicFallback')}: Q {basicSnapshot.diagnostics.fallback?.quote || '-'} / H {basicSnapshot.diagnostics.fallback?.history || '-'}
+                      {t('home.basicFallback')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.fallback?.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.fallback?.history || '-', uiLanguage)}
                     </span>
                     <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicSourceHealth')}: Q {basicSnapshot.diagnostics.sourceHealth?.quote?.status || '-'} / H {basicSnapshot.diagnostics.sourceHealth?.history?.status || '-'}
+                      {t('home.basicSourceHealth')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.sourceHealth?.quote?.status || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.sourceHealth?.history?.status || '-', uiLanguage)}
                     </span>
                     <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicPersistentCache')}: Q {String(basicSnapshot.diagnostics.persistentCache?.quote || '-')} / H {String(basicSnapshot.diagnostics.persistentCache?.history || '-')}
+                      {t('home.basicPersistentCache')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.persistentCache?.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.persistentCache?.history || '-', uiLanguage)}
                     </span>
                     {basicSnapshot.diagnostics.refresh ? (
                       <span className="rounded-md border border-subtle px-2 py-1">
-                        Refresh: {String(basicSnapshot.diagnostics.refresh.mode || '-')}
+                        {uiLanguage === 'en' ? 'Refresh' : '刷新'}: {localizeRuntimeLabel(basicSnapshot.diagnostics.refresh.mode || '-', uiLanguage)}
                       </span>
                     ) : null}
                     <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicPerformance')}: {String(basicSnapshot.diagnostics.performance.status || '-')}
+                      {t('home.basicPerformance')}: {localizeRuntimeLabel(basicSnapshot.diagnostics.performance.status || '-', uiLanguage)}
                     </span>
                   </div>
                 ) : null}
@@ -4004,12 +4415,12 @@ const HomePage: React.FC = () => {
                     role="alert"
                     className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground"
                   >
-                    <div className="font-medium">{basicSnapshot.degradation.message}</div>
+                    <div className="font-medium">{localizeGeneratedText(basicSnapshot.degradation.message, uiLanguage)}</div>
                     {basicSnapshot.warnings?.length ? (
                       <ul className="mt-1 space-y-1 text-xs text-secondary-text">
                         {basicSnapshot.warnings.map((warning) => (
                           <li key={`${warning.code}-${warning.message}`}>
-                            {warning.code}: {warning.message}
+                            {localizeRuntimeLabel(warning.code, uiLanguage)}: {localizeGeneratedText(warning.message, uiLanguage)}
                           </li>
                         ))}
                       </ul>
@@ -4158,7 +4569,7 @@ const HomePage: React.FC = () => {
                             ))}
                             className="rounded-md border border-subtle px-2 py-1 text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            Prev
+                            {uiLanguage === 'en' ? 'Prev' : '上一个'}
                           </button>
                           <button
                             type="button"
@@ -4171,7 +4582,7 @@ const HomePage: React.FC = () => {
                             ))}
                             className="rounded-md border border-subtle px-2 py-1 text-secondary-text hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            Next
+                            {uiLanguage === 'en' ? 'Next' : '下一个'}
                           </button>
                           {activeHistoryReportMatch && historyReportSearch.trim() ? (
                             <span data-testid="history-report-search-hit" className="min-w-0 flex-1 text-secondary-text">
@@ -4179,7 +4590,7 @@ const HomePage: React.FC = () => {
                             </span>
                           ) : (
                             <span data-testid="history-report-search-hit" className="text-muted-text">
-                              No match
+                              {uiLanguage === 'en' ? 'No match' : '无匹配'}
                             </span>
                           )}
                         </div>
@@ -4220,10 +4631,10 @@ const HomePage: React.FC = () => {
                                 className="min-w-0 rounded-lg border border-subtle bg-background/40 px-3 py-2 text-left text-xs text-secondary-text hover:text-foreground disabled:cursor-default disabled:border-primary/40 disabled:bg-primary/10 disabled:text-primary"
                               >
                                 <span className="block truncate font-medium">
-                                  {isCurrent ? 'Current' : historyTimelineDate(item.createdAt)}
+                                  {isCurrent ? (uiLanguage === 'en' ? 'Current' : '当前') : historyTimelineDate(item.createdAt)}
                                 </span>
                                 <span className="block truncate">
-                                  {item.stockCode} - {item.reportType || 'report'}
+                                  {item.stockCode} - {item.reportType || (uiLanguage === 'en' ? 'report' : '报告')}
                                 </span>
                               </button>
                             );
@@ -4245,7 +4656,7 @@ const HomePage: React.FC = () => {
                       onClick={() => void handleUpdateSelectedHistoryState({ favorite: !selectedHistoryState.favorite })}
                     >
                       <Star className="h-4 w-4" aria-hidden="true" />
-                      Favorite
+                      {uiLanguage === 'en' ? 'Favorite' : '收藏'}
                     </Button>
                     <Button
                       type="button"
@@ -4257,7 +4668,7 @@ const HomePage: React.FC = () => {
                       onClick={() => void handleUpdateSelectedHistoryState({ important: !selectedHistoryState.important })}
                     >
                       <Flag className="h-4 w-4" aria-hidden="true" />
-                      Important
+                      {uiLanguage === 'en' ? 'Important' : '重要'}
                     </Button>
                     <Button
                       type="button"
@@ -4269,7 +4680,9 @@ const HomePage: React.FC = () => {
                       onClick={() => void handleUpdateSelectedHistoryState({ read: !selectedHistoryState.read })}
                     >
                       <Eye className="h-4 w-4" aria-hidden="true" />
-                      {selectedHistoryState.read ? 'Read' : 'Unread'}
+                      {selectedHistoryState.read
+                        ? (uiLanguage === 'en' ? 'Read' : '已读')
+                        : (uiLanguage === 'en' ? 'Unread' : '未读')}
                     </Button>
                     <Button
                       type="button"
@@ -4285,19 +4698,21 @@ const HomePage: React.FC = () => {
                       ) : (
                         <Archive className="h-4 w-4" aria-hidden="true" />
                       )}
-                      {selectedHistoryState.archived ? 'Restore' : 'Archive'}
+                      {selectedHistoryState.archived
+                        ? (uiLanguage === 'en' ? 'Restore' : '恢复')
+                        : (uiLanguage === 'en' ? 'Archive' : '归档')}
                     </Button>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
                     <label className="min-w-0 flex-1">
-                      <span className="sr-only">Local history note</span>
+                      <span className="sr-only">{uiLanguage === 'en' ? 'Local history note' : '本地历史备注'}</span>
                       <textarea
                         value={historyStateNoteDraft}
                         onChange={(event) => setHistoryStateNoteDraft(event.target.value)}
                         data-testid="history-state-note-input"
                         maxLength={1000}
                         rows={2}
-                        placeholder="Local note for this historical report"
+                        placeholder={uiLanguage === 'en' ? 'Local note for this historical report' : '给这份历史报告添加本地备注'}
                         className="min-h-16 w-full resize-y rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-text focus:border-primary/60"
                       />
                     </label>
