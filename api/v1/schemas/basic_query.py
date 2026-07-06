@@ -255,6 +255,74 @@ class BasicKlineForecastPayload(BaseModel):
     boundary: str = "Experimental model preview; information analysis only; not investment advice."
 
 
+class KronosForecastScenarioPayload(BaseModel):
+    """One scenario returned by the local Kronos sandbox endpoint."""
+
+    label: str
+    direction: str
+    probability: int = Field(..., ge=0, le=100)
+    trigger: str
+    detail: str
+
+
+class KronosForecastPointPayload(BaseModel):
+    """One predicted or fallback future K-line point."""
+
+    timestamp: str
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[float] = None
+    amount: Optional[float] = None
+
+
+class KronosBacktestSummaryPayload(BaseModel):
+    """Lightweight local record evaluation summary."""
+
+    records: int = Field(0, ge=0)
+    evaluated: int = Field(0, ge=0)
+    hits: int = Field(0, ge=0)
+    hit_rate: Optional[float] = None
+    last_evaluated_at: Optional[str] = None
+
+
+class KronosForecastResponse(BaseModel):
+    """Local Kronos forecast sandbox response with explicit fallback status."""
+
+    stock_code: str
+    stock_name: Optional[str] = None
+    market: str
+    mode: str = "kronos_sandbox"
+    status: str = Field(..., pattern="^(model_ready|model_unavailable|model_disabled|model_error|premium_required)$")
+    provider: str = "kronos"
+    source: str
+    horizon: str = "next_5_bars"
+    lookback: int = Field(..., ge=5, le=512)
+    direction: str
+    confidence: int = Field(..., ge=0, le=100)
+    support: Optional[float] = None
+    resistance: Optional[float] = None
+    adapter_status: str
+    enabled: bool = False
+    kronos_model_used: bool = False
+    model_id: str
+    tokenizer_id: str
+    device: str
+    dependency_status: Dict[str, bool] = Field(default_factory=dict)
+    missing_dependencies: List[str] = Field(default_factory=list)
+    scenarios: List[KronosForecastScenarioPayload] = Field(default_factory=list)
+    forecast_points: List[KronosForecastPointPayload] = Field(default_factory=list)
+    backtest_summary: KronosBacktestSummaryPayload = Field(default_factory=KronosBacktestSummaryPayload)
+    warnings: List[str] = Field(default_factory=list)
+    elapsed_ms: float = Field(..., ge=0)
+    cache_hit: bool = False
+    record_id: str
+    ai_used: bool = False
+    public_search_used: bool = False
+    boundary: str = "Experimental model preview; information analysis only; not investment advice."
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 

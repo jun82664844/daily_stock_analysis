@@ -6,7 +6,7 @@ import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
-import { stocksApi, type BasicStockSnapshot } from '../api/stocks';
+import { stocksApi, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
@@ -446,6 +446,9 @@ const HomePage: React.FC = () => {
   const [historyReportSectionStatus, setHistoryReportSectionStatus] = useState('');
   const [isQueryingBasic, setIsQueryingBasic] = useState(false);
   const [basicQueryError, setBasicQueryError] = useState<ParsedApiError | null>(null);
+  const [kronosForecast, setKronosForecast] = useState<KronosForecastResponse | null>(null);
+  const [isRunningKronosForecast, setIsRunningKronosForecast] = useState(false);
+  const [kronosForecastError, setKronosForecastError] = useState('');
   const [basicRetentionBusy, setBasicRetentionBusy] = useState(false);
   const [basicRetentionStatus, setBasicRetentionStatus] = useState('');
   const [basicRetentionError, setBasicRetentionError] = useState('');
@@ -1391,8 +1394,10 @@ const HomePage: React.FC = () => {
     setBasicQueryError(null);
     setBasicRetentionStatus('');
     setBasicRetentionError('');
+    setKronosForecastError('');
     if (!forceRefresh) {
       setBasicSnapshot(null);
+      setKronosForecast(null);
     }
     clearMarketReviewState();
     if (stockCode) {
@@ -1412,6 +1417,26 @@ const HomePage: React.FC = () => {
       setIsQueryingBasic(false);
     }
   }, [clearMarketReviewState, isQueryingBasic, query, setQuery]);
+
+  const handleRunKronosForecast = useCallback(async (requireModel = false) => {
+    if (!basicSnapshot?.stockCode || isRunningKronosForecast) {
+      return;
+    }
+    setIsRunningKronosForecast(true);
+    setKronosForecastError('');
+    try {
+      const result = await stocksApi.kronosForecast(basicSnapshot.stockCode, {
+        lookback: 120,
+        horizon: 5,
+        requireModel,
+      });
+      setKronosForecast(result);
+    } catch (err: unknown) {
+      setKronosForecastError(getParsedApiError(err).message);
+    } finally {
+      setIsRunningKronosForecast(false);
+    }
+  }, [basicSnapshot?.stockCode, isRunningKronosForecast]);
 
   useEffect(() => {
     if (!basicSnapshot || marketReviewReport) {
@@ -3194,6 +3219,116 @@ const HomePage: React.FC = () => {
                               </p>
                             </div>
                           ))}
+                        </div>
+                        <div className="mt-3 rounded-lg border border-primary/25 bg-background/35 p-3" data-testid="basic-query-kronos-sandbox">
+                          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-primary">Kronos sandbox</div>
+                              <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                                Run the local adapter probe. If the real Kronos runtime is unavailable, this stays on the local rules fallback.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void handleRunKronosForecast(false)}
+                              isLoading={isRunningKronosForecast}
+                              loadingText="Checking Kronos"
+                              data-testid="basic-query-kronos-run"
+                            >
+                              <Sparkles className="h-4 w-4" />
+                              Check Kronos
+                            </Button>
+                          </div>
+                          {kronosForecastError ? (
+                            <div data-testid="basic-query-kronos-error" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                              {kronosForecastError}
+                            </div>
+                          ) : null}
+                          {kronosForecast ? (
+                            <div data-testid="basic-query-kronos-live-result" className="mt-3 space-y-3">
+                              <div className="flex min-w-0 flex-wrap gap-2 text-xs text-secondary-text">
+                                <span className="rounded-md border border-subtle/70 px-2 py-1">
+                                  {kronosForecast.status}
+                                </span>
+                                <span className="rounded-md border border-subtle/70 px-2 py-1">
+                                  {kronosForecast.kronosModelUsed ? 'Real Kronos model' : 'Local rules fallback'}
+                                </span>
+                                <span className="rounded-md border border-subtle/70 px-2 py-1">
+                                  {kronosForecast.source}
+                                </span>
+                                <span className="rounded-md border border-subtle/70 px-2 py-1">
+                                  {kronosForecast.elapsedMs.toLocaleString(undefined, { maximumFractionDigits: 1 })}ms
+                                </span>
+                              </div>
+                              <div className="grid gap-2 md:grid-cols-3">
+                                <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3">
+                                  <div className="text-xs text-secondary-text">Model</div>
+                                  <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                                    {kronosForecast.modelId}
+                                  </div>
+                                  <div className="mt-1 truncate text-[11px] text-secondary-text">
+                                    {kronosForecast.tokenizerId}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3">
+                                  <div className="text-xs text-secondary-text">Forecast</div>
+                                  <div className="mt-1 text-sm font-semibold text-foreground">
+                                    {kronosForecast.direction} / {kronosForecast.confidence}/100
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-secondary-text">
+                                    {kronosForecast.horizon}, lookback {kronosForecast.lookback}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3" data-testid="basic-query-kronos-backtest-summary">
+                                  <div className="text-xs text-secondary-text">Backtest records</div>
+                                  <div className="mt-1 text-sm font-semibold text-foreground">
+                                    {kronosForecast.backtestSummary.records} records
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-secondary-text">
+                                    hit rate {kronosForecast.backtestSummary.hitRate ?? '-'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div data-testid="basic-query-kronos-dependency-status" className="flex min-w-0 flex-wrap gap-2 text-xs">
+                                {Object.entries(kronosForecast.dependencyStatus).map(([name, available]) => (
+                                  <span
+                                    key={name}
+                                    className={`rounded-md border px-2 py-1 ${available ? 'border-success/40 bg-success/10 text-success' : 'border-warning/40 bg-warning/10 text-warning'}`}
+                                  >
+                                    {name}: {available ? 'ready' : 'missing'}
+                                  </span>
+                                ))}
+                              </div>
+                              {kronosForecast.missingDependencies.length ? (
+                                <div className="rounded-lg border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-warning">
+                                  Missing: {kronosForecast.missingDependencies.join(', ')}
+                                </div>
+                              ) : null}
+                              {kronosForecast.forecastPoints.length ? (
+                                <div className="grid gap-2 md:grid-cols-5" data-testid="basic-query-kronos-forecast-points">
+                                  {kronosForecast.forecastPoints.slice(0, 5).map((point) => (
+                                    <div key={point.timestamp} className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-2">
+                                      <div className="truncate text-[11px] text-secondary-text">{point.timestamp}</div>
+                                      <div className="mt-1 text-sm font-semibold text-foreground">
+                                        {formatBasicNumber(point.close)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {kronosForecast.warnings.length ? (
+                                <div className="space-y-1 text-xs text-secondary-text">
+                                  {kronosForecast.warnings.slice(0, 3).map((warning) => (
+                                    <div key={warning} className="rounded-md border border-subtle/70 px-2 py-1">
+                                      {warning}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-background/35 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
                           <span className="min-w-0 leading-relaxed">

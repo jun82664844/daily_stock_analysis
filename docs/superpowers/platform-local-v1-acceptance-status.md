@@ -418,3 +418,12 @@ git diff --check
 - HomePage renders `basic-query-news-center`, `basic-query-kline-forecast-lab`, and `basic-query-premium-feature-ladder` so ordinary users can see richer free value and the upgrade boundary.
 - Added `tests/test_platform_local_news_kline_v57.py` and `scripts/verify_platform_local_news_kline_v57.py`; the verifier prints `DSA_PLATFORM_LOCAL_NEWS_KLINE_V57_OK` only when required local checks pass.
 - V57 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-06 Kronos Sandbox V58 gate
+
+- Added `src/services/kronos_forecast_service.py`, a local Kronos sandbox adapter with dependency probing, cache, concurrency/timeout boundary, JSONL forecast records, and lightweight record-based backtest summary.
+- Added `GET /api/v1/stocks/{code}/kronos-forecast`. Anonymous users can view model readiness and fallback output; `require_model=true` requires login and a pro/premium/enterprise/admin boundary.
+- HomePage now renders `basic-query-kronos-sandbox`, `basic-query-kronos-run`, `basic-query-kronos-live-result`, `basic-query-kronos-dependency-status`, and `basic-query-kronos-backtest-summary` so users can distinguish a real Kronos run from the local rules fallback.
+- Current local environment lacks required Kronos runtime dependencies, so the honest expected status is `model_unavailable` / `kronos_model_used=false` unless the operator later installs and enables Kronos with `KRONOS_ENABLED=true`.
+- Added `tests/test_kronos_forecast_service_v58.py`, `tests/test_kronos_forecast_api_v58.py`, `tests/test_platform_kronos_sandbox_v58.py`, and `scripts/verify_platform_kronos_sandbox_v58.py`; the verifier prints `DSA_PLATFORM_KRONOS_SANDBOX_V58_OK` only when required local checks pass.
+- V58 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

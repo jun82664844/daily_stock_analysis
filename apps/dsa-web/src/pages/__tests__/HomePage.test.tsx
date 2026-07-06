@@ -67,6 +67,7 @@ vi.mock('../../api/stocks', () => ({
     extractFromImage: vi.fn(),
     parseImport: vi.fn(),
     prewarm: vi.fn(),
+    kronosForecast: vi.fn(),
     snapshot: vi.fn(),
   },
 }));
@@ -303,6 +304,50 @@ describe('HomePage', () => {
       results: {},
       elapsedMs: 1,
       aiUsed: false,
+    });
+    vi.mocked(stocksApi.kronosForecast).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      mode: 'kronos_sandbox',
+      status: 'model_unavailable',
+      provider: 'kronos',
+      source: 'local_kline_rules_kronos_unavailable',
+      horizon: 'next_5_bars',
+      lookback: 120,
+      direction: 'upside_bias',
+      confidence: 64,
+      support: 190,
+      resistance: 205,
+      adapterStatus: 'Kronos adapter ready; model not invoked because dependencies are missing: torch, model.',
+      enabled: true,
+      kronosModelUsed: false,
+      modelId: 'NeoQuasar/Kronos-small',
+      tokenizerId: 'NeoQuasar/Kronos-Tokenizer-base',
+      device: 'auto',
+      dependencyStatus: { pandas: true, torch: false, transformers: false, huggingfaceHub: true, model: false },
+      missingDependencies: ['torch', 'transformers', 'model'],
+      scenarios: [
+        {
+          label: 'Upside-biased preview',
+          direction: 'upside_bias',
+          probability: 64,
+          trigger: 'Hold above support.',
+          detail: 'Local fallback.',
+        },
+      ],
+      forecastPoints: [
+        { timestamp: '2026-07-07', close: 201 },
+        { timestamp: '2026-07-08', close: 202 },
+      ],
+      backtestSummary: { records: 1, evaluated: 1, hits: 1, hitRate: 1, lastEvaluatedAt: '2026-07-06T09:00:00' },
+      warnings: ['Kronos model unavailable; missing dependencies: torch, transformers, model.'],
+      elapsedMs: 12,
+      cacheHit: false,
+      recordId: 'unit-kronos',
+      aiUsed: false,
+      publicSearchUsed: false,
+      boundary: 'Experimental model preview; information analysis only; not investment advice.',
     });
     vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
       isComplete: true,
@@ -2022,6 +2067,19 @@ describe('HomePage', () => {
     expect(klineForecast).toHaveTextContent('Breakout confirmation');
     expect(klineForecast).toHaveTextContent('Pullback risk');
     expect(klineForecast).toHaveTextContent('not investment advice');
+    fireEvent.click(screen.getByTestId('basic-query-kronos-run'));
+    await waitFor(() => {
+      expect(stocksApi.kronosForecast).toHaveBeenCalledWith('AAPL', {
+        lookback: 120,
+        horizon: 5,
+        requireModel: false,
+      });
+    });
+    const kronosResult = await screen.findByTestId('basic-query-kronos-live-result');
+    expect(kronosResult).toHaveTextContent('model_unavailable');
+    expect(kronosResult).toHaveTextContent('Local rules fallback');
+    expect(screen.getByTestId('basic-query-kronos-dependency-status')).toHaveTextContent('torch: missing');
+    expect(screen.getByTestId('basic-query-kronos-backtest-summary')).toHaveTextContent('1 records');
     const premiumFeatureLadder = screen.getByTestId('basic-query-premium-feature-ladder');
     expect(premiumFeatureLadder).toHaveTextContent('Free no-AI');
     expect(premiumFeatureLadder).toHaveTextContent('Premium news');

@@ -792,3 +792,39 @@ Review focus:
 - HomePage must show `basic-query-news-center`, `basic-query-kline-forecast-lab`, and `basic-query-premium-feature-ladder` without blocking anonymous query.
 - `scripts/verify_platform_local_news_kline_v57.py` must stay visible despite the broad `verify_*.py` ignore rule.
 - V57 remains local-only, not public launch approval, not real payment, and not investment advice.
+
+## V58 Kronos Sandbox Addendum
+
+Purpose: add a real Kronos model adapter lane without pretending the model is installed. The UI can run a local sandbox check, show dependency/model readiness, fall back to deterministic rules, and preserve a local record/backtest trail.
+
+Files:
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `src/services/kronos_forecast_service.py`
+- `tests/test_kronos_forecast_service_v58.py`
+- `tests/test_kronos_forecast_api_v58.py`
+- `tests/test_platform_kronos_sandbox_v58.py`
+- `scripts/verify_platform_kronos_sandbox_v58.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-06-dsa-v58-kronos-sandbox.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Review focus:
+
+- Public `kronos-forecast` readiness/fallback must remain no-AI and no-public-search.
+- `require_model=true` must require a signed-in pro/premium/enterprise/admin user and must not silently return fallback as a real model result.
+- `kronos_model_used` must only be true after the configured local Kronos predictor actually runs.
+- JSONL forecast records must remain local metadata and must not contain API keys or secrets.
+- `scripts/verify_platform_kronos_sandbox_v58.py` must stay visible despite the broad `verify_*.py` ignore rule.
+- V58 remains local-only, not public launch approval, not real payment, not hosted model SLA, and not investment advice.

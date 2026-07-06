@@ -233,6 +233,66 @@ export type BasicSnapshotOptions = {
   refresh?: boolean;
 };
 
+export type KronosForecastResponse = {
+  stockCode: string;
+  stockName?: string | null;
+  market: string;
+  mode: string;
+  status: 'model_ready' | 'model_unavailable' | 'model_disabled' | 'model_error' | 'premium_required';
+  provider: string;
+  source: string;
+  horizon: string;
+  lookback: number;
+  direction: string;
+  confidence: number;
+  support?: number | null;
+  resistance?: number | null;
+  adapterStatus: string;
+  enabled: boolean;
+  kronosModelUsed: boolean;
+  modelId: string;
+  tokenizerId: string;
+  device: string;
+  dependencyStatus: Record<string, boolean>;
+  missingDependencies: string[];
+  scenarios: Array<{
+    label: string;
+    direction: string;
+    probability: number;
+    trigger: string;
+    detail: string;
+  }>;
+  forecastPoints: Array<{
+    timestamp: string;
+    open?: number | null;
+    high?: number | null;
+    low?: number | null;
+    close?: number | null;
+    volume?: number | null;
+    amount?: number | null;
+  }>;
+  backtestSummary: {
+    records: number;
+    evaluated: number;
+    hits: number;
+    hitRate?: number | null;
+    lastEvaluatedAt?: string | null;
+  };
+  warnings: string[];
+  elapsedMs: number;
+  cacheHit: boolean;
+  recordId: string;
+  aiUsed: boolean;
+  publicSearchUsed: boolean;
+  boundary: string;
+};
+
+export type KronosForecastOptions = {
+  lookback?: number;
+  horizon?: number;
+  requireModel?: boolean;
+};
+
 export type BasicPrewarmResponse = {
   requested: number;
   warmed: number;
@@ -295,6 +355,18 @@ export const stocksApi = {
       `/api/v1/stocks/${encodeURIComponent(code)}/snapshot${query}`,
     );
     return toCamelCase<BasicStockSnapshot>(response.data);
+  },
+
+  async kronosForecast(code: string, options?: KronosForecastOptions): Promise<KronosForecastResponse> {
+    const params = new URLSearchParams();
+    if (options?.lookback) params.set('lookback', String(options.lookback));
+    if (options?.horizon) params.set('horizon', String(options.horizon));
+    if (options?.requireModel) params.set('require_model', 'true');
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/stocks/${encodeURIComponent(code)}/kronos-forecast${query}`,
+    );
+    return toCamelCase<KronosForecastResponse>(response.data);
   },
 
   async prewarm(symbols: string[]): Promise<BasicPrewarmResponse> {

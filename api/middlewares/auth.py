@@ -58,11 +58,13 @@ def _platform_user_path(path: str) -> bool:
 
 
 def _public_no_ai_query_path(request: Request) -> bool:
-    """Allow anonymous users to try the public no-AI stock snapshot path."""
+    """Allow anonymous users to try public no-AI stock research paths."""
     if request.method.upper() != "GET":
         return False
     path = request.url.path.rstrip("/")
-    return path.startswith("/api/v1/stocks/") and path.endswith("/snapshot")
+    return path.startswith("/api/v1/stocks/") and (
+        path.endswith("/snapshot") or path.endswith("/kronos-forecast")
+    )
 
 
 def _csrf_failure_response(request: Request) -> JSONResponse | None:

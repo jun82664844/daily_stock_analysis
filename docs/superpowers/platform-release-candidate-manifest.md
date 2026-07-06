@@ -959,3 +959,50 @@ Review boundary:
 - `kline_forecast` is a Kronos-ready preview only; `kronos_model_used=false` until a real adapter and approval gate exist.
 - Keep `scripts/verify_platform_local_news_kline_v57.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V58 Kronos Sandbox Manifest Addendum
+
+Status: local-only Kronos adapter sandbox, no production launch approval and no hosted model SLA.
+
+New/updated files:
+
+- `.gitignore`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `src/services/kronos_forecast_service.py`
+- `tests/test_kronos_forecast_service_v58.py`
+- `tests/test_kronos_forecast_api_v58.py`
+- `tests/test_platform_kronos_sandbox_v58.py`
+- `scripts/verify_platform_kronos_sandbox_v58.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-06-dsa-v58-kronos-sandbox.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_KRONOS_SANDBOX_V58_OK`
+
+Suggested review/commit position:
+
+- After V57 local news/K-line forecast lab and before any real Kronos model installation, Hugging Face model download policy, GPU sizing, paid entitlement, or production market-data licensing work.
+
+Rollback notes:
+
+- Reverting this slice removes the standalone `kronos-forecast` endpoint, local Kronos sandbox service, HomePage live Kronos check panel, V58 verifier, and V58 docs. Existing V57 no-AI `kline_forecast` preview remains as long as V57 is kept.
+
+Review boundary:
+
+- Public fallback must not invoke AI, public search, paid APIs, or BYOK secrets.
+- `require_model=true` must not be available to anonymous/free users.
+- Current local environment may legitimately return `model_unavailable`; this must be displayed honestly, not hidden.
+- Keep `scripts/verify_platform_kronos_sandbox_v58.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

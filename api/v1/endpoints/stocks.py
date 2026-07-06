@@ -26,6 +26,7 @@ from api.v1.schemas.basic_query import (
     BasicPrewarmRequest,
     BasicPrewarmResponse,
     BasicStockSnapshot,
+    KronosForecastResponse,
 )
 from api.v1.schemas.stocks import (
     ExtractFromImageResponse,
@@ -48,6 +49,7 @@ from src.services.import_parser import (
 )
 from src.services.stock_service import StockService
 from src.services.basic_query_service import BasicQueryService
+from src.services.kronos_forecast_service import KronosForecastService
 from src.services.market_source_ops import build_market_source_ops_snapshot, recover_market_sources
 from src.services.stock_code_utils import normalize_crypto_symbol
 from src.services.system_config_service import SystemConfigService
@@ -519,6 +521,66 @@ def recover_market_source_health(
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"Local market source recovery failed: {str(e)}"},
+        )
+
+
+@router.get(
+    "/{stock_code}/kronos-forecast",
+    response_model=KronosForecastResponse,
+    responses={
+        200: {"description": "Local Kronos sandbox forecast or explicit fallback"},
+        401: {"description": "Login required for real Kronos model run"},
+        403: {"description": "Premium plan required for real Kronos model run"},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Local Kronos forecast sandbox",
+    description=(
+        "Return a local Kronos model sandbox forecast when enabled and available; otherwise return an explicit "
+        "local-rules fallback without AI or public search."
+    ),
+)
+def get_kronos_forecast(
+    request: Request,
+    stock_code: str,
+    lookback: int = Query(120, ge=5, le=512, description="Historical K-line bars for Kronos or fallback rules."),
+    horizon: int = Query(5, ge=1, le=30, description="Future K-line bars to forecast."),
+    require_model: bool = Query(False, description="Require a real Kronos model run instead of fallback status."),
+) -> KronosForecastResponse:
+    """Return a local Kronos sandbox payload with explicit fallback status."""
+    try:
+        normalized = _validate_and_normalize_stock_code(stock_code)
+        identity = platform_identity_from_request(request)
+        if require_model and identity is None:
+            raise HTTPException(
+                status_code=401,
+                detail={"error": "login_required", "message": "Login is required to run the Kronos model sandbox."},
+            )
+        if require_model and identity and not (identity.is_admin or identity.plan in {"pro", "premium", "enterprise"}):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "premium_required",
+                    "message": "A pro or higher plan is required to run the Kronos model sandbox.",
+                },
+            )
+        forecast = KronosForecastService().forecast(normalized, lookback=lookback, horizon=horizon)
+        if require_model and not forecast.get("kronos_model_used"):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "model_unavailable",
+                    "message": "Kronos model is not available locally; fallback preview was not returned because require_model=true.",
+                    "missing_dependencies": forecast.get("missing_dependencies", []),
+                },
+            )
+        return KronosForecastResponse.model_validate(forecast)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Local Kronos forecast failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"Local Kronos forecast failed: {str(e)}"},
         )
 
 

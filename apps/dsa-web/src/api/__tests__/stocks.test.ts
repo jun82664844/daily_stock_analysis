@@ -197,6 +197,63 @@ describe('stocksApi', () => {
     expect(result.aiUsed).toBe(false);
   });
 
+  it('loads local Kronos forecast sandbox results as camelCase data', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: 'AAPL',
+        stock_name: 'Apple Inc.',
+        market: 'us',
+        mode: 'kronos_sandbox',
+        status: 'model_unavailable',
+        provider: 'kronos',
+        source: 'local_kline_rules_kronos_unavailable',
+        horizon: 'next_5_bars',
+        lookback: 120,
+        direction: 'upside_bias',
+        confidence: 64,
+        support: 190,
+        resistance: 205,
+        adapter_status: 'Kronos dependencies missing.',
+        enabled: true,
+        kronos_model_used: false,
+        model_id: 'NeoQuasar/Kronos-small',
+        tokenizer_id: 'NeoQuasar/Kronos-Tokenizer-base',
+        device: 'auto',
+        dependency_status: { pandas: true, torch: false, transformers: false, huggingface_hub: true, model: false },
+        missing_dependencies: ['torch', 'transformers', 'model'],
+        scenarios: [
+          {
+            label: 'Upside-biased preview',
+            direction: 'upside_bias',
+            probability: 64,
+            trigger: 'Hold above support.',
+            detail: 'Local fallback.',
+          },
+        ],
+        forecast_points: [{ timestamp: '2026-07-07', close: 201 }],
+        backtest_summary: { records: 1, evaluated: 1, hits: 1, hit_rate: 1, last_evaluated_at: '2026-07-06T09:00:00' },
+        warnings: ['Kronos model unavailable.'],
+        elapsed_ms: 12,
+        cache_hit: false,
+        record_id: 'unit-kronos',
+        ai_used: false,
+        public_search_used: false,
+        boundary: 'Experimental model preview; information analysis only; not investment advice.',
+      },
+    });
+
+    const result = await stocksApi.kronosForecast('AAPL', { lookback: 120, horizon: 5, requireModel: true });
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/AAPL/kronos-forecast?lookback=120&horizon=5&require_model=true');
+    expect(result.status).toBe('model_unavailable');
+    expect(result.kronosModelUsed).toBe(false);
+    expect(result.dependencyStatus.huggingfaceHub).toBe(true);
+    expect(result.missingDependencies).toContain('torch');
+    expect(result.backtestSummary.hitRate).toBe(1);
+    expect(result.aiUsed).toBe(false);
+    expect(result.publicSearchUsed).toBe(false);
+  });
+
   it('loads local market source health as camelCase data', async () => {
     get.mockResolvedValueOnce({
       data: {

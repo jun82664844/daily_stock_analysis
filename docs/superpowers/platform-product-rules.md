@@ -100,6 +100,17 @@
 - The forecast lab is an experimental information view. It must show the `not investment advice` boundary and must not present scenarios as trade instructions.
 - Premium messaging may explain that realtime news, filings, source links, sector comparison, Kronos inference, BYOK, and local-model lanes can be unlocked later, but it must not imply real payment or production readiness in local V1.
 
+## Kronos Sandbox V58
+
+- Public visitors may call `GET /api/v1/stocks/{symbol}/kronos-forecast` to see Kronos sandbox readiness, dependency status, local fallback scenarios, forecast points, and a lightweight local record/backtest summary.
+- The public sandbox endpoint must remain no-AI and no-public-search when the real Kronos runtime is unavailable or disabled.
+- The endpoint must not claim `kronos_model_used=true` unless `KRONOS_ENABLED=true`, required local dependencies are present, and the local Kronos predictor actually returns forecast points.
+- `require_model=true` is reserved for real model execution and requires a signed-in pro/premium/enterprise user or admin. Anonymous users may see readiness/fallback status, but they cannot force a real model run.
+- Missing `torch`, `transformers`, `huggingface_hub`, or Kronos `model` dependencies must be shown as `model_unavailable` instead of being hidden behind generic failures.
+- Kronos forecast records are local JSONL metadata only and must not include API keys, bearer tokens, passwords, webhook secrets, or production credentials.
+- HomePage must visually distinguish the static V57 `kline_forecast` rules preview from the V58 live Kronos sandbox check via `basic-query-kronos-*` UI markers.
+- V58 remains local-only. It is not a public launch approval, not real payment, not hosted model SLA, and not investment advice.
+
 ## User Retention V56
 
 - Guest no-AI quick snapshots may be converted into private user retention only after registration or login; anonymous users must not write history or watchlist ownership data.
