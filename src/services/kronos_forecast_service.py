@@ -62,7 +62,8 @@ def _default_dependency_probe() -> Dict[str, bool]:
     return {
         "pandas": importlib.util.find_spec("pandas") is not None,
         "torch": importlib.util.find_spec("torch") is not None,
-        "transformers": importlib.util.find_spec("transformers") is not None,
+        "einops": importlib.util.find_spec("einops") is not None,
+        "safetensors": importlib.util.find_spec("safetensors") is not None,
         "huggingface_hub": importlib.util.find_spec("huggingface_hub") is not None,
         "model": importlib.util.find_spec("model") is not None,
     }
@@ -99,8 +100,8 @@ class KronosForecastService:
             "status": status,
             "dependency_status": dependency_status,
             "missing_dependencies": missing,
-            "model_id": os.getenv("KRONOS_MODEL_ID", "NeoQuasar/Kronos-small"),
-            "tokenizer_id": os.getenv("KRONOS_TOKENIZER_ID", "NeoQuasar/Kronos-Tokenizer-base"),
+            "model_id": os.getenv("KRONOS_MODEL_ID", "NeoQuasar/Kronos-mini"),
+            "tokenizer_id": os.getenv("KRONOS_TOKENIZER_ID", "NeoQuasar/Kronos-Tokenizer-2k"),
             "device": os.getenv("KRONOS_DEVICE", "auto"),
             "max_context": _safe_int(os.getenv("KRONOS_MAX_CONTEXT", "512"), 512, minimum=16, maximum=2048),
             "timeout_sec": max(1.0, float(os.getenv("KRONOS_TIMEOUT_SEC", "30"))),

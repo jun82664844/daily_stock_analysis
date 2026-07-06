@@ -795,7 +795,7 @@ Review focus:
 
 ## V58 Kronos Sandbox Addendum
 
-Purpose: add a real Kronos model adapter lane without pretending the model is installed. The UI can run a local sandbox check, show dependency/model readiness, fall back to deterministic rules, and preserve a local record/backtest trail.
+Purpose: add a real Kronos model adapter lane with an honest local-runtime boundary. The UI can run a local sandbox check, show dependency/model readiness, fall back to deterministic rules when disabled or unavailable, and preserve a local record/backtest trail.
 
 Files:
 

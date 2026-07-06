@@ -947,7 +947,7 @@ Acceptance marker:
 
 Suggested review/commit position:
 
-- After V56 user retention loop and before any real Kronos model installation, market-data licensing, or production payment work.
+- After V56 user retention loop and before production Kronos hosting, market-data licensing, or production payment work.
 
 Rollback notes:
 
@@ -993,7 +993,7 @@ Acceptance marker:
 
 Suggested review/commit position:
 
-- After V57 local news/K-line forecast lab and before any real Kronos model installation, Hugging Face model download policy, GPU sizing, paid entitlement, or production market-data licensing work.
+- After V57 local news/K-line forecast lab and before production Kronos hosting, Hugging Face model download policy, GPU sizing, paid entitlement, or production market-data licensing work.
 
 Rollback notes:
 
@@ -1003,6 +1003,6 @@ Review boundary:
 
 - Public fallback must not invoke AI, public search, paid APIs, or BYOK secrets.
 - `require_model=true` must not be available to anonymous/free users.
-- Current local environment may legitimately return `model_unavailable`; this must be displayed honestly, not hidden.
+- Current local environment may legitimately return `model_ready` when started with the local Kronos runtime flags, or `model_unavailable` / `model_disabled` when dependencies or flags are absent; either state must be displayed honestly, not hidden.
 - Keep `scripts/verify_platform_kronos_sandbox_v58.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

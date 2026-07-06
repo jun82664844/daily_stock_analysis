@@ -325,8 +325,8 @@ describe('HomePage', () => {
       modelId: 'NeoQuasar/Kronos-small',
       tokenizerId: 'NeoQuasar/Kronos-Tokenizer-base',
       device: 'auto',
-      dependencyStatus: { pandas: true, torch: false, transformers: false, huggingfaceHub: true, model: false },
-      missingDependencies: ['torch', 'transformers', 'model'],
+      dependencyStatus: { pandas: true, torch: false, einops: true, safetensors: true, huggingfaceHub: true, model: false },
+      missingDependencies: ['torch', 'model'],
       scenarios: [
         {
           label: 'Upside-biased preview',
@@ -341,7 +341,7 @@ describe('HomePage', () => {
         { timestamp: '2026-07-08', close: 202 },
       ],
       backtestSummary: { records: 1, evaluated: 1, hits: 1, hitRate: 1, lastEvaluatedAt: '2026-07-06T09:00:00' },
-      warnings: ['Kronos model unavailable; missing dependencies: torch, transformers, model.'],
+      warnings: ['Kronos model unavailable; missing dependencies: torch, model.'],
       elapsedMs: 12,
       cacheHit: false,
       recordId: 'unit-kronos',

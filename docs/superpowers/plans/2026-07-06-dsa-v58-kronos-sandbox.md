@@ -13,7 +13,7 @@ Boundaries:
 
 Target:
 - Add a deterministic `/api/v1/stocks/{code}/kronos-forecast` endpoint.
-- Add runtime dependency probing for `torch`, `transformers`, `huggingface_hub`, and Kronos `model`.
+- Add runtime dependency probing for `torch`, `einops`, `safetensors`, `huggingface_hub`, and Kronos `model`.
 - Add cache, timeout/concurrency guard, prediction record JSONL, and lightweight backtest summary.
 - Add frontend controls that clearly separate local rules preview from real Kronos model status.
 - Add verifier marker `DSA_PLATFORM_KRONOS_SANDBOX_V58_OK`.
@@ -25,5 +25,5 @@ Implemented:
 - Backend, frontend, verifier, and release package tests
 
 Local expected runtime:
-- If `torch`, `transformers`, or Kronos `model` are missing, the endpoint returns `model_unavailable`, `kronos_model_used=false`, and local fallback scenarios.
+- If `torch`, `einops`, `safetensors`, `huggingface_hub`, or Kronos `model` are missing, the endpoint returns `model_unavailable`, `kronos_model_used=false`, and local fallback scenarios.
 - Real Kronos execution remains opt-in with `KRONOS_ENABLED=true` and local dependency/model availability.

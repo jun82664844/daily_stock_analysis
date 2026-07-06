@@ -55,7 +55,8 @@ class KronosForecastServiceV58TestCase(unittest.TestCase):
                     dependency_probe=lambda: {
                         "pandas": True,
                         "torch": False,
-                        "transformers": False,
+                        "einops": True,
+                        "safetensors": True,
                         "huggingface_hub": True,
                         "model": False,
                     },
@@ -89,7 +90,8 @@ class KronosForecastServiceV58TestCase(unittest.TestCase):
                     dependency_probe=lambda: {
                         "pandas": True,
                         "torch": False,
-                        "transformers": False,
+                        "einops": True,
+                        "safetensors": True,
                         "huggingface_hub": True,
                         "model": False,
                     },
@@ -103,6 +105,28 @@ class KronosForecastServiceV58TestCase(unittest.TestCase):
             self.assertEqual(second["backtest_summary"]["records"], 1)
             self.assertNotIn("sk-", serialized.lower())
             self.assertNotIn("api_key", serialized.lower())
+
+    def test_availability_uses_official_kronos_runtime_dependencies(self) -> None:
+        from src.services.kronos_forecast_service import KronosForecastService
+
+        with patch.dict("os.environ", {"KRONOS_ENABLED": "true"}, clear=False):
+            service = KronosForecastService(
+                stock_service=FakeKronosStockService(),
+                dependency_probe=lambda: {
+                    "pandas": True,
+                    "torch": True,
+                    "einops": True,
+                    "safetensors": True,
+                    "huggingface_hub": True,
+                    "model": True,
+                },
+            )
+            availability = service.check_availability()
+
+        self.assertEqual(availability["status"], "model_ready")
+        self.assertEqual(availability["missing_dependencies"], [])
+        self.assertEqual(availability["model_id"], "NeoQuasar/Kronos-mini")
+        self.assertEqual(availability["tokenizer_id"], "NeoQuasar/Kronos-Tokenizer-2k")
 
 
 if __name__ == "__main__":

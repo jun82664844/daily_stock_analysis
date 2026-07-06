@@ -219,8 +219,8 @@ describe('stocksApi', () => {
         model_id: 'NeoQuasar/Kronos-small',
         tokenizer_id: 'NeoQuasar/Kronos-Tokenizer-base',
         device: 'auto',
-        dependency_status: { pandas: true, torch: false, transformers: false, huggingface_hub: true, model: false },
-        missing_dependencies: ['torch', 'transformers', 'model'],
+        dependency_status: { pandas: true, torch: false, einops: true, safetensors: true, huggingface_hub: true, model: false },
+        missing_dependencies: ['torch', 'model'],
         scenarios: [
           {
             label: 'Upside-biased preview',
