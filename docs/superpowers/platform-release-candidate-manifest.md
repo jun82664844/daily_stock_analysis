@@ -841,3 +841,36 @@ Review boundary:
 - HK realtime quote failures should degrade to latest historical close for display, with an explicit warning and no AI call.
 - Keep `scripts/verify_platform_local_user_acceptance_v54.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V55 Local Product Experience Manifest Addendum
+
+Status: local-only guest-first product experience, no production launch approval.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/basic_query_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_platform_local_product_experience_v55.py`
+- `scripts/verify_platform_local_product_experience_v55.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-06-dsa-v55-local-product-experience.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_LOCAL_PRODUCT_EXPERIENCE_V55_OK`
+
+Review boundary:
+
+- Anonymous users can query first; login and registration are helpful prompts, not blockers.
+- The free report includes `retention_brief`, `basic-query-retention-brief`, and `guest-conversion-guide` while keeping no-AI cost control.
+- Keep `scripts/verify_platform_local_product_experience_v55.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

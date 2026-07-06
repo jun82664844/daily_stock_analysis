@@ -244,6 +244,12 @@ const HISTORY_CENTER_REFRESH_FILTERS: readonly HistoryCenterRefreshFilter[] = ['
 const HISTORY_CENTER_STATE_FILTERS: readonly HistoryCenterStateFilter[] = ['all', 'favorite', 'important', 'archived', 'active', 'has_note', 'unread', 'read'];
 const HISTORY_CENTER_RANGE_FILTERS: readonly HistoryCenterRangeFilter[] = ['all', '7d', '30d', '90d'];
 const HISTORY_CENTER_SORT_FILTERS: readonly HistoryCenterSort[] = ['newest', 'oldest'];
+const GUEST_QUERY_EXAMPLES = [
+  { symbol: 'AAPL', label: 'Apple', market: 'US' },
+  { symbol: '600519', label: '贵州茅台', market: 'A-share' },
+  { symbol: '00700.HK', label: '腾讯控股', market: 'HK' },
+  { symbol: 'BTC-USD', label: 'Bitcoin', market: 'Crypto' },
+] as const;
 
 const isOneOf = <T extends string>(value: unknown, options: readonly T[]): value is T => (
   typeof value === 'string' && options.includes(value as T)
@@ -1183,6 +1189,13 @@ const HomePage: React.FC = () => {
       ? 'Selected local model'
       : 'Selected Platform API';
   const workspaceByokText = primaryApiKey ? 'BYOK ready' : 'BYOK not set';
+  const showGuestQueryEntry = !platformSession
+    && !basicSnapshot
+    && !marketReviewReport
+    && stockBarItems.length === 0
+    && historyItems.length === 0
+    && stockHistoryItems.length === 0
+    && marketReviewHistoryItems.length === 0;
   const platformWatchlistLanes = Array.from(
     new Set((platformWatchlistRefresh?.items ?? []).map((item) => item.routeLane).filter(Boolean)),
   );
@@ -2517,6 +2530,53 @@ const HomePage: React.FC = () => {
           </div>
         ) : null}
 
+        {showGuestQueryEntry ? (
+          <div className="px-3 pb-3 md:px-4">
+            <section
+              data-testid="guest-query-entry"
+              className="border-y border-subtle bg-surface/35 px-3 py-3 text-sm text-secondary-text md:px-4"
+            >
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                      No login required
+                    </span>
+                    <span className="rounded-md border border-subtle px-2 py-1">No AI quick check</span>
+                    <span className="rounded-md border border-subtle px-2 py-1">A股 / 美股 / 港股 / Crypto</span>
+                  </div>
+                  <div className="mt-2 text-base font-semibold text-foreground">
+                    先免费查一只标的，再决定是否登录保存历史和自选。
+                  </div>
+                  <p className="mt-1 max-w-3xl text-xs leading-5 text-secondary-text">
+                    输入代码即可查看行情、均线、量价、信号评分和观察点；登录只用于保存历史、自选股和额度管理，不阻断当前查询。
+                  </p>
+                </div>
+                <div className="flex min-w-0 flex-wrap gap-2">
+                  {GUEST_QUERY_EXAMPLES.map((item) => (
+                    <button
+                      key={item.symbol}
+                      type="button"
+                      data-testid={`guest-example-${item.symbol}`}
+                      disabled={isQueryingBasic}
+                      onClick={() => void handleBasicQuery(item.symbol)}
+                      className="inline-flex min-w-[7.5rem] items-center justify-between gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-left text-xs text-secondary-text transition-colors hover:border-primary/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-medium text-foreground">{item.symbol}</span>
+                        <span className="block truncate">{item.label}</span>
+                      </span>
+                      <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] uppercase">
+                        {item.market}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         <div className="flex-1 flex min-h-0 overflow-hidden">
           <div className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden pl-4 pb-4 md:flex lg:w-72">
             {sidebarContent}
@@ -2638,6 +2698,83 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {!platformSession ? (
+                  <section
+                    data-testid="guest-conversion-guide"
+                    className="mb-4 rounded-lg border border-subtle bg-background/35 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                            Login is optional
+                          </span>
+                          <span className="rounded-md border border-subtle px-2 py-1">No AI quick result stays visible</span>
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-foreground">
+                          登录后可 save history、加入 watchlist、保留 weekly quota 状态。
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          当前查询不会被阻断；注册或登录只用于长期保存记录、自选股和额度状态。
+                        </p>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap gap-2">
+                        <button
+                          type="button"
+                          data-testid="guest-guide-login"
+                          onClick={() => setAuthMode('login')}
+                          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'login' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
+                        >
+                          Login
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="guest-guide-register"
+                          onClick={() => setAuthMode('register')}
+                          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'register' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
+                        >
+                          Register
+                        </button>
+                      </div>
+                    </div>
+                    {platformEnabled ? (
+                      <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-subtle pt-3">
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={(event) => setAuthEmail(event.target.value)}
+                          data-testid="guest-auth-email"
+                          placeholder="Email"
+                          className="h-8 w-48 rounded-lg border border-subtle bg-surface px-2 text-xs text-foreground placeholder:text-muted-text"
+                        />
+                        <input
+                          type="password"
+                          value={authPassword}
+                          onChange={(event) => setAuthPassword(event.target.value)}
+                          data-testid="guest-auth-password"
+                          placeholder="Password"
+                          className="h-8 w-40 rounded-lg border border-subtle bg-surface px-2 text-xs text-foreground placeholder:text-muted-text"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          isLoading={authBusy}
+                          disabled={!authEmail.trim() || !authPassword}
+                          onClick={() => void handlePlatformAuth()}
+                          data-testid="guest-auth-submit"
+                        >
+                          {authMode === 'register' ? 'Register' : 'Login'}
+                        </Button>
+                        {authError ? <span className="text-xs text-danger">{authError}</span> : null}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-lg border border-subtle bg-surface/35 px-3 py-2 text-xs text-secondary-text">
+                        Account features can be enabled locally; the current no-AI query remains available without login.
+                      </div>
+                    )}
+                  </section>
+                ) : null}
                 {basicFreeReport ? (
                   <section
                     data-testid="basic-query-free-report"
@@ -2793,6 +2930,62 @@ const HomePage: React.FC = () => {
                           </span>
                           <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
                             {uiLanguage === 'en' ? 'Information analysis only' : '仅作信息分析'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                    {basicSnapshot.intelligence?.retentionBrief ? (
+                      <div
+                        data-testid="basic-query-retention-brief"
+                        className="mb-3 rounded-lg border border-primary/30 bg-background/45 p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">
+                              {uiLanguage === 'en' ? 'Why keep reading' : '为什么值得继续看'}
+                            </div>
+                            <h4 className="mt-1 text-base font-semibold text-foreground">
+                              {basicSnapshot.intelligence.retentionBrief.headline}
+                            </h4>
+                            <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                              {basicSnapshot.intelligence.retentionBrief.whyItMatters}
+                            </p>
+                          </div>
+                          <div className="shrink-0 rounded-lg border border-primary/35 bg-primary/10 px-3 py-2 text-xs text-primary">
+                            No AI
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)]">
+                          <div className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
+                            <div className="text-xs text-secondary-text">
+                              {uiLanguage === 'en' ? 'Support / resistance' : '支撑 / 压力'}
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-foreground">
+                              {basicSnapshot.intelligence.retentionBrief.supportResistance}
+                            </div>
+                            <div className="mt-2 text-[11px] text-secondary-text">
+                              {basicSnapshot.intelligence.retentionBrief.source}
+                            </div>
+                          </div>
+                          <div className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
+                            <div className="text-xs text-secondary-text">
+                              {uiLanguage === 'en' ? 'Next checks' : '下一步关注'}
+                            </div>
+                            <div className="mt-2 grid gap-1.5 text-xs leading-relaxed text-secondary-text md:grid-cols-3">
+                              {basicSnapshot.intelligence.retentionBrief.nextSteps.map((step) => (
+                                <div key={step} className="rounded-md border border-subtle/70 px-2 py-1.5">
+                                  {step}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
+                          <span className="min-w-0 leading-relaxed">
+                            {basicSnapshot.intelligence.retentionBrief.upgradeHint}
+                          </span>
+                          <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
+                            {basicSnapshot.intelligence.retentionBrief.boundary}
                           </span>
                         </div>
                       </div>

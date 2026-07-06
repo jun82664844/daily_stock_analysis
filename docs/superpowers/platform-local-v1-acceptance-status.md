@@ -390,3 +390,12 @@ git diff --check
 - Hong Kong quick snapshots now use the latest historical close as a clearly marked fallback when realtime quote is unavailable, so `00700.HK` can still show a display price without invoking AI.
 - Added `tests/test_platform_local_user_acceptance_v54.py` and `scripts/verify_platform_local_user_acceptance_v54.py`; the verifier prints `DSA_PLATFORM_LOCAL_USER_ACCEPTANCE_V54_OK` only when required local checks pass.
 - V54 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-06 Local Product Experience V55 gate
+
+- Anonymous visitors now see a guest-first query entry before login, with one-click examples for `AAPL`, `600519`, `00700.HK`, and `BTC-USD`.
+- Free no-AI snapshots now include an `intelligence.retention_brief` payload built from deterministic quote, indicator, route, and profile data. It does not call AI or public search.
+- HomePage renders `basic-query-retention-brief` with a readable headline, why-it-matters context, support/resistance framing, next steps, a soft upgrade hint, and the `not investment advice` boundary.
+- After a guest query, HomePage shows `guest-conversion-guide`: login is optional, the snapshot remains visible, and registration is positioned as saving history, watchlist, and weekly quota state.
+- Added `tests/test_platform_local_product_experience_v55.py` and `scripts/verify_platform_local_product_experience_v55.py`; the verifier prints `DSA_PLATFORM_LOCAL_PRODUCT_EXPERIENCE_V55_OK` only when required local checks pass.
+- V55 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

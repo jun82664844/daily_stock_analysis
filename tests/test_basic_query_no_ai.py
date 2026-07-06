@@ -179,6 +179,59 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertEqual(snapshot["diagnostics"]["cache"]["profile"], "miss")
         self.assertEqual(snapshot["diagnostics"]["sources"]["profile"], "unit_profile")
 
+    def test_no_ai_snapshot_includes_retention_brief(self) -> None:
+        class RetentionStockService:
+            def get_realtime_quote(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "Apple Inc.",
+                    "current_price": 200.0,
+                    "change_percent": 1.5,
+                    "volume": 1200000,
+                    "source": "unit_quote",
+                    "freshness": "fresh",
+                }
+
+            def get_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "Apple Inc.",
+                    "source": "unit_history",
+                    "data": [
+                        {"date": f"2026-06-{day:02d}", "close": 180.0 + day, "volume": 1000 + day}
+                        for day in range(1, 22)
+                    ],
+                }
+
+            def get_basic_company_profile(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "company_name": "Apple Inc.",
+                    "sector": "Technology",
+                    "industry": "Consumer Electronics",
+                    "market_cap": 4500000000000,
+                    "pe_ratio": 31.2,
+                    "source": "unit_profile",
+                }
+
+        with patch("src.services.analysis_service.AnalysisService") as analysis_service:
+            snapshot = BasicQueryService(
+                stock_service=RetentionStockService(),
+                cache=MarketDataCache(default_ttl_seconds=60),
+            ).get_snapshot("AAPL")
+
+        retention = snapshot["intelligence"]["retention_brief"]
+        self.assertFalse(snapshot["ai_used"])
+        self.assertEqual(retention["source"], "no_ai_retention_rules")
+        self.assertIn("AAPL", retention["headline"])
+        self.assertIn("Technology", retention["why_it_matters"])
+        self.assertIn("support", retention["support_resistance"])
+        self.assertIn("resistance", retention["support_resistance"])
+        self.assertGreaterEqual(len(retention["next_steps"]), 3)
+        self.assertIn("login", retention["upgrade_hint"].lower())
+        self.assertIn("not investment advice", retention["boundary"])
+        analysis_service.assert_not_called()
+
     def test_yfinance_profile_keeps_dividend_yield_percent_units(self) -> None:
         class FakeTicker:
             def get_info(self):

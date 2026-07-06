@@ -58,6 +58,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-05-dsa-ops-health-v52.md",
     "docs/superpowers/plans/2026-07-05-dsa-ops-health-panel-v53.md",
     "docs/superpowers/plans/2026-07-06-dsa-v54-local-user-acceptance.md",
+    "docs/superpowers/plans/2026-07-06-dsa-v55-local-product-experience.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -99,6 +100,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_ops_health_v52.py",
     "scripts/verify_platform_ops_health_panel_v53.py",
     "scripts/verify_platform_local_user_acceptance_v54.py",
+    "scripts/verify_platform_local_product_experience_v55.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/platform_watchlist.py",
@@ -144,6 +146,7 @@ REQUIRED_FILES = (
     "tests/test_platform_backup_restore_drill_v51.py",
     "tests/test_platform_ops_health_v52.py",
     "tests/test_platform_local_user_acceptance_v54.py",
+    "tests/test_platform_local_product_experience_v55.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -188,6 +191,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_ops_health_v52.py",
     "scripts/verify_platform_ops_health_panel_v53.py",
     "scripts/verify_platform_local_user_acceptance_v54.py",
+    "scripts/verify_platform_local_product_experience_v55.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

@@ -110,6 +110,15 @@ export type BasicStockSnapshot = {
       source: string;
       aiUsed?: boolean;
     } | null;
+    retentionBrief?: {
+      headline: string;
+      whyItMatters: string;
+      supportResistance: string;
+      nextSteps: string[];
+      upgradeHint: string;
+      boundary: string;
+      source: string;
+    } | null;
     items: Array<{
       category: string;
       title: string;

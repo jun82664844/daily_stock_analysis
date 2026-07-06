@@ -305,6 +305,106 @@ describe('HomePage', () => {
     });
   });
 
+  it('shows a guest-first query entry before login', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const entry = await screen.findByTestId('guest-query-entry');
+    expect(entry).toHaveTextContent('No login required');
+    expect(entry).toHaveTextContent('AAPL');
+    expect(entry).toHaveTextContent('600519');
+    expect(entry).toHaveTextContent('00700.HK');
+    expect(entry).toHaveTextContent('BTC-USD');
+    expect(screen.getByTestId('guest-example-AAPL')).toBeInTheDocument();
+    expect(screen.getByTestId('guest-example-600519')).toBeInTheDocument();
+    expect(screen.getByTestId('guest-example-00700.HK')).toBeInTheDocument();
+    expect(screen.getByTestId('guest-example-BTC-USD')).toBeInTheDocument();
+    expect(screen.getByTestId('history-center-filters')).toBeInTheDocument();
+  });
+
+  it('lets guests query first and then shows a non-blocking login guide', async () => {
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 200,
+        changePercent: 1.5,
+        source: 'unit_quote',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 198, ma20: 190 },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+        retentionBrief: {
+          headline: 'AAPL quick read: +1.5%, above MA20 190.',
+          whyItMatters: 'Free no-AI checklist.',
+          supportResistance: 'support 190; resistance 200',
+          nextSteps: ['Refresh once', 'Compare with QQQ', 'Use deep analysis for filings'],
+          upgradeHint: 'Login to save history and watchlist.',
+          boundary: 'Information analysis only; not investment advice.',
+          source: 'no_ai_retention_rules',
+        },
+        items: [],
+      },
+      diagnostics: {
+        elapsedMs: 5,
+        quoteElapsedMs: 2,
+        historyElapsedMs: 3,
+        cache: { quote: 'miss', history: 'miss' },
+        sources: { quote: 'unit_quote', history: 'unit_history' },
+        freshness: { quote: 'fresh', history: 'fresh' },
+        fallback: { quote: 'live', history: 'live' },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok' },
+      },
+      aiUsed: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('guest-example-AAPL'));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('AAPL');
+    });
+    expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+    const guide = await screen.findByTestId('guest-conversion-guide');
+    expect(guide).toHaveTextContent('Login is optional');
+    expect(guide).toHaveTextContent('save history');
+    expect(guide).toHaveTextContent('watchlist');
+    expect(guide).toHaveTextContent('weekly quota');
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('200');
+
+    fireEvent.click(screen.getByTestId('guest-guide-register'));
+
+    expect(screen.getByTestId('guest-conversion-guide')).toHaveTextContent('Register');
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+  });
+
   it('renders the dashboard workspace and auto-loads the first report', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
@@ -1401,6 +1501,19 @@ describe('HomePage', () => {
           source: 'no_ai_rules',
           aiUsed: false,
         },
+        retentionBrief: {
+          headline: 'AAPL quick read: +1.5%, above MA20 190.',
+          whyItMatters: 'This free snapshot turns quote, moving averages, volume and Technology / Consumer Electronics context into a first-pass checklist without spending AI quota.',
+          supportResistance: 'support 190; resistance 205',
+          nextSteps: [
+            'Refresh once before market action and confirm whether price stays above MA20.',
+            'Compare this move with QQQ instead of reading it alone.',
+            'Use deep analysis only when you need filings or a longer AI-written report.',
+          ],
+          upgradeHint: 'Login to save history, build a watchlist, keep quota state, and unlock deeper analysis when needed.',
+          boundary: 'Information analysis only; not investment advice.',
+          source: 'no_ai_retention_rules',
+        },
         marketBrief: {
           market: 'us',
           title: 'US equity quick view',
@@ -1592,6 +1705,13 @@ describe('HomePage', () => {
     expect(signalScore).toHaveTextContent('Data freshness');
     expect(signalScore).toHaveTextContent('Profile completeness');
     expect(signalScore).toHaveTextContent('No AI');
+    const retentionBrief = screen.getByTestId('basic-query-retention-brief');
+    expect(retentionBrief).toHaveTextContent('AAPL quick read');
+    expect(retentionBrief).toHaveTextContent('Technology / Consumer Electronics');
+    expect(retentionBrief).toHaveTextContent('support 190; resistance 205');
+    expect(retentionBrief).toHaveTextContent('Compare this move with QQQ');
+    expect(retentionBrief).toHaveTextContent('Login to save history');
+    expect(retentionBrief).toHaveTextContent('not investment advice');
     const productBrief = screen.getByTestId('basic-query-product-brief');
     expect(productBrief).toHaveTextContent('关键结论');
     expect(productBrief).toHaveTextContent('支撑');

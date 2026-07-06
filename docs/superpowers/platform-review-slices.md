@@ -699,3 +699,33 @@ Review focus:
 - `00700.HK` must get a clearly marked latest-historical-close fallback when realtime HK quote is unavailable.
 - `scripts/verify_platform_local_user_acceptance_v54.py` must stay visible despite the broad `verify_*.py` ignore rule.
 - V54 remains local-only, not public launch approval, not real payment, and not investment advice.
+
+## V55 Local Product Experience Addendum
+
+Purpose: improve the local first-visit product experience so ordinary users can query before login, receive a richer free no-AI report, and see non-blocking registration guidance.
+
+Files:
+
+- `src/services/basic_query_service.py`
+- `api/v1/schemas/basic_query.py`
+- `tests/test_basic_query_no_ai.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_platform_local_product_experience_v55.py`
+- `scripts/verify_platform_local_product_experience_v55.py`
+- `docs/superpowers/plans/2026-07-06-dsa-v55-local-product-experience.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review focus:
+
+- Anonymous users must still be able to run quick no-AI queries without platform login.
+- `retention_brief` must be deterministic and must not call `AnalysisService`, public search, or paid AI.
+- The guest conversion guide must not clear the current snapshot or force registration before query.
+- `scripts/verify_platform_local_product_experience_v55.py` must stay visible despite the broad `verify_*.py` ignore rule.
+- V55 remains local-only, not public launch approval, not real payment, and not investment advice.

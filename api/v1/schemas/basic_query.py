@@ -190,6 +190,18 @@ class BasicSignalScorePayload(BaseModel):
     ai_used: bool = False
 
 
+class BasicRetentionBriefPayload(BaseModel):
+    """Product-facing no-AI summary that helps first-time users keep reading."""
+
+    headline: str
+    why_it_matters: str
+    support_resistance: str
+    next_steps: List[str] = Field(default_factory=list)
+    upgrade_hint: str
+    boundary: str = "Information analysis only; not investment advice."
+    source: str = "no_ai_retention_rules"
+
+
 class BasicIntelligencePayload(BaseModel):
     """Low-cost information summary that never invokes AI or public search."""
 
@@ -199,6 +211,7 @@ class BasicIntelligencePayload(BaseModel):
     free_insights: List[BasicFreeInsightPayload] = Field(default_factory=list)
     peer_comparison: Optional[BasicPeerComparisonPayload] = None
     signal_score: Optional[BasicSignalScorePayload] = None
+    retention_brief: Optional[BasicRetentionBriefPayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)

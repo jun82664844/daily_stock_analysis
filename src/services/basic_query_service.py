@@ -785,6 +785,13 @@ class BasicQueryService:
                 indicators=indicators,
                 warnings=warnings,
             ),
+            "retention_brief": self._retention_brief_payload(
+                route=route,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+                warnings=warnings,
+            ),
             "items": [
                 {
                     "category": "news",
@@ -826,6 +833,68 @@ class BasicQueryService:
             ),
             "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
             "boundary": "Information analysis only; not investment advice.",
+        }
+
+    def _retention_brief_payload(
+        self,
+        *,
+        route: MarketRoute,
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
+        warnings: list[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        current_price = self._float_or_none(quote.get("current_price"))
+        change_percent = self._float_or_none(quote.get("change_percent"))
+        ma5 = self._float_or_none(indicators.get("ma5"))
+        ma20 = self._float_or_none(indicators.get("ma20"))
+        low = self._float_or_none(quote.get("low"))
+        high = self._float_or_none(quote.get("high"))
+        sector = str((profile or {}).get("sector") or "").strip()
+        industry = str((profile or {}).get("industry") or "").strip()
+        context = " / ".join(bit for bit in (sector, industry) if bit) or route.channel.replace("_", " ")
+
+        if current_price is not None and ma20 is not None:
+            trend_text = (
+                f"above MA20 {self._format_plain_number(ma20)}"
+                if current_price >= ma20
+                else f"below MA20 {self._format_plain_number(ma20)}"
+            )
+        elif current_price is not None:
+            trend_text = "with incomplete MA20 context"
+        else:
+            trend_text = "without a reliable latest price"
+
+        change_text = (
+            self._format_signed_percent_value(change_percent)
+            if change_percent is not None
+            else "unknown change"
+        )
+        support_candidates = [value for value in (low, ma20, ma5) if value is not None]
+        resistance_candidates = [value for value in (high, current_price, ma5, ma20) if value is not None]
+        support_text = self._format_plain_number(min(support_candidates)) if support_candidates else "unavailable"
+        resistance_text = self._format_plain_number(max(resistance_candidates)) if resistance_candidates else "unavailable"
+        warning_text = warnings[0].get("message") if warnings else None
+
+        next_steps = [
+            f"Refresh once before market action and confirm whether price stays {trend_text}.",
+            f"Compare this move with {self._comparison_targets_payload(route=route, profile=profile)[0]['symbol']} instead of reading it alone.",
+            "Use deep analysis only when you need news, filings, fundamentals, or a longer AI-written report.",
+        ]
+        if warning_text:
+            next_steps.insert(0, f"Resolve data warning first: {warning_text}")
+
+        return {
+            "headline": f"{route.normalized_code} quick read: {change_text}, {trend_text}.",
+            "why_it_matters": (
+                f"This free snapshot turns quote, moving averages, volume and {context} context "
+                "into a first-pass checklist without spending AI quota."
+            ),
+            "support_resistance": f"support {support_text}; resistance {resistance_text}",
+            "next_steps": next_steps[:4],
+            "upgrade_hint": "Login to save history, build a watchlist, keep quota state, and unlock deeper analysis when needed.",
+            "boundary": "Information analysis only; not investment advice.",
+            "source": "no_ai_retention_rules",
         }
 
     def _peer_comparison_payload(
