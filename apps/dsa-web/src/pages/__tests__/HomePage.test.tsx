@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
@@ -451,10 +451,16 @@ describe('HomePage', () => {
     expect(guide).toHaveTextContent('自选');
     expect(guide).toHaveTextContent('每周额度');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('200');
+    expect(within(guide).queryByTestId('guest-auth-email')).not.toBeInTheDocument();
+    expect(within(guide).queryByTestId('guest-auth-password')).not.toBeInTheDocument();
+    expect(within(guide).queryByTestId('guest-auth-submit')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('guest-guide-register'));
 
-    expect(screen.getByTestId('guest-conversion-guide')).toHaveTextContent('注册');
+    expect(screen.getByTestId('platform-auth-register-tab')).toHaveClass('bg-primary');
+    expect(screen.getByTestId('platform-auth-email')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-password')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('注册');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
   });
 
@@ -907,9 +913,9 @@ describe('HomePage', () => {
     expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
 
     fireEvent.click(screen.getByTestId('guest-guide-register'));
-    fireEvent.change(screen.getByTestId('guest-auth-email'), { target: { value: 'v56-user@example.com' } });
-    fireEvent.change(screen.getByTestId('guest-auth-password'), { target: { value: 'password123' } });
-    fireEvent.click(screen.getByTestId('guest-auth-submit'));
+    fireEvent.change(screen.getByTestId('platform-auth-email'), { target: { value: 'v56-user@example.com' } });
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
 
     await waitFor(() => {
       expect(platformApi.register).toHaveBeenCalledWith('v56-user@example.com', 'password123');

@@ -889,6 +889,7 @@ const HomePage: React.FC = () => {
   const marketReviewPollTimer = useRef<number | null>(null);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const basicSnapshotRef = useRef<HTMLDivElement | null>(null);
+  const platformAuthPanelRef = useRef<HTMLDivElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -1083,6 +1084,14 @@ const HomePage: React.FC = () => {
       setAuthBusy(false);
     }
   }, [authEmail, authMode, authPassword, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery]);
+
+  const handleGuestAuthModeRequest = useCallback((mode: 'login' | 'register') => {
+    setAuthMode(mode);
+    window.setTimeout(() => {
+      platformAuthPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+    }, 0);
+  }, []);
 
   const handlePlatformLogout = useCallback(async () => {
     await platformApi.logout();
@@ -2706,8 +2715,8 @@ const HomePage: React.FC = () => {
           </div>
         </header>
 
-        {platformEnabled && !basicSnapshot && !basicQueryError && !marketReviewReport ? (
-          <div className="px-3 pb-2 md:px-4">
+        {platformEnabled && !basicQueryError && !marketReviewReport && (!platformSession || !basicSnapshot) ? (
+          <div ref={platformAuthPanelRef} className="px-3 pb-2 md:px-4">
             <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-xs text-secondary-text md:flex-row md:items-center md:justify-between">
               {platformSession ? (
                 <>
@@ -3243,7 +3252,7 @@ const HomePage: React.FC = () => {
                         <button
                           type="button"
                           data-testid="guest-guide-login"
-                          onClick={() => setAuthMode('login')}
+                          onClick={() => handleGuestAuthModeRequest('login')}
                           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'login' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
                         >
                           {uiLanguage === 'en' ? 'Login' : '登录'}
@@ -3251,53 +3260,22 @@ const HomePage: React.FC = () => {
                         <button
                           type="button"
                           data-testid="guest-guide-register"
-                          onClick={() => setAuthMode('register')}
+                          onClick={() => handleGuestAuthModeRequest('register')}
                           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${authMode === 'register' ? 'border-primary/60 bg-primary/10 text-primary' : 'border-subtle bg-surface/60 text-secondary-text hover:text-foreground'}`}
                         >
                           {uiLanguage === 'en' ? 'Register' : '注册'}
                         </button>
                       </div>
                     </div>
-                    {platformEnabled ? (
-                      <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-subtle pt-3">
-                        <input
-                          type="email"
-                          value={authEmail}
-                          onChange={(event) => setAuthEmail(event.target.value)}
-                          data-testid="guest-auth-email"
-                          placeholder={uiLanguage === 'en' ? 'Email' : '邮箱'}
-                          className="h-8 w-48 rounded-lg border border-subtle bg-surface px-2 text-xs text-foreground placeholder:text-muted-text"
-                        />
-                        <input
-                          type="password"
-                          value={authPassword}
-                          onChange={(event) => setAuthPassword(event.target.value)}
-                          data-testid="guest-auth-password"
-                          placeholder={uiLanguage === 'en' ? 'Password' : '密码'}
-                          className="h-8 w-40 rounded-lg border border-subtle bg-surface px-2 text-xs text-foreground placeholder:text-muted-text"
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          isLoading={authBusy}
-                          disabled={!authEmail.trim() || !authPassword}
-                          onClick={() => void handlePlatformAuth()}
-                          data-testid="guest-auth-submit"
-                        >
-                          {authMode === 'register'
-                            ? (uiLanguage === 'en' ? 'Register' : '注册')
-                            : (uiLanguage === 'en' ? 'Login' : '登录')}
-                        </Button>
-                        {authError ? <span className="text-xs text-danger">{authError}</span> : null}
-                      </div>
-                    ) : (
-                      <div className="mt-3 rounded-lg border border-subtle bg-surface/35 px-3 py-2 text-xs text-secondary-text">
-                        {uiLanguage === 'en'
+                    <div className="mt-3 rounded-lg border border-subtle bg-surface/35 px-3 py-2 text-xs text-secondary-text">
+                      {platformEnabled
+                        ? (uiLanguage === 'en'
+                          ? 'Use the account entry above to log in or register. The current no-AI query remains available without login.'
+                          : '请使用上方账号入口登录或注册；当前免费查询不需要登录也能继续使用。')
+                        : (uiLanguage === 'en'
                           ? 'Account features can be enabled locally; the current no-AI query remains available without login.'
-                          : '账户功能可在本地启用；当前免费查询不需要登录也能继续使用。'}
-                      </div>
-                    )}
+                          : '账户功能可在本地启用；当前免费查询不需要登录也能继续使用。')}
+                    </div>
                   </section>
                 ) : null}
                 {basicFreeReport ? (
