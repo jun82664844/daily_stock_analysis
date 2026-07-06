@@ -131,6 +131,7 @@ const volumePriceSignalLabel = (value: unknown, language: string): string => {
   const isEnglish = language === 'en';
   if (signal === 'price_volume_confirmed') return isEnglish ? 'Price-volume confirmed' : '价量确认';
   if (signal === 'price_above_trend_volume_soft') return isEnglish ? 'Price above trend' : '价在趋势上方';
+  if (signal === 'price above trend volume soft') return isEnglish ? 'Price above trend, soft volume' : '价格位于趋势上方但量能偏弱';
   if (signal === 'volume_expanded_price_below_trend') return isEnglish ? 'Volume expanded' : '放量但价弱';
   if (signal === 'neutral') return isEnglish ? 'Neutral' : '中性';
   if (signal === 'insufficient_data') return isEnglish ? 'Insufficient data' : '数据不足';
@@ -210,6 +211,12 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'Profile context': '资料背景',
   'A-share broad-market reference.': 'A股大盘参照。',
   'A-share market sentiment reference.': 'A股市场情绪参照。',
+  Technology: '科技',
+  'Consumer Electronics': '消费电子',
+  'Technology / Consumer Electronics': '科技 / 消费电子',
+  'price above trend volume soft': '价格位于趋势上方但量能偏弱',
+  'Constructive quick signal': '快速信号偏积极',
+  'Mixed quick signal': '快速信号混合',
   'Trend confirmation': '趋势确认',
   'Trend repair': '趋势修复',
   'Risk boundary': '风险边界',
@@ -266,7 +273,27 @@ const SOURCE_ZH: Record<string, string> = {
   us_realtime: '美股实时行情',
   yahoo_chart: 'Yahoo行情',
   yfinance: 'Yahoo历史行情',
+  us_history: '美股历史行情',
+  unit_quote: '行情源',
+  unit_history: '历史行情',
+  yfinance_profile: '公司资料',
   unit_profile: '公司资料',
+};
+
+const GENERATED_TERM_ZH: Record<string, string> = {
+  'Technology / Consumer Electronics': '科技 / 消费电子',
+  'Consumer Electronics': '消费电子',
+  Technology: '科技',
+  'price above trend volume soft': '价格位于趋势上方但量能偏弱',
+  yfinance_profile: '公司资料',
+};
+
+const localizeGeneratedTerms = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (language === 'en' || !text) return text;
+  return Object.entries(GENERATED_TERM_ZH)
+    .sort((a, b) => b[0].length - a[0].length)
+    .reduce((result, [source, target]) => result.replaceAll(source, target), text);
 };
 
 const localizeGeneratedStatus = (value: unknown, language: string): string => {
@@ -298,6 +325,38 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度；未使用 AI 或公共搜索。`;
   match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\.$/);
   if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度。`;
+  match = text.match(/^Price ([^ ]+) is above MA5 ([^ ]+) and MA20 (.+?)\.$/);
+  if (match) return `价格 ${match[1]} 高于 MA5 ${match[2]} 和 MA20 ${match[3]}。`;
+  match = text.match(/^Price holds above MA20 ([^,]+), but short-term confirmation is mixed\.$/);
+  if (match) return `价格守在 MA20 ${match[1]} 上方，但短期确认仍然混合。`;
+  match = text.match(/^Price is above MA5 ([^ ]+) but below MA20 (.+?)\.$/);
+  if (match) return `价格高于 MA5 ${match[1]}，但低于 MA20 ${match[2]}。`;
+  match = text.match(/^Price and volume confirm each other in the quick rules\. Volume is (.+?) versus MA5\.$/);
+  if (match) return `价格和成交量在快速规则中相互确认。成交量相对 MA5 为 ${match[1]}。`;
+  match = text.match(/^Price and volume confirm each other in the quick rules\.$/);
+  if (match) return '价格和成交量在快速规则中相互确认。';
+  match = text.match(/^Price is above trend, while volume confirmation is still soft\. Volume is (.+?) versus MA5\.$/);
+  if (match) return `价格位于趋势上方，但量能确认仍偏弱。成交量相对 MA5 为 ${match[1]}。`;
+  match = text.match(/^Price is above trend, while volume confirmation is still soft\.$/);
+  if (match) return '价格位于趋势上方，但量能确认仍偏弱。';
+  match = text.match(/^Volume expanded while price remains below trend, so confirmation is mixed\. Volume is (.+?) versus MA5\.$/);
+  if (match) return `价格仍在趋势下方但成交量放大，确认信号仍然混合。成交量相对 MA5 为 ${match[1]}。`;
+  match = text.match(/^Volume expanded while price remains below trend, so confirmation is mixed\.$/);
+  if (match) return '价格仍在趋势下方但成交量放大，确认信号仍然混合。';
+  match = text.match(/^Volume-price score is limited because recent volume history is incomplete\.$/);
+  if (match) return '近期成交量历史不完整，量价评分受限。';
+  match = text.match(/^Quote data is fresh for this quick snapshot\.$/);
+  if (match) return '本次快速快照使用的是新鲜行情数据。';
+  match = text.match(/^Quote data came from cache; refresh before comparing intraday moves\.$/);
+  if (match) return '行情数据来自缓存；对比日内波动前请先刷新。';
+  match = text.match(/^Latest quote is unavailable; signal confidence is limited\.$/);
+  if (match) return '最新行情暂不可用，信号置信度受限。';
+  match = text.match(/^Crypto assets do not use stock fundamentals; quick context uses market lane and quote data\.$/);
+  if (match) return '加密资产不使用股票基本面；快速背景使用市场通道和行情数据。';
+  match = text.match(/^Basic company name is available, but valuation and sector fields are limited\.$/);
+  if (match) return '已有基础公司名称，但估值和板块字段有限。';
+  match = text.match(/^Company profile is unavailable in quick mode; deep mode can add fuller context\.$/);
+  if (match) return '快速模式下公司资料暂不可用；深度模式可补充更完整背景。';
   match = text.match(/^(.+?) quick read: ([^,]+), (below|above|低于|高于) MA20 (.+?)\.?$/);
   if (match) return `${match[1]} 快速解读：${match[2]}，${match[3] === 'below' || match[3] === '低于' ? '低于' : '高于'} MA20 ${match[4]}。`;
   match = text.match(/^support ([^;]+); resistance (.+)$/);
@@ -310,6 +369,8 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return `守住 MA20 ${match[1]}，并观察量能变化是否维持在 ${match[2]} 附近。`;
   match = text.match(/^Local rules read support near ([^ ]+) and resistance near (.+?)\. This is not Kronos inference\.$/);
   if (match) return `本地规则读取到支撑约 ${match[1]}、压力约 ${match[2]}。这不是 Kronos 模型推理。`;
+  match = text.match(/^Market cap ([^;]+); PE ([^;]+); PB ([^;]+); dividend yield ([^;]+); revenue ([^;]+); net profit (.+?)\.?$/);
+  if (match) return `总市值 ${match[1]}；市盈率 ${match[2]}；市净率 ${match[3]}；股息率 ${match[4]}；营收 ${match[5]}；净利润 ${match[6]}。`;
   match = text.match(/^Market cap ([^;]+); PE ([^;]+); PB (.+?)\.?$/);
   if (match) return `总市值 ${match[1]}；市盈率 ${match[2]}；市净率 ${match[3]}。`;
   match = text.match(/^Market cap ([^;]+); PE ([^;]+); dividend yield (.+?)\.?$/);
@@ -331,21 +392,31 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   match = text.match(/^Compare (.+?) against (.+?) before reading it in isolation\.$/);
   if (match) return `解读 ${match[1]} 前，先对比 ${match[2]}。`;
   match = text.match(/^Context is (.+?)\. Current volume-price signal is (.+?)\. Compare against route-based peers before reading this symbol in isolation\.?$/);
-  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : match[1]}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。解读该标的前，先与市场通道给出的同类参照对比。`;
+  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : localizeGeneratedTerms(match[1], language)}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。解读该标的前，先与市场通道给出的同类参照对比。`;
+  match = text.match(/^Context is (.+?); current volume-price signal is (.+?)\. Compare against route-based peers before reading this symbol in isolation\.?$/);
+  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : localizeGeneratedTerms(match[1], language)}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。解读该标的前，先与市场通道给出的同类参照对比。`;
   match = text.match(/^Context is (.+?)\. Current volume-price signal is ([^.]+)\.$/);
-  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : match[1]}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。`;
+  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : localizeGeneratedTerms(match[1], language)}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。`;
+  match = text.match(/^Context is (.+?); current volume-price signal is ([^.]+)\.$/);
+  if (match) return `当前背景为 ${match[1] === 'a share' ? 'A股' : localizeGeneratedTerms(match[1], language)}；量价信号为 ${volumePriceSignalLabel(match[2], language)}。`;
   match = text.match(/^Today's quick read: price changed (.+?), stays (.+?), and volume is (.+?) versus MA5\.$/);
   if (match) return `今日快速解读：价格变化 ${match[1]}，当前 ${match[2].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}，成交量相对 MA5 为 ${match[3]}。`;
+  match = text.match(/^Today's quick read: price changed (.+?), holds above MA20 (.+?), and volume is (.+?) versus MA5\.$/);
+  if (match) return `今日快速解读：价格变化 ${match[1]}，当前高于 MA20 ${match[2]}，成交量相对 MA5 为 ${match[3]}。`;
   match = text.match(/^Today's quick read: price changed (.+?), stays (.+?), and volume is (.+?)\.$/);
   if (match) return `今日快速解读：价格变化 ${match[1]}，当前 ${match[2].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}，成交量 ${match[3]}。`;
+  match = text.match(/^Today's quick read: price changed (.+?), holds above MA20 (.+?), and volume is (.+?)\.$/);
+  if (match) return `今日快速解读：价格变化 ${match[1]}，当前高于 MA20 ${match[2]}，成交量 ${match[3]}。`;
   match = text.match(/^Last price (.+?)$/);
   if (match) return `最新价 ${match[1]}`;
   match = text.match(/^stays (.+?)$/);
   if (match) return `当前${match[1].replace(/^below MA20/, '低于 MA20').replace(/^above MA20/, '高于 MA20')}`;
+  match = text.match(/^holds above MA20 (.+?)$/);
+  if (match) return `当前高于 MA20 ${match[1]}`;
   match = text.match(/^volume is (.+?) versus MA5$/);
   if (match) return `成交量相对 MA5 为 ${match[1]}`;
   match = text.match(/^Read this move against (.+?); quick profile context is (.+?)\.$/);
-  if (match) return `结合 ${match[1]} 阅读本次波动；快速资料背景为 ${match[2] === 'a share' ? 'A股' : match[2]}。`;
+  if (match) return `结合 ${match[1]} 阅读本次波动；快速资料背景为 ${match[2] === 'a share' ? 'A股' : localizeGeneratedTerms(match[2], language)}。`;
   match = text.match(/^Data warning: Quote is stale; quick view uses cached quote and latest available history\.$/);
   if (match) return '数据警示：行情已过期；快速视图使用缓存行情和最新可用历史。';
   match = text.match(/^Lane (.+?)$/);
@@ -356,8 +427,12 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return `观察价格能否重新站回 MA20 ${match[1]}，再判断结构是否修复。`;
   match = text.match(/^Company profile is available; compare valuation fields before relying on price signals alone\.$/);
   if (match) return '公司资料可用；不要只依赖价格信号，还要对比估值字段。';
+  match = text.match(/^(.+?) information lanes for (.+?): news, announcements, financials, sector context, and data quality\. No AI or public search was used\.$/);
+  if (match) return `${match[1]} 的 ${localizeGeneratedTerms(match[2], language)} 信息通道：资讯、公告、财务、板块背景和数据质量。未使用 AI 或公共搜索。`;
+  match = text.match(/^SEC filings, earnings call notes, and source links are reserved for deep mode or configured feeds\. Free mode avoids public search and AI cost\.$/);
+  if (match) return 'SEC 文件、业绩电话会纪要和来源链接保留给深度模式或已配置资讯源；免费模式避免公共搜索和 AI 成本。';
 
-  return text
+  return localizeGeneratedTerms(text
     .replace(/^Price is above MA20 and short-term trend remains constructive\.$/, '价格位于 MA20 上方，短期趋势结构仍偏积极。')
     .replace(/^Volume-price behavior is neutral in the quick rules\. Volume is ([^ ]+) versus MA5\.$/, '量价行为在快速规则中为中性；成交量相对 MA5 为 $1。')
     .replace(/^Volume is above recent average but still needs follow-through\.$/, '成交量高于近期均量，但仍需要后续确认。')
@@ -418,7 +493,7 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
     .replace(/^Treat this as a checklist for the next refresh, not a trade instruction\.$/, '把它作为下一次刷新时的检查清单，不是交易指令。')
     .replace(/^Price loses support ([^ ]+) or data freshness degrades\.$/, '价格跌破支撑 $1，或数据新鲜度继续下降。')
     .replace(/^Recheck source freshness and broad-market references before interpreting weakness\.$/, '解读走弱前，先复核数据新鲜度和大盘参照。')
-    .replace(/^Forecast lab output is experimental information analysis only; not investment advice\.$/, '预测实验室输出仅作实验性信息分析，不构成投资建议。');
+    .replace(/^Forecast lab output is experimental information analysis only; not investment advice\.$/, '预测实验室输出仅作实验性信息分析，不构成投资建议。'), language);
 };
 
 const historyCenterMarketLabel = (value: HistoryCenterMarketFilter, language: string): string => {
@@ -1352,8 +1427,8 @@ const HomePage: React.FC = () => {
     const isEnglish = uiLanguage === 'en';
     const profile = basicSnapshot.profile;
     return [
-      { label: isEnglish ? 'Sector' : '板块', value: profile.sector || '-' },
-      { label: isEnglish ? 'Industry' : '行业', value: profile.industry || '-' },
+      { label: isEnglish ? 'Sector' : '板块', value: isEnglish ? profile.sector || '-' : localizeGeneratedTerms(profile.sector || '-', uiLanguage) },
+      { label: isEnglish ? 'Industry' : '行业', value: isEnglish ? profile.industry || '-' : localizeGeneratedTerms(profile.industry || '-', uiLanguage) },
       { label: isEnglish ? 'Exchange' : '交易所', value: profile.exchange || '-' },
       { label: isEnglish ? 'Currency' : '币种', value: profile.currency || '-' },
       { label: isEnglish ? 'Country / region' : '国家/地区', value: profile.country || '-' },
@@ -1374,8 +1449,8 @@ const HomePage: React.FC = () => {
     const isEnglish = uiLanguage === 'en';
     const profile = basicSnapshot.profile;
     return [
-      { label: isEnglish ? 'Sector' : '板块', value: profile.sector || '-' },
-      { label: isEnglish ? 'Industry' : '行业', value: profile.industry || '-' },
+      { label: isEnglish ? 'Sector' : '板块', value: isEnglish ? profile.sector || '-' : localizeGeneratedTerms(profile.sector || '-', uiLanguage) },
+      { label: isEnglish ? 'Industry' : '行业', value: isEnglish ? profile.industry || '-' : localizeGeneratedTerms(profile.industry || '-', uiLanguage) },
       { label: isEnglish ? 'Market cap' : '总市值', value: formatBasicCompactNumber(profile.marketCap) },
       { label: isEnglish ? 'PE' : '市盈率', value: formatBasicNumber(profile.peRatio) },
     ].filter((item) => item.value !== '-');
@@ -1416,7 +1491,7 @@ const HomePage: React.FC = () => {
     );
     const profile = basicSnapshot.profile;
     const profileHeadline = profile
-      ? [profile.sector, profile.industry].filter(Boolean).join(' · ') || (isEnglish ? 'Company profile available' : '公司资料可用')
+      ? [profile.sector, profile.industry].filter(Boolean).map((value) => localizeGeneratedTerms(value, uiLanguage)).join(' · ') || (isEnglish ? 'Company profile available' : '公司资料可用')
       : (isEnglish ? 'Company profile not available yet' : '公司资料暂不可用');
     let score = 50;
     if (aboveMa5) score += 10;

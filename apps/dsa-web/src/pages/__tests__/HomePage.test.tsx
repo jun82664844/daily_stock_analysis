@@ -616,6 +616,126 @@ describe('HomePage', () => {
     expect(klineForecast).not.toHaveTextContent('Kronos model not installed');
   });
 
+  it('localizes US news, filing, financial, and sector nouns in Chinese mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 308.63,
+        changePercent: 4.75,
+        source: 'us_realtime',
+        freshness: 'stale',
+      },
+      indicators: { ma20: 294.8025, volumeChangeVsMa5: -31.5573, volumePriceSignal: 'neutral' },
+      profile: {
+        sector: 'Technology',
+        industry: 'Consumer Electronics',
+        marketCap: 4533000000000,
+        peRatio: 37.3192,
+        pbRatio: 42.511,
+        dividendYield: 0.35,
+        revenue: 451442000000,
+        netProfit: 122575500000,
+        source: 'yfinance_profile',
+        freshness: 'stale',
+      },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+        newsCenter: {
+          title: 'Local news center',
+          summary: 'AAPL information lanes for Technology / Consumer Electronics: news, announcements, financials, sector context, and data quality. No AI or public search was used.',
+          source: 'no_ai_news_center_rules',
+          aiUsed: false,
+          publicSearchUsed: false,
+          premiumUnlock: 'Premium can add realtime news, filings, source links, sector comparison, and AI summaries.',
+          boundary: 'Information analysis only; not investment advice.',
+          items: [
+            {
+              category: 'news',
+              title: 'Market-moving news lane',
+              summary: 'AAPL is at 308.63 with +4.75%. Realtime public news/search is off in free local mode, so this lane is a checklist placeholder.',
+              status: 'degraded',
+              source: 'no_ai_news_center_rules',
+              action: 'Use deep analysis or configured news feeds for realtime links.',
+            },
+            {
+              category: 'announcements',
+              title: 'SEC filings lane',
+              summary: 'SEC filings, earnings call notes, and source links are reserved for deep mode or configured feeds. Free mode avoids public search and AI cost.',
+              status: 'degraded',
+              source: 'no_ai_news_center_rules',
+              action: 'Upgrade or configure a filings source when source links are required.',
+            },
+            {
+              category: 'financials',
+              title: 'Financial snapshot lane',
+              summary: 'Market cap 4.533T; PE 37.3192; PB 42.511; dividend yield 0.35%; revenue 451.442B; net profit 122.5755B.',
+              status: 'available',
+              source: 'yfinance_profile',
+              action: 'Compare valuation and fundamentals before relying on price action alone.',
+            },
+            {
+              category: 'sector',
+              title: 'Sector and peer lane',
+              summary: 'Context is Technology / Consumer Electronics; current volume-price signal is price above trend volume soft. Compare against route-based peers before reading this symbol in isolation.',
+              status: 'available',
+              source: 'no_ai_news_center_rules',
+              action: 'Open peer comparison or deep sector view for richer cross-asset context.',
+            },
+          ],
+        },
+      },
+      diagnostics: {
+        elapsedMs: 4,
+        quoteElapsedMs: 2,
+        historyElapsedMs: 2,
+        cache: { quote: 'hit', history: 'hit' },
+        sources: { quote: 'us_realtime', history: 'yfinance' },
+        freshness: { quote: 'stale', history: 'stale' },
+        fallback: { quote: 'cache', history: 'cache' },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok' },
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    const newsCenter = await screen.findByTestId('basic-query-news-center');
+    expect(newsCenter).toHaveTextContent('科技 / 消费电子');
+    expect(newsCenter).toHaveTextContent('SEC 文件、业绩电话会纪要和来源链接');
+    expect(newsCenter).toHaveTextContent('股息率 0.35%');
+    expect(newsCenter).toHaveTextContent('营收 451.442B');
+    expect(newsCenter).toHaveTextContent('净利润 122.5755B');
+    expect(newsCenter).toHaveTextContent('公司资料');
+    expect(newsCenter).not.toHaveTextContent('Technology / Consumer Electronics');
+    expect(newsCenter).not.toHaveTextContent('SEC filings');
+    expect(newsCenter).not.toHaveTextContent('dividend yield');
+    expect(newsCenter).not.toHaveTextContent('revenue');
+    expect(newsCenter).not.toHaveTextContent('net profit');
+    expect(newsCenter).not.toHaveTextContent('yfinance_profile');
+  });
+
   it('keeps a guest AAPL snapshot through register and saves it to history and watchlist', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
@@ -2180,14 +2300,14 @@ describe('HomePage', () => {
     const primarySummary = screen.getByTestId('basic-query-primary-summary');
     expect(primarySummary).toHaveTextContent('Apple Inc.');
     expect(primarySummary).toHaveTextContent('200');
-    expect(primarySummary).toHaveTextContent('Technology');
-    expect(primarySummary).toHaveTextContent('Consumer Electronics');
+    expect(primarySummary).toHaveTextContent('科技');
+    expect(primarySummary).toHaveTextContent('消费电子');
     expect(primarySummary).toHaveTextContent('4.5T');
     expect(primarySummary).toHaveTextContent('31.2');
     const freeReport = screen.getByTestId('basic-query-free-report');
     expect(freeReport).toHaveTextContent('未用 AI');
-    expect(freeReport).toHaveTextContent('Technology');
-    expect(freeReport).toHaveTextContent('Consumer Electronics');
+    expect(freeReport).toHaveTextContent('科技');
+    expect(freeReport).toHaveTextContent('消费电子');
     expect(freeReport).toHaveTextContent('MA5');
     expect(freeReport).toHaveTextContent('MA20');
     expect(freeReport).toHaveTextContent('4.5T');
@@ -2200,9 +2320,12 @@ describe('HomePage', () => {
     expect(signalScore).toHaveTextContent('数据新鲜度');
     expect(signalScore).toHaveTextContent('资料完整度');
     expect(signalScore).toHaveTextContent('未用 AI');
+    expect(signalScore).not.toHaveTextContent('Constructive quick signal');
+    expect(signalScore).not.toHaveTextContent('Price 200 is above MA5');
+    expect(signalScore).not.toHaveTextContent('Price is above trend');
     const retentionBrief = screen.getByTestId('basic-query-retention-brief');
     expect(retentionBrief).toHaveTextContent('AAPL 快速解读');
-    expect(retentionBrief).toHaveTextContent('Technology / Consumer Electronics');
+    expect(retentionBrief).toHaveTextContent('科技 / 消费电子');
     expect(retentionBrief).toHaveTextContent('支撑 190；压力 205');
     expect(retentionBrief).toHaveTextContent('与 QQQ 对比');
     expect(retentionBrief).toHaveTextContent('登录后可保存历史');
@@ -2270,6 +2393,10 @@ describe('HomePage', () => {
     expect(marketBrief).toHaveTextContent('美股行情数据');
     expect(marketBrief).toHaveTextContent('纳指与行业 ETF 背景');
     const freeInsights = screen.getByTestId('basic-query-free-insights');
+    expect(freeInsights).not.toHaveTextContent('Technology / Consumer Electronics');
+    expect(freeInsights).not.toHaveTextContent('quick profile context');
+    expect(freeInsights).not.toHaveTextContent('holds above MA20');
+    expect(freeInsights).not.toHaveTextContent('volume is');
     expect(freeInsights).toHaveTextContent('免费洞察');
     expect(freeInsights).toHaveTextContent('波动解释');
     expect(freeInsights).toHaveTextContent('同业背景');
@@ -2319,8 +2446,8 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('量能变化');
     expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('12.5%');
     expect(screen.getByTestId('basic-query-technical-details')).toHaveTextContent('价量确认');
-    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('Technology');
-    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('Consumer Electronics');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('科技');
+    expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('消费电子');
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('NASDAQ');
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('USD');
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('4.5T');
