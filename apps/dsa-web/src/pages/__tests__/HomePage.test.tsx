@@ -461,6 +461,10 @@ describe('HomePage', () => {
     expect(screen.getByTestId('platform-auth-email')).toBeInTheDocument();
     expect(screen.getByTestId('platform-auth-password')).toBeInTheDocument();
     expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('注册');
+    expect(screen.getByTestId('platform-auth-submit')).toBeEnabled();
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+    expect(screen.getByTestId('platform-auth-error')).toHaveTextContent('请先输入邮箱');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
   });
 

@@ -1059,13 +1059,24 @@ const HomePage: React.FC = () => {
   }, [refreshPlatformSession]);
 
   const handlePlatformAuth = useCallback(async () => {
+    const email = authEmail.trim();
+    if (!email) {
+      setAuthError(uiLanguage === 'en' ? 'Enter an email first.' : '请先输入邮箱');
+      platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+      return;
+    }
+    if (!authPassword) {
+      setAuthError(uiLanguage === 'en' ? 'Enter a password first.' : '请先输入密码');
+      platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-password"]')?.focus();
+      return;
+    }
     setAuthBusy(true);
     setAuthError('');
     try {
       const retainedQuery = basicSnapshot?.stockCode || query;
       const payload = authMode === 'register'
-        ? await platformApi.register(authEmail.trim(), authPassword)
-        : await platformApi.login(authEmail.trim(), authPassword);
+        ? await platformApi.register(email, authPassword)
+        : await platformApi.login(email, authPassword);
       await loadPlatformAccount(payload);
       setAuthPassword('');
       resetDashboardState();
@@ -1083,12 +1094,21 @@ const HomePage: React.FC = () => {
     } finally {
       setAuthBusy(false);
     }
-  }, [authEmail, authMode, authPassword, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery]);
+  }, [authEmail, authMode, authPassword, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery, uiLanguage]);
 
   const handleGuestAuthModeRequest = useCallback((mode: 'login' | 'register') => {
     setAuthMode(mode);
+    setAuthError('');
     window.setTimeout(() => {
       platformAuthPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+    }, 0);
+  }, []);
+
+  const handlePlatformAuthModeChange = useCallback((mode: 'login' | 'register') => {
+    setAuthMode(mode);
+    setAuthError('');
+    window.setTimeout(() => {
       platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
     }, 0);
   }, []);
@@ -2953,7 +2973,7 @@ const HomePage: React.FC = () => {
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setAuthMode('login')}
+                      onClick={() => handlePlatformAuthModeChange('login')}
                       data-testid="platform-auth-login-tab"
                       className={`rounded-md px-2 py-1 ${authMode === 'login' ? 'bg-primary text-primary-foreground' : 'text-secondary-text hover:text-foreground'}`}
                     >
@@ -2961,13 +2981,13 @@ const HomePage: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setAuthMode('register')}
+                      onClick={() => handlePlatformAuthModeChange('register')}
                       data-testid="platform-auth-register-tab"
                       className={`rounded-md px-2 py-1 ${authMode === 'register' ? 'bg-primary text-primary-foreground' : 'text-secondary-text hover:text-foreground'}`}
                     >
                       注册
                     </button>
-                    {authError ? <span className="text-danger">{authError}</span> : null}
+                    {authError ? <span className="text-danger" data-testid="platform-auth-error">{authError}</span> : null}
                   </div>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <input
@@ -2991,7 +3011,7 @@ const HomePage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       isLoading={authBusy}
-                      disabled={!authEmail.trim() || !authPassword}
+                      disabled={authBusy}
                       onClick={() => void handlePlatformAuth()}
                       data-testid="platform-auth-submit"
                     >
