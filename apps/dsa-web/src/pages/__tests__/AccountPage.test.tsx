@@ -83,8 +83,8 @@ function billingPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function renderPage() {
-  window.localStorage.setItem('dsa.uiLanguage', 'en');
+function renderPage(language: 'zh' | 'en' = 'en') {
+  window.localStorage.setItem('dsa.uiLanguage', language);
   return render(
     <UiLanguageProvider>
       <AccountPage />
@@ -112,6 +112,46 @@ beforeEach(() => {
 });
 
 describe('AccountPage', () => {
+  it('localizes account and sandbox billing content in Chinese mode', async () => {
+    billingAccount.mockResolvedValueOnce(billingPayload({
+      mode: 'disabled',
+      subscription: {
+        userId: 7,
+        provider: 'sandbox',
+        providerSubscriptionId: null,
+        plan: 'free',
+        status: 'none',
+        createdAt: '2026-07-02T08:00:00',
+        updatedAt: '2026-07-02T08:05:00',
+      },
+    }));
+    renderPage('zh');
+
+    expect(await screen.findByRole('heading', { name: '账户' })).toBeInTheDocument();
+    expect(screen.getByText('API Key 托管')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '保存 API Key' })).toBeInTheDocument();
+    expect(screen.getByText('本地支付沙箱')).toBeInTheDocument();
+    expect(screen.getByText('仅本地模拟账单，真实支付仍关闭')).toBeInTheDocument();
+    expect(screen.getByText(/本地沙箱账单/)).toBeInTheDocument();
+    expect(screen.getByText('订阅')).toBeInTheDocument();
+    expect(screen.getByText('账单模式')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '启动沙箱升级' })).toBeInTheDocument();
+    expect(screen.getByText('最近结账会话')).toBeInTheDocument();
+    expect(screen.getByText('最近账单事件')).toBeInTheDocument();
+    expect(screen.getByText('结账完成')).toBeInTheDocument();
+    expect(screen.getAllByText('专业版 / 沙箱')[0]).toBeInTheDocument();
+    expect(screen.getByText('免费版 / 未订阅')).toBeInTheDocument();
+    expect(screen.getByText('已关闭')).toBeInTheDocument();
+
+    expect(screen.queryByText('Local payment sandbox')).not.toBeInTheDocument();
+    expect(screen.queryByText('MOCK BILLING ONLY; REAL PAYMENT REMAINS DISABLED')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start sandbox upgrade')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recent checkout sessions')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recent billing events')).not.toBeInTheDocument();
+    expect(screen.queryByText('none')).not.toBeInTheDocument();
+    expect(screen.queryByText('disabled')).not.toBeInTheDocument();
+  });
+
   it('renders account, quota buckets, masked API key state, and no plaintext key', async () => {
     renderPage();
 
