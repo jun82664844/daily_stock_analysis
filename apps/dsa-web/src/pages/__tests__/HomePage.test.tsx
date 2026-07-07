@@ -2526,7 +2526,7 @@ describe('HomePage', () => {
     expect(premiumFeatureLadder).toHaveTextContent('免费无AI');
     expect(premiumFeatureLadder).toHaveTextContent('高级资讯');
     expect(premiumFeatureLadder).toHaveTextContent('Kronos 已就绪');
-    expect(premiumFeatureLadder).toHaveTextContent('自带Key或本地模型');
+    expect(premiumFeatureLadder).toHaveTextContent('我的 API 或本地模型');
     const productBrief = screen.getByTestId('basic-query-product-brief');
     expect(productBrief).toHaveTextContent('关键结论');
     expect(productBrief).toHaveTextContent('支撑');
@@ -2985,6 +2985,89 @@ describe('HomePage', () => {
     expect(workspace).toHaveTextContent('Selected Platform API');
     expect(workspace).toHaveTextContent('BYOK ready');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps the signed-in account panel compact and localized in Chinese', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue({
+      user: {
+        id: 16,
+        email: 'zh-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 16,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-01',
+      },
+    });
+    vi.mocked(platformApi.account).mockResolvedValue({
+      user: {
+        id: 16,
+        email: 'zh-user@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 16,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-01',
+      },
+      quotaBuckets: [
+        {
+          userId: 16,
+          plan: 'free',
+          weeklyLimit: null,
+          used: 0,
+          remaining: null,
+          periodStart: '2026-07-01',
+          quotaBucket: 'basic_query',
+        },
+      ],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    vi.mocked(platformApi.watchlist).mockResolvedValue({ userId: 16, total: 0, items: [], aiUsed: false });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    const panel = await screen.findByTestId('platform-signed-in-panel');
+    const status = screen.getByTestId('platform-query-status');
+    expect(status).toHaveTextContent('已登录 zh-user@example.com');
+    expect(status).toHaveTextContent('套餐 免费版');
+    expect(status).toHaveTextContent('每周免费 剩余 5/5');
+    expect(status).toHaveTextContent('免费快照 已用 0/不限');
+    expect(status).toHaveTextContent('我的 API 未设置');
+    expect(status).toHaveTextContent('推荐 平台 API');
+    expect(status).toHaveTextContent('退出');
+    expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('平台 API、我的 API 或本地模型');
+    expect(screen.getByTestId('platform-ai-cost-warning')).not.toHaveTextContent('BYOK');
+    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('分析通道');
+    expect(screen.getByTestId('platform-mode-user')).toHaveTextContent('我的 API');
+    expect(screen.getByTestId('platform-api-key-save')).toHaveTextContent('保存密钥');
+    expect(screen.getByTestId('platform-watchlist-panel')).toHaveTextContent('暂无');
+    expect(screen.getByTestId('platform-watchlist-add-current')).toHaveTextContent('加入当前');
+    expect(panel.textContent?.match(/zh-user@example\.com/g)?.length ?? 0).toBe(1);
+    expect(panel).not.toHaveTextContent('Signed in');
+    expect(panel).not.toHaveTextContent('Plan free');
+    expect(panel).not.toHaveTextContent('Weekly free');
+    expect(panel).not.toHaveTextContent('No-AI quick');
   });
 
   it('renders refreshed watchlist board rows and runs no-AI quick query from a row', async () => {

@@ -192,7 +192,7 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'Sector and peer lane': '板块与同业通道',
   'Data quality lane': '数据质量通道',
   'Premium news': '高级资讯',
-  'BYOK or local model': 'BYOK 或本地模型',
+  'BYOK or local model': '我的 API 或本地模型',
   'Move explanation': '波动解释',
   'Peer context': '同业背景',
   'Key risks': '关键风险',
@@ -544,9 +544,20 @@ const formatQuotaLeft = (quota?: Pick<PlatformQuota, 'weeklyLimit' | 'remaining'
   return isEnglish ? `${quota.remaining ?? 0}/${quota.weeklyLimit} left` : `剩余 ${quota.remaining ?? 0}/${quota.weeklyLimit}`;
 };
 
+const platformPlanLabel = (plan?: string | null, language = 'en'): string => {
+  const value = String(plan || '-');
+  if (language === 'en') return value;
+  const zh: Record<string, string> = {
+    free: '免费版',
+    pro: '专业版',
+    premium: '高级版',
+  };
+  return zh[value] || value;
+};
+
 const apiKeyModeLabel = (mode?: string | null, language = 'en'): string => {
   const isEnglish = language === 'en';
-  if (mode === 'user') return 'BYOK';
+  if (mode === 'user') return isEnglish ? 'BYOK' : '我的 API';
   if (mode === 'local') return isEnglish ? 'local model' : '本地模型';
   return isEnglish ? 'platform API' : '平台 API';
 };
@@ -593,9 +604,9 @@ const localizeRuntimeLabel = (value: unknown, language: string): string => {
     'Platform API': '平台 API',
     'Selected Platform API': '已选择平台 API',
     'Selected local model': '已选择本地模型',
-    'Selected BYOK': '已选择 BYOK',
-    'BYOK ready': 'BYOK 已就绪',
-    'BYOK not set': 'BYOK 未设置',
+    'Selected BYOK': '已选择我的 API',
+    'BYOK ready': '我的 API 已就绪',
+    'BYOK not set': '我的 API 未设置',
   };
   if (zh[text]) return zh[text];
   const reports = text.match(/^(\d+) reports$/);
@@ -1520,11 +1531,6 @@ const HomePage: React.FC = () => {
     [analysisSkills, selectedStrategyId],
   );
   const hasUserApiKey = platformKeys.some((key) => key.enabled);
-  const quotaText = platformSession
-    ? platformSession.quota.weeklyLimit === null
-      ? `${platformSession.quota.used}/∞`
-      : `${platformSession.quota.remaining ?? 0}/${platformSession.quota.weeklyLimit}`
-    : '';
   const handleApiKeyModeChange = useCallback((mode: ApiKeyMode) => {
     setApiKeyMode(mode);
   }, [setApiKeyMode]);
@@ -1540,7 +1546,7 @@ const HomePage: React.FC = () => {
   const byokAiQuotaText = byokAiQuickQuota ? formatQuotaLeft(byokAiQuickQuota, uiLanguage) : (uiLanguage === 'en' ? 'available after saving a user key' : '保存用户 API Key 后可用');
   const localModelQuotaText = localAiQuota ? formatQuotaLeft(localAiQuota, uiLanguage) : (uiLanguage === 'en' ? 'local capacity gate' : '本地算力限制');
   const byokStatusText = primaryApiKey
-    ? (uiLanguage === 'en' ? `BYOK ready ${primaryApiKey.maskedKey}` : `BYOK 已就绪 ${primaryApiKey.maskedKey}`)
+    ? (uiLanguage === 'en' ? `BYOK ready ${primaryApiKey.maskedKey}` : `我的 API 已就绪 ${primaryApiKey.maskedKey}`)
     : localizeRuntimeLabel('BYOK not set', uiLanguage);
   const recommendedModeText = uiLanguage === 'en'
     ? `Recommended ${apiKeyModeLabel(platformAccount?.recommendedQueryMode, uiLanguage)}`
@@ -1814,12 +1820,12 @@ const HomePage: React.FC = () => {
     ? `${stockHistoryTotal ?? 0} reports`
     : `${stockHistoryTotal ?? 0} 份报告`;
   const workspaceAiModeText = apiKeyMode === 'user'
-    ? (uiLanguage === 'en' ? 'Selected BYOK' : '已选择 BYOK')
+    ? (uiLanguage === 'en' ? 'Selected BYOK' : '已选择我的 API')
     : apiKeyMode === 'local'
       ? (uiLanguage === 'en' ? 'Selected local model' : '已选择本地模型')
       : (uiLanguage === 'en' ? 'Selected Platform API' : '已选择平台 API');
   const workspaceByokText = primaryApiKey
-    ? (uiLanguage === 'en' ? 'BYOK ready' : 'BYOK 已就绪')
+    ? (uiLanguage === 'en' ? 'BYOK ready' : '我的 API 已就绪')
     : localizeRuntimeLabel('BYOK not set', uiLanguage);
   const showGuestQueryEntry = !platformSession
     && !basicSnapshot
@@ -2881,13 +2887,32 @@ const HomePage: React.FC = () => {
                     >
                       <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap font-medium text-foreground">
                         <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span className="max-w-[14rem] truncate">Signed in {platformSession.user.email}</span>
+                        <span className="max-w-[14rem] truncate">
+                          {uiLanguage === 'en' ? 'Signed in' : '已登录'} {platformSession.user.email}
+                        </span>
                       </span>
-                      <span data-testid="platform-status-plan" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">Plan {platformSession.user.plan}</span>
-                      <span data-testid="platform-status-weekly" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">Weekly free {accountQuotaText}</span>
-                      <span data-testid="platform-status-basic-quota" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">No-AI quick {basicQuotaText}</span>
+                      <span data-testid="platform-status-plan" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">
+                        {uiLanguage === 'en' ? 'Plan' : '套餐'} {platformPlanLabel(platformSession.user.plan, uiLanguage)}
+                      </span>
+                      <span data-testid="platform-status-weekly" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">
+                        {uiLanguage === 'en' ? 'Weekly free' : '每周免费'} {accountQuotaText}
+                      </span>
+                      <span data-testid="platform-status-basic-quota" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">
+                        {uiLanguage === 'en' ? 'No-AI quick' : '免费快照'} {basicQuotaText}
+                      </span>
                       <span data-testid="platform-status-byok" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">{byokStatusText}</span>
                       <span data-testid="platform-status-recommended" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">{recommendedModeText}</span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void handlePlatformLogout()}
+                        data-testid="platform-logout-button"
+                        className="ml-auto"
+                      >
+                        <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                        {uiLanguage === 'en' ? 'Sign out' : '退出'}
+                      </Button>
                     </div>
                     <div
                       data-testid="platform-ai-cost-warning"
@@ -2895,7 +2920,7 @@ const HomePage: React.FC = () => {
                     >
                       {uiLanguage === 'en'
                         ? 'Quick snapshot stays no-AI. Quick/Deep AI uses selected quota: platform API, BYOK, or local model. Historical reports stay separate from current snapshots.'
-                        : '快速快照保持未用 AI；快速/深度 AI 会使用所选额度：平台 API、BYOK 或本地模型。历史报告和当前快照单独保存。'}
+                        : '快速快照保持未用 AI；快速/深度 AI 会使用所选额度：平台 API、我的 API 或本地模型。历史报告和当前快照单独保存。'}
                     </div>
                     <div
                       data-testid="platform-watchlist-panel"
@@ -2916,7 +2941,9 @@ const HomePage: React.FC = () => {
                           {item.stockCode}
                         </button>
                       )) : (
-                        <span className="rounded-md border border-subtle px-2 py-1">empty</span>
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {uiLanguage === 'en' ? 'Empty' : '暂无'}
+                        </span>
                       )}
                       <Button
                         type="button"
@@ -2927,7 +2954,7 @@ const HomePage: React.FC = () => {
                         data-testid="platform-watchlist-add-current"
                       >
                         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                        Add current
+                        {uiLanguage === 'en' ? 'Add current' : '加入当前'}
                       </Button>
                       <Button
                         type="button"
@@ -3021,15 +3048,13 @@ const HomePage: React.FC = () => {
                       <div className="text-xs text-danger" role="alert">{platformWatchlistError}</div>
                     ) : null}
                   </div>
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                      <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-                      <span className="max-w-[11rem] truncate">{platformSession.user.email}</span>
+                  <div
+                    data-testid="platform-query-mode-panel"
+                    className="flex min-w-0 flex-wrap items-center gap-2 border-t border-subtle/70 pt-2"
+                  >
+                    <span className="whitespace-nowrap text-xs font-medium text-foreground">
+                      {uiLanguage === 'en' ? 'Analysis channel' : '分析通道'}
                     </span>
-                    <span className="rounded-md border border-subtle px-2 py-1">{platformSession.user.plan}</span>
-                    <span className="rounded-md border border-subtle px-2 py-1">额度 {quotaText}</span>
-                  </div>
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <div className="inline-flex overflow-hidden rounded-lg border border-subtle">
                       <button
                         type="button"
@@ -3074,7 +3099,7 @@ const HomePage: React.FC = () => {
                       onChange={(event) => setApiKeyModel(event.target.value)}
                       data-testid="platform-api-key-model"
                       placeholder={platformKeys[0]?.model || '模型名'}
-                      className="h-8 w-56 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
+                      className="h-8 w-full min-w-[12rem] max-w-[22rem] flex-1 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text md:w-56 md:flex-none"
                     />
                     <input
                       type="password"
@@ -3082,7 +3107,7 @@ const HomePage: React.FC = () => {
                       onChange={(event) => setApiKeyDraft(event.target.value)}
                       data-testid="platform-api-key-secret"
                       placeholder={platformKeys[0]?.maskedKey || 'API Key'}
-                      className="h-8 w-40 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
+                      className="h-8 w-full min-w-[10rem] max-w-[18rem] flex-1 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text md:w-40 md:flex-none"
                     />
                     <Button
                       type="button"
@@ -3094,11 +3119,7 @@ const HomePage: React.FC = () => {
                       data-testid="platform-api-key-save"
                     >
                       <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-                      保存
-                    </Button>
-                    <Button type="button" variant="secondary" size="sm" onClick={() => void handlePlatformLogout()} data-testid="platform-logout-button">
-                      <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                      退出
+                      {uiLanguage === 'en' ? 'Save key' : '保存密钥'}
                     </Button>
                   </div>
                 </>
@@ -3959,8 +3980,8 @@ const HomePage: React.FC = () => {
                             uiLanguage === 'en' ? 'K-line forecast adapter lane after local model approval.' : '本地模型确认后可使用K线预测适配通道。',
                           ],
                           [
-                            uiLanguage === 'en' ? 'BYOK or local model' : '自带Key或本地模型',
-                            uiLanguage === 'en' ? 'Use platform API, user API key, or approved local model quota.' : '可使用平台 API、用户自带 API Key 或已批准的本地模型额度。',
+                            uiLanguage === 'en' ? 'BYOK or local model' : '我的 API 或本地模型',
+                            uiLanguage === 'en' ? 'Use platform API, user API key, or approved local model quota.' : '可使用平台 API、用户自带 API 密钥或已批准的本地模型额度。',
                           ],
                         ].map(([title, detail]) => (
                           <div key={title} className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
@@ -4472,7 +4493,7 @@ const HomePage: React.FC = () => {
                             {uiLanguage === 'en' ? `Platform API quick AI ${platformAiQuotaText}` : `平台 API 快速 AI ${platformAiQuotaText}`}
                           </span>
                           <span className="rounded-md border border-subtle px-2 py-1">
-                            {uiLanguage === 'en' ? `BYOK ${byokStatusText}; quick bucket ${byokAiQuotaText}` : `BYOK ${byokStatusText}；快速额度 ${byokAiQuotaText}`}
+                            {uiLanguage === 'en' ? `BYOK ${byokStatusText}; quick bucket ${byokAiQuotaText}` : `${byokStatusText}；快速额度 ${byokAiQuotaText}`}
                           </span>
                           <span className="rounded-md border border-subtle px-2 py-1">
                             {uiLanguage === 'en' ? `Local model ${localModelQuotaText}` : `本地模型 ${localModelQuotaText}`}
@@ -4498,7 +4519,7 @@ const HomePage: React.FC = () => {
                               data-testid="platform-mode-user"
                               className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'user' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                             >
-                              BYOK
+                              {uiLanguage === 'en' ? 'BYOK' : '我的 API'}
                             </button>
                             <button
                               type="button"
