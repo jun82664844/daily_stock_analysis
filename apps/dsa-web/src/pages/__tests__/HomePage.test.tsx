@@ -531,8 +531,9 @@ describe('HomePage', () => {
       expect(platformApi.requestRegistrationCode).toHaveBeenCalledWith('verified@example.com');
     });
     expect(screen.getByTestId('platform-auth-verification-status')).toHaveTextContent('123456');
+    expect(screen.getByTestId('platform-auth-verification-code')).toHaveValue('123456');
+    expect(screen.queryByTestId('platform-auth-error')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('platform-auth-verification-code'), { target: { value: '123456' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
 
     await waitFor(() => {

@@ -1133,9 +1133,10 @@ const HomePage: React.FC = () => {
     setAuthVerificationStatus('');
     try {
       const response = await platformApi.requestRegistrationCode(email);
-      setAuthVerificationCode('');
+      setAuthError('');
+      setAuthVerificationCode(response.devCode || '');
       const devCodeText = response.devCode
-        ? (uiLanguage === 'en' ? ` Local code: ${response.devCode}` : `本地验证码：${response.devCode}`)
+        ? (uiLanguage === 'en' ? ` Local code auto-filled: ${response.devCode}` : `本地验证码已自动填入：${response.devCode}`)
         : '';
       setAuthVerificationStatus(
         uiLanguage === 'en'
@@ -3052,7 +3053,10 @@ const HomePage: React.FC = () => {
                       autoCorrect="off"
                       spellCheck={false}
                       value={authEmail}
-                      onChange={(event) => setAuthEmail(event.target.value)}
+                      onChange={(event) => {
+                        setAuthEmail(event.target.value);
+                        setAuthError('');
+                      }}
                       data-testid="platform-auth-email"
                       placeholder="邮箱"
                       className="h-8 w-44 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
@@ -3062,7 +3066,10 @@ const HomePage: React.FC = () => {
                       name="dsa-platform-password"
                       autoComplete="new-password"
                       value={authPassword}
-                      onChange={(event) => setAuthPassword(event.target.value)}
+                      onChange={(event) => {
+                        setAuthPassword(event.target.value);
+                        setAuthError('');
+                      }}
                       data-testid="platform-auth-password"
                       placeholder="密码"
                       className="h-8 w-36 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
@@ -3074,7 +3081,10 @@ const HomePage: React.FC = () => {
                           name="dsa-platform-password-confirm"
                           autoComplete="new-password"
                           value={authPasswordConfirm}
-                          onChange={(event) => setAuthPasswordConfirm(event.target.value)}
+                          onChange={(event) => {
+                            setAuthPasswordConfirm(event.target.value);
+                            setAuthError('');
+                          }}
                           data-testid="platform-auth-confirm-password"
                           placeholder={uiLanguage === 'en' ? 'Confirm' : '确认密码'}
                           className="h-8 w-36 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
@@ -3085,7 +3095,10 @@ const HomePage: React.FC = () => {
                           name="dsa-platform-verification-code"
                           autoComplete="one-time-code"
                           value={authVerificationCode}
-                          onChange={(event) => setAuthVerificationCode(event.target.value)}
+                          onChange={(event) => {
+                            setAuthVerificationCode(event.target.value);
+                            setAuthError('');
+                          }}
                           data-testid="platform-auth-verification-code"
                           placeholder={uiLanguage === 'en' ? 'Code' : '验证码'}
                           className="h-8 w-24 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
