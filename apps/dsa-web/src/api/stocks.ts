@@ -142,6 +142,9 @@ export type BasicStockSnapshot = {
       summary: string;
       status: string;
       source: string;
+      sourceMode?: string;
+      skill?: Record<string, unknown>;
+      diagnostics?: Record<string, unknown>;
       updatedAt?: string | null;
       aiUsed: boolean;
       publicSearchUsed: boolean;

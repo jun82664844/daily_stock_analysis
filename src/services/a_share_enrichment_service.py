@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 
@@ -34,12 +36,46 @@ class AShareEnrichmentService:
         http_get: Optional[HttpGet] = None,
         timeout_seconds: Optional[float] = None,
         http_enabled: Optional[bool] = None,
+        source_mode: Optional[str] = None,
+        cache_ttl_seconds: Optional[float] = None,
+        min_interval_seconds: Optional[float] = None,
+        skill_root: Optional[str] = None,
+        skill_revision: Optional[str] = None,
+        time_provider: Optional[Callable[[], float]] = None,
     ) -> None:
         self.timeout_seconds = max(0.1, float(timeout_seconds or os.getenv("A_STOCK_DATA_POC_TIMEOUT_SEC", "1.2")))
+        self.source_mode = self._normalize_source_mode(source_mode or os.getenv("A_STOCK_DATA_SOURCE_MODE", "poc"))
+        self.cache_ttl_seconds = max(
+            0.0,
+            float(
+                cache_ttl_seconds
+                if cache_ttl_seconds is not None
+                else os.getenv("A_STOCK_DATA_CACHE_TTL_SEC", "600")
+            ),
+        )
+        self.min_interval_seconds = max(
+            0.0,
+            float(
+                min_interval_seconds
+                if min_interval_seconds is not None
+                else os.getenv("A_STOCK_DATA_MIN_INTERVAL_SEC", "1")
+            ),
+        )
+        self.skill_root = skill_root or os.getenv(
+            "A_STOCK_DATA_SKILL_ROOT",
+            r"C:\Users\26879\Documents\Codex\external\a-stock-data",
+        )
+        self.skill_revision = skill_revision or os.getenv("A_STOCK_DATA_SKILL_REVISION") or self._detect_skill_revision()
+        self._time_provider = time_provider or time.monotonic
+        self._cache: dict[tuple[str, str], dict[str, Any]] = {}
+        self._last_request_at: dict[tuple[str, str], float] = {}
         enabled = http_enabled
         if enabled is None:
-            enabled = os.getenv("A_STOCK_DATA_POC_HTTP_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
-        self.http_get = http_get if http_get is not None else (self._default_http_get if enabled else None)
+            enabled = self._env_flag("A_STOCK_DATA_HTTP_ENABLED") or self._env_flag("A_STOCK_DATA_POC_HTTP_ENABLED")
+        if self.source_mode == "off":
+            self.http_get = None
+        else:
+            self.http_get = http_get if http_get is not None else (self._default_http_get if enabled else None)
 
     def get_enrichment(
         self,
@@ -53,9 +89,10 @@ class AShareEnrichmentService:
         code = self._normalize_code(stock_code)
         fetched: dict[str, dict[str, Any] | None] = {}
         errors: dict[str, str] = {}
+        diagnostics: dict[str, Any] = self._new_diagnostics(errors)
 
         for channel in self.CHANNELS:
-            fetched[channel] = self._fetch_channel(channel, code=code, errors=errors)
+            fetched[channel] = self._fetch_channel(channel, code=code, errors=errors, diagnostics=diagnostics)
 
         has_external_data = any(self._has_external_payload(fetched.get(channel)) for channel in self.CHANNELS)
         if not has_external_data:
@@ -74,6 +111,9 @@ class AShareEnrichmentService:
                 "updated_at": self._now_iso(),
                 "ai_used": False,
                 "public_search_used": False,
+                "source_mode": self.source_mode,
+                "skill": self._skill_metadata(),
+                "diagnostics": diagnostics,
                 "channels": channels,
                 "premium_unlock": "Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details.",
                 "boundary": "Information analysis only; not investment advice.",
@@ -87,36 +127,124 @@ class AShareEnrichmentService:
             self._dragon_tiger_channel(code, stock_name, fetched.get("dragon_tiger")),
         ]
         any_available = any(item["status"] == "available" for item in channels)
-        status = "degraded" if errors or not any_available else "available"
+        status = "degraded" if errors or diagnostics["rate_limited_channels"] or not any_available else "available"
         summary = self._summary(stock_name or code, profile=profile, quote=quote, status=status)
+        source = "a_stock_data_skill_adapter" if self.source_mode == "a_stock_data" else "a_stock_data_poc_adapter"
         return {
             "title": "A-share enrichment",
             "summary": summary,
             "status": status,
-            "source": "a_stock_data_poc_adapter",
+            "source": source,
             "updated_at": self._now_iso(),
             "ai_used": False,
             "public_search_used": False,
+            "source_mode": self.source_mode,
+            "skill": self._skill_metadata(),
+            "diagnostics": diagnostics,
             "channels": channels,
             "premium_unlock": "Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details.",
             "boundary": "Information analysis only; not investment advice.",
         }
 
-    def _fetch_channel(self, channel: str, *, code: str, errors: dict[str, str]) -> dict[str, Any] | None:
+    def _fetch_channel(
+        self,
+        channel: str,
+        *,
+        code: str,
+        errors: dict[str, str],
+        diagnostics: dict[str, Any],
+    ) -> dict[str, Any] | None:
         if self.http_get is None:
             return None
+        now = self._time_provider()
+        cache_key = (channel, code)
+        cached = self._cache.get(cache_key)
+        if self._cache_is_fresh(cached, now):
+            diagnostics["cache"]["hits"] += 1
+            return cached["payload"]
+        last_request_at = self._last_request_at.get(cache_key)
+        if (
+            self.min_interval_seconds > 0
+            and last_request_at is not None
+            and now - last_request_at < self.min_interval_seconds
+        ):
+            diagnostics["rate_limited_channels"].append(channel)
+            if cached is not None:
+                diagnostics["cache"]["stale_hits"] += 1
+                return cached["payload"]
+            errors[channel] = "rate_limited"
+            return None
+        diagnostics["cache"]["misses"] += 1
+        self._last_request_at[cache_key] = now
         try:
-            slug = self.CHANNEL_SLUGS.get(channel, channel.replace("_", "-"))
+            url = self._channel_url(channel)
             result = self.http_get(
-                f"a-stock-data-poc://{slug}",
-                params={"code": code},
-                headers={"User-Agent": "DSA local a-stock-data POC"},
+                url,
+                params={"code": code, "channel": channel, "source_mode": self.source_mode},
+                headers={"User-Agent": "DSA local a-stock-data adapter"},
                 timeout=self.timeout_seconds,
             )
-            return result if isinstance(result, dict) else None
+            if not isinstance(result, dict):
+                return None
+            if self._has_external_payload(result):
+                self._cache[cache_key] = {"payload": result, "fetched_at": now}
+            return result
         except Exception as exc:
             errors[channel] = type(exc).__name__
             return None
+
+    def _channel_url(self, channel: str) -> str:
+        if self.source_mode == "a_stock_data":
+            return f"a-stock-data://{channel}"
+        slug = self.CHANNEL_SLUGS.get(channel, channel.replace("_", "-"))
+        return f"a-stock-data-poc://{slug}"
+
+    def _new_diagnostics(self, errors: dict[str, str]) -> dict[str, Any]:
+        return {
+            "source_mode": self.source_mode,
+            "cache": {"hits": 0, "stale_hits": 0, "misses": 0},
+            "rate_limited_channels": [],
+            "errors": errors,
+        }
+
+    def _cache_is_fresh(self, cached: dict[str, Any] | None, now: float) -> bool:
+        if cached is None:
+            return False
+        fetched_at = self._float_or_none(cached.get("fetched_at"))
+        if fetched_at is None:
+            return False
+        return now - fetched_at <= self.cache_ttl_seconds
+
+    def _skill_metadata(self) -> dict[str, Any]:
+        root = Path(self.skill_root)
+        return {
+            "name": "simonlin1212/a-stock-data",
+            "mode": "reference_adapter",
+            "installed": (root / "SKILL.md").exists(),
+            "revision": self.skill_revision,
+        }
+
+    def _detect_skill_revision(self) -> str:
+        head_path = Path(self.skill_root or "") / ".git" / "HEAD"
+        try:
+            head = head_path.read_text(encoding="utf-8", errors="replace").strip()
+            if head.startswith("ref:"):
+                ref_path = Path(self.skill_root) / ".git" / head.split(" ", 1)[1]
+                return ref_path.read_text(encoding="utf-8", errors="replace").strip()[:7]
+            return head[:7]
+        except Exception:
+            return "unknown"
+
+    def _normalize_source_mode(self, value: str) -> str:
+        normalized = str(value or "poc").strip().lower().replace("-", "_")
+        if normalized in {"a_stock_data", "skill", "real"}:
+            return "a_stock_data"
+        if normalized in {"off", "disabled", "none"}:
+            return "off"
+        return "poc"
+
+    def _env_flag(self, name: str) -> bool:
+        return os.getenv(name, "false").lower() in {"1", "true", "yes", "on"}
 
     def _has_external_payload(self, payload: dict[str, Any] | None) -> bool:
         if not isinstance(payload, dict) or not payload:

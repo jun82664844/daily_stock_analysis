@@ -274,6 +274,9 @@ class BasicAShareEnrichmentPayload(BaseModel):
     summary: str
     status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
     source: str = "a_stock_data_poc_adapter"
+    source_mode: str = "poc"
+    skill: Dict[str, Any] = Field(default_factory=dict)
+    diagnostics: Dict[str, Any] = Field(default_factory=dict)
     updated_at: Optional[str] = None
     ai_used: bool = False
     public_search_used: bool = False

@@ -1049,3 +1049,41 @@ Review boundary:
 - Adapter source failures must remain visible degraded states, not hidden successes.
 - Keep `scripts/verify_platform_a_stock_data_poc_v59.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V60 A-Stock-Data Source Manifest Addendum
+
+Status: local-only configurable source adapter for the locally cloned `simonlin1212/a-stock-data` repository. It does not approve production deployment, real payment, production secrets, or market-data redistribution.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `scripts/verify_platform_a_stock_data_v60.py`
+- `tests/test_platform_a_stock_data_v60.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `docs/superpowers/plans/2026-07-07-dsa-v60-a-stock-data-source.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_A_STOCK_DATA_V60_OK`
+
+Suggested review/commit position:
+
+- After V59 A-share enrichment POC and before any live paid data-source, public news/search, or production data licensing work.
+
+Rollback note:
+
+- Reverting this slice removes `A_STOCK_DATA_SOURCE_MODE=a_stock_data`, source diagnostics, cache/rate-limit adapter behavior, and the V60 verifier. The V59 local quick-reference A-share enrichment panel can remain if its slice is kept.
+
+Review boundary:
+
+- External calls are disabled by default.
+- Cache and rate limit are mandatory for any source adapter call path.
+- Diagnostics must remain secret-safe.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

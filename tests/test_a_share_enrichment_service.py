@@ -122,6 +122,96 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         self.assertIn("price_structure", {item["category"] for item in payload["channels"]})
         self.assertIn("not investment advice", payload["boundary"])
 
+    def test_a_stock_data_source_mode_uses_skill_metadata_and_cache(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        calls: list[tuple[str, dict]] = []
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            calls.append((url, params or {}))
+            if url.endswith("/capital_flow"):
+                return {"main_net": 88000000, "main_net_ratio": 2.4}
+            if url.endswith("/sector"):
+                return {"industry": "baijiu", "concepts": ["consumer", "high dividend"]}
+            if url.endswith("/research"):
+                return {"items": [{"title": "sample research", "rating": "buy"}]}
+            if url.endswith("/announcements"):
+                return {"items": [{"title": "sample announcement", "date": "2026-07-07"}]}
+            if url.endswith("/dragon_tiger"):
+                return {"items": [{"date": "2026-07-06", "net_buy": 12000000}]}
+            return {}
+
+        service = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            cache_ttl_seconds=300,
+            min_interval_seconds=0,
+            skill_root=r"C:\Users\26879\Documents\Codex\external\a-stock-data",
+            skill_revision="bcda405",
+        )
+
+        first = service.get_enrichment("600519.SH", stock_name="Kweichow Moutai")
+        second = service.get_enrichment("600519.SH", stock_name="Kweichow Moutai")
+
+        self.assertEqual(first["source"], "a_stock_data_skill_adapter")
+        self.assertEqual(first["source_mode"], "a_stock_data")
+        self.assertEqual(first["skill"]["revision"], "bcda405")
+        self.assertEqual(first["diagnostics"]["cache"]["hits"], 0)
+        self.assertEqual(second["diagnostics"]["cache"]["hits"], 5)
+        self.assertEqual(len(calls), 5)
+        self.assertTrue(all(url.startswith("a-stock-data://") for url, _params in calls))
+        self.assertEqual({params["code"] for _url, params in calls}, {"600519"})
+
+    def test_a_stock_data_source_mode_reuses_stale_cache_during_rate_limit(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        now = [1000.0]
+        calls: list[str] = []
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            calls.append(url)
+            return {"items": [{"title": "cached item"}]}
+
+        service = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            cache_ttl_seconds=0,
+            min_interval_seconds=30,
+            time_provider=lambda: now[0],
+        )
+
+        first = service.get_enrichment("600519")
+        now[0] = 1001.0
+        second = service.get_enrichment("600519")
+
+        self.assertEqual(first["status"], "available")
+        self.assertEqual(second["status"], "degraded")
+        self.assertEqual(second["diagnostics"]["rate_limited_channels"], list(AShareEnrichmentService.CHANNELS))
+        self.assertEqual(second["diagnostics"]["cache"]["stale_hits"], 5)
+        self.assertEqual(len(calls), 5)
+
+    def test_a_stock_data_source_mode_degrades_failed_channel_only(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/research"):
+                raise TimeoutError("research timeout")
+            return {"items": [{"title": f"{url} item"}]}
+
+        payload = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            min_interval_seconds=0,
+        ).get_enrichment("600519", stock_name="Kweichow Moutai")
+
+        by_category = {item["category"]: item for item in payload["channels"]}
+        self.assertEqual(payload["status"], "degraded")
+        self.assertEqual(by_category["research"]["status"], "degraded")
+        self.assertEqual(by_category["announcements"]["status"], "available")
+        self.assertEqual(payload["diagnostics"]["errors"], {"research": "TimeoutError"})
+        self.assertFalse(payload["ai_used"])
+        self.assertFalse(payload["public_search_used"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -861,3 +861,31 @@ Review focus:
 - HomePage must render `basic-query-a-share-enrichment` with Chinese/English language consistency and without exposing secrets.
 - `scripts/verify_platform_a_stock_data_poc_v59.py` must stay visible despite the broad `verify_*.py` ignore rule and print `DSA_PLATFORM_A_STOCK_DATA_POC_V59_OK` only when V59 markers are present.
 - V59 remains local-only, not public launch approval, not real payment, not market-data licensing approval, and not investment advice.
+
+## V60 A-Stock-Data Source Addendum
+
+Purpose: connect the local `simonlin1212/a-stock-data` checkout as a configurable A-share source adapter with cache, rate limit, source-mode diagnostics, and degraded fallback. This remains local-only and does not approve public data-source redistribution.
+
+Files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `scripts/verify_platform_a_stock_data_v60.py`
+- `tests/test_platform_a_stock_data_v60.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `docs/superpowers/plans/2026-07-07-dsa-v60-a-stock-data-source.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- `A_STOCK_DATA_SOURCE_MODE` must default safely and external calls disabled by default unless explicitly enabled or injected in tests.
+- Cache and rate limit must prevent repeated source calls from slowing or blocking free quick queries.
+- A single failed channel must mark degradation without hiding successful channels.
+- Schema and TypeScript can expose non-secret diagnostics, but must not expose API keys or production secrets.
+- `scripts/verify_platform_a_stock_data_v60.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_V60_OK` only when the V60 markers are present.
+- V60 remains local-only, not real payment, not production deployment, not market-data licensing approval, and not investment advice.
