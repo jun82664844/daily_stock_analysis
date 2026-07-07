@@ -2787,6 +2787,7 @@ describe('HomePage', () => {
     );
 
     const platformStatus = await screen.findByTestId('platform-query-status');
+    expect(screen.getByTestId('platform-signed-in-panel')).toHaveClass('w-full');
     expect(platformStatus).toHaveTextContent('Signed in v15-user@example.com');
     expect(platformStatus).toHaveTextContent('Plan free');
     expect(platformStatus).toHaveTextContent('Weekly free 1/5 left');
@@ -2794,6 +2795,11 @@ describe('HomePage', () => {
     expect(platformStatus).toHaveTextContent('BYOK ready sk-...live');
     expect(platformStatus).toHaveTextContent('Recommended BYOK');
     expect(platformStatus).not.toHaveTextContent('sk-live-secret');
+    expect(screen.getByTestId('platform-status-plan')).toHaveClass('whitespace-nowrap');
+    expect(screen.getByTestId('platform-status-weekly')).toHaveClass('whitespace-nowrap');
+    expect(screen.getByTestId('platform-status-basic-quota')).toHaveClass('whitespace-nowrap');
+    expect(screen.getByTestId('platform-status-byok')).toHaveClass('whitespace-nowrap');
+    expect(screen.getByTestId('platform-status-recommended')).toHaveClass('whitespace-nowrap');
     expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('Quick snapshot stays no-AI');
     expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('Quick/Deep AI uses selected quota');
     expect(await screen.findByTestId('platform-watchlist-panel')).toHaveTextContent('Watchlist 4');

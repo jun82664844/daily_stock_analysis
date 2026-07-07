@@ -2729,23 +2729,23 @@ const HomePage: React.FC = () => {
 
         {platformEnabled && !basicQueryError && !marketReviewReport && (!platformSession || !basicSnapshot) ? (
           <div ref={platformAuthPanelRef} className="px-3 pb-2 md:px-4">
-            <div className="flex flex-col gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-xs text-secondary-text md:flex-row md:items-center md:justify-between">
+            <div className={`flex flex-col gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-xs text-secondary-text ${platformSession ? 'md:items-stretch' : 'md:flex-row md:items-center md:justify-between'}`}>
               {platformSession ? (
                 <>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div data-testid="platform-signed-in-panel" className="flex min-w-0 w-full flex-col gap-2">
                     <div
                       data-testid="platform-query-status"
                       className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-secondary-text"
                     >
-                      <span className="inline-flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+                      <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap font-medium text-foreground">
                         <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span className="max-w-[14rem] truncate">Signed in {platformSession.user.email}</span>
                       </span>
-                      <span className="rounded-md border border-subtle px-2 py-1">Plan {platformSession.user.plan}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">Weekly free {accountQuotaText}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">No-AI quick {basicQuotaText}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">{byokStatusText}</span>
-                      <span className="rounded-md border border-subtle px-2 py-1">{recommendedModeText}</span>
+                      <span data-testid="platform-status-plan" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">Plan {platformSession.user.plan}</span>
+                      <span data-testid="platform-status-weekly" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">Weekly free {accountQuotaText}</span>
+                      <span data-testid="platform-status-basic-quota" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">No-AI quick {basicQuotaText}</span>
+                      <span data-testid="platform-status-byok" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">{byokStatusText}</span>
+                      <span data-testid="platform-status-recommended" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">{recommendedModeText}</span>
                     </div>
                     <div
                       data-testid="platform-ai-cost-warning"
