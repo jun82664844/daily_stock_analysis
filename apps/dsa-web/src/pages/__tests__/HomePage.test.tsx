@@ -457,6 +457,14 @@ describe('HomePage', () => {
     expect(screen.getByTestId('platform-auth-password')).toBeInTheDocument();
     expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('注册');
     expect(screen.getByTestId('platform-auth-submit')).toBeEnabled();
+    expect(screen.getByTestId('platform-auth-email')).toHaveAttribute('autocomplete', 'off');
+    expect(screen.getByTestId('platform-auth-password')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByTestId('platform-auth-password')).toHaveValue('');
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('platform-auth-login-tab'));
+    expect(screen.getByTestId('platform-auth-password')).toHaveValue('');
+    fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
+    expect(screen.getByTestId('platform-auth-password')).toHaveValue('');
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
     expect(screen.getByTestId('platform-auth-error')).toHaveTextContent('请先输入邮箱');

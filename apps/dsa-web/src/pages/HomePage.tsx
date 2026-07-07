@@ -1099,6 +1099,7 @@ const HomePage: React.FC = () => {
   const handlePlatformAuthModeChange = useCallback((mode: 'login' | 'register') => {
     setAuthMode(mode);
     setAuthError('');
+    setAuthPassword('');
     window.setTimeout(() => {
       platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
     }, 0);
@@ -2983,6 +2984,10 @@ const HomePage: React.FC = () => {
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <input
                       type="email"
+                      name="dsa-platform-email"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={authEmail}
                       onChange={(event) => setAuthEmail(event.target.value)}
                       data-testid="platform-auth-email"
@@ -2991,6 +2996,8 @@ const HomePage: React.FC = () => {
                     />
                     <input
                       type="password"
+                      name="dsa-platform-password"
+                      autoComplete="new-password"
                       value={authPassword}
                       onChange={(event) => setAuthPassword(event.target.value)}
                       data-testid="platform-auth-password"
