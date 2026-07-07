@@ -1087,3 +1087,41 @@ Review boundary:
 - Cache and rate limit are mandatory for any source adapter call path.
 - Diagnostics must remain secret-safe.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V61 A-Stock-Data UI Manifest Addendum
+
+Status: local-only HomePage source-control layer for the V60 A-share adapter. It does not approve production deployment, real payment, production secrets, or market-data redistribution.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/endpoints/stocks.py`
+- `tests/test_basic_query_no_ai.py`
+- `scripts/verify_platform_a_stock_data_ui_v61.py`
+- `tests/test_platform_a_stock_data_ui_v61.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_A_STOCK_DATA_UI_V61_OK`
+
+Suggested review/commit position:
+
+- After V60 source adapter and before any live paid A-share data-source, public news/search expansion, or production data licensing work.
+
+Rollback note:
+
+- Reverting this slice removes the HomePage source selector, API query option, V61 verifier, and V61 docs. The V60 backend adapter remains available through configuration if its slice is kept.
+
+Review boundary:
+
+- Probe queries remain no-AI and no-public-search.
+- UI diagnostics must remain secret-safe.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

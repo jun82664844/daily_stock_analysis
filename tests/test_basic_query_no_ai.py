@@ -124,6 +124,57 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertFalse(body["ai_used"])
         analysis_service.assert_not_called()
 
+    def test_snapshot_accepts_a_share_source_mode_query_param(self) -> None:
+        captured_modes: list[str | None] = []
+
+        class FakeBasicQueryService:
+            def __init__(self, *args, **kwargs):
+                service = kwargs.get("a_share_enrichment_service")
+                captured_modes.append(getattr(service, "source_mode", None))
+
+            def get_snapshot(self, stock_code: str, *, force_refresh: bool = False):
+                mode = captured_modes[-1]
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "贵州茅台",
+                    "market": "cn",
+                    "quote": {
+                        "current_price": 1188.8,
+                        "source": "unit_quote",
+                        "freshness": "fresh",
+                    },
+                    "indicators": {},
+                    "intelligence": {
+                        "mode": "no_ai_low_cost",
+                        "ai_used": False,
+                        "a_share_enrichment": {
+                            "title": "A-share enrichment",
+                            "summary": "source mode probe",
+                            "status": "degraded",
+                            "source": "a_stock_data_skill_adapter",
+                            "source_mode": mode,
+                            "skill": {"revision": "unit"},
+                            "diagnostics": {"cache": {"hits": 0}, "rate_limited_channels": []},
+                            "ai_used": False,
+                            "public_search_used": False,
+                            "channels": [],
+                            "premium_unlock": "Premium can add more sources.",
+                            "boundary": "Information analysis only; not investment advice.",
+                        },
+                        "items": [],
+                        "boundary": "Information analysis only; not investment advice.",
+                    },
+                    "ai_used": False,
+                }
+
+        with patch("api.v1.endpoints.stocks.BasicQueryService", FakeBasicQueryService):
+            response = self.client.get("/api/v1/stocks/600519/snapshot?a_share_source_mode=a_stock_data")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(captured_modes, ["a_stock_data"])
+        self.assertEqual(body["intelligence"]["a_share_enrichment"]["source_mode"], "a_stock_data")
+
     def test_service_snapshot_includes_no_ai_company_profile_when_available(self) -> None:
         class RichStockService:
             def get_realtime_quote(self, stock_code: str):

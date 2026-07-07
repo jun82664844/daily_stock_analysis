@@ -889,3 +889,31 @@ Review focus:
 - Schema and TypeScript can expose non-secret diagnostics, but must not expose API keys or production secrets.
 - `scripts/verify_platform_a_stock_data_v60.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_V60_OK` only when the V60 markers are present.
 - V60 remains local-only, not real payment, not production deployment, not market-data licensing approval, and not investment advice.
+
+## V61 A-Stock-Data UI Addendum
+
+Purpose: expose the configurable A-share source adapter in HomePage so local users can switch local rules, `a-stock-data`, or off mode and run 600519/000001 sample probes without AI or public search.
+
+Files:
+
+- `.gitignore`
+- `api/v1/endpoints/stocks.py`
+- `tests/test_basic_query_no_ai.py`
+- `scripts/verify_platform_a_stock_data_ui_v61.py`
+- `tests/test_platform_a_stock_data_ui_v61.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- `a_share_source_mode` must remain limited to `poc|a_stock_data|off`.
+- UI diagnostics may show cache counts and local repository revision, but must not expose API keys or source credentials.
+- Probe buttons for `600519` and `000001` must use refreshed no-AI snapshots and the selected source mode.
+- `scripts/verify_platform_a_stock_data_ui_v61.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_UI_V61_OK` only when the V61 markers are present.
+- V61 remains local-only, not real payment, not production deployment, not market-data licensing approval, and not investment advice.

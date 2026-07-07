@@ -228,6 +228,47 @@ describe('stocksApi', () => {
     expect(result.aiUsed).toBe(false);
   });
 
+  it('loads A-share snapshots with a selected enrichment source mode', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: '600519',
+        market: 'cn',
+        quote: {
+          current_price: 1188.8,
+          source: 'unit_quote',
+          freshness: 'fresh',
+        },
+        indicators: {},
+        intelligence: {
+          mode: 'no_ai_low_cost',
+          ai_used: false,
+          a_share_enrichment: {
+            title: 'A-share enrichment',
+            summary: 'adapter mode',
+            status: 'degraded',
+            source: 'a_stock_data_skill_adapter',
+            source_mode: 'a_stock_data',
+            skill: { revision: 'bcda405' },
+            diagnostics: { cache: { hits: 1, misses: 0 }, rate_limited_channels: [] },
+            ai_used: false,
+            public_search_used: false,
+            channels: [],
+            premium_unlock: 'Premium can add sources.',
+            boundary: 'Information analysis only; not investment advice.',
+          },
+          items: [],
+        },
+        ai_used: false,
+      },
+    });
+
+    const result = await stocksApi.snapshot('600519', { aShareSourceMode: 'a_stock_data' });
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/600519/snapshot?a_share_source_mode=a_stock_data');
+    expect(result.intelligence?.aShareEnrichment?.sourceMode).toBe('a_stock_data');
+    expect(result.intelligence?.aShareEnrichment?.skill?.revision).toBe('bcda405');
+  });
+
   it('prewarms no-AI market cache as camelCase data', async () => {
     post.mockResolvedValueOnce({
       data: {

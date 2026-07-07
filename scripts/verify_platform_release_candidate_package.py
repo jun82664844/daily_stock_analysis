@@ -64,6 +64,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-06-dsa-v58-kronos-sandbox.md",
     "docs/superpowers/plans/2026-07-07-dsa-v59-a-stock-data-poc.md",
     "docs/superpowers/plans/2026-07-07-dsa-v60-a-stock-data-source.md",
+    "docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -111,6 +112,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_kronos_sandbox_v58.py",
     "scripts/verify_platform_a_stock_data_poc_v59.py",
     "scripts/verify_platform_a_stock_data_v60.py",
+    "scripts/verify_platform_a_stock_data_ui_v61.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/services/a_share_enrichment_service.py",
@@ -167,6 +169,7 @@ REQUIRED_FILES = (
     "tests/test_a_share_enrichment_service.py",
     "tests/test_platform_a_stock_data_poc_v59.py",
     "tests/test_platform_a_stock_data_v60.py",
+    "tests/test_platform_a_stock_data_ui_v61.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -217,6 +220,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_kronos_sandbox_v58.py",
     "scripts/verify_platform_a_stock_data_poc_v59.py",
     "scripts/verify_platform_a_stock_data_v60.py",
+    "scripts/verify_platform_a_stock_data_ui_v61.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

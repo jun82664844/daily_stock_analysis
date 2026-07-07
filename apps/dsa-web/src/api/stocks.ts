@@ -254,6 +254,7 @@ export type BasicStockSnapshot = {
 
 export type BasicSnapshotOptions = {
   refresh?: boolean;
+  aShareSourceMode?: 'poc' | 'a_stock_data' | 'off';
 };
 
 export type KronosForecastResponse = {
@@ -373,7 +374,12 @@ export type MarketSourceRecoveryResponse = {
 
 export const stocksApi = {
   async snapshot(code: string, options?: BasicSnapshotOptions): Promise<BasicStockSnapshot> {
-    const query = options?.refresh ? '?refresh=true' : '';
+    const params = new URLSearchParams();
+    if (options?.refresh) params.set('refresh', 'true');
+    if (options?.aShareSourceMode && options.aShareSourceMode !== 'poc') {
+      params.set('a_share_source_mode', options.aShareSourceMode);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/stocks/${encodeURIComponent(code)}/snapshot${query}`,
     );

@@ -89,6 +89,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v58: bool = True,
         include_v59: bool = True,
         include_v60: bool = True,
+        include_v61: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -295,6 +296,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "Do not commit real API Key\nexternal calls disabled by default\n"
                 "a-stock-data\ncache\nrate limit\nDSA_PLATFORM_A_STOCK_DATA_V60_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\na-stock-data\n600519\n000001\n"
+                "DSA_PLATFORM_A_STOCK_DATA_UI_V61_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -356,6 +362,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_kronos_sandbox_v58.py",
             "scripts/verify_platform_a_stock_data_poc_v59.py",
             "scripts/verify_platform_a_stock_data_v60.py",
+            "scripts/verify_platform_a_stock_data_ui_v61.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -412,6 +419,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_a_share_enrichment_service.py",
             "tests/test_platform_a_stock_data_poc_v59.py",
             "tests/test_platform_a_stock_data_v60.py",
+            "tests/test_platform_a_stock_data_ui_v61.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -615,6 +623,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v60 and rel_path in {
                 "scripts/verify_platform_a_stock_data_v60.py",
                 "tests/test_platform_a_stock_data_v60.py",
+            }:
+                continue
+            if not include_v61 and rel_path in {
+                "scripts/verify_platform_a_stock_data_ui_v61.py",
+                "tests/test_platform_a_stock_data_ui_v61.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -880,6 +893,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v60:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-07-dsa-v60-a-stock-data-source.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v61:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1549,6 +1569,20 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("scripts/verify_platform_a_stock_data_v60.py", missing)
         self.assertIn("tests/test_platform_a_stock_data_v60.py", missing)
         self.assertIn("docs/superpowers/plans/2026-07-07-dsa-v60-a-stock-data-source.md", missing)
+
+    def test_reports_missing_a_stock_data_ui_v61_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v61=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        missing = by_id["required_files_present"].metadata["missing_files"]
+        self.assertIn("scripts/verify_platform_a_stock_data_ui_v61.py", missing)
+        self.assertIn("tests/test_platform_a_stock_data_ui_v61.py", missing)
+        self.assertIn("docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md", missing)
 
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:

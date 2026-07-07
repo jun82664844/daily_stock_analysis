@@ -1030,6 +1030,96 @@ describe('HomePage', () => {
     expect(aShareEnrichment).not.toHaveTextContent('External announcements');
   });
 
+  it('lets users switch A-share enrichment source mode and run sample probes', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: '600519',
+      stockName: 'Kweichow Moutai',
+      market: 'cn',
+      quote: {
+        currentPrice: 1188.8,
+        source: 'a_share_realtime',
+        freshness: 'fresh',
+      },
+      indicators: {},
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        aShareEnrichment: {
+          title: 'A-share enrichment',
+          summary: 'Adapter mode visible.',
+          status: 'degraded',
+          source: 'a_stock_data_skill_adapter',
+          sourceMode: 'a_stock_data',
+          skill: { installed: true, revision: 'bcda405' },
+          diagnostics: {
+            cache: { hits: 1, misses: 0, staleHits: 0 },
+            rateLimitedChannels: [],
+            errors: {},
+          },
+          updatedAt: '2026-07-07T09:30:00Z',
+          aiUsed: false,
+          publicSearchUsed: false,
+          premiumUnlock: 'Premium can expand sources.',
+          boundary: 'Information analysis only; not investment advice.',
+          channels: [
+            {
+              category: 'announcements',
+              title: 'Announcements channel',
+              summary: 'Checklist placeholder.',
+              status: 'degraded',
+              source: 'a_stock_data_poc_local_rules',
+              action: 'Enable cached source fetching after approval.',
+              updatedAt: '2026-07-07T09:30:00Z',
+            },
+          ],
+        },
+        items: [],
+        boundary: 'Information analysis only; not investment advice.',
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: '600519' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Query' }));
+
+    const sourcePanel = await screen.findByTestId('a-share-source-control');
+    expect(sourcePanel).toHaveTextContent('A-share source');
+    expect(sourcePanel).toHaveTextContent('cache H1 / M0 / S0');
+    expect(sourcePanel).toHaveTextContent('repo bcda405');
+
+    fireEvent.click(screen.getByTestId('a-share-source-mode-a_stock_data'));
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenLastCalledWith('600519', {
+        refresh: true,
+        aShareSourceMode: 'a_stock_data',
+      });
+    });
+
+    fireEvent.click(screen.getByTestId('a-share-source-probe-000001'));
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenLastCalledWith('000001', {
+        refresh: true,
+        aShareSourceMode: 'a_stock_data',
+      });
+    });
+  });
+
   it('keeps a guest AAPL snapshot through register and saves it to history and watchlist', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });

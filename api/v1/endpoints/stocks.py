@@ -49,6 +49,7 @@ from src.services.import_parser import (
 )
 from src.services.stock_service import StockService
 from src.services.basic_query_service import BasicQueryService
+from src.services.a_share_enrichment_service import AShareEnrichmentService
 from src.services.kronos_forecast_service import KronosForecastService
 from src.services.market_source_ops import build_market_source_ops_snapshot, recover_market_sources
 from src.services.stock_code_utils import normalize_crypto_symbol
@@ -599,11 +600,20 @@ def get_kronos_forecast(
 def get_basic_stock_snapshot(
     stock_code: str,
     refresh: bool = Query(False, description="Force a deterministic no-AI market data refresh and update local cache."),
+    a_share_source_mode: str = Query(
+        "poc",
+        pattern="^(poc|a_stock_data|off)$",
+        description="A-share enrichment source mode for this no-AI snapshot.",
+    ),
 ) -> BasicStockSnapshot:
     """Return a fast stock snapshot without invoking an AI model."""
     try:
         normalized = _validate_and_normalize_stock_code(stock_code)
-        snapshot = BasicQueryService().get_snapshot(normalized, force_refresh=refresh)
+        a_share_enrichment_service = AShareEnrichmentService(source_mode=a_share_source_mode)
+        snapshot = BasicQueryService(a_share_enrichment_service=a_share_enrichment_service).get_snapshot(
+            normalized,
+            force_refresh=refresh,
+        )
         return BasicStockSnapshot.model_validate(snapshot)
     except HTTPException:
         raise

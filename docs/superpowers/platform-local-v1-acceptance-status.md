@@ -427,3 +427,12 @@ git diff --check
 - The local Kronos runtime has now been installed on this workstation: `local/kronos`, `torch 2.11.0+cu128`, `einops`, `safetensors`, and Hugging Face model cache are available. When 8018 is started with `KRONOS_ENABLED=true`, `KRONOS_MODEL_ID=NeoQuasar/Kronos-mini`, `KRONOS_TOKENIZER_ID=NeoQuasar/Kronos-Tokenizer-2k`, and `KRONOS_REPO_PATH=local/kronos`, the live endpoint can honestly return `model_ready` / `kronos_model_used=true`. If those runtime flags are disabled or dependencies are missing, it must still show `model_unavailable` or `model_disabled` instead of faking a model run.
 - Added `tests/test_kronos_forecast_service_v58.py`, `tests/test_kronos_forecast_api_v58.py`, `tests/test_platform_kronos_sandbox_v58.py`, and `scripts/verify_platform_kronos_sandbox_v58.py`; the verifier prints `DSA_PLATFORM_KRONOS_SANDBOX_V58_OK` only when required local checks pass.
 - V58 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-07 A-Stock-Data UI V61 gate
+
+- A-share quick snapshots now accept `a_share_source_mode=poc|a_stock_data|off` from the public no-AI snapshot endpoint.
+- HomePage renders an A-share source control inside the A-share enrichment card, showing selected mode, cache diagnostics, local repository revision, and rate-limit count.
+- Users can switch to the configured `a-stock-data` adapter and run 600519/000001 probes from the same card; probes remain refreshed no-AI snapshots.
+- Frontend API maps `aShareSourceMode` to `a_share_source_mode`; HomePage tests cover the switch and probes.
+- Added `tests/test_platform_a_stock_data_ui_v61.py` and `scripts/verify_platform_a_stock_data_ui_v61.py`; the verifier prints `DSA_PLATFORM_A_STOCK_DATA_UI_V61_OK` only when required local checks pass.
+- V61 remains local-only. It is not public launch approval, not real payment, not production deployment, not market-data licensing approval, do not commit real API Key, and not investment advice.

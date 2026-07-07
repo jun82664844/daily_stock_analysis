@@ -6,7 +6,7 @@ import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
-import { stocksApi, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
+import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
@@ -772,6 +772,47 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null
 );
 
+type AShareSourceMode = NonNullable<BasicSnapshotOptions['aShareSourceMode']>;
+
+const A_SHARE_SOURCE_MODES: AShareSourceMode[] = ['poc', 'a_stock_data', 'off'];
+
+const normalizeAShareSourceMode = (value: unknown): AShareSourceMode => (
+  value === 'a_stock_data' || value === 'off' ? value : 'poc'
+);
+
+const aShareSourceModeLabel = (mode: AShareSourceMode, language: string): string => {
+  const isEnglish = language === 'en';
+  if (mode === 'a_stock_data') return isEnglish ? 'a-stock-data' : 'a-stock-data适配';
+  if (mode === 'off') return isEnglish ? 'Off' : '关闭';
+  return isEnglish ? 'Local rules' : '本地规则';
+};
+
+const getRecordField = (record: Record<string, unknown>, key: string): Record<string, unknown> => {
+  const value = record[key];
+  return isPlainRecord(value) && !Array.isArray(value) ? value : {};
+};
+
+const asDisplayNumber = (value: unknown): string => (
+  typeof value === 'number' && Number.isFinite(value) ? String(value) : '0'
+);
+
+const formatAShareCacheDiagnostics = (diagnostics: Record<string, unknown>, language: string): string => {
+  const cache = getRecordField(diagnostics, 'cache');
+  const label = language === 'en' ? 'cache' : '缓存';
+  return `${label} H${asDisplayNumber(cache.hits)} / M${asDisplayNumber(cache.misses)} / S${asDisplayNumber(cache.staleHits)}`;
+};
+
+const formatAShareSkillRevision = (skill: Record<string, unknown>, language: string): string => {
+  const revision = typeof skill.revision === 'string' && skill.revision.trim() ? skill.revision.trim() : '-';
+  return `${language === 'en' ? 'repo' : '仓库'} ${revision}`;
+};
+
+const formatAShareRateLimited = (diagnostics: Record<string, unknown>, language: string): string => {
+  const value = diagnostics.rateLimitedChannels;
+  const count = Array.isArray(value) ? value.length : 0;
+  return `${language === 'en' ? 'rate limited' : '限流通道'} ${count}`;
+};
+
 const getPlatformAuthErrorCode = (error: unknown): string | null => {
   if (!isPlainRecord(error)) {
     return null;
@@ -1071,6 +1112,7 @@ const HomePage: React.FC = () => {
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [basicSnapshot, setBasicSnapshot] = useState<BasicStockSnapshot | null>(null);
+  const [aShareSourceMode, setAShareSourceMode] = useState<AShareSourceMode>('poc');
   const [autocompleteCloseSignal, setAutocompleteCloseSignal] = useState(0);
   const restoredHistoryCenterFiltersRef = useRef(false);
   const appliedInitialHistoryCenterFiltersRef = useRef(false);
@@ -2121,7 +2163,12 @@ const HomePage: React.FC = () => {
     setMarketReviewError(null);
   }, [stopMarketReviewPolling]);
 
-  const handleBasicQuery = useCallback(async (stockCode?: string, _stockName?: string, forceRefresh = false) => {
+  const handleBasicQuery = useCallback(async (
+    stockCode?: string,
+    _stockName?: string,
+    forceRefresh = false,
+    sourceModeOverride?: AShareSourceMode,
+  ) => {
     const target = (stockCode || query).trim();
     if (!target || isQueryingBasic) {
       return null;
@@ -2143,8 +2190,16 @@ const HomePage: React.FC = () => {
     }
 
     try {
-      const snapshot = forceRefresh
-        ? await stocksApi.snapshot(target, { refresh: true })
+      const selectedAShareSourceMode = sourceModeOverride ?? aShareSourceMode;
+      const options: BasicSnapshotOptions = {};
+      if (forceRefresh) {
+        options.refresh = true;
+      }
+      if (selectedAShareSourceMode !== 'poc') {
+        options.aShareSourceMode = selectedAShareSourceMode;
+      }
+      const snapshot = Object.keys(options).length > 0
+        ? await stocksApi.snapshot(target, options)
         : await stocksApi.snapshot(target);
       setBasicSnapshot(snapshot);
       clearError();
@@ -2155,7 +2210,28 @@ const HomePage: React.FC = () => {
     } finally {
       setIsQueryingBasic(false);
     }
-  }, [clearError, clearMarketReviewState, isQueryingBasic, query, setQuery]);
+  }, [aShareSourceMode, clearError, clearMarketReviewState, isQueryingBasic, query, setQuery]);
+
+  useEffect(() => {
+    const snapshotSourceMode = basicSnapshot?.intelligence?.aShareEnrichment?.sourceMode;
+    if (!snapshotSourceMode) {
+      return;
+    }
+    setAShareSourceMode(normalizeAShareSourceMode(snapshotSourceMode));
+  }, [basicSnapshot?.intelligence?.aShareEnrichment?.sourceMode]);
+
+  const handleAShareSourceModeSelect = useCallback((mode: AShareSourceMode) => {
+    setAShareSourceMode(mode);
+    const currentAShareCode = basicSnapshot?.market === 'cn' ? basicSnapshot.stockCode : '';
+    if (currentAShareCode) {
+      void handleBasicQuery(currentAShareCode, undefined, true, mode);
+    }
+  }, [basicSnapshot?.market, basicSnapshot?.stockCode, handleBasicQuery]);
+
+  const handleAShareSourceProbe = useCallback((symbol: string) => {
+    setQuery(symbol);
+    void handleBasicQuery(symbol, undefined, true, aShareSourceMode);
+  }, [aShareSourceMode, handleBasicQuery, setQuery]);
 
   const handleRunKronosForecast = useCallback(async (requireModel = false) => {
     if (!basicSnapshot?.stockCode || isRunningKronosForecast) {
@@ -2805,6 +2881,16 @@ const HomePage: React.FC = () => {
       return rightTime - leftTime;
     });
   }, [marketReviewHistoryItems, stockBarItems, t]);
+
+  const aShareEnrichment = basicSnapshot?.intelligence?.aShareEnrichment ?? null;
+  const aShareDiagnosticsValue = aShareEnrichment?.diagnostics;
+  const aShareSkillValue = aShareEnrichment?.skill;
+  const aShareEnrichmentDiagnostics = isPlainRecord(aShareDiagnosticsValue) && !Array.isArray(aShareDiagnosticsValue)
+    ? aShareDiagnosticsValue
+    : {};
+  const aShareEnrichmentSkill = isPlainRecord(aShareSkillValue) && !Array.isArray(aShareSkillValue)
+    ? aShareSkillValue
+    : {};
 
   const sidebarContent = useMemo(
     () => (
@@ -3935,6 +4021,77 @@ const HomePage: React.FC = () => {
                                 ? (uiLanguage === 'en' ? 'Public search' : '公共搜索')
                                 : (uiLanguage === 'en' ? 'No public search' : '未用公共搜索')}
                             </span>
+                          </div>
+                        </div>
+                        <div
+                          data-testid="a-share-source-control"
+                          className="mb-3 rounded-lg border border-subtle/80 bg-surface/35 p-3"
+                        >
+                          <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-foreground">
+                                {uiLanguage === 'en' ? 'A-share source' : 'A股数据源'}
+                              </div>
+                              <div className="mt-1 text-[11px] leading-relaxed text-secondary-text">
+                                {uiLanguage === 'en'
+                                  ? 'Switch local rules, the a-stock-data adapter, or turn the enrichment lane off for comparison.'
+                                  : '可切换本地规则、a-stock-data 适配器或关闭增强通道，用于对比数据差异。'}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap gap-1.5">
+                              {A_SHARE_SOURCE_MODES.map((mode) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  data-testid={`a-share-source-mode-${mode}`}
+                                  onClick={() => handleAShareSourceModeSelect(mode)}
+                                  disabled={isQueryingBasic}
+                                  className={[
+                                    'rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                                    aShareSourceMode === mode
+                                      ? 'border-primary/60 bg-primary/15 text-primary'
+                                      : 'border-subtle text-secondary-text hover:border-primary/40 hover:text-primary',
+                                    isQueryingBasic ? 'opacity-60' : '',
+                                  ].join(' ')}
+                                >
+                                  {aShareSourceModeLabel(mode, uiLanguage)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {formatAShareCacheDiagnostics(aShareEnrichmentDiagnostics, uiLanguage)}
+                            </span>
+                            <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {formatAShareSkillRevision(aShareEnrichmentSkill, uiLanguage)}
+                            </span>
+                            <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {formatAShareRateLimited(aShareEnrichmentDiagnostics, uiLanguage)}
+                            </span>
+                            <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {uiLanguage === 'en' ? 'mode' : '模式'} {aShareSourceModeLabel(normalizeAShareSourceMode(aShareEnrichment?.sourceMode), uiLanguage)}
+                            </span>
+                            {aShareEnrichment?.updatedAt ? (
+                              <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                {aShareEnrichment.updatedAt}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                            <span className="text-secondary-text">{uiLanguage === 'en' ? 'Probe' : '实测'}</span>
+                            {['600519', '000001'].map((symbol) => (
+                              <button
+                                key={symbol}
+                                type="button"
+                                data-testid={`a-share-source-probe-${symbol}`}
+                                onClick={() => handleAShareSourceProbe(symbol)}
+                                disabled={isQueryingBasic}
+                                className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+                              >
+                                {symbol}
+                              </button>
+                            ))}
                           </div>
                         </div>
                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
