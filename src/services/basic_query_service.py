@@ -161,6 +161,7 @@ class BasicQueryService:
             stock_name=self._stock_name(quote, history, profile),
             quote=quote_payload,
             profile=profile_payload,
+            indicators=indicators,
         )
 
         return {
@@ -872,6 +873,7 @@ class BasicQueryService:
         stock_name: Optional[str],
         quote: Dict[str, Any],
         profile: Optional[Dict[str, Any]],
+        indicators: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
         if route.market != "cn":
             return None
@@ -881,6 +883,7 @@ class BasicQueryService:
                 stock_name=stock_name,
                 profile=profile,
                 quote=quote,
+                indicators=indicators,
             )
         except Exception:
             return {

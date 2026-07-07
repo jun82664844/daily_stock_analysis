@@ -229,7 +229,7 @@ const zh = {
   'home.analyzing': '分析中',
   'home.query': '查询',
   'home.querying': '查询中',
-  'home.quickAnalyze': '快速分析',
+  'home.quickAnalyze': 'AI 快速分析',
   'home.deepAnalyze': '深度分析',
   'home.askAi': '追问 AI',
   'home.basicSnapshotTitle': '基础行情',

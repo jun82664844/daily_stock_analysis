@@ -642,20 +642,21 @@ describe('HomePage', () => {
           label: 'Weak quick signal',
           summary: '600519 signal is 47/100 from trend, volume, data freshness, and profile completeness. No AI or public search was used.',
           components: [
-            { key: 'trend', label: 'Trend', score: 42, status: 'warning', detail: 'Price is below MA20 1212.965; trend repair still needs confirmation.' },
+            { key: 'trend', label: 'Trend', score: 42, status: 'missing', detail: 'Trend score is limited because latest price or MA20 is unavailable.' },
             { key: 'volume', label: 'Volume', score: 50, status: 'neutral', detail: 'Volume-price behavior is neutral in the quick rules. Volume is -75.1617% versus MA5.' },
-            { key: 'freshness', label: 'Data freshness', score: 35, status: 'warning', detail: 'Quote data is stale; treat the quick signal as provisional. Quote is stale; quick view uses cached quote and latest available history.' },
+            { key: 'freshness', label: 'Data freshness', score: 90, status: 'warning', detail: 'Quote data is fresh for this quick snapshot. a_share historical source timed out; moving averages may be incomplete.' },
             { key: 'profile', label: 'Profile completeness', score: 76, status: 'positive', detail: 'Company profile has usable valuation or financial fields.' },
           ],
           source: 'no_ai_rules',
           aiUsed: false,
         },
         retentionBrief: {
-          headline: '600519 quick read: -1.1%, below MA20 1212.965.',
+          headline: '600519 quick read: -1.1%, with incomplete MA20 context.',
           whyItMatters: 'This free snapshot turns quote, moving averages, volume and a share context into a first-pass checklist without spending AI quota.',
           supportResistance: 'support 1181.28; resistance 1212.965',
           nextSteps: [
-            'Resolve data warning first: Quote is stale; quick view uses cached quote and latest available history.',
+            'Resolve data warning first: a_share historical source timed out; moving averages may be incomplete.',
+            'Refresh once before market action and confirm whether price stays with incomplete MA20 context.',
             'Compare this move with 000300.SH instead of reading it alone.',
             'Use deep analysis only when you need news, filings, fundamentals, or a longer AI-written report.',
           ],
@@ -772,6 +773,14 @@ describe('HomePage', () => {
     expect(signalScore).toHaveTextContent('资料完整度');
     expect(signalScore).not.toHaveTextContent('Trend');
     expect(signalScore).not.toHaveTextContent('Data freshness');
+    expect(signalScore).not.toHaveTextContent('Trend score is limited');
+    expect(signalScore).not.toHaveTextContent('historical source timed out');
+
+    const retentionBrief = screen.getByTestId('basic-query-retention-brief');
+    expect(retentionBrief).not.toHaveTextContent('quick read:');
+    expect(retentionBrief).not.toHaveTextContent('Resolve data warning first');
+    expect(retentionBrief).not.toHaveTextContent('Refresh once before market action');
+    expect(retentionBrief).not.toHaveTextContent('with incomplete MA20 context');
 
     const newsCenter = screen.getByTestId('basic-query-news-center');
     expect(newsCenter).toHaveTextContent('本地资讯中心');
@@ -919,6 +928,106 @@ describe('HomePage', () => {
     expect(newsCenter).not.toHaveTextContent('revenue');
     expect(newsCenter).not.toHaveTextContent('net profit');
     expect(newsCenter).not.toHaveTextContent('yfinance_profile');
+  });
+
+  it('localizes A-share quick reference fallback data in Chinese mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      market: 'cn',
+      quote: {
+        currentPrice: 1181.28,
+        changePercent: -1.1,
+        source: 'a_share_realtime',
+        freshness: 'stale',
+      },
+      indicators: {
+        ma5: 1195.782,
+        ma10: 1191.91,
+        ma20: 1212.965,
+        lastClose: 1202.45,
+        priceChange5d: 2.894,
+        priceChange20d: -3.0267,
+        volumeChangeVsMa5: -75.1617,
+      },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        aShareEnrichment: {
+          title: 'A-share quick reference',
+          summary: '贵州茅台 quick reference uses quote, moving-average, volume, valuation, and freshness data. External announcements, fund-flow, research, and dragon-tiger seats are not enabled in free quick mode.',
+          status: 'available',
+          source: 'basic_quote_snapshot',
+          updatedAt: '2026-07-07T09:30:00Z',
+          aiUsed: false,
+          publicSearchUsed: false,
+          premiumUnlock: 'Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details.',
+          boundary: 'Information analysis only; not investment advice.',
+          channels: [
+            { category: 'price_structure', title: 'Price structure', summary: 'Latest 1181.28, change -1.1%, open 1186, high 1190, low 1181.28; price is below MA20 1212.965.', status: 'available', source: 'basic_quote_snapshot', action: 'Use this as a first-pass structure check for 贵州茅台; refresh stale quotes before comparing intraday moves.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'volume_activity', title: 'Volume activity', summary: 'Volume 174.7K, amount 207M; volume is -75.1617% versus MA5.', status: 'available', source: 'basic_indicator_snapshot', action: 'Use volume only as confirmation; price and source freshness come first.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'valuation_snapshot', title: 'Valuation snapshot', summary: 'Market cap 1.4767T; PE 17.85; PB 6.34.', status: 'available', source: 'basic_profile_snapshot', action: 'Use valuation as context, not as a timing signal.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'trend_windows', title: 'Trend windows', summary: '5-day change 2.894%; 20-day change -3.0267%; MA5 1195.782, MA10 1191.91, MA20 1212.965; last close 1202.45.', status: 'available', source: 'basic_indicator_snapshot', action: 'Compare short-window moves with MA20 before reading the trend as repaired.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'data_quality', title: 'Data quality', summary: 'Quote freshness stale; profile freshness stale; quote source a_share_realtime.', status: 'available', source: 'basic_data_quality_snapshot', action: 'Treat stale or cached data as provisional and refresh before acting on changes.', updatedAt: '2026-07-07T09:30:00Z' },
+          ],
+        },
+        items: [],
+        boundary: 'Information analysis only; not investment advice.',
+      },
+      diagnostics: {
+        elapsedMs: 4,
+        quoteElapsedMs: 2,
+        historyElapsedMs: 2,
+        cache: { quote: 'hit', history: 'hit' },
+        sources: { quote: 'a_share_realtime', history: 'a_share_history' },
+        freshness: { quote: 'stale', history: 'stale' },
+        fallback: { quote: 'cache', history: 'cache' },
+        routeLane: 'a_share_market_data',
+        performance: { status: 'ok' },
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: '600519.SH' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519.SH');
+    });
+
+    const aShareEnrichment = await screen.findByTestId('basic-query-a-share-enrichment');
+    expect(aShareEnrichment).toHaveTextContent('A股快速参考数据');
+    expect(aShareEnrichment).toHaveTextContent('价格结构');
+    expect(aShareEnrichment).toHaveTextContent('量价活跃度');
+    expect(aShareEnrichment).toHaveTextContent('估值快照');
+    expect(aShareEnrichment).toHaveTextContent('周期趋势');
+    expect(aShareEnrichment).toHaveTextContent('数据质量');
+    expect(aShareEnrichment).toHaveTextContent('最新价 1181.28');
+    expect(aShareEnrichment).toHaveTextContent('成交额 207M');
+    expect(aShareEnrichment).toHaveTextContent('市值 1.4767T');
+    expect(aShareEnrichment).toHaveTextContent('5日涨跌 2.894%');
+    expect(aShareEnrichment).toHaveTextContent('未用公共搜索');
+    expect(aShareEnrichment).toHaveTextContent('不构成投资建议');
+    expect(aShareEnrichment).not.toHaveTextContent('A-share quick reference');
+    expect(aShareEnrichment).not.toHaveTextContent('Price structure');
+    expect(aShareEnrichment).not.toHaveTextContent('Data quality');
+    expect(aShareEnrichment).not.toHaveTextContent('External announcements');
   });
 
   it('keeps a guest AAPL snapshot through register and saves it to history and watchlist', async () => {
@@ -2116,12 +2225,63 @@ describe('HomePage', () => {
 
     const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
-    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AI 快速分析' }));
 
     await waitFor(() => {
       expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
     });
     expect(screen.getByText(/股票 600519 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
+  });
+
+  it('clears stale analysis connection errors after a successful no-AI query', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    useStockPoolStore.setState({
+      query: 'AAPL',
+      error: {
+        title: '无法连接到本地服务',
+        message: '旧的本地连接错误',
+        rawMessage: 'Failed to fetch',
+        category: 'local_connection_failed',
+      },
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 200,
+        changePercent: 1.5,
+        source: 'unit_quote',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 198, ma20: 190 },
+      profile: { companyName: 'Apple Inc.', source: 'unit_profile', freshness: 'fresh' },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('旧的本地连接错误')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    expect(await screen.findByTestId('basic-query-snapshot')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('旧的本地连接错误')).not.toBeInTheDocument();
+    });
   });
 
   it('runs basic query without submitting AI analysis', async () => {
@@ -3842,7 +4002,7 @@ describe('HomePage', () => {
 
     const input = screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
-    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AI 快速分析' }));
 
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({

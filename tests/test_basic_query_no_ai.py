@@ -357,7 +357,7 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
                 }
 
         class FakeAShareEnrichmentService:
-            def get_enrichment(self, stock_code: str, *, stock_name=None, profile=None, quote=None):
+            def get_enrichment(self, stock_code: str, *, stock_name=None, profile=None, quote=None, indicators=None):
                 return {
                     "title": "A股增强数据",
                     "summary": f"{stock_name or stock_code} 的公告、资金流、板块、研报和龙虎榜本地增强通道。",

@@ -48,6 +48,7 @@ class AShareEnrichmentService:
         stock_name: str | None = None,
         profile: Optional[dict[str, Any]] = None,
         quote: Optional[dict[str, Any]] = None,
+        indicators: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         code = self._normalize_code(stock_code)
         fetched: dict[str, dict[str, Any] | None] = {}
@@ -55,6 +56,28 @@ class AShareEnrichmentService:
 
         for channel in self.CHANNELS:
             fetched[channel] = self._fetch_channel(channel, code=code, errors=errors)
+
+        has_external_data = any(self._has_external_payload(fetched.get(channel)) for channel in self.CHANNELS)
+        if not has_external_data:
+            channels = self._quick_reference_channels(
+                stock_name=stock_name or code,
+                quote=quote,
+                profile=profile,
+                indicators=indicators,
+            )
+            any_available = any(item["status"] == "available" for item in channels)
+            return {
+                "title": "A-share quick reference",
+                "summary": self._quick_reference_summary(stock_name or code),
+                "status": "available" if any_available else "degraded",
+                "source": "basic_quote_snapshot",
+                "updated_at": self._now_iso(),
+                "ai_used": False,
+                "public_search_used": False,
+                "channels": channels,
+                "premium_unlock": "Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details.",
+                "boundary": "Information analysis only; not investment advice.",
+            }
 
         channels = [
             self._announcements_channel(code, stock_name, fetched.get("announcements")),
@@ -94,6 +117,148 @@ class AShareEnrichmentService:
         except Exception as exc:
             errors[channel] = type(exc).__name__
             return None
+
+    def _has_external_payload(self, payload: dict[str, Any] | None) -> bool:
+        if not isinstance(payload, dict) or not payload:
+            return False
+        items = payload.get("items")
+        if isinstance(items, list):
+            return bool(items)
+        return any(value not in (None, "", [], {}) for value in payload.values())
+
+    def _quick_reference_summary(self, label: str) -> str:
+        return (
+            f"{label} quick reference uses quote, moving-average, volume, valuation, and freshness data. "
+            "External announcements, fund-flow, research, and dragon-tiger seats are not enabled in free quick mode."
+        )
+
+    def _quick_reference_channels(
+        self,
+        *,
+        stock_name: str,
+        quote: dict[str, Any] | None,
+        profile: dict[str, Any] | None,
+        indicators: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        return [
+            self._price_structure_channel(stock_name, quote, indicators),
+            self._volume_activity_channel(quote, indicators),
+            self._valuation_snapshot_channel(profile),
+            self._trend_windows_channel(indicators),
+            self._data_quality_channel(quote, profile),
+        ]
+
+    def _price_structure_channel(
+        self,
+        stock_name: str,
+        quote: dict[str, Any] | None,
+        indicators: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        price = self._float_or_none((quote or {}).get("current_price"))
+        change = self._float_or_none((quote or {}).get("change_percent"))
+        open_price = self._float_or_none((quote or {}).get("open"))
+        high = self._float_or_none((quote or {}).get("high"))
+        low = self._float_or_none((quote or {}).get("low"))
+        ma20 = self._float_or_none((indicators or {}).get("ma20"))
+        status = "available" if price is not None else "degraded"
+        if price is not None and ma20 is not None:
+            position = "above" if price >= ma20 else "below"
+            position_text = f"price is {position} MA20 {self._format_number(ma20)}"
+        else:
+            position_text = "MA20 context is incomplete"
+        return self._channel(
+            "price_structure",
+            "Price structure",
+            (
+                f"Latest {self._format_number_or_dash(price)}, change {self._format_percent(change)}, "
+                f"open {self._format_number_or_dash(open_price)}, high {self._format_number_or_dash(high)}, "
+                f"low {self._format_number_or_dash(low)}; {position_text}."
+            ),
+            status=status,
+            source="basic_quote_snapshot",
+            action=f"Use this as a first-pass structure check for {stock_name}; refresh stale quotes before comparing intraday moves.",
+        )
+
+    def _volume_activity_channel(
+        self,
+        quote: dict[str, Any] | None,
+        indicators: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        volume = self._float_or_none((quote or {}).get("volume"))
+        amount = self._float_or_none((quote or {}).get("amount"))
+        volume_change = self._float_or_none((indicators or {}).get("volume_change_vs_ma5"))
+        status = "available" if volume is not None or amount is not None or volume_change is not None else "degraded"
+        change_text = (
+            f"volume is {self._format_percent(volume_change)} versus MA5"
+            if volume_change is not None
+            else "volume versus MA5 is incomplete"
+        )
+        return self._channel(
+            "volume_activity",
+            "Volume activity",
+            f"Volume {self._format_money(volume)}, amount {self._format_money(amount)}; {change_text}.",
+            status=status,
+            source="basic_indicator_snapshot",
+            action="Use volume only as confirmation; price and source freshness come first.",
+        )
+
+    def _valuation_snapshot_channel(self, profile: dict[str, Any] | None) -> dict[str, Any]:
+        market_cap = self._float_or_none((profile or {}).get("market_cap"))
+        pe_ratio = self._float_or_none((profile or {}).get("pe_ratio"))
+        pb_ratio = self._float_or_none((profile or {}).get("pb_ratio"))
+        parts = [
+            f"Market cap {self._format_money(market_cap)}" if market_cap is not None else None,
+            f"PE {self._format_number(pe_ratio)}" if pe_ratio is not None else None,
+            f"PB {self._format_number(pb_ratio)}" if pb_ratio is not None else None,
+        ]
+        available_parts = [part for part in parts if part]
+        summary = "; ".join(available_parts) + "." if available_parts else "Valuation fields are not available in the free quick snapshot."
+        return self._channel(
+            "valuation_snapshot",
+            "Valuation snapshot",
+            summary,
+            status="available" if available_parts else "degraded",
+            source="basic_profile_snapshot",
+            action="Use valuation as context, not as a timing signal.",
+        )
+
+    def _trend_windows_channel(self, indicators: dict[str, Any] | None) -> dict[str, Any]:
+        ma5 = self._float_or_none((indicators or {}).get("ma5"))
+        ma10 = self._float_or_none((indicators or {}).get("ma10"))
+        ma20 = self._float_or_none((indicators or {}).get("ma20"))
+        change_5d = self._float_or_none((indicators or {}).get("price_change_5d"))
+        change_20d = self._float_or_none((indicators or {}).get("price_change_20d"))
+        last_close = self._float_or_none((indicators or {}).get("last_close"))
+        has_value = any(value is not None for value in (ma5, ma10, ma20, change_5d, change_20d, last_close))
+        return self._channel(
+            "trend_windows",
+            "Trend windows",
+            (
+                f"5-day change {self._format_percent(change_5d)}; 20-day change {self._format_percent(change_20d)}; "
+                f"MA5 {self._format_number_or_dash(ma5)}, MA10 {self._format_number_or_dash(ma10)}, "
+                f"MA20 {self._format_number_or_dash(ma20)}; last close {self._format_number_or_dash(last_close)}."
+            ),
+            status="available" if has_value else "degraded",
+            source="basic_indicator_snapshot",
+            action="Compare short-window moves with MA20 before reading the trend as repaired.",
+        )
+
+    def _data_quality_channel(
+        self,
+        quote: dict[str, Any] | None,
+        profile: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        quote_freshness = str((quote or {}).get("freshness") or "unknown")
+        profile_freshness = str((profile or {}).get("freshness") or "unknown")
+        quote_source = str((quote or {}).get("source") or "unknown")
+        return self._channel(
+            "data_quality",
+            "Data quality",
+            f"Quote freshness {quote_freshness}; profile freshness {profile_freshness}; quote source {quote_source}.",
+            status="available" if quote_freshness != "unknown" or quote_source != "unknown" else "degraded",
+            source="basic_data_quality_snapshot",
+            action="Treat stale or cached data as provisional and refresh before acting on changes.",
+        )
 
     def _announcements_channel(
         self,
@@ -317,16 +482,24 @@ class AShareEnrichmentService:
         if value is None:
             return "-"
         absolute = abs(value)
+        if absolute >= 1_000_000_000_000:
+            return f"{self._format_scaled(value, 1_000_000_000_000, 4)}T"
         if absolute >= 1_000_000_000:
-            return f"{self._format_number(value / 1_000_000_000)}B"
+            return f"{self._format_scaled(value, 1_000_000_000, 2)}B"
         if absolute >= 1_000_000:
-            return f"{self._format_number(value / 1_000_000)}M"
+            return f"{self._format_scaled(value, 1_000_000, 2)}M"
         if absolute >= 1_000:
-            return f"{self._format_number(value / 1_000)}K"
+            return f"{self._format_scaled(value, 1_000, 1)}K"
         return self._format_number(value)
 
     def _format_percent(self, value: float | None) -> str:
         return "-" if value is None else f"{self._format_number(value)}%"
+
+    def _format_number_or_dash(self, value: float | None) -> str:
+        return "-" if value is None else self._format_number(value)
+
+    def _format_scaled(self, value: float, divisor: float, decimals: int) -> str:
+        return f"{value / divisor:.{decimals}f}".rstrip("0").rstrip(".")
 
     def _format_number(self, value: float) -> str:
         text = f"{value:.4f}".rstrip("0").rstrip(".")

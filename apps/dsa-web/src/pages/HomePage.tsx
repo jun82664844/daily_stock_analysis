@@ -184,8 +184,13 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   available: '可用',
   degraded: '降级',
   unavailable: '不可用',
+  fresh: '新鲜',
+  stale: '过期',
+  cached: '缓存',
+  unknown: '未知',
   'Local news center': '本地资讯中心',
   'A-share enrichment': 'A股增强数据',
+  'A-share quick reference': 'A股快速参考数据',
   'Market-moving news lane': '影响行情的资讯通道',
   'Announcements lane': '公告通道',
   'SEC filings lane': 'SEC 文件通道',
@@ -197,6 +202,11 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'Sector channel': '板块通道',
   'Research channel': '研报通道',
   'Dragon-tiger channel': '龙虎榜通道',
+  'Price structure': '价格结构',
+  'Volume activity': '量价活跃度',
+  'Valuation snapshot': '估值快照',
+  'Trend windows': '周期趋势',
+  'Data quality': '数据质量',
   'Premium news': '高级资讯',
   'BYOK or local model': '我的 API 或本地模型',
   'Move explanation': '波动解释',
@@ -238,6 +248,10 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   capital_flow: '资金流',
   research: '研报',
   dragon_tiger: '龙虎榜',
+  price_structure: '价格结构',
+  volume_activity: '量价活跃度',
+  valuation_snapshot: '估值快照',
+  trend_windows: '周期趋势',
   data_quality: '数据质量',
   'K-line forecast lab': 'K线预测实验室',
   'Kronos-ready': 'Kronos 已就绪',
@@ -280,6 +294,10 @@ const SOURCE_ZH: Record<string, string> = {
   a_stock_data_eastmoney_concept_blocks: '东财概念板块',
   a_stock_data_eastmoney_reportapi: '东财研报',
   a_stock_data_eastmoney_datacenter: '东财数据中心',
+  basic_quote_snapshot: '基础行情快照',
+  basic_indicator_snapshot: '基础指标快照',
+  basic_profile_snapshot: '基础资料快照',
+  basic_data_quality_snapshot: '基础数据质量',
   local_kline_rules_kronos_ready: '本地K线规则',
   local_kline_rules_kronos_unavailable: '本地K线规则兜底',
   local_kline_rules_kronos_error: '本地K线错误兜底',
@@ -300,6 +318,8 @@ const GENERATED_TERM_ZH: Record<string, string> = {
   'Technology / Consumer Electronics': '科技 / 消费电子',
   'Consumer Electronics': '消费电子',
   Technology: '科技',
+  a_share: 'A股',
+  'with incomplete MA20 context': 'MA20 背景不完整',
   'price above trend volume soft': '价格位于趋势上方但量能偏弱',
   yfinance_profile: '公司资料',
 };
@@ -337,7 +357,40 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (GENERATED_TEXT_ZH[text]) return GENERATED_TEXT_ZH[text];
   if (SOURCE_ZH[text]) return SOURCE_ZH[text];
 
-  let match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\. No AI or public search was used\.$/);
+  let match = text.match(/^(.+?) quick reference uses quote, moving-average, volume, valuation, and freshness data\. External announcements, fund-flow, research, and dragon-tiger seats are not enabled in free quick mode\.$/);
+  if (match) return `${match[1]} 快速参考使用行情、均线、量价、估值和数据新鲜度；免费快速模式暂未启用实时公告、资金流、研报和龙虎榜席位明细。`;
+  match = text.match(/^Latest ([^,]+), change ([^,]+), open ([^,]+), high ([^,]+), low ([^;]+); price is (above|below) MA20 (.+?)\.$/);
+  if (match) return `最新价 ${match[1]}，涨跌幅 ${match[2]}，开盘 ${match[3]}，最高 ${match[4]}，最低 ${match[5]}；价格${match[6] === 'above' ? '高于' : '低于'} MA20 ${match[7]}。`;
+  match = text.match(/^Latest ([^,]+), change ([^,]+), open ([^,]+), high ([^,]+), low ([^;]+); MA20 context is incomplete\.$/);
+  if (match) return `最新价 ${match[1]}，涨跌幅 ${match[2]}，开盘 ${match[3]}，最高 ${match[4]}，最低 ${match[5]}；MA20 背景暂不完整。`;
+  match = text.match(/^Volume ([^,]+), amount ([^;]+); volume is (.+?) versus MA5\.$/);
+  if (match) return `成交量 ${match[1]}，成交额 ${match[2]}；成交量相对 MA5 为 ${match[3]}。`;
+  match = text.match(/^Volume ([^,]+), amount ([^;]+); volume versus MA5 is incomplete\.$/);
+  if (match) return `成交量 ${match[1]}，成交额 ${match[2]}；成交量相对 MA5 暂不完整。`;
+  match = text.match(/^Market cap ([^;]+); PE ([^;]+); PB ([^;]+); dividend yield ([^;]+); revenue ([^;]+); net profit (.+?)\.?$/);
+  if (match) return `市值 ${match[1]}；市盈率 ${match[2]}；市净率 ${match[3]}；股息率 ${match[4]}；营收 ${match[5]}；净利润 ${match[6]}。`;
+  match = text.match(/^Market cap ([^;]+); PE ([^;]+); PB (.+?)\.$/);
+  if (match) return `市值 ${match[1]}；市盈率 ${match[2]}；市净率 ${match[3]}。`;
+  match = text.match(/^Valuation fields are not available in the free quick snapshot\.$/);
+  if (match) return '免费快速快照暂未取得估值字段。';
+  match = text.match(/^5-day change ([^;]+); 20-day change ([^;]+); MA5 ([^,]+), MA10 ([^,]+), MA20 ([^;]+); last close (.+?)\.$/);
+  if (match) return `5日涨跌 ${match[1]}；20日涨跌 ${match[2]}；MA5 ${match[3]}，MA10 ${match[4]}，MA20 ${match[5]}；最近收盘 ${match[6]}。`;
+  match = text.match(/^Quote freshness ([^;]+); profile freshness ([^;]+); quote source (.+?)\.$/);
+  if (match) return `行情新鲜度 ${localizeGeneratedStatus(match[1], language)}；资料新鲜度 ${localizeGeneratedStatus(match[2], language)}；行情来源 ${localizeGeneratedSource(match[3], language)}。`;
+  match = text.match(/^Use this as a first-pass structure check for (.+?); refresh stale quotes before comparing intraday moves\.$/);
+  if (match) return `先把它作为 ${match[1]} 的第一层结构检查；对比日内波动前先刷新过期行情。`;
+  match = text.match(/^Use volume only as confirmation; price and source freshness come first\.$/);
+  if (match) return '成交量只作为确认项；优先看价格位置和数据来源新鲜度。';
+  match = text.match(/^Use valuation as context, not as a timing signal\.$/);
+  if (match) return '估值只作为背景参考，不作为短线时点信号。';
+  match = text.match(/^Compare short-window moves with MA20 before reading the trend as repaired\.$/);
+  if (match) return '先把短周期涨跌与 MA20 对照，再判断趋势是否修复。';
+  match = text.match(/^Treat stale or cached data as provisional and refresh before acting on changes\.$/);
+  if (match) return '过期或缓存数据只作临时参考，解读变化前请先刷新。';
+  match = text.match(/^Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details\.$/);
+  if (match) return '高级版可增加实时公告、资金流历史、研报 PDF、板块联动和龙虎榜席位明细。';
+
+  match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\. No AI or public search was used\.$/);
   if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度；未使用 AI 或公共搜索。`;
   match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\.$/);
   if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度。`;
@@ -361,8 +414,28 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return '价格仍在趋势下方但成交量放大，确认信号仍然混合。';
   match = text.match(/^Volume-price score is limited because recent volume history is incomplete\.$/);
   if (match) return '近期成交量历史不完整，量价评分受限。';
+  match = text.match(/^Trend score is limited because latest price or MA20 is unavailable\.$/);
+  if (match) return '最新价或 MA20 缺失，趋势评分受限。';
+  match = text.match(/^Quote data is fresh for this quick snapshot\. (.+?) historical source timed out; moving averages may be incomplete\.$/);
+  if (match) return `本次快速快照使用新鲜行情数据。${localizeGeneratedTerms(match[1], language)} 历史数据源超时，均线可能不完整。`;
+  match = text.match(/^Quote data is fresh for this quick snapshot\. (.+?) historical source is cooling down after repeated failures; moving averages may be incomplete\.$/);
+  if (match) return `本次快速快照使用新鲜行情数据。${localizeGeneratedTerms(match[1], language)} 历史数据源连续失败后暂时冷却，均线可能不完整。`;
+  match = text.match(/^Quote data is fresh for this quick snapshot\. (.+?) historical bars are unavailable; moving averages may be incomplete\.$/);
+  if (match) return `本次快速快照使用新鲜行情数据。${localizeGeneratedTerms(match[1], language)} 历史K线暂不可用，均线可能不完整。`;
   match = text.match(/^Quote data is fresh for this quick snapshot\.$/);
   if (match) return '本次快速快照使用的是新鲜行情数据。';
+  match = text.match(/^Resolve data warning first: (.+?) historical source timed out; moving averages may be incomplete\.?$/);
+  if (match) return `先处理数据警示：${localizeGeneratedTerms(match[1], language)} 历史数据源超时，均线可能不完整。`;
+  match = text.match(/^Resolve data warning first: (.+?) historical source is cooling down after repeated failures; moving averages may be incomplete\.?$/);
+  if (match) return `先处理数据警示：${localizeGeneratedTerms(match[1], language)} 历史数据源连续失败后暂时冷却，均线可能不完整。`;
+  match = text.match(/^Resolve data warning first: (.+?) historical bars are unavailable; moving averages may be incomplete\.?$/);
+  if (match) return `先处理数据警示：${localizeGeneratedTerms(match[1], language)} 历史K线暂不可用，均线可能不完整。`;
+  match = text.match(/^(.+?) historical source timed out; moving averages may be incomplete\.$/);
+  if (match) return `${localizeGeneratedTerms(match[1], language)} 历史数据源超时，均线可能不完整。`;
+  match = text.match(/^(.+?) historical source is cooling down after repeated failures; moving averages may be incomplete\.$/);
+  if (match) return `${localizeGeneratedTerms(match[1], language)} 历史数据源连续失败后暂时冷却，均线可能不完整。`;
+  match = text.match(/^(.+?) historical bars are unavailable; moving averages may be incomplete\.$/);
+  if (match) return `${localizeGeneratedTerms(match[1], language)} 历史K线暂不可用，均线可能不完整。`;
   match = text.match(/^Quote data came from cache; refresh before comparing intraday moves\.$/);
   if (match) return '行情数据来自缓存；对比日内波动前请先刷新。';
   match = text.match(/^Latest quote is unavailable; signal confidence is limited\.$/);
@@ -375,6 +448,8 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return '快速模式下公司资料暂不可用；深度模式可补充更完整背景。';
   match = text.match(/^(.+?) quick read: ([^,]+), (below|above|低于|高于) MA20 (.+?)\.?$/);
   if (match) return `${match[1]} 快速解读：${match[2]}，${match[3] === 'below' || match[3] === '低于' ? '低于' : '高于'} MA20 ${match[4]}。`;
+  match = text.match(/^(.+?) quick read: ([^,]+), with incomplete MA20 context\.?$/);
+  if (match) return `${match[1]} 快速解读：${match[2]}，MA20 背景不完整。`;
   match = text.match(/^support ([^;]+); resistance (.+)$/);
   if (match) return `支撑 ${match[1]}；压力 ${match[2]}`;
   match = text.match(/^Price is below MA20 ([^;]+); trend repair still needs confirmation\.$/);
@@ -393,6 +468,14 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return `总市值 ${match[1]}；市盈率 ${match[2]}；股息率 ${match[3]}。`;
   match = text.match(/^Refresh once before market action and confirm whether price stays (below|above|低于|高于) MA20 (.+?)\.?$/);
   if (match) return `先刷新一次行情，并确认价格是否仍然${match[1] === 'below' || match[1] === '低于' ? '低于' : '高于'} MA20 ${match[2]}。`;
+  match = text.match(/^Refresh once before market action and confirm whether price stays with incomplete MA20 context\.?$/);
+  if (match) return '先刷新一次行情；当前 MA20 背景不完整，确认后再解读价格位置。';
+  match = text.match(/^Resolve data warning first: (.+?) historical source timed out; moving averages may be incomplete\.?$/);
+  if (match) return `先处理数据警示：${localizeGeneratedTerms(match[1], language)} 历史数据源超时，均线可能不完整。`;
+  match = text.match(/^Resolve data warning first: (.+?) historical source is cooling down after repeated failures; moving averages may be incomplete\.?$/);
+  if (match) return `先处理数据警示：${localizeGeneratedTerms(match[1], language)} 历史数据源连续失败后暂时冷却，均线可能不完整。`;
+  match = text.match(/^Resolve data warning first: (.+?) historical bars are unavailable; moving averages may be incomplete\.?$/);
+  if (match) return `先处理数据警示：${localizeGeneratedTerms(match[1], language)} 历史K线暂不可用，均线可能不完整。`;
   match = text.match(/^Price is ([^ ]+) and holds (below|above) MA20 with positive short-term confirmation\.$/);
   if (match) return `价格为 ${match[1]}，并保持${match[2] === 'below' ? '低于' : '高于'} MA20，短期确认偏积极。`;
   match = text.match(/^Hold above MA20 ([^ ]+) and keep volume change near (.+?)\.?$/);
@@ -2064,6 +2147,7 @@ const HomePage: React.FC = () => {
         ? await stocksApi.snapshot(target, { refresh: true })
         : await stocksApi.snapshot(target);
       setBasicSnapshot(snapshot);
+      clearError();
       return snapshot;
     } catch (err: unknown) {
       setBasicQueryError(getParsedApiError(err));
@@ -2071,7 +2155,7 @@ const HomePage: React.FC = () => {
     } finally {
       setIsQueryingBasic(false);
     }
-  }, [clearMarketReviewState, isQueryingBasic, query, setQuery]);
+  }, [clearError, clearMarketReviewState, isQueryingBasic, query, setQuery]);
 
   const handleRunKronosForecast = useCallback(async (requireModel = false) => {
     if (!basicSnapshot?.stockCode || isRunningKronosForecast) {
