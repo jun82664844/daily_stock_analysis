@@ -1006,3 +1006,46 @@ Review boundary:
 - Current local environment may legitimately return `model_ready` when started with the local Kronos runtime flags, or `model_unavailable` / `model_disabled` when dependencies or flags are absent; either state must be displayed honestly, not hidden.
 - Keep `scripts/verify_platform_kronos_sandbox_v58.py` visible despite the broad `verify_*.py` ignore rule.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V59 A-Stock-Data POC Manifest Addendum
+
+Status: local-only A-share enrichment POC, no production launch approval, no real payment, and no market-data licensing approval.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/basic_query_service.py`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_a_share_enrichment_service.py`
+- `tests/test_platform_a_stock_data_poc_v59.py`
+- `scripts/verify_platform_a_stock_data_poc_v59.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-07-dsa-v59-a-stock-data-poc.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_A_STOCK_DATA_POC_V59_OK`
+
+Suggested review/commit position:
+
+- After V58 Kronos sandbox and before any production data-source licensing, public news/search expansion, or paid A-share data-source integration.
+
+Rollback notes:
+
+- Reverting this slice removes the `a_share_enrichment` payload, local A-share enrichment adapter, HomePage A-share enrichment panel, V59 verifier, and V59 docs. Existing quick snapshot, V57 news center, and V58 Kronos sandbox should remain unaffected if their slices are kept.
+
+Review boundary:
+
+- A-share enrichment quick mode must not invoke AI, public search, paid APIs, BYOK secrets, or production data-source credentials.
+- Adapter source failures must remain visible degraded states, not hidden successes.
+- Keep `scripts/verify_platform_a_stock_data_poc_v59.py` visible despite the broad `verify_*.py` ignore rule.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

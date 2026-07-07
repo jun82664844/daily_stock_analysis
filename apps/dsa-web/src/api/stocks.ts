@@ -137,6 +137,26 @@ export type BasicStockSnapshot = {
       premiumUnlock: string;
       boundary: string;
     } | null;
+    aShareEnrichment?: {
+      title: string;
+      summary: string;
+      status: string;
+      source: string;
+      updatedAt?: string | null;
+      aiUsed: boolean;
+      publicSearchUsed: boolean;
+      channels: Array<{
+        category: string;
+        title: string;
+        summary: string;
+        status: string;
+        source: string;
+        action: string;
+        updatedAt?: string | null;
+      }>;
+      premiumUnlock: string;
+      boundary: string;
+    } | null;
     klineForecast?: {
       title: string;
       horizon: string;

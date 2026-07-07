@@ -185,12 +185,18 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   degraded: '降级',
   unavailable: '不可用',
   'Local news center': '本地资讯中心',
+  'A-share enrichment': 'A股增强数据',
   'Market-moving news lane': '影响行情的资讯通道',
   'Announcements lane': '公告通道',
   'SEC filings lane': 'SEC 文件通道',
   'Financial snapshot lane': '财务快照通道',
   'Sector and peer lane': '板块与同业通道',
   'Data quality lane': '数据质量通道',
+  'Announcements channel': '公告通道',
+  'Fund-flow channel': '资金流通道',
+  'Sector channel': '板块通道',
+  'Research channel': '研报通道',
+  'Dragon-tiger channel': '龙虎榜通道',
   'Premium news': '高级资讯',
   'BYOK or local model': '我的 API 或本地模型',
   'Move explanation': '波动解释',
@@ -229,6 +235,9 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   announcements: '公告',
   financials: '财务',
   sector: '板块',
+  capital_flow: '资金流',
+  research: '研报',
+  dragon_tiger: '龙虎榜',
   data_quality: '数据质量',
   'K-line forecast lab': 'K线预测实验室',
   'Kronos-ready': 'Kronos 已就绪',
@@ -264,6 +273,13 @@ const SOURCE_ZH: Record<string, string> = {
   no_ai_news_center_rules: '免费资讯规则',
   no_ai_quick_snapshot: '免费快照',
   no_ai_route_rules: '免费市场通道规则',
+  a_stock_data_poc_adapter: 'A股增强适配器',
+  a_stock_data_poc_local_rules: 'A股本地增强规则',
+  a_stock_data_cninfo_or_f10: '公告/F10来源',
+  a_stock_data_eastmoney_fund_flow: '东财资金流',
+  a_stock_data_eastmoney_concept_blocks: '东财概念板块',
+  a_stock_data_eastmoney_reportapi: '东财研报',
+  a_stock_data_eastmoney_datacenter: '东财数据中心',
   local_kline_rules_kronos_ready: '本地K线规则',
   local_kline_rules_kronos_unavailable: '本地K线规则兜底',
   local_kline_rules_kronos_error: '本地K线错误兜底',
@@ -431,6 +447,57 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return `${match[1]} 的 ${localizeGeneratedTerms(match[2], language)} 信息通道：资讯、公告、财务、板块背景和数据质量。未使用 AI 或公共搜索。`;
   match = text.match(/^SEC filings, earnings call notes, and source links are reserved for deep mode or configured feeds\. Free mode avoids public search and AI cost\.$/);
   if (match) return 'SEC 文件、业绩电话会纪要和来源链接保留给深度模式或已配置资讯源；免费模式避免公共搜索和 AI 成本。';
+  match = text.match(/^(.+?) A-share enrichment for announcements, fund flow, sectors, research, and dragon-tiger data (is available through the local POC lane|is degraded through local rules)\.(?: Context: (.+?)\.)?(?: Last price (.+?)(?:, change (.+?))?)?$/);
+  if (match) {
+    const statusText = match[2] === 'is available through the local POC lane' ? '已接入本地 POC 通道' : '以本地规则降级展示';
+    const contextText = match[3] ? `；背景：${localizeGeneratedTerms(match[3], language)}` : '';
+    const priceText = match[4] ? `；最新价 ${match[4]}${match[5] ? `，涨跌幅 ${match[5]}` : ''}` : '';
+    return `${match[1]} 的公告、资金流、板块、研报和龙虎榜增强数据${statusText}${contextText}${priceText}。`;
+  }
+  match = text.match(/^(.+?) keeps a reserved CNINFO \/ TDX F10 announcements lane; quick mode shows the checklist entry only\.$/);
+  if (match) return `${match[1]} 已预留巨潮 / 通达信 F10 公告通道；当前快速模式只显示检查入口。`;
+  match = text.match(/^Later versions can enable cached announcement fetching without calling external sources on every query\.$/);
+  if (match) return '后续可开启公告抓取缓存，避免每次查询直连外部来源。';
+  match = text.match(/^Main fund net inflow is (.+?)(?:, ratio (.+?))?\.$/);
+  if (match) return `主力资金净流入 ${match[1]}${match[2] ? `，占比 ${match[2]}` : ''}。`;
+  match = text.match(/^Check whether main fund inflow is continuous across several sessions, not only a single-day move\.$/);
+  if (match) return '观察近几日主力净流入是否连续，而不是只看单日波动。';
+  match = text.match(/^(.+?) keeps a reserved Eastmoney fund-flow lane\.(?: Current change is (.+?)\.)?$/);
+  if (match) return `${match[1]} 已预留东财资金流通道。${match[2] ? `当前涨跌幅 ${match[2]}。` : ''}`;
+  match = text.match(/^Later versions can add cached daily fund flow by main, large, medium, and small orders\.$/);
+  if (match) return '后续可接入主力、大单、中单、小单日级资金流缓存。';
+  match = text.match(/^(.+?) current context: (.+?)\.$/);
+  if (match) return `${match[1]} 当前背景：${localizeGeneratedTerms(match[2], language)}。`;
+  match = text.match(/^Compare move, valuation, and fund flow against the same sector\.$/);
+  if (match) return '和同板块标的做涨跌、估值和资金流对比。';
+  match = text.match(/^(.+?) has no usable sector tags yet; later versions can add Eastmoney concepts and industry mapping\.$/);
+  if (match) return `${match[1]} 暂无可用板块标签，后续可接入东财概念和行业归属。`;
+  match = text.match(/^Refresh profile data or enable sector sources before comparing peers\.$/);
+  if (match) return '刷新公司资料或开启板块来源后再比较。';
+  match = text.match(/^Latest research: (.+?)(?:; rating (.+?))?\.$/);
+  if (match) return `最近研报：${match[1]}${match[2] ? `；评级 ${match[2]}` : ''}。`;
+  match = text.match(/^Premium can expand research lists, PDFs, and institution forecast fields\.$/);
+  if (match) return '高级版可展开研报列表、PDF 和机构预测字段。';
+  match = text.match(/^(.+?) keeps a reserved Eastmoney \/ iFinD research lane; free quick mode does not fetch PDFs\.$/);
+  if (match) return `${match[1]} 已预留东财 / iFinD 研报通道；免费快速模式不拉取 PDF。`;
+  match = text.match(/^Deep mode can fetch research sources by symbol and industry\.$/);
+  if (match) return '深度模式可按标的和行业拉取研报来源。';
+  match = text.match(/^(.*?)Dragon-tiger list record exists(?:, net buy (.+?))?\.$/);
+  if (match) return `${match[1] ? `${match[1]}` : ''}存在龙虎榜记录${match[2] ? `，净买入 ${match[2]}` : ''}。`;
+  match = text.match(/^(.+?) keeps a reserved dragon-tiger seat lane; seat details are not fetched in quick mode\.$/);
+  if (match) return `${match[1]} 已预留龙虎榜席位通道；当前快速模式不拉取席位明细。`;
+  match = text.match(/^Focus on institution seats and brokerage buy\/sell direction\.$/);
+  if (match) return '重点看机构席位和营业部买卖方向。';
+  match = text.match(/^Fetch seat details only after unusual moves or limit-up events to reduce source pressure\.$/);
+  if (match) return '出现异动或涨停时再拉取席位明细，降低来源压力。';
+  match = text.match(/^Deep mode can expand original announcement text and source links\.$/);
+  if (match) return '深度模式可展开公告原文和来源链接。';
+  match = text.match(/^Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details\.$/);
+  if (match) return '高级版可展开公告原文、研报 PDF、资金流历史、板块联动和龙虎榜席位明细。';
+  match = text.match(/^(.+?) A-share enrichment is temporarily degraded; the basic quote snapshot remains available\.$/);
+  if (match) return `${match[1]} 的 A股增强数据暂时降级；基础行情快照仍可继续使用。`;
+  match = text.match(/^Premium can expand announcement, research, fund-flow, sector, and dragon-tiger sources\.$/);
+  if (match) return '高级版可展开公告、研报、资金流、板块和龙虎榜来源。';
 
   return localizeGeneratedTerms(text
     .replace(/^Price is above MA20 and short-term trend remains constructive\.$/, '价格位于 MA20 上方，短期趋势结构仍偏积极。')
@@ -3750,6 +3817,90 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                    {basicSnapshot.intelligence?.aShareEnrichment ? (
+                      <div
+                        data-testid="basic-query-a-share-enrichment"
+                        className="mb-3 rounded-lg border border-primary/30 bg-background/40 p-3"
+                      >
+                        <div className="mb-3 flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">
+                              {uiLanguage === 'en' ? 'A-share data expansion' : 'A股数据扩展'}
+                            </div>
+                            <h4 className="mt-1 text-base font-semibold text-foreground">
+                              {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.title, uiLanguage)}
+                            </h4>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.summary, uiLanguage)}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px]">
+                            <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary">
+                              {localizeGeneratedStatus(basicSnapshot.intelligence.aShareEnrichment.status, uiLanguage)}
+                            </span>
+                            <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
+                              {localizeGeneratedSource(basicSnapshot.intelligence.aShareEnrichment.source, uiLanguage)}
+                            </span>
+                            <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 font-medium text-primary">
+                              {basicSnapshot.intelligence.aShareEnrichment.aiUsed
+                                ? (uiLanguage === 'en' ? 'AI used' : '已使用 AI')
+                                : t('home.noAi')}
+                            </span>
+                            <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
+                              {basicSnapshot.intelligence.aShareEnrichment.publicSearchUsed
+                                ? (uiLanguage === 'en' ? 'Public search' : '公共搜索')
+                                : (uiLanguage === 'en' ? 'No public search' : '未用公共搜索')}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                          {basicSnapshot.intelligence.aShareEnrichment.channels.map((item) => (
+                            <div
+                              key={`${item.category}-${item.title}`}
+                              className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3"
+                            >
+                              <div className="flex min-w-0 items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-foreground">
+                                    {localizeGeneratedText(item.title, uiLanguage)}
+                                  </div>
+                                  <div className="mt-1 truncate text-[11px] text-primary">
+                                    {localizeGeneratedText(item.category, uiLanguage)}
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-md border border-subtle px-1.5 py-0.5 text-[11px] text-secondary-text">
+                                  {localizeGeneratedStatus(item.status, uiLanguage)}
+                                </span>
+                              </div>
+                              <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                                {localizeGeneratedText(item.summary, uiLanguage)}
+                              </p>
+                              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
+                                {localizeGeneratedText(item.action, uiLanguage)}
+                              </p>
+                              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                                <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                  {localizeGeneratedSource(item.source, uiLanguage)}
+                                </span>
+                                {item.updatedAt ? (
+                                  <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                    {item.updatedAt}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-secondary-text sm:flex-row sm:items-center sm:justify-between">
+                          <span className="min-w-0 leading-relaxed">
+                            {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.premiumUnlock, uiLanguage)}
+                          </span>
+                          <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1">
+                            {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.boundary, uiLanguage)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                     {basicSnapshot.intelligence?.klineForecast ? (
                       <div
                         data-testid="basic-query-kline-forecast-lab"
@@ -3961,7 +4112,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {(basicSnapshot.intelligence?.newsCenter || basicSnapshot.intelligence?.klineForecast) ? (
+                    {(basicSnapshot.intelligence?.newsCenter || basicSnapshot.intelligence?.aShareEnrichment || basicSnapshot.intelligence?.klineForecast) ? (
                       <div
                         data-testid="basic-query-premium-feature-ladder"
                         className="mb-3 grid gap-2 rounded-lg border border-primary/25 bg-background/35 p-3 md:grid-cols-4"

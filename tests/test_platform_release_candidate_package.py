@@ -87,6 +87,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v56: bool = True,
         include_v57: bool = True,
         include_v58: bool = True,
+        include_v59: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -282,6 +283,12 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "Do not commit real API Key\nKRONOS_ENABLED\nmodel_unavailable\n"
                 "DSA_PLATFORM_KRONOS_SANDBOX_V58_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-07-dsa-v59-a-stock-data-poc.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo AI calls\nNo public search\n"
+                "a-stock-data\nA-share enrichment\n"
+                "DSA_PLATFORM_A_STOCK_DATA_POC_V59_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -341,9 +348,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_local_user_retention_v56.py",
             "scripts/verify_platform_local_news_kline_v57.py",
             "scripts/verify_platform_kronos_sandbox_v58.py",
+            "scripts/verify_platform_a_stock_data_poc_v59.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
+            "src/services/a_share_enrichment_service.py",
             "src/services/kronos_forecast_service.py",
             "src/services/market_source_ops.py",
             "src/services/local_functional_status.py",
@@ -393,6 +402,8 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_kronos_forecast_service_v58.py",
             "tests/test_kronos_forecast_api_v58.py",
             "tests/test_platform_kronos_sandbox_v58.py",
+            "tests/test_a_share_enrichment_service.py",
+            "tests/test_platform_a_stock_data_poc_v59.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -584,6 +595,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "tests/test_kronos_forecast_service_v58.py",
                 "tests/test_kronos_forecast_api_v58.py",
                 "tests/test_platform_kronos_sandbox_v58.py",
+            }:
+                continue
+            if not include_v59 and rel_path in {
+                "scripts/verify_platform_a_stock_data_poc_v59.py",
+                "src/services/a_share_enrichment_service.py",
+                "tests/test_a_share_enrichment_service.py",
+                "tests/test_platform_a_stock_data_poc_v59.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -835,6 +853,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v58:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-06-dsa-v58-kronos-sandbox.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v59:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-07-dsa-v59-a-stock-data-poc.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1474,6 +1499,22 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("tests/test_kronos_forecast_api_v58.py", missing)
         self.assertIn("tests/test_platform_kronos_sandbox_v58.py", missing)
         self.assertIn("docs/superpowers/plans/2026-07-06-dsa-v58-kronos-sandbox.md", missing)
+
+    def test_reports_missing_a_stock_data_poc_v59_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v59=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        missing = by_id["required_files_present"].metadata["missing_files"]
+        self.assertIn("scripts/verify_platform_a_stock_data_poc_v59.py", missing)
+        self.assertIn("src/services/a_share_enrichment_service.py", missing)
+        self.assertIn("tests/test_a_share_enrichment_service.py", missing)
+        self.assertIn("tests/test_platform_a_stock_data_poc_v59.py", missing)
+        self.assertIn("docs/superpowers/plans/2026-07-07-dsa-v59-a-stock-data-poc.md", missing)
 
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:

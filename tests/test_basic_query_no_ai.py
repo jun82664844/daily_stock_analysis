@@ -309,6 +309,91 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertIn("Premium", kline_forecast["premium_unlock"])
         analysis_service.assert_not_called()
 
+    def test_a_share_snapshot_includes_a_stock_data_enrichment_poc(self) -> None:
+        class AShareStockService:
+            def get_realtime_quote(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "贵州茅台",
+                    "current_price": 1600.0,
+                    "change_percent": 1.2,
+                    "open": 1580.0,
+                    "high": 1610.0,
+                    "low": 1576.0,
+                    "prev_close": 1581.0,
+                    "volume": 1200000,
+                    "amount": 1920000000.0,
+                    "source": "unit_quote",
+                    "freshness": "fresh",
+                }
+
+            def get_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "贵州茅台",
+                    "source": "unit_history",
+                    "data": [
+                        {
+                            "date": f"2026-06-{day:02d}",
+                            "open": 1500.0 + day,
+                            "high": 1510.0 + day,
+                            "low": 1490.0 + day,
+                            "close": 1500.0 + day,
+                            "volume": 1000000 + day * 1000,
+                        }
+                        for day in range(1, 22)
+                    ],
+                }
+
+            def get_basic_company_profile(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "company_name": "贵州茅台",
+                    "sector": "食品饮料",
+                    "industry": "白酒",
+                    "market_cap": 2000000000000,
+                    "pe_ratio": 24.8,
+                    "source": "unit_profile",
+                }
+
+        class FakeAShareEnrichmentService:
+            def get_enrichment(self, stock_code: str, *, stock_name=None, profile=None, quote=None):
+                return {
+                    "title": "A股增强数据",
+                    "summary": f"{stock_name or stock_code} 的公告、资金流、板块、研报和龙虎榜本地增强通道。",
+                    "status": "available",
+                    "source": "a_stock_data_poc_fixture",
+                    "ai_used": False,
+                    "public_search_used": False,
+                    "channels": [
+                        {"category": "announcements", "title": "公告通道", "summary": "近公告可用于核对重大事项。", "status": "available", "source": "fixture", "action": "深度模式可展开公告来源。"},
+                        {"category": "capital_flow", "title": "资金流通道", "summary": "主力资金净流入为正。", "status": "available", "source": "fixture", "action": "观察连续性。"},
+                        {"category": "sector", "title": "板块通道", "summary": "食品饮料 / 白酒。", "status": "available", "source": "fixture", "action": "对比同板块。"},
+                        {"category": "research", "title": "研报通道", "summary": "有机构研报覆盖。", "status": "available", "source": "fixture", "action": "高级版可查看详情。"},
+                        {"category": "dragon_tiger", "title": "龙虎榜通道", "summary": "未见近期异常上榜。", "status": "degraded", "source": "fixture", "action": "刷新后复核。"},
+                    ],
+                    "premium_unlock": "高级版可展开原始来源、PDF、席位明细和资金流历史。",
+                    "boundary": "Information analysis only; not investment advice.",
+                }
+
+        with patch("src.services.analysis_service.AnalysisService") as analysis_service:
+            snapshot = BasicQueryService(
+                stock_service=AShareStockService(),
+                cache=MarketDataCache(default_ttl_seconds=60),
+                a_share_enrichment_service=FakeAShareEnrichmentService(),
+            ).get_snapshot("600519")
+
+        enrichment = snapshot["intelligence"]["a_share_enrichment"]
+        self.assertEqual(snapshot["market"], "cn")
+        self.assertFalse(snapshot["ai_used"])
+        self.assertFalse(enrichment["ai_used"])
+        self.assertFalse(enrichment["public_search_used"])
+        categories = {item["category"] for item in enrichment["channels"]}
+        self.assertEqual(categories, {"announcements", "capital_flow", "sector", "research", "dragon_tiger"})
+        self.assertEqual(enrichment["source"], "a_stock_data_poc_fixture")
+        self.assertIn("not investment advice", enrichment["boundary"])
+        analysis_service.assert_not_called()
+
     def test_yfinance_profile_keeps_dividend_yield_percent_units(self) -> None:
         class FakeTicker:
             def get_info(self):

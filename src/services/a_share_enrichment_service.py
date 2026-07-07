@@ -1,0 +1,336 @@
+# -*- coding: utf-8 -*-
+"""Local A-share enrichment adapter inspired by a-stock-data.
+
+This POC keeps the quick query lane deterministic: no AI calls, no public
+search, no hard dependency on third-party unofficial endpoints.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from datetime import datetime, timezone
+from typing import Any, Callable, Optional
+
+
+HttpGet = Callable[..., dict[str, Any]]
+
+
+class AShareEnrichmentService:
+    """Build compact A-share information channels with safe degradation."""
+
+    CHANNELS = ("announcements", "capital_flow", "sector", "research", "dragon_tiger")
+    CHANNEL_SLUGS = {
+        "announcements": "announcements",
+        "capital_flow": "fund-flow",
+        "sector": "concept-blocks",
+        "research": "reports",
+        "dragon_tiger": "dragon-tiger",
+    }
+
+    def __init__(
+        self,
+        *,
+        http_get: Optional[HttpGet] = None,
+        timeout_seconds: Optional[float] = None,
+        http_enabled: Optional[bool] = None,
+    ) -> None:
+        self.timeout_seconds = max(0.1, float(timeout_seconds or os.getenv("A_STOCK_DATA_POC_TIMEOUT_SEC", "1.2")))
+        enabled = http_enabled
+        if enabled is None:
+            enabled = os.getenv("A_STOCK_DATA_POC_HTTP_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+        self.http_get = http_get if http_get is not None else (self._default_http_get if enabled else None)
+
+    def get_enrichment(
+        self,
+        stock_code: str,
+        *,
+        stock_name: str | None = None,
+        profile: Optional[dict[str, Any]] = None,
+        quote: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        code = self._normalize_code(stock_code)
+        fetched: dict[str, dict[str, Any] | None] = {}
+        errors: dict[str, str] = {}
+
+        for channel in self.CHANNELS:
+            fetched[channel] = self._fetch_channel(channel, code=code, errors=errors)
+
+        channels = [
+            self._announcements_channel(code, stock_name, fetched.get("announcements")),
+            self._capital_flow_channel(code, stock_name, quote, fetched.get("capital_flow")),
+            self._sector_channel(code, stock_name, profile, fetched.get("sector")),
+            self._research_channel(code, stock_name, fetched.get("research")),
+            self._dragon_tiger_channel(code, stock_name, fetched.get("dragon_tiger")),
+        ]
+        any_available = any(item["status"] == "available" for item in channels)
+        status = "degraded" if errors or not any_available else "available"
+        summary = self._summary(stock_name or code, profile=profile, quote=quote, status=status)
+        return {
+            "title": "A-share enrichment",
+            "summary": summary,
+            "status": status,
+            "source": "a_stock_data_poc_adapter",
+            "updated_at": self._now_iso(),
+            "ai_used": False,
+            "public_search_used": False,
+            "channels": channels,
+            "premium_unlock": "Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details.",
+            "boundary": "Information analysis only; not investment advice.",
+        }
+
+    def _fetch_channel(self, channel: str, *, code: str, errors: dict[str, str]) -> dict[str, Any] | None:
+        if self.http_get is None:
+            return None
+        try:
+            slug = self.CHANNEL_SLUGS.get(channel, channel.replace("_", "-"))
+            result = self.http_get(
+                f"a-stock-data-poc://{slug}",
+                params={"code": code},
+                headers={"User-Agent": "DSA local a-stock-data POC"},
+                timeout=self.timeout_seconds,
+            )
+            return result if isinstance(result, dict) else None
+        except Exception as exc:
+            errors[channel] = type(exc).__name__
+            return None
+
+    def _announcements_channel(
+        self,
+        code: str,
+        stock_name: str | None,
+        payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        item = self._first_item(payload)
+        if item:
+            title = str(item.get("title") or "Latest announcement")
+            date = str(item.get("date") or "").strip()
+            summary = f"{date + ' ' if date else ''}{title}"
+            return self._channel(
+                "announcements",
+                "Announcements channel",
+                summary,
+                status="available",
+                source="a_stock_data_cninfo_or_f10",
+                action="Deep mode can expand original announcement text and source links.",
+            )
+        return self._channel(
+            "announcements",
+            "Announcements channel",
+            f"{stock_name or code} keeps a reserved CNINFO / TDX F10 announcements lane; quick mode shows the checklist entry only.",
+            status="degraded",
+            source="a_stock_data_poc_local_rules",
+            action="Later versions can enable cached announcement fetching without calling external sources on every query.",
+        )
+
+    def _capital_flow_channel(
+        self,
+        code: str,
+        stock_name: str | None,
+        quote: dict[str, Any] | None,
+        payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        main_net = self._float_or_none((payload or {}).get("main_net"))
+        ratio = self._float_or_none((payload or {}).get("main_net_ratio"))
+        if main_net is not None:
+            ratio_text = f", ratio {self._format_percent(ratio)}" if ratio is not None else ""
+            return self._channel(
+                "capital_flow",
+                "Fund-flow channel",
+                f"Main fund net inflow is {self._format_money(main_net)}{ratio_text}.",
+                status="available",
+                source="a_stock_data_eastmoney_fund_flow",
+                action="Check whether main fund inflow is continuous across several sessions, not only a single-day move.",
+            )
+        change_percent = self._float_or_none((quote or {}).get("change_percent"))
+        price_hint = f" Current change is {self._format_percent(change_percent)}." if change_percent is not None else ""
+        return self._channel(
+            "capital_flow",
+            "Fund-flow channel",
+            f"{stock_name or code} keeps a reserved Eastmoney fund-flow lane.{price_hint}".strip(),
+            status="degraded",
+            source="a_stock_data_poc_local_rules",
+            action="Later versions can add cached daily fund flow by main, large, medium, and small orders.",
+        )
+
+    def _sector_channel(
+        self,
+        code: str,
+        stock_name: str | None,
+        profile: dict[str, Any] | None,
+        payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        concepts = payload.get("concepts") if isinstance(payload, dict) else None
+        concepts_list = [str(item) for item in concepts or [] if item]
+        industry = str((payload or {}).get("industry") or (profile or {}).get("industry") or "").strip()
+        sector = str((profile or {}).get("sector") or "").strip()
+        bits = [bit for bit in [sector, industry, " / ".join(concepts_list[:3])] if bit]
+        if bits:
+            return self._channel(
+                "sector",
+                "Sector channel",
+                f"{stock_name or code} current context: {'; '.join(bits)}.",
+                status="available",
+                source="a_stock_data_eastmoney_concept_blocks",
+                action="Compare move, valuation, and fund flow against the same sector.",
+            )
+        return self._channel(
+            "sector",
+            "Sector channel",
+            f"{stock_name or code} has no usable sector tags yet; later versions can add Eastmoney concepts and industry mapping.",
+            status="degraded",
+            source="a_stock_data_poc_local_rules",
+            action="Refresh profile data or enable sector sources before comparing peers.",
+        )
+
+    def _research_channel(
+        self,
+        code: str,
+        stock_name: str | None,
+        payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        item = self._first_item(payload)
+        if item:
+            title = str(item.get("title") or "Institutional research")
+            rating = str(item.get("rating") or "").strip()
+            rating_text = f"; rating {rating}" if rating else ""
+            return self._channel(
+                "research",
+                "Research channel",
+                f"Latest research: {title}{rating_text}.",
+                status="available",
+                source="a_stock_data_eastmoney_reportapi",
+                action="Premium can expand research lists, PDFs, and institution forecast fields.",
+            )
+        return self._channel(
+            "research",
+            "Research channel",
+            f"{stock_name or code} keeps a reserved Eastmoney / iFinD research lane; free quick mode does not fetch PDFs.",
+            status="degraded",
+            source="a_stock_data_poc_local_rules",
+            action="Deep mode can fetch research sources by symbol and industry.",
+        )
+
+    def _dragon_tiger_channel(
+        self,
+        code: str,
+        stock_name: str | None,
+        payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        item = self._first_item(payload)
+        net_buy = self._float_or_none((item or {}).get("net_buy"))
+        if item:
+            date = str(item.get("date") or "").strip()
+            buy_text = f", net buy {self._format_money(net_buy)}" if net_buy is not None else ""
+            return self._channel(
+                "dragon_tiger",
+                "Dragon-tiger channel",
+                f"{date + ' ' if date else ''}Dragon-tiger list record exists{buy_text}.",
+                status="available",
+                source="a_stock_data_eastmoney_datacenter",
+                action="Focus on institution seats and brokerage buy/sell direction.",
+            )
+        return self._channel(
+            "dragon_tiger",
+            "Dragon-tiger channel",
+            f"{stock_name or code} keeps a reserved dragon-tiger seat lane; seat details are not fetched in quick mode.",
+            status="degraded",
+            source="a_stock_data_poc_local_rules",
+            action="Fetch seat details only after unusual moves or limit-up events to reduce source pressure.",
+        )
+
+    def _channel(
+        self,
+        category: str,
+        title: str,
+        summary: str,
+        *,
+        status: str,
+        source: str,
+        action: str,
+    ) -> dict[str, Any]:
+        return {
+            "category": category,
+            "title": title,
+            "summary": summary,
+            "status": status,
+            "source": source,
+            "action": action,
+            "updated_at": self._now_iso(),
+        }
+
+    def _default_http_get(self, url: str, *, params=None, headers=None, timeout=None) -> dict[str, Any]:
+        try:
+            import requests
+
+            response = requests.get(url, params=params, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            data = response.json()
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _summary(
+        self,
+        label: str,
+        *,
+        profile: dict[str, Any] | None,
+        quote: dict[str, Any] | None,
+        status: str,
+    ) -> str:
+        context = " / ".join(
+            str(value)
+            for value in ((profile or {}).get("sector"), (profile or {}).get("industry"))
+            if value
+        )
+        price = self._float_or_none((quote or {}).get("current_price"))
+        change = self._float_or_none((quote or {}).get("change_percent"))
+        price_text = ""
+        if price is not None:
+            price_text = f" Last price {self._format_number(price)}"
+            if change is not None:
+                price_text += f", change {self._format_percent(change)}"
+        status_text = "is available through the local POC lane" if status == "available" else "is degraded through local rules"
+        context_text = f" Context: {context}." if context else ""
+        return f"{label} A-share enrichment for announcements, fund flow, sectors, research, and dragon-tiger data {status_text}.{context_text}{price_text}".strip()
+
+    def _first_item(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
+        items = payload.get("items") if isinstance(payload, dict) else None
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            return items[0]
+        return None
+
+    def _normalize_code(self, stock_code: str) -> str:
+        raw = str(stock_code or "").strip().upper()
+        match = re.search(r"(\d{6})", raw)
+        return match.group(1) if match else raw
+
+    def _float_or_none(self, value: Any) -> float | None:
+        if value in (None, ""):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _format_money(self, value: float | None) -> str:
+        if value is None:
+            return "-"
+        absolute = abs(value)
+        if absolute >= 1_000_000_000:
+            return f"{self._format_number(value / 1_000_000_000)}B"
+        if absolute >= 1_000_000:
+            return f"{self._format_number(value / 1_000_000)}M"
+        if absolute >= 1_000:
+            return f"{self._format_number(value / 1_000)}K"
+        return self._format_number(value)
+
+    def _format_percent(self, value: float | None) -> str:
+        return "-" if value is None else f"{self._format_number(value)}%"
+
+    def _format_number(self, value: float) -> str:
+        text = f"{value:.4f}".rstrip("0").rstrip(".")
+        return text or "0"
+
+    def _now_iso(self) -> str:
+        return datetime.now(timezone.utc).replace(microsecond=0).isoformat()

@@ -676,6 +676,24 @@ describe('HomePage', () => {
             { category: 'financials', title: 'Financial snapshot lane', summary: 'Market cap 1.4767T; PE 17.85; PB 6.34.', status: 'available', source: 'a_share_realtime', action: 'Compare valuation and fundamentals before relying on price action alone.' },
           ],
         },
+        aShareEnrichment: {
+          title: 'A-share enrichment',
+          summary: '贵州茅台 A-share enrichment for announcements, fund flow, sectors, research, and dragon-tiger data is available through the local POC lane. Context: 白酒 / 沪深300. Last price 1210, change -1.1%',
+          status: 'available',
+          source: 'a_stock_data_poc_adapter',
+          updatedAt: '2026-07-07T09:30:00Z',
+          aiUsed: false,
+          publicSearchUsed: false,
+          premiumUnlock: 'Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details.',
+          boundary: 'Information analysis only; not investment advice.',
+          channels: [
+            { category: 'announcements', title: 'Announcements channel', summary: '贵州茅台 keeps a reserved CNINFO / TDX F10 announcements lane; quick mode shows the checklist entry only.', status: 'degraded', source: 'a_stock_data_poc_local_rules', action: 'Later versions can enable cached announcement fetching without calling external sources on every query.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'capital_flow', title: 'Fund-flow channel', summary: 'Main fund net inflow is 120M, ratio 8.5%.', status: 'available', source: 'a_stock_data_eastmoney_fund_flow', action: 'Check whether main fund inflow is continuous across several sessions, not only a single-day move.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'sector', title: 'Sector channel', summary: '贵州茅台 current context: 白酒; 沪深300.', status: 'available', source: 'a_stock_data_eastmoney_concept_blocks', action: 'Compare move, valuation, and fund flow against the same sector.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'research', title: 'Research channel', summary: 'Latest research: Earnings quality tracker; rating buy.', status: 'available', source: 'a_stock_data_eastmoney_reportapi', action: 'Premium can expand research lists, PDFs, and institution forecast fields.', updatedAt: '2026-07-07T09:30:00Z' },
+            { category: 'dragon_tiger', title: 'Dragon-tiger channel', summary: '2026-07-06 Dragon-tiger list record exists, net buy 30M.', status: 'available', source: 'a_stock_data_eastmoney_datacenter', action: 'Focus on institution seats and brokerage buy/sell direction.', updatedAt: '2026-07-07T09:30:00Z' },
+          ],
+        },
         klineForecast: {
           title: 'K-line forecast lab',
           horizon: 'next_5_bars',
@@ -761,6 +779,18 @@ describe('HomePage', () => {
     expect(newsCenter).toHaveTextContent('未用公共搜索');
     expect(newsCenter).not.toHaveTextContent('News center');
     expect(newsCenter).not.toHaveTextContent('Market-moving news lane');
+
+    const aShareEnrichment = screen.getByTestId('basic-query-a-share-enrichment');
+    expect(aShareEnrichment).toHaveTextContent('A股增强数据');
+    expect(aShareEnrichment).toHaveTextContent('A股数据扩展');
+    expect(aShareEnrichment).toHaveTextContent('资金流通道');
+    expect(aShareEnrichment).toHaveTextContent('研报通道');
+    expect(aShareEnrichment).toHaveTextContent('龙虎榜通道');
+    expect(aShareEnrichment).toHaveTextContent('主力资金净流入 120M');
+    expect(aShareEnrichment).toHaveTextContent('高级版可展开公告原文');
+    expect(aShareEnrichment).toHaveTextContent('不构成投资建议');
+    expect(aShareEnrichment).not.toHaveTextContent('Fund-flow channel');
+    expect(aShareEnrichment).not.toHaveTextContent('Dragon-tiger channel');
 
     const klineForecast = screen.getByTestId('basic-query-kline-forecast-lab');
     expect(klineForecast).toHaveTextContent('K线预测实验室');

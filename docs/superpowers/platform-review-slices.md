@@ -828,3 +828,36 @@ Review focus:
 - JSONL forecast records must remain local metadata and must not contain API keys or secrets.
 - `scripts/verify_platform_kronos_sandbox_v58.py` must stay visible despite the broad `verify_*.py` ignore rule.
 - V58 remains local-only, not public launch approval, not real payment, not hosted model SLA, and not investment advice.
+
+## V59 A-Stock-Data POC Addendum
+
+Purpose: enrich A-share free quick snapshots with local, no-AI data lanes inspired by `a-stock-data`: announcements, fund flow, sector/concept context, research, and dragon-tiger list. This is a local adapter POC, not a public data-source license approval.
+
+Files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/basic_query_service.py`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_a_share_enrichment_service.py`
+- `tests/test_platform_a_stock_data_poc_v59.py`
+- `scripts/verify_platform_a_stock_data_poc_v59.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-07-dsa-v59-a-stock-data-poc.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- `a_share_enrichment` must only run for `route.market == "cn"` and must never block US, HK, or crypto quick snapshots.
+- Quick mode must keep `ai_used=false` and `public_search_used=false`; public search, long AI summaries, and real-time source links stay deep/premium/configured-source work.
+- Adapter failures must degrade into visible channel statuses instead of failing the whole snapshot.
+- HomePage must render `basic-query-a-share-enrichment` with Chinese/English language consistency and without exposing secrets.
+- `scripts/verify_platform_a_stock_data_poc_v59.py` must stay visible despite the broad `verify_*.py` ignore rule and print `DSA_PLATFORM_A_STOCK_DATA_POC_V59_OK` only when V59 markers are present.
+- V59 remains local-only, not public launch approval, not real payment, not market-data licensing approval, and not investment advice.

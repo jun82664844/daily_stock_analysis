@@ -138,6 +138,58 @@ describe('stocksApi', () => {
     expect(result.aiUsed).toBe(false);
   });
 
+  it('loads A-share enrichment channels as camelCase snapshot data', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: '600519.SH',
+        stock_name: '贵州茅台',
+        market: 'cn',
+        quote: {
+          current_price: 1210,
+          source: 'a_share_realtime',
+          freshness: 'fresh',
+        },
+        indicators: {},
+        intelligence: {
+          mode: 'no_ai_low_cost',
+          ai_used: false,
+          a_share_enrichment: {
+            title: 'A股增强数据',
+            summary: '贵州茅台本地增强数据通道已就绪。',
+            status: 'available',
+            source: 'a_stock_data_poc_adapter',
+            updated_at: '2026-07-07T09:30:00Z',
+            ai_used: false,
+            public_search_used: false,
+            premium_unlock: '高级版可展开公告原文、研报 PDF、资金流历史、板块联动和龙虎榜席位明细。',
+            boundary: 'Information analysis only; not investment advice.',
+            channels: [
+              {
+                category: 'capital_flow',
+                title: '资金流通道',
+                summary: '主力资金净流入 1.2亿。',
+                status: 'available',
+                source: 'a_stock_data_eastmoney_fund_flow',
+                action: '观察近几日主力净流入是否连续。',
+                updated_at: '2026-07-07T09:31:00Z',
+              },
+            ],
+          },
+          items: [],
+        },
+        ai_used: false,
+      },
+    });
+
+    const result = await stocksApi.snapshot('600519.SH');
+
+    expect(result.intelligence?.aShareEnrichment?.aiUsed).toBe(false);
+    expect(result.intelligence?.aShareEnrichment?.publicSearchUsed).toBe(false);
+    expect(result.intelligence?.aShareEnrichment?.updatedAt).toBe('2026-07-07T09:30:00Z');
+    expect(result.intelligence?.aShareEnrichment?.channels[0].category).toBe('capital_flow');
+    expect(result.intelligence?.aShareEnrichment?.channels[0].updatedAt).toBe('2026-07-07T09:31:00Z');
+  });
+
   it('loads force-refresh no-AI stock snapshots with refresh diagnostics', async () => {
     get.mockResolvedValueOnce({
       data: {

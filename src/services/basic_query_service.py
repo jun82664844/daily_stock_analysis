@@ -14,6 +14,7 @@ from src.services.stock_code_utils import normalize_crypto_symbol
 from src.services.market_data_cache import CacheHit, MarketDataCache
 from src.services.market_source_health import MarketSourceHealthRegistry, default_market_source_health
 from src.services.persistent_market_data_cache import default_persistent_market_data_cache
+from src.services.a_share_enrichment_service import AShareEnrichmentService
 from src.services.stock_service import StockService
 
 
@@ -60,10 +61,12 @@ class BasicQueryService:
         fetch_timeout_seconds: Optional[float] = None,
         profile_timeout_seconds: Optional[float] = None,
         source_health: Optional[MarketSourceHealthRegistry] = None,
+        a_share_enrichment_service: Optional[Any] = None,
     ):
         self.stock_service = stock_service or StockService()
         self.cache = cache or default_persistent_market_data_cache
         self.source_health = source_health or default_market_source_health
+        self.a_share_enrichment_service = a_share_enrichment_service or AShareEnrichmentService()
         self.fetch_timeout_seconds = (
             _DEFAULT_FETCH_TIMEOUT_SECONDS if fetch_timeout_seconds is None else max(0.001, float(fetch_timeout_seconds))
         )
@@ -152,6 +155,13 @@ class BasicQueryService:
             freshness=profile_freshness,
             source_fallback=profile_source,
         )
+        a_share_enrichment = self._a_share_enrichment_payload(
+            route=route,
+            code=code,
+            stock_name=self._stock_name(quote, history, profile),
+            quote=quote_payload,
+            profile=profile_payload,
+        )
 
         return {
             "stock_code": code,
@@ -168,6 +178,7 @@ class BasicQueryService:
                 indicators=indicators,
                 trend=trend,
                 warnings=warnings,
+                a_share_enrichment=a_share_enrichment,
             ),
             "route": route.to_payload(),
             "warnings": warnings,
@@ -759,6 +770,7 @@ class BasicQueryService:
         indicators: Dict[str, Any],
         trend: Optional[Dict[str, Any]],
         warnings: list[Dict[str, str]],
+        a_share_enrichment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         financial_summary, financial_status = self._financial_intelligence_summary(profile, route=route)
         quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
@@ -808,6 +820,7 @@ class BasicQueryService:
                 trend=trend,
                 warnings=warnings,
             ),
+            "a_share_enrichment": a_share_enrichment,
             "items": [
                 {
                     "category": "news",
@@ -850,6 +863,37 @@ class BasicQueryService:
             "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
             "boundary": "Information analysis only; not investment advice.",
         }
+
+    def _a_share_enrichment_payload(
+        self,
+        *,
+        route: MarketRoute,
+        code: str,
+        stock_name: Optional[str],
+        quote: Dict[str, Any],
+        profile: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        if route.market != "cn":
+            return None
+        try:
+            return self.a_share_enrichment_service.get_enrichment(
+                code,
+                stock_name=stock_name,
+                profile=profile,
+                quote=quote,
+            )
+        except Exception:
+            return {
+                "title": "A-share enrichment",
+                "summary": f"{stock_name or code} A-share enrichment is temporarily degraded; the basic quote snapshot remains available.",
+                "status": "degraded",
+                "source": "a_stock_data_poc_adapter",
+                "ai_used": False,
+                "public_search_used": False,
+                "channels": [],
+                "premium_unlock": "Premium can expand announcement, research, fund-flow, sector, and dragon-tiger sources.",
+                "boundary": "Information analysis only; not investment advice.",
+            }
 
     def _retention_brief_payload(
         self,

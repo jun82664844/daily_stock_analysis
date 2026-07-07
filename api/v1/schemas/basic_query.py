@@ -255,6 +255,33 @@ class BasicKlineForecastPayload(BaseModel):
     boundary: str = "Experimental model preview; information analysis only; not investment advice."
 
 
+class BasicAShareEnrichmentChannelPayload(BaseModel):
+    """One local A-share enrichment channel inspired by a-stock-data."""
+
+    category: str
+    title: str
+    summary: str
+    status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
+    source: str = "a_stock_data_poc_adapter"
+    action: str
+    updated_at: Optional[str] = None
+
+
+class BasicAShareEnrichmentPayload(BaseModel):
+    """Local A-share enrichment payload that never invokes AI or public search."""
+
+    title: str = "A-share enrichment"
+    summary: str
+    status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
+    source: str = "a_stock_data_poc_adapter"
+    updated_at: Optional[str] = None
+    ai_used: bool = False
+    public_search_used: bool = False
+    channels: List[BasicAShareEnrichmentChannelPayload] = Field(default_factory=list)
+    premium_unlock: str
+    boundary: str = "Information analysis only; not investment advice."
+
+
 class KronosForecastScenarioPayload(BaseModel):
     """One scenario returned by the local Kronos sandbox endpoint."""
 
@@ -335,6 +362,7 @@ class BasicIntelligencePayload(BaseModel):
     retention_brief: Optional[BasicRetentionBriefPayload] = None
     news_center: Optional[BasicNewsCenterPayload] = None
     kline_forecast: Optional[BasicKlineForecastPayload] = None
+    a_share_enrichment: Optional[BasicAShareEnrichmentPayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)
