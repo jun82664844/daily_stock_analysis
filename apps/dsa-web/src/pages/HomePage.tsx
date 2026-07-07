@@ -607,6 +607,76 @@ const localizeRuntimeLabel = (value: unknown, language: string): string => {
   return localizeGeneratedSource(text, language);
 };
 
+const isPlainRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null
+);
+
+const getPlatformAuthErrorCode = (error: unknown): string | null => {
+  if (!isPlainRecord(error)) {
+    return null;
+  }
+  const response = error.response;
+  if (!isPlainRecord(response)) {
+    return null;
+  }
+  const data = response.data;
+  if (!isPlainRecord(data)) {
+    return null;
+  }
+  const detail = data.detail;
+  if (isPlainRecord(detail) && typeof detail.error === 'string') {
+    return detail.error;
+  }
+  return typeof data.error === 'string' ? data.error : null;
+};
+
+const localizePlatformAuthError = (
+  error: unknown,
+  language: string,
+  fallback: string,
+): string => {
+  const isEnglish = language === 'en';
+  const code = getPlatformAuthErrorCode(error);
+  const messages: Record<string, { en: string; zh: string }> = {
+    email_exists: {
+      en: 'Email already exists. Sign in instead.',
+      zh: '该邮箱已注册，请直接登录',
+    },
+    invalid_credentials: {
+      en: 'Invalid email or password.',
+      zh: '邮箱或密码不正确，请检查后再登录',
+    },
+    invalid_verification_code: {
+      en: 'Invalid or expired verification code. Send a new code and try again.',
+      zh: '验证码无效或已过期，请重新发送验证码',
+    },
+    verification_required: {
+      en: 'Enter the email verification code first.',
+      zh: '请先输入邮箱验证码',
+    },
+    platform_auth_disabled: {
+      en: 'Account login is currently disabled.',
+      zh: '账号登录功能暂未开启',
+    },
+    rate_limited: {
+      en: 'Too many attempts. Please wait and try again.',
+      zh: '尝试次数过多，请稍后再试',
+    },
+  };
+  if (code && messages[code]) {
+    return isEnglish ? messages[code].en : messages[code].zh;
+  }
+
+  const parsed = getParsedApiError(error);
+  if (isEnglish) {
+    return parsed.message || fallback;
+  }
+  const raw = `${parsed.rawMessage} ${parsed.message}`.toLowerCase();
+  if (raw.includes('invalid email')) return '邮箱格式不正确';
+  if (raw.includes('password must be at least')) return '密码至少需要 8 位';
+  return fallback;
+};
+
 type HistoryCenterMarketFilter = 'all' | 'cn' | 'us' | 'hk' | 'crypto';
 type HistoryCenterReportFilter = 'all' | 'stock' | ReportType;
 type HistoryCenterRefreshFilter = 'all' | 'refreshed' | 'not_refreshed';
@@ -1115,7 +1185,11 @@ const HomePage: React.FC = () => {
         refreshActiveTasks(),
       ]);
     } catch (err: unknown) {
-      setAuthError(getParsedApiError(err).message || '账号登录失败');
+      setAuthError(localizePlatformAuthError(
+        err,
+        uiLanguage,
+        uiLanguage === 'en' ? 'Account sign-in failed.' : '账号登录失败',
+      ));
     } finally {
       setAuthBusy(false);
     }
@@ -1147,7 +1221,11 @@ const HomePage: React.FC = () => {
         platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-verification-code"]')?.focus();
       }, 0);
     } catch (err: unknown) {
-      setAuthError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Failed to send verification code' : '验证码发送失败'));
+      setAuthError(localizePlatformAuthError(
+        err,
+        uiLanguage,
+        uiLanguage === 'en' ? 'Failed to send verification code' : '验证码发送失败',
+      ));
     } finally {
       setAuthVerificationBusy(false);
     }

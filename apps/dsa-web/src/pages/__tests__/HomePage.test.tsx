@@ -541,6 +541,78 @@ describe('HomePage', () => {
     });
   });
 
+  it('localizes platform login errors when UI language is Chinese', async () => {
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.login).mockRejectedValueOnce({
+      response: {
+        status: 401,
+        data: { error: 'invalid_credentials', message: 'Invalid login' },
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByTestId('platform-auth-email'), { target: { value: 'login@example.com' } });
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'bad-password' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+
+    expect(await screen.findByTestId('platform-auth-error')).toHaveTextContent('邮箱或密码不正确，请检查后再登录');
+  });
+
+  it('localizes platform register errors when UI language is Chinese', async () => {
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.register).mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: { error: 'email_exists', message: 'Email already exists' },
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('platform-auth-register-tab'));
+    fireEvent.change(screen.getByTestId('platform-auth-email'), { target: { value: 'exists@example.com' } });
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('platform-auth-confirm-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('platform-auth-verification-code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+
+    expect(await screen.findByTestId('platform-auth-error')).toHaveTextContent('该邮箱已注册，请直接登录');
+  });
+
+  it('keeps platform auth errors in English when UI language is English', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.login).mockRejectedValueOnce({
+      response: {
+        status: 401,
+        data: { error: 'invalid_credentials', message: 'Invalid login' },
+      },
+    });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    fireEvent.change(await screen.findByTestId('platform-auth-email'), { target: { value: 'login@example.com' } });
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'bad-password' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+
+    expect(await screen.findByTestId('platform-auth-error')).toHaveTextContent('Invalid email or password.');
+  });
+
   it('localizes structured no-AI query content when UI language is Chinese', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
     vi.mocked(historyApi.getList).mockResolvedValue({
