@@ -85,6 +85,7 @@ vi.mock('../../api/platform', () => ({
     current: vi.fn(),
     account: vi.fn(),
     listApiKeys: vi.fn(),
+    requestRegistrationCode: vi.fn(),
     register: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
@@ -229,6 +230,13 @@ describe('HomePage', () => {
     vi.mocked(platformApi.current).mockResolvedValue(null);
     vi.mocked(platformApi.account).mockRejectedValue(new Error('not signed in'));
     vi.mocked(platformApi.listApiKeys).mockResolvedValue([]);
+    vi.mocked(platformApi.requestRegistrationCode).mockResolvedValue({
+      email: 'user@example.com',
+      sent: true,
+      expiresInSeconds: 600,
+      devCode: '123456',
+      message: 'Local verification code generated',
+    });
     vi.mocked(platformApi.logout).mockResolvedValue(undefined);
     vi.mocked(platformApi.saveApiKey).mockResolvedValue({
       provider: 'deepseek',
@@ -455,20 +463,81 @@ describe('HomePage', () => {
     expect(screen.getByTestId('platform-auth-register-tab')).toHaveClass('bg-primary');
     expect(screen.getByTestId('platform-auth-email')).toBeInTheDocument();
     expect(screen.getByTestId('platform-auth-password')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-confirm-password')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-verification-code')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-send-code')).toHaveTextContent('发送验证码');
     expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('注册');
     expect(screen.getByTestId('platform-auth-submit')).toBeEnabled();
     expect(screen.getByTestId('platform-auth-email')).toHaveAttribute('autocomplete', 'off');
     expect(screen.getByTestId('platform-auth-password')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByTestId('platform-auth-confirm-password')).toHaveAttribute('autocomplete', 'new-password');
     expect(screen.getByTestId('platform-auth-password')).toHaveValue('');
+    expect(screen.getByTestId('platform-auth-confirm-password')).toHaveValue('');
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('platform-auth-confirm-password'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByTestId('platform-auth-login-tab'));
     expect(screen.getByTestId('platform-auth-password')).toHaveValue('');
+    expect(screen.queryByTestId('platform-auth-confirm-password')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
     expect(screen.getByTestId('platform-auth-password')).toHaveValue('');
+    expect(screen.getByTestId('platform-auth-confirm-password')).toHaveValue('');
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
     expect(screen.getByTestId('platform-auth-error')).toHaveTextContent('请先输入邮箱');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
+  });
+
+  it('requires password confirmation and a local verification code before registration', async () => {
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.register).mockResolvedValue({
+      user: {
+        id: 77,
+        email: 'verified@example.com',
+        role: 'user',
+        plan: 'free',
+        status: 'active',
+      },
+      quota: {
+        userId: 77,
+        plan: 'free',
+        weeklyLimit: 5,
+        used: 0,
+        remaining: 5,
+        periodStart: '2026-07-06',
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('platform-auth-register-tab'));
+    fireEvent.change(screen.getByTestId('platform-auth-email'), { target: { value: 'verified@example.com' } });
+    fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('platform-auth-confirm-password'), { target: { value: 'password456' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+
+    expect(screen.getByTestId('platform-auth-error')).toHaveTextContent('两次输入的密码不一致');
+    expect(platformApi.register).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId('platform-auth-confirm-password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+    expect(screen.getByTestId('platform-auth-error')).toHaveTextContent('请先输入邮箱验证码');
+
+    fireEvent.click(screen.getByTestId('platform-auth-send-code'));
+    await waitFor(() => {
+      expect(platformApi.requestRegistrationCode).toHaveBeenCalledWith('verified@example.com');
+    });
+    expect(screen.getByTestId('platform-auth-verification-status')).toHaveTextContent('123456');
+
+    fireEvent.change(screen.getByTestId('platform-auth-verification-code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByTestId('platform-auth-submit'));
+
+    await waitFor(() => {
+      expect(platformApi.register).toHaveBeenCalledWith('verified@example.com', 'password123', '123456');
+    });
   });
 
   it('localizes structured no-AI query content when UI language is Chinese', async () => {
@@ -922,10 +991,16 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
     fireEvent.change(screen.getByTestId('platform-auth-email'), { target: { value: 'v56-user@example.com' } });
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('platform-auth-confirm-password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('platform-auth-send-code'));
+    await waitFor(() => {
+      expect(platformApi.requestRegistrationCode).toHaveBeenCalledWith('v56-user@example.com');
+    });
+    fireEvent.change(screen.getByTestId('platform-auth-verification-code'), { target: { value: '123456' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
 
     await waitFor(() => {
-      expect(platformApi.register).toHaveBeenCalledWith('v56-user@example.com', 'password123');
+      expect(platformApi.register).toHaveBeenCalledWith('v56-user@example.com', 'password123', '123456');
     });
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('Apple Inc.');
     const modeGuide = await screen.findByTestId('basic-query-retention-mode-guide');

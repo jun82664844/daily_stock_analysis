@@ -9,8 +9,23 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlatformRegisterRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     email: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=8, max_length=256)
+    verification_code: Optional[str] = Field(default=None, alias="verificationCode", max_length=16)
+
+
+class PlatformRegistrationVerificationRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+
+
+class PlatformRegistrationVerificationResponse(BaseModel):
+    email: str
+    sent: bool
+    expires_in_seconds: int
+    dev_code: Optional[str] = None
+    message: str
 
 
 class PlatformLoginRequest(BaseModel):

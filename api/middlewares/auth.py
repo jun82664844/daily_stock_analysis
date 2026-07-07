@@ -28,6 +28,7 @@ EXEMPT_PATHS = frozenset({
     "/api/v1/auth/status",
     "/api/v1/platform/login",
     "/api/v1/platform/register",
+    "/api/v1/platform/register/verification-code",
     "/api/v1/platform/status",
     "/api/v1/billing/webhook",
     "/api/health",

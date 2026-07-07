@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArchiveRestore, BarChart3, Check, Download, Eye, Flag, KeyRound, LogOut, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
+import { Archive, ArchiveRestore, BarChart3, Check, Download, Eye, Flag, KeyRound, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
@@ -880,8 +880,12 @@ const HomePage: React.FC = () => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState('');
+  const [authVerificationCode, setAuthVerificationCode] = useState('');
+  const [authVerificationStatus, setAuthVerificationStatus] = useState('');
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [authVerificationBusy, setAuthVerificationBusy] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [apiKeyProvider, setApiKeyProvider] = useState('deepseek');
   const [apiKeyModel, setApiKeyModel] = useState('deepseek/deepseek-v4-flash');
@@ -1070,15 +1074,36 @@ const HomePage: React.FC = () => {
       platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-password"]')?.focus();
       return;
     }
+    const verificationCode = authVerificationCode.trim();
+    if (authMode === 'register') {
+      if (!authPasswordConfirm) {
+        setAuthError(uiLanguage === 'en' ? 'Confirm the password first.' : '请再次输入密码');
+        platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-confirm-password"]')?.focus();
+        return;
+      }
+      if (authPassword !== authPasswordConfirm) {
+        setAuthError(uiLanguage === 'en' ? 'The two passwords do not match.' : '两次输入的密码不一致');
+        platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-confirm-password"]')?.focus();
+        return;
+      }
+      if (!verificationCode) {
+        setAuthError(uiLanguage === 'en' ? 'Enter the email verification code first.' : '请先输入邮箱验证码');
+        platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-verification-code"]')?.focus();
+        return;
+      }
+    }
     setAuthBusy(true);
     setAuthError('');
     try {
       const retainedQuery = basicSnapshot?.stockCode || query;
       const payload = authMode === 'register'
-        ? await platformApi.register(email, authPassword)
+        ? await platformApi.register(email, authPassword, verificationCode)
         : await platformApi.login(email, authPassword);
       await loadPlatformAccount(payload);
       setAuthPassword('');
+      setAuthPasswordConfirm('');
+      setAuthVerificationCode('');
+      setAuthVerificationStatus('');
       resetDashboardState();
       if (retainedQuery.trim()) {
         setQuery(retainedQuery.trim());
@@ -1094,12 +1119,46 @@ const HomePage: React.FC = () => {
     } finally {
       setAuthBusy(false);
     }
-  }, [authEmail, authMode, authPassword, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery, uiLanguage]);
+  }, [authEmail, authMode, authPassword, authPasswordConfirm, authVerificationCode, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery, uiLanguage]);
+
+  const handleRequestRegistrationCode = useCallback(async () => {
+    const email = authEmail.trim();
+    if (!email) {
+      setAuthError(uiLanguage === 'en' ? 'Enter an email first.' : '请先输入邮箱');
+      platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+      return;
+    }
+    setAuthVerificationBusy(true);
+    setAuthError('');
+    setAuthVerificationStatus('');
+    try {
+      const response = await platformApi.requestRegistrationCode(email);
+      setAuthVerificationCode('');
+      const devCodeText = response.devCode
+        ? (uiLanguage === 'en' ? ` Local code: ${response.devCode}` : `本地验证码：${response.devCode}`)
+        : '';
+      setAuthVerificationStatus(
+        uiLanguage === 'en'
+          ? `Verification code generated.${devCodeText}`
+          : `验证码已生成。${devCodeText}`,
+      );
+      window.setTimeout(() => {
+        platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-verification-code"]')?.focus();
+      }, 0);
+    } catch (err: unknown) {
+      setAuthError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Failed to send verification code' : '验证码发送失败'));
+    } finally {
+      setAuthVerificationBusy(false);
+    }
+  }, [authEmail, uiLanguage]);
 
   const handlePlatformAuthModeChange = useCallback((mode: 'login' | 'register') => {
     setAuthMode(mode);
     setAuthError('');
     setAuthPassword('');
+    setAuthPasswordConfirm('');
+    setAuthVerificationCode('');
+    setAuthVerificationStatus('');
     window.setTimeout(() => {
       platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
     }, 0);
@@ -1117,6 +1176,10 @@ const HomePage: React.FC = () => {
     setBasicSnapshot(null);
     setBasicRetentionStatus('');
     setBasicRetentionError('');
+    setAuthPassword('');
+    setAuthPasswordConfirm('');
+    setAuthVerificationCode('');
+    setAuthVerificationStatus('');
     resetDashboardState();
   }, [resetDashboardState, setApiKeyMode]);
 
@@ -3004,6 +3067,43 @@ const HomePage: React.FC = () => {
                       placeholder="密码"
                       className="h-8 w-36 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
                     />
+                    {authMode === 'register' ? (
+                      <>
+                        <input
+                          type="password"
+                          name="dsa-platform-password-confirm"
+                          autoComplete="new-password"
+                          value={authPasswordConfirm}
+                          onChange={(event) => setAuthPasswordConfirm(event.target.value)}
+                          data-testid="platform-auth-confirm-password"
+                          placeholder={uiLanguage === 'en' ? 'Confirm' : '确认密码'}
+                          className="h-8 w-36 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          name="dsa-platform-verification-code"
+                          autoComplete="one-time-code"
+                          value={authVerificationCode}
+                          onChange={(event) => setAuthVerificationCode(event.target.value)}
+                          data-testid="platform-auth-verification-code"
+                          placeholder={uiLanguage === 'en' ? 'Code' : '验证码'}
+                          className="h-8 w-24 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          isLoading={authVerificationBusy}
+                          disabled={authVerificationBusy}
+                          onClick={() => void handleRequestRegistrationCode()}
+                          data-testid="platform-auth-send-code"
+                        >
+                          <MailCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                          {uiLanguage === 'en' ? 'Send code' : '发送验证码'}
+                        </Button>
+                      </>
+                    ) : null}
                     <Button
                       type="button"
                       variant="secondary"
@@ -3015,6 +3115,11 @@ const HomePage: React.FC = () => {
                     >
                       {authMode === 'register' ? '注册' : '登录'}
                     </Button>
+                    {authMode === 'register' && authVerificationStatus ? (
+                      <span className="text-success" data-testid="platform-auth-verification-status">
+                        {authVerificationStatus}
+                      </span>
+                    ) : null}
                   </div>
                 </>
               )}

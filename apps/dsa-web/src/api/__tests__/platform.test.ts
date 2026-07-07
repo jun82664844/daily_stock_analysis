@@ -18,6 +18,45 @@ describe('platformApi', () => {
     del.mockReset();
   });
 
+  it('requests a local registration verification code as camelCase', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        email: 'user@example.com',
+        sent: true,
+        expires_in_seconds: 600,
+        dev_code: '123456',
+        message: 'Local verification code generated',
+      },
+    });
+
+    const result = await platformApi.requestRegistrationCode('User@Example.com');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/platform/register/verification-code', {
+      email: 'User@Example.com',
+    });
+    expect(result.email).toBe('user@example.com');
+    expect(result.expiresInSeconds).toBe(600);
+    expect(result.devCode).toBe('123456');
+  });
+
+  it('sends the registration verification code when creating a user', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        user: { id: 2, email: 'user@example.com', role: 'user', plan: 'free', status: 'active' },
+        quota: { user_id: 2, plan: 'free', weekly_limit: 5, used: 0, remaining: 5, period_start: '2026-07-06' },
+      },
+    });
+
+    const result = await platformApi.register('user@example.com', 'password123', '654321');
+
+    expect(post).toHaveBeenCalledWith('/api/v1/platform/register', {
+      email: 'user@example.com',
+      password: 'password123',
+      verificationCode: '654321',
+    });
+    expect(result.user.email).toBe('user@example.com');
+  });
+
   it('loads current user and quota as camelCase', async () => {
     get.mockResolvedValueOnce({
       data: {

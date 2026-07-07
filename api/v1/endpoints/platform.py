@@ -27,6 +27,8 @@ from api.v1.schemas.platform import (
     PlatformLoginRequest,
     PlatformPlanUpdateRequest,
     PlatformQuotaResponse,
+    PlatformRegistrationVerificationRequest,
+    PlatformRegistrationVerificationResponse,
     PlatformRegisterRequest,
     PlatformSnapshotHistorySaveRequest,
     PlatformSnapshotHistorySaveResponse,
@@ -35,6 +37,11 @@ from api.v1.schemas.platform import (
     PlatformWatchlistRefreshResponse,
     PlatformWatchlistResponse,
     PlatformWatchlistUpsertRequest,
+)
+from src.platform_email_verification import (
+    PlatformEmailVerificationService,
+    email_verification_required,
+    registration_dev_code_visible,
 )
 from src.platform_accounts import (
     PLATFORM_SESSION_COOKIE,
@@ -218,6 +225,40 @@ async def platform_status() -> Dict[str, bool]:
     return {"platform_auth_enabled": is_platform_user_auth_enabled()}
 
 
+@router.post("/register/verification-code", response_model=PlatformRegistrationVerificationResponse)
+async def platform_registration_verification_code(
+    request: Request,
+    body: PlatformRegistrationVerificationRequest,
+):
+    if not is_platform_user_auth_enabled():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "platform_auth_disabled", "message": "Platform user auth is disabled"},
+        )
+    limited = check_platform_rate_limit(request, "register_verification")
+    if limited is not None:
+        return limited
+
+    verification_service = PlatformEmailVerificationService()
+    try:
+        code = verification_service.request_registration_code(body.email)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": "invalid_request", "message": str(exc)})
+
+    _audit(
+        user_id=None,
+        action="platform_registration_verification_requested",
+        metadata={"email": code.email, "delivery": "local_dev"},
+    )
+    return {
+        "email": code.email,
+        "sent": True,
+        "expires_in_seconds": code.expires_in_seconds,
+        "dev_code": code.code if registration_dev_code_visible() else None,
+        "message": "Local verification code generated. Production email delivery is not enabled.",
+    }
+
+
 @router.post("/register", response_model=PlatformAuthResponse)
 async def platform_register(request: Request, body: PlatformRegisterRequest):
     if not is_platform_user_auth_enabled():
@@ -228,6 +269,20 @@ async def platform_register(request: Request, body: PlatformRegisterRequest):
     limited = check_platform_rate_limit(request, "register")
     if limited is not None:
         return limited
+
+    verification_code = (body.verification_code or "").strip()
+    if email_verification_required() and not verification_code:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "verification_required", "message": "Email verification code is required"},
+        )
+    if verification_code:
+        verification_service = PlatformEmailVerificationService()
+        if not verification_service.verify_registration_code(body.email, verification_code):
+            return JSONResponse(
+                status_code=400,
+                content={"error": "invalid_verification_code", "message": "Invalid or expired verification code"},
+            )
 
     service = PlatformAccountService()
     try:

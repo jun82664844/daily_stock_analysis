@@ -284,16 +284,37 @@ export interface PlatformSnapshotHistorySaveResponse {
   aiUsed: boolean;
 }
 
+export interface PlatformRegistrationVerificationResponse {
+  email: string;
+  sent: boolean;
+  expiresInSeconds: number;
+  devCode?: string | null;
+  message: string;
+}
+
 export const platformApi = {
   status: async (): Promise<{ platformAuthEnabled: boolean }> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/status');
     return toCamelCase<{ platformAuthEnabled: boolean }>(response.data);
   },
 
-  register: async (email: string, password: string): Promise<PlatformAuthPayload> => {
-    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/register', {
+  requestRegistrationCode: async (email: string): Promise<PlatformRegistrationVerificationResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/register/verification-code', {
+      email,
+    });
+    return toCamelCase<PlatformRegistrationVerificationResponse>(response.data);
+  },
+
+  register: async (email: string, password: string, verificationCode?: string): Promise<PlatformAuthPayload> => {
+    const payload: { email: string; password: string; verificationCode?: string } = {
       email,
       password,
+    };
+    if (verificationCode) {
+      payload.verificationCode = verificationCode;
+    }
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/register', {
+      ...payload,
     });
     emitPlatformSessionChanged();
     return toCamelCase<PlatformAuthPayload>(response.data);
