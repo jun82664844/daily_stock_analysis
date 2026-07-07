@@ -389,6 +389,24 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   if (match) return '过期或缓存数据只作临时参考，解读变化前请先刷新。';
   match = text.match(/^Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details\.$/);
   if (match) return '高级版可增加实时公告、资金流历史、研报 PDF、板块联动和龙虎榜席位明细。';
+  match = text.match(/^(.+?) has no usable sector tags yet; later versions can add Eastmoney concepts and industry mapping\.$/);
+  if (match) return `${match[1]} 暂无可用板块标签；可切换数据源或刷新公司资料后再做同类股对比。`;
+  match = text.match(/^Refresh profile data or enable sector sources before comparing peers\.$/);
+  if (match) return '缺少板块标签时，先用行情、估值和公告通道做基础判断，不要直接做同业强弱结论。';
+  match = text.match(/^(.+?) keeps a reserved CNINFO \/ TDX F10 announcements lane; quick mode shows the checklist entry only\.$/);
+  if (match) return `${match[1]} 已预留公告通道；快速模式只展示检查清单，深度模式可展开公告原文和来源链接。`;
+  match = text.match(/^(.+?) keeps a reserved Eastmoney fund-flow lane\. Current change is (.+?)\.$/);
+  if (match) return `${match[1]} 已预留东方财富资金流通道；当前涨跌幅 ${match[2]}。`;
+  match = text.match(/^(.+?) keeps a reserved Eastmoney fund-flow lane\.$/);
+  if (match) return `${match[1]} 已预留东方财富资金流通道。`;
+  match = text.match(/^(.+?) keeps a reserved Eastmoney \/ iFinD research lane; free quick mode does not fetch PDFs\.$/);
+  if (match) return `${match[1]} 已预留研报通道；免费快速模式不拉取 PDF。`;
+  match = text.match(/^(.+?) keeps a reserved dragon-tiger seat lane; seat details are not fetched in quick mode\.$/);
+  if (match) return `${match[1]} 已预留龙虎榜席位通道；快速模式不拉取席位明细。`;
+  match = text.match(/^Deep mode can fetch research sources by symbol and industry\.$/);
+  if (match) return '深度模式可按代码和行业拉取研报来源。';
+  match = text.match(/^Fetch seat details only after unusual moves or limit-up events to reduce source pressure\.$/);
+  if (match) return '出现异动或涨跌停后再拉取席位明细，减少数据源压力。';
 
   match = text.match(/^(.+?) signal is ([0-9.]+)\/100 from trend, volume, data freshness, and profile completeness\. No AI or public search was used\.$/);
   if (match) return `${match[1]} 信号评分为 ${match[2]}/100，来自趋势、量价、数据新鲜度和资料完整度；未使用 AI 或公共搜索。`;
@@ -780,6 +798,17 @@ const normalizeAShareSourceMode = (value: unknown): AShareSourceMode => (
   value === 'a_stock_data' || value === 'off' ? value : 'poc'
 );
 
+const shouldApplyAShareSourceMode = (value: string): boolean => {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) {
+    return false;
+  }
+  if (/^\d{6}(\.(SH|SZ|SS))?$/.test(normalized)) {
+    return true;
+  }
+  return /[\u4e00-\u9fff]/.test(normalized);
+};
+
 const aShareSourceModeLabel = (mode: AShareSourceMode, language: string): string => {
   const isEnglish = language === 'en';
   if (mode === 'a_stock_data') return isEnglish ? 'a-stock-data' : 'a-stock-data适配';
@@ -1112,7 +1141,7 @@ const HomePage: React.FC = () => {
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [basicSnapshot, setBasicSnapshot] = useState<BasicStockSnapshot | null>(null);
-  const [aShareSourceMode, setAShareSourceMode] = useState<AShareSourceMode>('poc');
+  const [aShareSourceMode, setAShareSourceMode] = useState<AShareSourceMode>('a_stock_data');
   const [autocompleteCloseSignal, setAutocompleteCloseSignal] = useState(0);
   const restoredHistoryCenterFiltersRef = useRef(false);
   const appliedInitialHistoryCenterFiltersRef = useRef(false);
@@ -2195,7 +2224,7 @@ const HomePage: React.FC = () => {
       if (forceRefresh) {
         options.refresh = true;
       }
-      if (selectedAShareSourceMode !== 'poc') {
+      if (selectedAShareSourceMode !== 'poc' && shouldApplyAShareSourceMode(target)) {
         options.aShareSourceMode = selectedAShareSourceMode;
       }
       const snapshot = Object.keys(options).length > 0

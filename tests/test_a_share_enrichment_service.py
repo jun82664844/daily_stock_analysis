@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import sys
 import unittest
+from unittest.mock import patch
 
 
 class AShareEnrichmentServiceTestCase(unittest.TestCase):
@@ -162,6 +164,16 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         self.assertTrue(all(url.startswith("a-stock-data://") for url, _params in calls))
         self.assertEqual({params["code"] for _url, params in calls}, {"600519"})
 
+    def test_a_stock_data_source_mode_uses_longer_default_timeout_than_local_poc(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        with patch.dict("os.environ", {}, clear=True):
+            poc = AShareEnrichmentService(source_mode="poc", http_enabled=False)
+            real = AShareEnrichmentService(source_mode="a_stock_data", http_enabled=False)
+
+        self.assertEqual(poc.timeout_seconds, 1.2)
+        self.assertEqual(real.timeout_seconds, 2.5)
+
     def test_a_stock_data_source_mode_reuses_stale_cache_during_rate_limit(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService
 
@@ -205,12 +217,256 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         ).get_enrichment("600519", stock_name="Kweichow Moutai")
 
         by_category = {item["category"]: item for item in payload["channels"]}
+        expected_titles = {
+            "announcements": "公告通道",
+            "capital_flow": "资金流通道",
+            "sector": "板块通道",
+            "research": "研报通道",
+            "dragon_tiger": "龙虎榜通道",
+        }
+        for category, title in expected_titles.items():
+            self.assertEqual(by_category[category]["title"], title)
         self.assertEqual(payload["status"], "degraded")
         self.assertEqual(by_category["research"]["status"], "degraded")
         self.assertEqual(by_category["announcements"]["status"], "available")
         self.assertEqual(payload["diagnostics"]["errors"], {"research": "TimeoutError"})
         self.assertFalse(payload["ai_used"])
         self.assertFalse(payload["public_search_used"])
+
+    def test_default_a_stock_data_adapter_builds_useful_channels_from_public_payloads(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        calls: list[tuple[str, str, dict]] = []
+
+        class FakeResponse:
+            def __init__(self, payload: dict) -> None:
+                self._payload = payload
+                self.status_code = 200
+                self.content = b"{}"
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return self._payload
+
+        class FakeRequests:
+            @staticmethod
+            def get(url: str, params=None, headers=None, timeout=None):
+                calls.append(("GET", url, params or {}))
+                if "szse_stock.json" in url:
+                    return FakeResponse({"stockList": [{"code": "600519", "orgId": "gssx0600519"}]})
+                if "stock/fflow/kline/get" in url:
+                    return FakeResponse(
+                        {
+                            "data": {
+                                "klines": [
+                                    "2026-07-07 14:58,-1200000,200000,300000,-400000,-500000",
+                                    "2026-07-07 14:59,-800000,100000,200000,-300000,-400000",
+                                ]
+                            }
+                        }
+                    )
+                if "slist/get" in url:
+                    return FakeResponse(
+                        {
+                            "data": {
+                                "diff": [
+                                    {"f14": "白酒", "f12": "BK0477", "f3": -1.2, "f128": "贵州茅台"},
+                                    {"f14": "贵州板块", "f12": "BK0159", "f3": -0.6, "f128": "中航重机"},
+                                ]
+                            }
+                        }
+                    )
+                if "report/list" in url:
+                    return FakeResponse(
+                        {
+                            "data": [
+                                {
+                                    "title": "贵州茅台跟踪报告：渠道库存保持健康",
+                                    "emRatingName": "买入",
+                                    "orgSName": "中信证券",
+                                    "publishDate": "2026-07-07 08:00:00",
+                                }
+                            ]
+                        }
+                    )
+                if "datacenter-web.eastmoney.com" in url:
+                    return FakeResponse(
+                        {
+                            "result": {
+                                "data": [
+                                    {
+                                        "TRADE_DATE": "2026-07-06 00:00:00",
+                                        "EXPLANATION": "日价格振幅达到15%",
+                                        "BILLBOARD_NET_AMT": 33000000,
+                                        "TURNOVERRATE": 8.5,
+                                    }
+                                ]
+                            }
+                        }
+                    )
+                raise AssertionError(f"unexpected GET {url}")
+
+            @staticmethod
+            def post(url: str, data=None, params=None, headers=None, timeout=None):
+                calls.append(("POST", url, data or params or {}))
+                if "hisAnnouncement/query" in url:
+                    return FakeResponse(
+                        {
+                            "announcements": [
+                                {
+                                    "announcementTitle": "2025年年度权益分派实施公告",
+                                    "announcementTypeName": "分红",
+                                    "announcementTime": 1783382400000,
+                                    "announcementId": "123456",
+                                }
+                            ]
+                        }
+                    )
+                raise AssertionError(f"unexpected POST {url}")
+
+        with patch.dict(sys.modules, {"requests": FakeRequests}):
+            payload = AShareEnrichmentService(
+                source_mode="a_stock_data",
+                http_enabled=True,
+                min_interval_seconds=0,
+            ).get_enrichment(
+                "600519.SH",
+                stock_name="贵州茅台",
+                profile={"sector": "消费", "industry": "白酒"},
+                quote={"current_price": 1188.8, "change_percent": -1.5},
+            )
+
+        self.assertEqual(payload["source"], "a_stock_data_skill_adapter")
+        self.assertEqual(payload["status"], "available")
+        by_category = {item["category"]: item for item in payload["channels"]}
+        self.assertIn("2025年年度权益分派实施公告", by_category["announcements"]["summary"])
+        self.assertIn("主力资金", by_category["capital_flow"]["summary"])
+        self.assertIn("-2M", by_category["capital_flow"]["summary"])
+        self.assertIn("白酒", by_category["sector"]["summary"])
+        self.assertIn("当前背景", by_category["sector"]["summary"])
+        self.assertNotIn("current context", by_category["sector"]["summary"])
+        self.assertIn("贵州茅台跟踪报告", by_category["research"]["summary"])
+        self.assertIn("2026-07-06", by_category["dragon_tiger"]["summary"])
+        self.assertTrue(any("push2.eastmoney.com/api/qt/stock/fflow/kline/get" in url for _method, url, _params in calls))
+        self.assertTrue(any("www.cninfo.com.cn/new/hisAnnouncement/query" in url for _method, url, _params in calls))
+        self.assertFalse(payload["ai_used"])
+        self.assertFalse(payload["public_search_used"])
+
+    def test_checked_empty_fund_flow_reports_clear_degradation_not_reserved_lane(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/capital_flow"):
+                return {"checked": True, "items": []}
+            if url.endswith("/sector"):
+                return {"checked": True, "concepts": ["白酒"], "industry": "食品饮料"}
+            if url.endswith("/announcements"):
+                return {"checked": True, "items": []}
+            if url.endswith("/research"):
+                return {"checked": True, "items": []}
+            if url.endswith("/dragon_tiger"):
+                return {"checked": True, "items": []}
+            return {}
+
+        payload = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            min_interval_seconds=0,
+        ).get_enrichment("600519", stock_name="贵州茅台", quote={"change_percent": -1.5})
+
+        fund_flow = {item["category"]: item for item in payload["channels"]}["capital_flow"]
+        self.assertEqual(fund_flow["status"], "degraded")
+        self.assertIn("资金流通道已查询", fund_flow["summary"])
+        self.assertNotIn("reserved Eastmoney", fund_flow["summary"])
+
+    def test_default_adapter_timeout_keeps_checked_channel_copy(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        class FakeRequests:
+            @staticmethod
+            def get(url: str, params=None, headers=None, timeout=None):
+                if "report/list" in url:
+                    raise TimeoutError("research timeout")
+                raise TimeoutError("skip other channels")
+
+            @staticmethod
+            def post(url: str, data=None, params=None, headers=None, timeout=None):
+                raise TimeoutError("skip other channels")
+
+        with patch.dict(sys.modules, {"requests": FakeRequests}):
+            payload = AShareEnrichmentService(
+                source_mode="a_stock_data",
+                http_enabled=True,
+                min_interval_seconds=0,
+            ).get_enrichment("600519", stock_name="贵州茅台")
+
+        by_category = {item["category"]: item for item in payload["channels"]}
+        self.assertIn("research", by_category)
+        research = by_category["research"]
+        self.assertIn("已查询研报通道", research["summary"])
+        self.assertNotIn("reserved Eastmoney", research["summary"])
+
+    def test_cninfo_fallback_uses_sse_gssh_orgid_for_shanghai_codes(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        posted: list[dict] = []
+
+        class FakeResponse:
+            def __init__(self, payload: dict) -> None:
+                self._payload = payload
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return self._payload
+
+        class FakeRequests:
+            @staticmethod
+            def get(url: str, params=None, headers=None, timeout=None):
+                return FakeResponse({"stockList": []})
+
+            @staticmethod
+            def post(url: str, data=None, params=None, headers=None, timeout=None):
+                posted.append(data or {})
+                return FakeResponse(
+                    {
+                        "announcements": [
+                            {
+                                "announcementTitle": "贵州茅台2025年年度权益分派实施公告",
+                                "announcementTime": 1782057600000,
+                                "announcementId": "123456",
+                            }
+                        ]
+                    }
+                )
+
+        payload = AShareEnrichmentService()._fetch_cninfo_announcements(FakeRequests, "600519", timeout=1)
+
+        self.assertEqual(posted[0]["stock"], "600519,gssh0600519")
+        self.assertEqual(payload["items"][0]["title"], "贵州茅台2025年年度权益分派实施公告")
+
+    def test_sector_channel_uses_moutai_local_fallback_when_public_source_empty(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/sector"):
+                return {"checked": True, "concepts": [], "industry": ""}
+            return {"checked": True, "items": []}
+
+        payload = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            min_interval_seconds=0,
+        ).get_enrichment("600519", stock_name="贵州茅台")
+
+        sector = {item["category"]: item for item in payload["channels"]}["sector"]
+        self.assertEqual(sector["status"], "available")
+        self.assertIn("白酒", sector["summary"])
+        self.assertIn("消费", sector["summary"])
+        self.assertNotIn("no usable sector tags", sector["summary"])
 
 
 if __name__ == "__main__":

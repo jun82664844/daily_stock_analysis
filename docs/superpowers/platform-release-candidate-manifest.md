@@ -1125,3 +1125,41 @@ Review boundary:
 - Probe queries remain no-AI and no-public-search.
 - UI diagnostics must remain secret-safe.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V62 A-Stock-Data Useful Data Manifest Addendum
+
+Status: local-only useful-data upgrade for the A-share `a-stock-data` adapter. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `scripts/verify_platform_a_stock_data_useful_v62.py`
+- `tests/test_platform_a_stock_data_useful_v62.py`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-07-dsa-v62-a-stock-data-useful.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_A_STOCK_DATA_USEFUL_V62_OK`
+
+Suggested review/commit position:
+
+- After V61 A-stock-data UI source control and before any paid data-source, production data licensing, or public deployment work.
+
+Rollback note:
+
+- Reverting this slice removes the public-source parser mapping, checked degraded channel copy, Shanghai CNINFO `gssh0{code}` fallback, common A-share sector fallback tags, the `a_stock_data` 2.5s default timeout, A-share default source-mode preference, V62 verifier, and V62 docs. V59/V60/V61 remain available if their slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search.
+- Empty or failed public-source channels must be explicit degraded cards.
+- Non-A-share inputs must not be routed through A-share source mode.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

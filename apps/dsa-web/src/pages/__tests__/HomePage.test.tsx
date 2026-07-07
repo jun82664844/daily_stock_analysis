@@ -746,7 +746,9 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
 
     await waitFor(() => {
-      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519.SH');
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519.SH', {
+        aShareSourceMode: 'a_stock_data',
+      });
     });
 
     const freeReport = await screen.findByTestId('basic-query-free-report');
@@ -1008,7 +1010,9 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
 
     await waitFor(() => {
-      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519.SH');
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519.SH', {
+        aShareSourceMode: 'a_stock_data',
+      });
     });
 
     const aShareEnrichment = await screen.findByTestId('basic-query-a-share-enrichment');
@@ -1444,7 +1448,10 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByTestId('history-report-refresh-current'));
 
     await waitFor(() => {
-      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519', { refresh: true });
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('600519', {
+        refresh: true,
+        aShareSourceMode: 'a_stock_data',
+      });
     });
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('1,688');

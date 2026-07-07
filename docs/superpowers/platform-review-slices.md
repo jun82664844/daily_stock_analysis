@@ -917,3 +917,32 @@ Review focus:
 - Probe buttons for `600519` and `000001` must use refreshed no-AI snapshots and the selected source mode.
 - `scripts/verify_platform_a_stock_data_ui_v61.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_UI_V61_OK` only when the V61 markers are present.
 - V61 remains local-only, not real payment, not production deployment, not market-data licensing approval, and not investment advice.
+
+## V62 A-Stock-Data Useful Data Addendum
+
+Purpose: make the A-share free snapshot visibly useful by mapping the local `a-stock-data` adapter to public-source parsers for CNINFO announcements and Eastmoney fund-flow, sector, research, and dragon-tiger checks. The HomePage default applies this source mode only for A-share inputs.
+
+Files:
+
+- `.gitignore`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `scripts/verify_platform_a_stock_data_useful_v62.py`
+- `tests/test_platform_a_stock_data_useful_v62.py`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-07-dsa-v62-a-stock-data-useful.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V62 remains local-only and does not approve production deployment, real payment, market-data redistribution, or investment advice.
+- Quick mode must remain `ai_used=false` and `public_search_used=false`.
+- A failed or empty upstream channel must remain visible as a checked degraded card, not a vague reserved-lane placeholder.
+- Shanghai CNINFO fallback must use `gssh0{code}`, and 600519 / 贵州茅台 keeps useful local sector fallback tags if the public sector endpoint is empty or slow.
+- `a_stock_data` mode may use a 2.5s default timeout for real public endpoints; local POC mode keeps the 1.2s fast fallback.
+- HomePage should default A-share inputs to `a_stock_data` but must not route AAPL/BTC/HK symbols through the A-share source mode.
+- `scripts/verify_platform_a_stock_data_useful_v62.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_USEFUL_V62_OK` only when the V62 markers are present.

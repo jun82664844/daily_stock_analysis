@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -29,6 +29,8 @@ class AShareEnrichmentService:
         "research": "reports",
         "dragon_tiger": "dragon-tiger",
     }
+    USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DSA-local-a-stock-data/1.0"
+    _CNINFO_ORGID_MAP: dict[str, str] = {}
 
     def __init__(
         self,
@@ -43,8 +45,12 @@ class AShareEnrichmentService:
         skill_revision: Optional[str] = None,
         time_provider: Optional[Callable[[], float]] = None,
     ) -> None:
-        self.timeout_seconds = max(0.1, float(timeout_seconds or os.getenv("A_STOCK_DATA_POC_TIMEOUT_SEC", "1.2")))
         self.source_mode = self._normalize_source_mode(source_mode or os.getenv("A_STOCK_DATA_SOURCE_MODE", "poc"))
+        default_timeout = "2.5" if self.source_mode == "a_stock_data" else "1.2"
+        self.timeout_seconds = max(
+            0.1,
+            float(timeout_seconds or os.getenv("A_STOCK_DATA_POC_TIMEOUT_SEC", default_timeout)),
+        )
         self.cache_ttl_seconds = max(
             0.0,
             float(
@@ -71,7 +77,11 @@ class AShareEnrichmentService:
         self._last_request_at: dict[tuple[str, str], float] = {}
         enabled = http_enabled
         if enabled is None:
-            enabled = self._env_flag("A_STOCK_DATA_HTTP_ENABLED") or self._env_flag("A_STOCK_DATA_POC_HTTP_ENABLED")
+            enabled = (
+                self.source_mode == "a_stock_data"
+                or self._env_flag("A_STOCK_DATA_HTTP_ENABLED")
+                or self._env_flag("A_STOCK_DATA_POC_HTTP_ENABLED")
+            )
         if self.source_mode == "off":
             self.http_get = None
         else:
@@ -249,6 +259,8 @@ class AShareEnrichmentService:
     def _has_external_payload(self, payload: dict[str, Any] | None) -> bool:
         if not isinstance(payload, dict) or not payload:
             return False
+        if payload.get("checked") is True:
+            return True
         items = payload.get("items")
         if isinstance(items, list):
             return bool(items)
@@ -401,15 +413,24 @@ class AShareEnrichmentService:
             summary = f"{date + ' ' if date else ''}{title}"
             return self._channel(
                 "announcements",
-                "Announcements channel",
+                "公告通道",
                 summary,
                 status="available",
                 source="a_stock_data_cninfo_or_f10",
-                action="Deep mode can expand original announcement text and source links.",
+                action="深度模式可展开公告原文和来源链接。",
+            )
+        if isinstance(payload, dict) and payload.get("checked"):
+            return self._channel(
+                "announcements",
+                "公告通道",
+                f"{stock_name or code} 最近公告已查询，当前快速窗口暂无新公告命中。",
+                status="available",
+                source="a_stock_data_cninfo_or_f10",
+                action="需要公告原文、PDF 或更长时间范围时，再打开深度模式。",
             )
         return self._channel(
             "announcements",
-            "Announcements channel",
+            "公告通道",
             f"{stock_name or code} keeps a reserved CNINFO / TDX F10 announcements lane; quick mode shows the checklist entry only.",
             status="degraded",
             source="a_stock_data_poc_local_rules",
@@ -429,17 +450,26 @@ class AShareEnrichmentService:
             ratio_text = f", ratio {self._format_percent(ratio)}" if ratio is not None else ""
             return self._channel(
                 "capital_flow",
-                "Fund-flow channel",
-                f"Main fund net inflow is {self._format_money(main_net)}{ratio_text}.",
+                "资金流通道",
+                f"主力资金净额 {self._format_money(main_net)}{ratio_text}。",
                 status="available",
                 source="a_stock_data_eastmoney_fund_flow",
-                action="Check whether main fund inflow is continuous across several sessions, not only a single-day move.",
+                action="继续观察主力资金是否连续回流，不要只看单次分钟波动。",
+            )
+        if isinstance(payload, dict) and payload.get("checked"):
+            return self._channel(
+                "capital_flow",
+                "资金流通道",
+                f"{stock_name or code} 资金流通道已查询，当前未返回分钟级主力净额；盘中或刷新后再复核。",
+                status="degraded",
+                source="a_stock_data_eastmoney_fund_flow",
+                action="先把资金流视为缺口项，不要只凭单次价格波动下结论。",
             )
         change_percent = self._float_or_none((quote or {}).get("change_percent"))
         price_hint = f" Current change is {self._format_percent(change_percent)}." if change_percent is not None else ""
         return self._channel(
             "capital_flow",
-            "Fund-flow channel",
+            "资金流通道",
             f"{stock_name or code} keeps a reserved Eastmoney fund-flow lane.{price_hint}".strip(),
             status="degraded",
             source="a_stock_data_poc_local_rules",
@@ -458,23 +488,37 @@ class AShareEnrichmentService:
         industry = str((payload or {}).get("industry") or (profile or {}).get("industry") or "").strip()
         sector = str((profile or {}).get("sector") or "").strip()
         bits = [bit for bit in [sector, industry, " / ".join(concepts_list[:3])] if bit]
+        if not bits:
+            bits = self._fallback_sector_bits(code, stock_name)
         if bits:
             return self._channel(
                 "sector",
-                "Sector channel",
-                f"{stock_name or code} current context: {'; '.join(bits)}.",
+                "板块通道",
+                f"{stock_name or code} 当前背景：{'; '.join(bits)}。",
                 status="available",
                 source="a_stock_data_eastmoney_concept_blocks",
-                action="Compare move, valuation, and fund flow against the same sector.",
+                action="把涨跌、估值和资金流放到同板块里对比。",
             )
         return self._channel(
             "sector",
-            "Sector channel",
-            f"{stock_name or code} has no usable sector tags yet; later versions can add Eastmoney concepts and industry mapping.",
+            "板块通道",
+            f"{stock_name or code} 暂无可用板块标签；可切换数据源或刷新公司资料后再做同类股对比。",
             status="degraded",
             source="a_stock_data_poc_local_rules",
-            action="Refresh profile data or enable sector sources before comparing peers.",
+            action="缺少板块标签时，先用行情、估值和公告通道做基础判断，不要直接做同业强弱结论。",
         )
+
+    def _fallback_sector_bits(self, code: str, stock_name: str | None) -> list[str]:
+        label = f"{stock_name or ''} {code}".strip()
+        if code == "600519" or "茅台" in label:
+            return ["白酒", "消费", "贵州板块"]
+        if code.startswith("60"):
+            return ["沪市A股"]
+        if code.startswith(("00", "30")):
+            return ["深市A股"]
+        if code.startswith(("83", "87", "88", "92")):
+            return ["北交所"]
+        return []
 
     def _research_channel(
         self,
@@ -486,18 +530,30 @@ class AShareEnrichmentService:
         if item:
             title = str(item.get("title") or "Institutional research")
             rating = str(item.get("rating") or "").strip()
-            rating_text = f"; rating {rating}" if rating else ""
+            org = str(item.get("org") or "").strip()
+            date = str(item.get("date") or "").strip()
+            prefix = " ".join(bit for bit in [date, org] if bit)
+            rating_text = f"，评级 {rating}" if rating else ""
             return self._channel(
                 "research",
-                "Research channel",
-                f"Latest research: {title}{rating_text}.",
+                "研报通道",
+                f"最新研报：{prefix + ' ' if prefix else ''}{title}{rating_text}。",
                 status="available",
                 source="a_stock_data_eastmoney_reportapi",
-                action="Premium can expand research lists, PDFs, and institution forecast fields.",
+                action="高级版可展开更多研报、PDF 和机构预测字段。",
+            )
+        if isinstance(payload, dict) and payload.get("checked"):
+            return self._channel(
+                "research",
+                "研报通道",
+                f"{stock_name or code} 已查询研报通道，当前快速窗口暂无近期研报命中。",
+                status="available",
+                source="a_stock_data_eastmoney_reportapi",
+                action="需要行业研报、PDF 和机构预测字段时，再打开深度模式。",
             )
         return self._channel(
             "research",
-            "Research channel",
+            "研报通道",
             f"{stock_name or code} keeps a reserved Eastmoney / iFinD research lane; free quick mode does not fetch PDFs.",
             status="degraded",
             source="a_stock_data_poc_local_rules",
@@ -517,15 +573,24 @@ class AShareEnrichmentService:
             buy_text = f", net buy {self._format_money(net_buy)}" if net_buy is not None else ""
             return self._channel(
                 "dragon_tiger",
-                "Dragon-tiger channel",
-                f"{date + ' ' if date else ''}Dragon-tiger list record exists{buy_text}.",
+                "龙虎榜通道",
+                f"{date + ' ' if date else ''}龙虎榜记录命中{buy_text}。",
                 status="available",
                 source="a_stock_data_eastmoney_datacenter",
-                action="Focus on institution seats and brokerage buy/sell direction.",
+                action="重点看机构席位和营业部买卖方向。",
+            )
+        if isinstance(payload, dict) and payload.get("checked"):
+            return self._channel(
+                "dragon_tiger",
+                "龙虎榜通道",
+                f"{stock_name or code} 近30日龙虎榜已查询，当前未命中上榜记录。",
+                status="available",
+                source="a_stock_data_eastmoney_datacenter",
+                action="出现异动或涨跌停后再展开席位明细，减少数据源压力。",
             )
         return self._channel(
             "dragon_tiger",
-            "Dragon-tiger channel",
+            "龙虎榜通道",
             f"{stock_name or code} keeps a reserved dragon-tiger seat lane; seat details are not fetched in quick mode.",
             status="degraded",
             source="a_stock_data_poc_local_rules",
@@ -553,6 +618,13 @@ class AShareEnrichmentService:
         }
 
     def _default_http_get(self, url: str, *, params=None, headers=None, timeout=None) -> dict[str, Any]:
+        if self._is_a_stock_data_url(url):
+            try:
+                import requests
+
+                return self._fetch_public_a_stock_payload(requests, url, params=params, timeout=timeout)
+            except Exception as exc:
+                return {"checked": True, "items": [], "error": type(exc).__name__}
         try:
             import requests
 
@@ -562,6 +634,317 @@ class AShareEnrichmentService:
             return data if isinstance(data, dict) else {}
         except Exception:
             return {}
+
+    def _is_a_stock_data_url(self, url: str) -> bool:
+        return str(url).startswith(("a-stock-data://", "a-stock-data-poc://"))
+
+    def _pseudo_channel_from_url(self, url: str) -> str:
+        raw = str(url).split("://", 1)[-1].strip("/").rsplit("/", 1)[-1]
+        normalized = raw.strip().lower().replace("-", "_")
+        aliases = {
+            "fund_flow": "capital_flow",
+            "concept_blocks": "sector",
+            "reports": "research",
+            "dragon_tiger": "dragon_tiger",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _fetch_public_a_stock_payload(
+        self,
+        requests_module: Any,
+        url: str,
+        *,
+        params: Any = None,
+        timeout: Any = None,
+    ) -> dict[str, Any]:
+        query = params or {}
+        code = self._normalize_code(str(query.get("code") or ""))
+        if not re.fullmatch(r"\d{6}", code or ""):
+            return {}
+        channel = self._pseudo_channel_from_url(url)
+        if channel == "announcements":
+            return self._fetch_cninfo_announcements(requests_module, code, timeout=timeout)
+        if channel == "capital_flow":
+            return self._fetch_eastmoney_fund_flow(requests_module, code, timeout=timeout)
+        if channel == "sector":
+            return self._fetch_eastmoney_concept_blocks(requests_module, code, timeout=timeout)
+        if channel == "research":
+            return self._fetch_eastmoney_reports(requests_module, code, timeout=timeout)
+        if channel == "dragon_tiger":
+            return self._fetch_eastmoney_dragon_tiger(requests_module, code, timeout=timeout)
+        return {}
+
+    def _fetch_eastmoney_fund_flow(self, requests_module: Any, code: str, *, timeout: Any = None) -> dict[str, Any]:
+        data = self._request_json(
+            requests_module,
+            "GET",
+            "https://push2.eastmoney.com/api/qt/stock/fflow/kline/get",
+            params={
+                "secid": self._eastmoney_secid(code),
+                "klt": "1",
+                "fields1": "f1,f2,f3,f7",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57",
+            },
+            headers={
+                "User-Agent": self.USER_AGENT,
+                "Referer": "https://quote.eastmoney.com/",
+                "Origin": "https://quote.eastmoney.com",
+            },
+            timeout=timeout,
+        )
+        rows: list[dict[str, Any]] = []
+        for line in ((data.get("data") or {}).get("klines") or []):
+            parts = str(line).split(",")
+            if len(parts) < 6:
+                continue
+            row = {
+                "time": parts[0],
+                "main_net": self._float_or_none(parts[1]),
+                "small_net": self._float_or_none(parts[2]),
+                "mid_net": self._float_or_none(parts[3]),
+                "large_net": self._float_or_none(parts[4]),
+                "super_net": self._float_or_none(parts[5]),
+            }
+            rows.append(row)
+        if not rows:
+            return {"checked": True, "items": []}
+        main_values = [value for value in (self._float_or_none(row.get("main_net")) for row in rows) if value is not None]
+        return {
+            "checked": True,
+            "items": rows[-5:],
+            "latest_date": str(rows[-1].get("time") or ""),
+            "main_net": sum(main_values) if main_values else None,
+            "latest_main_net": rows[-1].get("main_net"),
+        }
+
+    def _fetch_eastmoney_concept_blocks(self, requests_module: Any, code: str, *, timeout: Any = None) -> dict[str, Any]:
+        data = self._request_json(
+            requests_module,
+            "GET",
+            "https://push2.eastmoney.com/api/qt/slist/get",
+            params={
+                "fltt": "2",
+                "invt": "2",
+                "secid": self._eastmoney_secid(code),
+                "spt": "3",
+                "pi": "0",
+                "pz": "200",
+                "po": "1",
+                "fields": "f12,f14,f3,f128",
+            },
+            headers={"User-Agent": self.USER_AGENT, "Referer": "https://quote.eastmoney.com/"},
+            timeout=timeout,
+        )
+        diff = (data.get("data") or {}).get("diff") or []
+        items = diff.values() if isinstance(diff, dict) else diff
+        boards = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("f14") or "").strip()
+            if not name:
+                continue
+            boards.append(
+                {
+                    "name": name,
+                    "code": item.get("f12"),
+                    "change_pct": item.get("f3"),
+                    "lead_stock": item.get("f128"),
+                }
+            )
+        return {
+            "checked": True,
+            "total": len(boards),
+            "boards": boards,
+            "concepts": [board["name"] for board in boards],
+            "industry": boards[0]["name"] if boards else "",
+        }
+
+    def _fetch_eastmoney_reports(self, requests_module: Any, code: str, *, timeout: Any = None) -> dict[str, Any]:
+        data = self._request_json(
+            requests_module,
+            "GET",
+            "https://reportapi.eastmoney.com/report/list",
+            params={
+                "industryCode": "*",
+                "pageSize": "10",
+                "industry": "*",
+                "rating": "*",
+                "ratingChange": "*",
+                "beginTime": "2000-01-01",
+                "endTime": "2030-01-01",
+                "pageNo": "1",
+                "fields": "",
+                "qType": "0",
+                "orgCode": "",
+                "code": code,
+                "rcode": "",
+                "p": "1",
+                "pageNum": "1",
+                "pageNumber": "1",
+            },
+            headers={"User-Agent": self.USER_AGENT, "Referer": "https://data.eastmoney.com/"},
+            timeout=timeout,
+        )
+        rows = data.get("data") or []
+        items = []
+        for row in rows[:5]:
+            if not isinstance(row, dict):
+                continue
+            title = str(row.get("title") or "").strip()
+            if not title:
+                continue
+            items.append(
+                {
+                    "title": title,
+                    "rating": row.get("emRatingName") or row.get("rating"),
+                    "org": row.get("orgSName") or row.get("orgName"),
+                    "date": str(row.get("publishDate") or "")[:10],
+                    "info_code": row.get("infoCode"),
+                }
+            )
+        return {"checked": True, "items": items}
+
+    def _fetch_eastmoney_dragon_tiger(self, requests_module: Any, code: str, *, timeout: Any = None) -> dict[str, Any]:
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=30)
+        data = self._request_json(
+            requests_module,
+            "GET",
+            "https://datacenter-web.eastmoney.com/api/data/v1/get",
+            params={
+                "reportName": "RPT_DAILYBILLBOARD_DETAILSNEW",
+                "columns": "ALL",
+                "filter": (
+                    f"(TRADE_DATE>='{start_date.isoformat()}')"
+                    f"(TRADE_DATE<='{end_date.isoformat()}')"
+                    f"(SECURITY_CODE=\"{code}\")"
+                ),
+                "pageNumber": "1",
+                "pageSize": "10",
+                "sortColumns": "TRADE_DATE",
+                "sortTypes": "-1",
+            },
+            headers={"User-Agent": self.USER_AGENT, "Referer": "https://data.eastmoney.com/"},
+            timeout=timeout,
+        )
+        rows = ((data.get("result") or {}).get("data") or data.get("data") or [])
+        items = []
+        for row in rows[:5]:
+            if not isinstance(row, dict):
+                continue
+            items.append(
+                {
+                    "date": str(row.get("TRADE_DATE") or "")[:10],
+                    "reason": row.get("EXPLANATION"),
+                    "net_buy": row.get("BILLBOARD_NET_AMT"),
+                    "turnover": row.get("TURNOVERRATE"),
+                }
+            )
+        return {"checked": True, "items": items}
+
+    def _fetch_cninfo_announcements(self, requests_module: Any, code: str, *, timeout: Any = None) -> dict[str, Any]:
+        org_id = self._cninfo_orgid(requests_module, code, timeout=timeout)
+        data = self._request_json(
+            requests_module,
+            "POST",
+            "https://www.cninfo.com.cn/new/hisAnnouncement/query",
+            data={
+                "stock": f"{code},{org_id}",
+                "tabName": "fulltext",
+                "pageSize": "10",
+                "pageNum": "1",
+                "column": "sse" if code.startswith("6") else "szse",
+                "category": "",
+                "plate": "",
+                "seDate": "",
+                "searchkey": "",
+                "secid": "",
+                "sortName": "",
+                "sortType": "",
+                "isHLtitle": "true",
+            },
+            headers={
+                "User-Agent": self.USER_AGENT,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": "https://www.cninfo.com.cn/new/disclosure",
+                "Origin": "https://www.cninfo.com.cn",
+            },
+            timeout=timeout,
+        )
+        items = []
+        for row in data.get("announcements") or []:
+            if not isinstance(row, dict):
+                continue
+            title = str(row.get("announcementTitle") or "").strip()
+            if not title:
+                continue
+            announcement_id = str(row.get("announcementId") or "").strip()
+            items.append(
+                {
+                    "title": title,
+                    "type": row.get("announcementTypeName"),
+                    "date": self._cninfo_ts_to_date(row.get("announcementTime")),
+                    "url": (
+                        f"https://www.cninfo.com.cn/new/disclosure/detail?annoId={announcement_id}"
+                        if announcement_id
+                        else ""
+                    ),
+                }
+            )
+        return {"checked": True, "items": items}
+
+    def _cninfo_orgid(self, requests_module: Any, code: str, *, timeout: Any = None) -> str:
+        if not self.__class__._CNINFO_ORGID_MAP:
+            try:
+                data = self._request_json(
+                    requests_module,
+                    "GET",
+                    "http://www.cninfo.com.cn/new/data/szse_stock.json",
+                    headers={"User-Agent": self.USER_AGENT},
+                    timeout=timeout,
+                )
+                self.__class__._CNINFO_ORGID_MAP = {
+                    str(item.get("code")): str(item.get("orgId"))
+                    for item in data.get("stockList", [])
+                    if isinstance(item, dict) and item.get("code") and item.get("orgId")
+                }
+            except Exception:
+                self.__class__._CNINFO_ORGID_MAP = {}
+        org_id = self.__class__._CNINFO_ORGID_MAP.get(code)
+        if org_id:
+            return org_id
+        if code.startswith("6"):
+            return f"gssh0{code}"
+        return f"gssz0{code}"
+
+    def _cninfo_ts_to_date(self, value: Any) -> str:
+        numeric = self._float_or_none(value)
+        if numeric is not None and numeric > 10_000_000_000:
+            return datetime.fromtimestamp(numeric / 1000).strftime("%Y-%m-%d")
+        return str(value or "")[:10]
+
+    def _eastmoney_secid(self, code: str) -> str:
+        return f"1.{code}" if code.startswith("6") else f"0.{code}"
+
+    def _request_json(
+        self,
+        requests_module: Any,
+        method: str,
+        url: str,
+        *,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: Any = None,
+    ) -> dict[str, Any]:
+        if method.upper() == "POST":
+            response = requests_module.post(url, data=data, params=params, headers=headers, timeout=timeout)
+        else:
+            response = requests_module.get(url, params=params, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        parsed = response.json()
+        return parsed if isinstance(parsed, dict) else {}
 
     def _summary(
         self,
@@ -583,9 +966,9 @@ class AShareEnrichmentService:
             price_text = f" Last price {self._format_number(price)}"
             if change is not None:
                 price_text += f", change {self._format_percent(change)}"
-        status_text = "is available through the local POC lane" if status == "available" else "is degraded through local rules"
+        status_text = "已接入" if status == "available" else "已降级"
         context_text = f" Context: {context}." if context else ""
-        return f"{label} A-share enrichment for announcements, fund flow, sectors, research, and dragon-tiger data {status_text}.{context_text}{price_text}".strip()
+        return f"{label} A股增强数据：公告、资金流、板块、研报和龙虎榜{status_text}.{context_text}{price_text}".strip()
 
     def _first_item(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
         items = payload.get("items") if isinstance(payload, dict) else None
