@@ -2925,6 +2925,10 @@ describe('HomePage', () => {
     expect(valueSummary).toHaveTextContent('风险边界');
     expect(valueSummary).toHaveTextContent('升级可解锁');
     expect(valueSummary).toHaveTextContent('深度分析');
+    const featureEntry = screen.getByTestId('basic-query-free-feature-entry');
+    expect(valueSummary).toContainElement(featureEntry);
+    expect(valueSummary).toContainElement(screen.getByTestId('basic-query-feature-entry-news'));
+    expect(valueSummary).toContainElement(screen.getByTestId('basic-query-feature-entry-kline'));
     expect(
       primarySummary.compareDocumentPosition(valueSummary)
       & Node.DOCUMENT_POSITION_FOLLOWING,

@@ -1026,5 +1026,6 @@ Review focus:
 - V65 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
 - Free quick mode must remain `ai_used=false` and `public_search_used=false`.
 - The first-screen summary must not replace the detailed no-AI report; it is a user-facing entry layer only.
+- The free summary must keep visible entries for News Center and K-line forecast so those features remain discoverable after query.
 - Data diagnostics should remain available but collapsed by default so free users see product value before technical internals.
 - `scripts/verify_platform_free_value_v65.py` must stay visible and print `DSA_PLATFORM_FREE_VALUE_V65_OK` only when the V65 markers are present.

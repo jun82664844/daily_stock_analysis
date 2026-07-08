@@ -1274,5 +1274,6 @@ Review boundary:
 
 - No AI calls and no public search in free quick mode.
 - The free summary is a product-value entry layer, not a trade instruction.
+- News Center and K-line forecast must remain visible from the free summary as feature entries.
 - Diagnostics remain available for support/operator debugging but no longer dominate the free result.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

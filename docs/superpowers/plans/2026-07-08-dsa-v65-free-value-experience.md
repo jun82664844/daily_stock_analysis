@@ -12,6 +12,7 @@ Make the free no-AI query result feel useful enough for ordinary users to contin
 
 - Add a first-screen free value summary after the quote header.
 - Show a readable conclusion, current watch points, risk boundary, and upgrade unlock path.
+- Keep first-screen entries for News Center and K-line forecast so those free functions do not look missing.
 - Keep the free flow no-AI and no public search.
 - Move low-level diagnostics behind a collapsed details block by default.
 

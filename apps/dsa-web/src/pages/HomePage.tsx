@@ -2282,6 +2282,13 @@ const HomePage: React.FC = () => {
     }
   }, [basicSnapshot?.stockCode, isRunningKronosForecast]);
 
+  const handleBasicFeatureJump = useCallback((testId: string) => {
+    const target = document.querySelector(`[data-testid="${testId}"]`);
+    if (target instanceof HTMLElement && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!basicSnapshot || marketReviewReport) {
       return;
@@ -3749,6 +3756,43 @@ const HomePage: React.FC = () => {
                         <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
                           {uiLanguage === 'en' ? 'Information only' : '仅作信息分析'}
                         </span>
+                      </div>
+                    </div>
+                    <div
+                      data-testid="basic-query-free-feature-entry"
+                      className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-background/35 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Free feature entry' : '免费功能入口'}
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {uiLanguage === 'en'
+                            ? 'News and K-line forecast are available below; jump straight to the feature you want to inspect.'
+                            : '资讯中心和K线预测已经在本次免费查询里开放，可直接跳到对应功能查看。'}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          data-testid="basic-query-feature-entry-news"
+                          onClick={() => handleBasicFeatureJump('basic-query-news-center')}
+                        >
+                          <Search className="h-4 w-4" aria-hidden="true" />
+                          {uiLanguage === 'en' ? 'News center' : '资讯中心'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          data-testid="basic-query-feature-entry-kline"
+                          onClick={() => handleBasicFeatureJump('basic-query-kline-forecast-lab')}
+                        >
+                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                          {uiLanguage === 'en' ? 'K-line forecast' : 'K线预测'}
+                        </Button>
                       </div>
                     </div>
                     <div className="mt-3 grid gap-2 md:grid-cols-3">
