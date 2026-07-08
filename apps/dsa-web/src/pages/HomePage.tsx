@@ -3363,15 +3363,11 @@ const HomePage: React.FC = () => {
     (
       stockCode?: string,
       stockName?: string,
-      selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
+      _selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
     ) => {
-      if (platformEnabled) {
-        void handleBasicQuery(stockCode, stockName);
-        return;
-      }
-      handleSubmitAnalysis(stockCode, stockName, selectionSource, 'fast');
+      void handleBasicQuery(stockCode, stockName);
     },
-    [handleBasicQuery, handleSubmitAnalysis, platformEnabled],
+    [handleBasicQuery],
   );
 
   useEffect(() => {
@@ -3797,7 +3793,7 @@ const HomePage: React.FC = () => {
                 type="button"
                 variant="secondary"
                 size="md"
-                disabled={!query || (platformEnabled ? isQueryingBasic : isAnalyzing)}
+                disabled={!query || isQueryingBasic}
                 onClick={() => handleQuickAnalyze(undefined, undefined, 'manual')}
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
@@ -6376,7 +6372,7 @@ const HomePage: React.FC = () => {
                       type="button"
                       variant="secondary"
                       size="sm"
-                      disabled={platformEnabled ? isQueryingBasic : isAnalyzing}
+                      disabled={isQueryingBasic}
                       onClick={() => handleQuickAnalyze(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual')}
                     >
                       <Sparkles className="h-4 w-4" aria-hidden="true" />

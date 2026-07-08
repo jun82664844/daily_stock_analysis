@@ -2494,7 +2494,7 @@ describe('HomePage', () => {
 
     const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
-    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
+    fireEvent.click(screen.getByRole('button', { name: '深度分析' }));
 
     await waitFor(() => {
       expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
@@ -2547,6 +2547,52 @@ describe('HomePage', () => {
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByTestId('basic-query-primary-summary')).toHaveTextContent('贵州茅台');
     expect(screen.queryByText('Login required')).not.toBeInTheDocument();
+  });
+
+  it('routes quick analysis to the free no-AI snapshot before platform status finishes loading', async () => {
+    vi.mocked(platformApi.status).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 310.66,
+        changePercent: -0.24,
+        source: 'unit_quote',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 303.138, ma20: 295.04 },
+      profile: { companyName: 'Apple Inc.', source: 'unit_profile', freshness: 'fresh' },
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        boundary: 'Information analysis only; not investment advice.',
+      },
+      aiUsed: false,
+    } as any);
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run while platform status is still loading'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
+
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledWith('AAPL');
+    });
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('basic-query-primary-summary')).toHaveTextContent('Apple Inc.');
   });
 
   it('clears stale analysis connection errors after a successful no-AI query', async () => {
@@ -4422,7 +4468,7 @@ describe('HomePage', () => {
     fireEvent.change(await screen.findByPlaceholderText('Enter a stock code or name, e.g. 600519, Kweichow Moutai, AAPL'), {
       target: { value: 'AAPL' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Quick analysis' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Deep analysis' }));
     fireEvent.click(screen.getByRole('button', { name: 'Market review' }));
 
     await waitFor(() => {
@@ -4893,7 +4939,7 @@ describe('HomePage', () => {
 
     const input = screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
-    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
+    fireEvent.click(screen.getByRole('button', { name: '深度分析' }));
 
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
