@@ -220,6 +220,8 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'CSI 300 and SSE Composite context': '沪深300与上证指数背景',
   'Announcements require deep mode or configured sources': '公告需要深度模式或已配置的数据源',
   'Broad market': '大盘',
+  'Nasdaq Composite': '纳斯达克综合指数',
+  'Technology sector ETF': '科技行业 ETF',
   'Index lens': '指数参照',
   'Sector lens': '行业参照',
   'CSI 300': '沪深300',
@@ -230,6 +232,7 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   Technology: '科技',
   'Consumer Electronics': '消费电子',
   'Technology / Consumer Electronics': '科技 / 消费电子',
+  'United States': '美国',
   'price above trend volume soft': '价格位于趋势上方但量能偏弱',
   'Constructive quick signal': '快速信号偏积极',
   'Mixed quick signal': '快速信号混合',
@@ -2210,6 +2213,46 @@ const HomePage: React.FC = () => {
       ...(basicSnapshot.warnings ?? []).slice(0, 2).map((warning) => localizeGeneratedText(warning.message, uiLanguage)),
       localizeGeneratedText(basicSnapshot.intelligence?.boundary || 'not investment advice', uiLanguage),
     ].filter(Boolean);
+    const eventAction = (category: string, action?: string | null): string => {
+      if (!isEnglish && category === 'news') {
+        return '使用深度分析或配置资讯源';
+      }
+      return localizeGeneratedText(action || (isEnglish ? 'Check the source before interpreting.' : '解读前先确认来源。'), uiLanguage);
+    };
+    const eventDetails = newsItems.length > 0
+      ? [
+          isEnglish ? 'Event checklist' : '事件清单',
+          ...newsItems.map((item) => (
+            isEnglish
+              ? `${localizeGeneratedText(item.title, uiLanguage)}: ${localizeGeneratedText(item.summary, uiLanguage)} Status: ${basicIntelligenceStatusLabel(item.status, uiLanguage)}. Next: ${eventAction(item.category)}.`
+              : `${localizeGeneratedText(item.title, uiLanguage)}：${localizeGeneratedText(item.summary, uiLanguage)} 状态：${basicIntelligenceStatusLabel(item.status, uiLanguage)}。下一步：${eventAction(item.category)}。`
+          )),
+        ]
+      : [
+          isEnglish ? 'Event checklist' : '事件清单',
+          isEnglish ? 'No realtime event source is enabled in free mode.' : '免费模式暂未启用实时事件源。',
+        ];
+    const peerTableRows = peerRows.length > 0
+      ? peerRows.slice(0, 3).map((row) => ({
+          symbol: row.symbol,
+          label: localizeGeneratedText(row.label, uiLanguage),
+          role: localizeGeneratedText(row.role, uiLanguage),
+          currentSignal: localizeGeneratedText(row.currentSignal, uiLanguage),
+          compareNext: localizeGeneratedText(row.compareNext, uiLanguage),
+        }))
+      : comparisonTargets.slice(0, 3).map((item) => ({
+          symbol: item.symbol,
+          label: localizeGeneratedText(item.label, uiLanguage),
+          role: localizeGeneratedText(item.status, uiLanguage),
+          currentSignal: localizeGeneratedText(item.reason, uiLanguage),
+          compareNext: isEnglish ? 'Refresh and compare again.' : '刷新后再对比强弱。',
+        }));
+    const klineScenarios = (basicSnapshot.intelligence?.klineForecast?.scenarios ?? []).slice(0, 3).map((scenario) => ({
+      label: localizeGeneratedText(scenario.label, uiLanguage),
+      probability: scenario.probability,
+      trigger: localizeGeneratedText(scenario.trigger, uiLanguage),
+      detail: localizeGeneratedText(scenario.detail, uiLanguage),
+    }));
     const sameModulesText = isEnglish
       ? 'Free mode shows concrete data first. Premium can switch the same cards to API-backed news, filings, funds, and model sources.'
       : '免费版先展示可用的真实数据；高级版可把同样卡片切换到 API 资讯、公告、资金流和模型数据源。';
@@ -2238,6 +2281,17 @@ const HomePage: React.FC = () => {
             { label: isEnglish ? 'Market cap' : '总市值', value: formatBasicCompactNumber(basicSnapshot.profile?.marketCap) },
             { label: isEnglish ? 'PE ratio' : '市盈率', value: formatBasicNumber(basicSnapshot.profile?.peRatio) },
           ],
+          details: [
+            `${isEnglish ? 'Open' : '开盘'} ${formatBasicNumber(basicSnapshot.quote.open)}`,
+            `${isEnglish ? 'High' : '最高'} ${formatBasicNumber(basicSnapshot.quote.high)}`,
+            `${isEnglish ? 'Low' : '最低'} ${formatBasicNumber(basicSnapshot.quote.low)}`,
+            `${isEnglish ? 'Previous close' : '昨收'} ${formatBasicNumber(basicSnapshot.quote.prevClose)}`,
+            `${isEnglish ? 'Exchange' : '交易所'} ${basicSnapshot.profile?.exchange || '-'}`,
+            `${isEnglish ? 'Currency' : '币种'} ${basicSnapshot.profile?.currency || '-'}`,
+            `${isEnglish ? 'Country' : '地区'} ${localizeGeneratedText(basicSnapshot.profile?.country || '-', uiLanguage)}`,
+          ],
+          peerRows: [],
+          scenarios: [],
         },
         {
           key: 'technical',
@@ -2251,6 +2305,15 @@ const HomePage: React.FC = () => {
             { label: isEnglish ? 'Support' : '支撑', value: supportValue },
             { label: isEnglish ? 'Resistance' : '压力', value: resistanceValue },
           ],
+          details: [
+            `${isEnglish ? 'Volume signal' : '量价信号'} ${volumePriceSignalLabel(pickBasicIndicator(basicSnapshot.indicators, 'volumePriceSignal', 'volume_price_signal'), uiLanguage)}`,
+            `${isEnglish ? 'Volume vs MA5' : '量能相对 MA5'} ${formatSignedBasicPercent(pickBasicIndicator(basicSnapshot.indicators, 'volumeChangeVsMa5', 'volume_change_vs_ma5'))}`,
+            `${isEnglish ? 'Trend window' : '趋势窗口'} ${basicSnapshot.trend?.window ?? '-'}`,
+            `${isEnglish ? 'Range low' : '区间低点'} ${formatBasicNumber(basicSnapshot.trend?.minClose)}`,
+            `${isEnglish ? 'Range high' : '区间高点'} ${formatBasicNumber(basicSnapshot.trend?.maxClose)}`,
+          ],
+          peerRows: [],
+          scenarios: klineScenarios,
         },
         {
           key: 'events',
@@ -2262,6 +2325,9 @@ const HomePage: React.FC = () => {
             label: isEnglish ? `Lane ${index + 1}` : `通道 ${index + 1}`,
             value: point,
           })),
+          details: eventDetails,
+          peerRows: [],
+          scenarios: [],
         },
         {
           key: 'peer-risk',
@@ -2275,6 +2341,11 @@ const HomePage: React.FC = () => {
             { label: isEnglish ? 'Boundary' : '边界', value: isEnglish ? 'information analysis only' : '仅作信息分析，不构成投资建议' },
           ],
           points: riskPoints,
+          details: riskPoints.length > 0
+            ? riskPoints
+            : [isEnglish ? 'Use this as a risk checklist, not a trading instruction.' : '把这里作为风险清单，不作为交易指令。'],
+          peerRows: peerTableRows,
+          scenarios: [],
         },
       ],
       footer: sameModulesText,
@@ -4252,6 +4323,97 @@ const HomePage: React.FC = () => {
                                   {point}
                                 </span>
                               ))}
+                            </div>
+                          ) : null}
+                          {card.details?.length ? (
+                            <details
+                              data-testid={
+                                card.key === 'core'
+                                  ? 'basic-query-data-detail-core'
+                                  : card.key === 'events'
+                                    ? 'basic-query-data-detail-events'
+                                    : `basic-query-data-detail-${card.key}`
+                              }
+                              className="mt-3 rounded-md border border-subtle/70 bg-surface/30 p-2.5"
+                            >
+                              <summary className="cursor-pointer text-xs font-medium text-primary">
+                                {uiLanguage === 'en' ? 'Expand details' : '展开详情'}
+                              </summary>
+                              <div className="mt-2 grid gap-1.5 text-[11px] leading-relaxed text-secondary-text">
+                                {card.details.slice(0, 7).map((detail, index) => (
+                                  <div
+                                    key={`${card.key}-detail-${index}`}
+                                    className="min-w-0 rounded-md border border-subtle/60 bg-background/25 px-2 py-1"
+                                  >
+                                    {detail}
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          ) : null}
+                          {card.scenarios?.length ? (
+                            <div
+                              data-testid="basic-query-kline-triggers"
+                              className="mt-3 rounded-md border border-primary/25 bg-primary/10 p-2.5"
+                            >
+                              <div className="text-xs font-medium text-primary">
+                                {uiLanguage === 'en' ? 'K-line triggers' : 'K线触发条件'}
+                              </div>
+                              <div className="mt-2 grid gap-2">
+                                {card.scenarios.map((scenario) => (
+                                  <div
+                                    key={`${card.key}-${scenario.label}`}
+                                    className="min-w-0 rounded-md border border-subtle/70 bg-background/35 px-2 py-1.5"
+                                  >
+                                    <div className="flex min-w-0 items-center justify-between gap-2">
+                                      <span className="min-w-0 truncate text-xs font-semibold text-foreground">
+                                        {scenario.label}
+                                      </span>
+                                      <span className="shrink-0 rounded-md border border-primary/30 px-1.5 py-0.5 text-[10px] text-primary">
+                                        {scenario.probability}%
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 text-[11px] leading-relaxed text-secondary-text">
+                                      {scenario.trigger}
+                                    </div>
+                                    <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
+                                      {scenario.detail}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          {card.peerRows?.length ? (
+                            <div
+                              data-testid="basic-query-peer-table"
+                              className="mt-3 rounded-md border border-primary/25 bg-primary/10 p-2.5"
+                            >
+                              <div className="text-xs font-medium text-primary">
+                                {uiLanguage === 'en' ? 'Peer comparison table' : '同业对比表'}
+                              </div>
+                              <div className="mt-2 grid gap-1.5 text-[11px] text-secondary-text">
+                                <div className="grid gap-1 rounded-md border border-subtle/70 bg-background/35 px-2 py-1 font-medium text-foreground sm:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1.25fr_1.25fr]">
+                                  <span>{uiLanguage === 'en' ? 'Symbol' : '标的'}</span>
+                                  <span>{uiLanguage === 'en' ? 'Role' : '角色'}</span>
+                                  <span>{uiLanguage === 'en' ? 'Current signal' : '当前信号'}</span>
+                                  <span>{uiLanguage === 'en' ? 'Next compare' : '下次对比'}</span>
+                                </div>
+                                {card.peerRows.map((row) => (
+                                  <div
+                                    key={`${card.key}-${row.symbol}`}
+                                    className="grid gap-1 rounded-md border border-subtle/70 bg-background/25 px-2 py-1 sm:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1.25fr_1.25fr]"
+                                  >
+                                    <span className="min-w-0">
+                                      <span className="block truncate font-medium text-foreground">{row.symbol}</span>
+                                      <span className="block truncate text-[10px] text-secondary-text">{row.label}</span>
+                                    </span>
+                                    <span className="min-w-0 truncate">{row.role}</span>
+                                    <span className="min-w-0 line-clamp-2">{row.currentSignal}</span>
+                                    <span className="min-w-0 line-clamp-2">{row.compareNext}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           ) : null}
                         </div>

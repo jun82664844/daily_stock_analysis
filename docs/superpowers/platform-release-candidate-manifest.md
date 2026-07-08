@@ -1421,3 +1421,42 @@ Review boundary:
 - The board must show concrete quote, technical, event, peer, and risk fields using existing snapshot data.
 - Free and premium show the same visible modules; premium/API modes improve freshness, source links, configured feeds, and model depth.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V70 Free Detail Readability Manifest Addendum
+
+Status: local-only free-result readability upgrade. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_detail_readability_v70.py`
+- `tests/test_platform_free_detail_readability_v70.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `src/notification_sender/feishu_sender.py`
+- `tests/test_feishu_sender_import_resilience.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_FREE_DETAIL_READABILITY_V70_OK`
+
+Suggested review/commit position:
+
+- After V69 free data depth and before paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes the free detail readability layer, V70 verifier, and V70 docs. V69 free data depth and earlier free query modules remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- The detail layer must show expandable quote fields, event checklist, peer comparison table, and K-line triggers using existing snapshot data.
+- Free and premium show the same visible modules; premium/API modes improve freshness, source links, configured feeds, and model depth.
+- Windows local startup must keep working when `lark_oapi` import raises `OSError`; the Feishu App Bot SDK should degrade to unavailable instead of preventing the API from starting.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

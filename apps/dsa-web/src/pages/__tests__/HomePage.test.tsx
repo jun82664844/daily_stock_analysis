@@ -2955,6 +2955,36 @@ describe('HomePage', () => {
     expect(dataDepthBoard).toHaveTextContent('XLK');
     expect(dataDepthBoard).toHaveTextContent('仅作信息分析，不构成投资建议');
     expect(dataDepthBoard).not.toHaveTextContent('Free data depth board');
+    const coreDetail = screen.getByTestId('basic-query-data-detail-core');
+    expect(coreDetail).toHaveTextContent('展开详情');
+    expect(coreDetail).toHaveTextContent(/开盘\s*198/);
+    expect(coreDetail).toHaveTextContent(/最高\s*205/);
+    expect(coreDetail).toHaveTextContent(/最低\s*197/);
+    expect(coreDetail).toHaveTextContent(/昨收\s*197/);
+    expect(coreDetail).toHaveTextContent('NASDAQ');
+    expect(coreDetail).toHaveTextContent('美国');
+    const eventDetail = screen.getByTestId('basic-query-data-detail-events');
+    expect(eventDetail).toHaveTextContent('事件清单');
+    expect(eventDetail).toHaveTextContent('影响行情的资讯通道');
+    expect(eventDetail).toHaveTextContent('状态：降级');
+    expect(eventDetail).toHaveTextContent('下一步：使用深度分析或配置资讯源');
+    const peerTable = screen.getByTestId('basic-query-peer-table');
+    expect(peerTable).toHaveTextContent('同业对比表');
+    expect(peerTable).toHaveTextContent('标的');
+    expect(peerTable).toHaveTextContent('角色');
+    expect(peerTable).toHaveTextContent('当前信号');
+    expect(peerTable).toHaveTextContent('下次对比');
+    expect(peerTable).toHaveTextContent('大盘');
+    expect(peerTable).toHaveTextContent('纳斯达克综合指数');
+    expect(peerTable).toHaveTextContent('科技行业 ETF');
+    const klineTriggers = screen.getByTestId('basic-query-kline-triggers');
+    expect(klineTriggers).toHaveTextContent('K线触发条件');
+    expect(klineTriggers).toHaveTextContent('上行倾向预览');
+    expect(klineTriggers).toHaveTextContent('突破确认');
+    expect(klineTriggers).toHaveTextContent('回落风险');
+    expect(klineTriggers).toHaveTextContent('守住 MA20 190');
+    expect(klineTriggers).toHaveTextContent('价格放量收在压力位 205 上方');
+    expect(klineTriggers).toHaveTextContent('价格跌破支撑 190');
     expect(
       primarySummary.compareDocumentPosition(commercialJourney)
       & Node.DOCUMENT_POSITION_FOLLOWING,

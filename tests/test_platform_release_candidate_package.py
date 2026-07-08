@@ -98,6 +98,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v67: bool = True,
         include_v68: bool = True,
         include_v69: bool = True,
+        include_v70: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -354,6 +355,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "free data depth\nsame visible modules\nA-share\nUS equity\n"
                 "DSA_PLATFORM_FREE_DATA_DEPTH_V69_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo AI calls\nNo public search\n"
+                "free detail readability\nsame visible modules\nexpand details\n"
+                "event checklist\npeer comparison table\nK-line triggers\n"
+                "DSA_PLATFORM_FREE_DETAIL_READABILITY_V70_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -424,6 +432,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_free_research_board_v67.py",
             "scripts/verify_platform_free_commercial_journey_v68.py",
             "scripts/verify_platform_free_data_depth_v69.py",
+            "scripts/verify_platform_free_detail_readability_v70.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -434,7 +443,9 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "src/services/production_readiness.py",
             "src/services/platform_backup.py",
             "src/services/platform_ops_health.py",
+            "src/notification_sender/feishu_sender.py",
             "tests/test_platform_release_candidate_package.py",
+            "tests/test_feishu_sender_import_resilience.py",
             "tests/test_platform_user_e2e_safety.py",
             "tests/test_billing_subscription_lifecycle.py",
             "tests/test_platform_query_quality_v4.py",
@@ -489,6 +500,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_free_research_board_v67.py",
             "tests/test_platform_free_commercial_journey_v68.py",
             "tests/test_platform_free_data_depth_v69.py",
+            "tests/test_platform_free_detail_readability_v70.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -737,6 +749,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v69 and rel_path in {
                 "scripts/verify_platform_free_data_depth_v69.py",
                 "tests/test_platform_free_data_depth_v69.py",
+            }:
+                continue
+            if not include_v70 and rel_path in {
+                "scripts/verify_platform_free_detail_readability_v70.py",
+                "tests/test_platform_free_detail_readability_v70.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -1065,6 +1082,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v69:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-08-dsa-v69-free-data-depth.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v70:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1860,6 +1884,20 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("scripts/verify_platform_free_data_depth_v69.py", missing)
         self.assertIn("tests/test_platform_free_data_depth_v69.py", missing)
         self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v69-free-data-depth.md", missing)
+
+    def test_reports_missing_free_detail_readability_v70_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v70=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        missing = by_id["required_files_present"].metadata["missing_files"]
+        self.assertIn("scripts/verify_platform_free_detail_readability_v70.py", missing)
+        self.assertIn("tests/test_platform_free_detail_readability_v70.py", missing)
+        self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md", missing)
 
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:

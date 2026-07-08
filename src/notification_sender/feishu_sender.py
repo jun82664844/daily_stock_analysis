@@ -49,7 +49,7 @@ try:
     FEISHU_DOMAIN = _SDK_FEISHU_DOMAIN
     LARK_DOMAIN = _SDK_LARK_DOMAIN
     FEISHU_SDK_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError):
     pass
 
 # ---------------------------------------------------------------------------

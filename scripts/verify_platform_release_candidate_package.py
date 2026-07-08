@@ -73,6 +73,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-08-dsa-v67-free-research-board.md",
     "docs/superpowers/plans/2026-07-08-dsa-v68-free-commercial-journey.md",
     "docs/superpowers/plans/2026-07-08-dsa-v69-free-data-depth.md",
+    "docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -129,6 +130,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_free_research_board_v67.py",
     "scripts/verify_platform_free_commercial_journey_v68.py",
     "scripts/verify_platform_free_data_depth_v69.py",
+    "scripts/verify_platform_free_detail_readability_v70.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/services/a_share_enrichment_service.py",
@@ -139,7 +141,9 @@ REQUIRED_FILES = (
     "src/services/production_readiness.py",
     "src/services/platform_backup.py",
     "src/services/platform_ops_health.py",
+    "src/notification_sender/feishu_sender.py",
     "tests/test_platform_release_candidate_package.py",
+    "tests/test_feishu_sender_import_resilience.py",
     "tests/test_platform_user_e2e_safety.py",
     "tests/test_billing_subscription_lifecycle.py",
     "tests/test_platform_query_quality_v4.py",
@@ -194,6 +198,7 @@ REQUIRED_FILES = (
     "tests/test_platform_free_research_board_v67.py",
     "tests/test_platform_free_commercial_journey_v68.py",
     "tests/test_platform_free_data_depth_v69.py",
+    "tests/test_platform_free_detail_readability_v70.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -253,6 +258,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_research_board_v67.py",
     "scripts/verify_platform_free_commercial_journey_v68.py",
     "scripts/verify_platform_free_data_depth_v69.py",
+    "scripts/verify_platform_free_detail_readability_v70.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

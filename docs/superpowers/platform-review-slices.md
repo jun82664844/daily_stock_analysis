@@ -1131,3 +1131,31 @@ Review focus:
 - `basic-query-data-depth-board` must show `免费版真实数据面板`, `美股重点数据`, `A股重点数据`, `核心数据`, `技术结构`, `资讯与事件`, and `同业与风险`.
 - The board should use existing snapshot fields and must not trigger extra AI/model/API/public-search cost.
 - `scripts/verify_platform_free_data_depth_v69.py` must stay visible and print `DSA_PLATFORM_FREE_DATA_DEPTH_V69_OK` only when V69 markers are present.
+
+## V70 Free Detail Readability Addendum
+
+Purpose: make the free data-depth board easier to read and inspect. The new detail layer adds expandable quote fields, event checklist wording, peer comparison rows, and K-line trigger cards without changing the free quick path into an AI/API/search workflow.
+
+Files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_detail_readability_v70.py`
+- `tests/test_platform_free_detail_readability_v70.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `src/notification_sender/feishu_sender.py`
+- `tests/test_feishu_sender_import_resilience.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V70 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and avoid public search by default.
+- `basic-query-data-detail-core`, `basic-query-data-detail-events`, `basic-query-peer-table`, and `basic-query-kline-triggers` must stay visible in the free result path.
+- The free and premium versions keep the same visible modules; premium/API mode only improves freshness, source links, configured feeds, and model depth.
+- `src/notification_sender/feishu_sender.py` must degrade when `lark_oapi` import raises `OSError`, so Windows local socket pressure does not prevent the API app from starting.
+- `scripts/verify_platform_free_detail_readability_v70.py` must stay visible and print `DSA_PLATFORM_FREE_DETAIL_READABILITY_V70_OK` only when V70 markers are present.
