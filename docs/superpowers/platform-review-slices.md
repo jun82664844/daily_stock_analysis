@@ -1003,3 +1003,28 @@ Review focus:
 - `details` must be compact scan aids; they do not replace the channel summary/action text.
 - Missing or degraded lanes must remain explicit instead of silently disappearing.
 - `scripts/verify_platform_a_stock_data_details_v64.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_DETAILS_V64_OK` only when the V64 markers are present.
+
+## V65 Free-Value Experience Addendum
+
+Purpose: make the free no-AI stock result feel useful in the first screen by showing a clear value summary before deeper details. The summary highlights the conclusion, current watch points, risk boundary, and what deep/premium analysis can unlock, while diagnostic internals are collapsed by default.
+
+Files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_value_v65.py`
+- `tests/test_platform_free_value_v65.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v65-free-value-experience.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V65 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and `public_search_used=false`.
+- The first-screen summary must not replace the detailed no-AI report; it is a user-facing entry layer only.
+- Data diagnostics should remain available but collapsed by default so free users see product value before technical internals.
+- `scripts/verify_platform_free_value_v65.py` must stay visible and print `DSA_PLATFORM_FREE_VALUE_V65_OK` only when the V65 markers are present.

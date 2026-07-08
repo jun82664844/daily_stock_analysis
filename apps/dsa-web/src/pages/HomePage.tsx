@@ -3725,6 +3725,85 @@ const HomePage: React.FC = () => {
                 </div>
                 {basicFreeReport ? (
                   <section
+                    data-testid="basic-query-free-value-summary"
+                    className="mb-4 rounded-lg border border-primary/35 bg-primary/10 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Free value summary' : '免费版重点结论'}
+                        </div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage)}
+                        </h3>
+                        <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                          {uiLanguage === 'en'
+                            ? 'The free view highlights the useful first read: quote structure, support and resistance, risk boundaries, and what a deeper report can unlock.'
+                            : '免费版先给出可理解的一眼结论：行情结构、支撑压力、风险边界，以及高级分析可以继续解锁的内容。'}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+                        <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary">
+                          {t('home.noAi')}
+                        </span>
+                        <span className="rounded-md border border-subtle px-2 py-1 text-secondary-text">
+                          {uiLanguage === 'en' ? 'Information only' : '仅作信息分析'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
+                      <div className="min-w-0 rounded-lg border border-subtle bg-background/35 p-3">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'What matters now' : '当前看点'}
+                        </div>
+                        <div className="mt-2 space-y-1 text-sm font-medium text-foreground">
+                          <div className="truncate">
+                            {uiLanguage === 'en' ? 'Support' : '支撑'} {localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}
+                          </div>
+                          <div className="truncate">
+                            {uiLanguage === 'en' ? 'Resistance' : '压力'} {localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                          {localizeGeneratedText(basicFreeReport.productBrief.shortStatus, uiLanguage)}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle bg-background/35 p-3">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Risk boundary' : '风险边界'}
+                        </div>
+                        <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          {basicFreeReport.productBrief.risks.slice(0, 3).map((risk) => (
+                            <span key={risk} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {localizeGeneratedText(risk, uiLanguage)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-primary/30 bg-background/35 p-3">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Upgrade unlocks' : '升级可解锁'}
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                          {localizeGeneratedText(basicFreeReport.productBrief.upgradeText, uiLanguage)}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="mt-3"
+                          disabled={isAnalyzing}
+                          onClick={() => handleSubmitAnalysis(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual', 'deep')}
+                        >
+                          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                          {t('home.deepAnalyze')}
+                        </Button>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicFreeReport ? (
+                  <section
                     data-testid="basic-query-free-report"
                     className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3"
                   >
@@ -5145,31 +5224,39 @@ const HomePage: React.FC = () => {
                   ) : null}
                 </div>
                 {basicSnapshot.diagnostics ? (
-                  <div data-testid="basic-query-diagnostics" className="mt-2 flex flex-wrap gap-2 text-xs text-secondary-text">
-                    <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicDiagnostics')}: {formatBasicNumber(basicSnapshot.diagnostics.elapsedMs)}ms
-                    </span>
-                    <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicCache')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.cache.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.cache.history || '-', uiLanguage)}
-                    </span>
-                    <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicFallback')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.fallback?.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.fallback?.history || '-', uiLanguage)}
-                    </span>
-                    <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicSourceHealth')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.sourceHealth?.quote?.status || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.sourceHealth?.history?.status || '-', uiLanguage)}
-                    </span>
-                    <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicPersistentCache')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.persistentCache?.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.persistentCache?.history || '-', uiLanguage)}
-                    </span>
-                    {basicSnapshot.diagnostics.refresh ? (
+                  <details
+                    data-testid="basic-query-diagnostics-details"
+                    className="mt-3 rounded-lg border border-subtle bg-background/25 px-3 py-2 text-xs text-secondary-text"
+                  >
+                    <summary className="cursor-pointer font-medium text-secondary-text hover:text-foreground">
+                      {uiLanguage === 'en' ? 'Data diagnostics' : '数据诊断'}
+                    </summary>
+                    <div data-testid="basic-query-diagnostics" className="mt-2 flex flex-wrap gap-2">
                       <span className="rounded-md border border-subtle px-2 py-1">
-                        {uiLanguage === 'en' ? 'Refresh' : '刷新'}: {localizeRuntimeLabel(basicSnapshot.diagnostics.refresh.mode || '-', uiLanguage)}
+                        {t('home.basicDiagnostics')}: {formatBasicNumber(basicSnapshot.diagnostics.elapsedMs)}ms
                       </span>
-                    ) : null}
-                    <span className="rounded-md border border-subtle px-2 py-1">
-                      {t('home.basicPerformance')}: {localizeRuntimeLabel(basicSnapshot.diagnostics.performance.status || '-', uiLanguage)}
-                    </span>
-                  </div>
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {t('home.basicCache')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.cache.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.cache.history || '-', uiLanguage)}
+                      </span>
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {t('home.basicFallback')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.fallback?.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.fallback?.history || '-', uiLanguage)}
+                      </span>
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {t('home.basicSourceHealth')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.sourceHealth?.quote?.status || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.sourceHealth?.history?.status || '-', uiLanguage)}
+                      </span>
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {t('home.basicPersistentCache')}: Q {localizeRuntimeLabel(basicSnapshot.diagnostics.persistentCache?.quote || '-', uiLanguage)} / H {localizeRuntimeLabel(basicSnapshot.diagnostics.persistentCache?.history || '-', uiLanguage)}
+                      </span>
+                      {basicSnapshot.diagnostics.refresh ? (
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {uiLanguage === 'en' ? 'Refresh' : '刷新'}: {localizeRuntimeLabel(basicSnapshot.diagnostics.refresh.mode || '-', uiLanguage)}
+                        </span>
+                      ) : null}
+                      <span className="rounded-md border border-subtle px-2 py-1">
+                        {t('home.basicPerformance')}: {localizeRuntimeLabel(basicSnapshot.diagnostics.performance.status || '-', uiLanguage)}
+                      </span>
+                    </div>
+                  </details>
                 ) : null}
                 {basicSnapshot.degradation && basicSnapshot.degradation.status !== 'ok' ? (
                   <div

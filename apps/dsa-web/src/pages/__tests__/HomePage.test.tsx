@@ -2919,6 +2919,16 @@ describe('HomePage', () => {
     expect(primarySummary).toHaveTextContent('消费电子');
     expect(primarySummary).toHaveTextContent('4.5T');
     expect(primarySummary).toHaveTextContent('31.2');
+    const valueSummary = screen.getByTestId('basic-query-free-value-summary');
+    expect(valueSummary).toHaveTextContent('免费版重点结论');
+    expect(valueSummary).toHaveTextContent('当前看点');
+    expect(valueSummary).toHaveTextContent('风险边界');
+    expect(valueSummary).toHaveTextContent('升级可解锁');
+    expect(valueSummary).toHaveTextContent('深度分析');
+    expect(
+      primarySummary.compareDocumentPosition(valueSummary)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const freeReport = screen.getByTestId('basic-query-free-report');
     expect(freeReport).toHaveTextContent('未用 AI');
     expect(freeReport).toHaveTextContent('科技');
@@ -3069,6 +3079,7 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('31.2');
     expect(screen.getByTestId('basic-query-company-profile')).toHaveTextContent('公司资料');
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('未用 AI');
+    expect(screen.getByTestId('basic-query-diagnostics-details')).not.toHaveAttribute('open');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('18ms');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 未命中 / H 未命中');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 实时 / H 实时');

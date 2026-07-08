@@ -1240,3 +1240,39 @@ Review boundary:
 - No AI calls and no public search in free quick mode.
 - `details` are compact scan aids and must not hide missing/degraded source state.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V65 Free-Value Experience Manifest Addendum
+
+Status: local-only free user conversion and readability upgrade. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_value_v65.py`
+- `tests/test_platform_free_value_v65.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v65-free-value-experience.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_FREE_VALUE_V65_OK`
+
+Suggested review/commit position:
+
+- After V64 A-share detail-density work and before any paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes the free value summary, collapsed diagnostics default, V65 verifier, and V65 docs. V64 A-share details and earlier no-AI query logic remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- The free summary is a product-value entry layer, not a trade instruction.
+- Diagnostics remain available for support/operator debugging but no longer dominate the free result.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

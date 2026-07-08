@@ -93,6 +93,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v62: bool = True,
         include_v63: bool = True,
         include_v64: bool = True,
+        include_v65: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -320,6 +321,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "Do not commit real API Key\nNo AI calls\nNo public search\n"
                 "details\nDSA_PLATFORM_A_STOCK_DATA_DETAILS_V64_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-08-dsa-v65-free-value-experience.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo AI calls\nNo public search\n"
+                "free value summary\nDSA_PLATFORM_FREE_VALUE_V65_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -385,6 +391,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_a_stock_data_useful_v62.py",
             "scripts/verify_platform_a_stock_data_experience_v63.py",
             "scripts/verify_platform_a_stock_data_details_v64.py",
+            "scripts/verify_platform_free_value_v65.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -445,6 +452,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_a_stock_data_useful_v62.py",
             "tests/test_platform_a_stock_data_experience_v63.py",
             "tests/test_platform_a_stock_data_details_v64.py",
+            "tests/test_platform_free_value_v65.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -668,6 +676,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v64 and rel_path in {
                 "scripts/verify_platform_a_stock_data_details_v64.py",
                 "tests/test_platform_a_stock_data_details_v64.py",
+            }:
+                continue
+            if not include_v65 and rel_path in {
+                "scripts/verify_platform_free_value_v65.py",
+                "tests/test_platform_free_value_v65.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -961,6 +974,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v64:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-08-dsa-v64-a-stock-data-details.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v65:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-08-dsa-v65-free-value-experience.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1686,6 +1706,20 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("scripts/verify_platform_a_stock_data_details_v64.py", missing)
         self.assertIn("tests/test_platform_a_stock_data_details_v64.py", missing)
         self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v64-a-stock-data-details.md", missing)
+
+    def test_reports_missing_free_value_v65_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v65=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        missing = by_id["required_files_present"].metadata["missing_files"]
+        self.assertIn("scripts/verify_platform_free_value_v65.py", missing)
+        self.assertIn("tests/test_platform_free_value_v65.py", missing)
+        self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v65-free-value-experience.md", missing)
 
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
