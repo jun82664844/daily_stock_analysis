@@ -1185,3 +1185,36 @@ Review notes:
 Acceptance:
 
 - `scripts/verify_platform_free_multimarket_v71.py` must stay visible and print `DSA_PLATFORM_FREE_MULTIMARKET_V71_OK` only when V71 implementation, tests, docs, release package coverage, and git visibility markers are present.
+
+## V72 Free Peer Quotes Addendum
+
+Scope: local-only free query value upgrade. This slice makes the free no-AI peer/market comparison modules show available reference quote values instead of only names and explanations.
+
+Changed files:
+
+- `src/services/basic_query_service.py`
+- `api/v1/schemas/basic_query.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_market_data_cache.py`
+- `scripts/verify_platform_free_peer_quotes_v72.py`
+- `tests/test_platform_free_peer_quotes_v72.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v72-free-peer-quotes.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review notes:
+
+- Free and premium users should see the same comparison modules; premium/API only improves source quality, freshness, source links, configured feeds, and model depth.
+- Reference quote fetches use a short timeout and existing cache. Missing reference quotes must degrade to unavailable and must not block the main snapshot.
+- If the primary platform reference quote source returns empty, the free lane may use the no-key Yahoo chart fallback for public benchmark symbols.
+- Cache coverage confirms the main quote and reference quotes are not fetched again on the second snapshot.
+- No AI calls, no public search, no real payment, no production deployment, and no real API Key are part of this local boundary.
+- All copy remains information analysis only and not investment advice.
+
+Acceptance:
+
+- `scripts/verify_platform_free_peer_quotes_v72.py` must stay visible and print `DSA_PLATFORM_FREE_PEER_QUOTES_V72_OK` only when V72 implementation, tests, docs, release package coverage, and git visibility markers are present.

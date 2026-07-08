@@ -3657,6 +3657,133 @@ describe('HomePage', () => {
     }
   });
 
+  it('shows free comparison reference quote values in Chinese mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh-CN');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 308.63,
+        changePercent: 4.75,
+        source: 'unit_quote',
+        freshness: 'fresh',
+      },
+      profile: {
+        companyName: 'Apple Inc.',
+        sector: 'Technology',
+        industry: 'Consumer Electronics',
+        marketCap: 4530000000000,
+        peRatio: 37.3192,
+        source: 'unit_profile',
+        freshness: 'fresh',
+      },
+      indicators: { ma5: 291.578, ma20: 294.8025 },
+      route: {
+        inputCode: 'AAPL',
+        normalizedCode: 'AAPL',
+        market: 'us',
+        channel: 'us_equity',
+        dataSourceLane: 'us_market_data',
+        quoteSources: ['unit_quote'],
+        historySources: ['unit_history'],
+        aiRequired: false,
+      },
+      diagnostics: {
+        elapsedMs: 20,
+        quoteElapsedMs: 10,
+        historyElapsedMs: 10,
+        profileElapsedMs: 1,
+        cache: { quote: 'miss', history: 'miss', profile: 'miss' },
+        sources: { quote: 'unit_quote', history: 'unit_history', profile: 'unit_profile' },
+        freshness: { quote: 'fresh', history: 'fresh', profile: 'fresh' },
+        timeouts: { quote: false, history: false, profile: false },
+        errors: { quote: null, history: null, profile: null },
+        fallback: { quote: 'live', history: 'live', profile: 'live' },
+        persistentCache: { quote: 'none', history: 'none', profile: 'none', mode: 'local_json' },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      intelligence: {
+        mode: 'free_rules',
+        aiUsed: false,
+        items: [],
+        peerComparison: {
+          title: 'Peer and market comparison',
+          summary: 'Compare AAPL against QQQ and ^IXIC before reading it in isolation.',
+          rows: [
+            {
+              symbol: 'QQQ',
+              label: 'QQQ',
+              role: 'Market benchmark',
+              reason: 'US growth and technology benchmark.',
+              currentSignal: 'AAPL is above MA20 with +4.75%; volume signal is neutral.',
+              compareNext: 'Check whether AAPL confirms faster or weaker than QQQ on the next refresh.',
+              source: 'no_ai_route_rules',
+              referenceQuote: {
+                currentPrice: 512.34,
+                price: 512.34,
+                changePercent: 0.87,
+                freshness: 'fresh',
+                source: 'unit_reference_quote',
+                status: 'available',
+                updateTime: '2026-07-08T09:31:00',
+              },
+            },
+          ],
+        },
+        comparisonTargets: [
+          {
+            symbol: 'QQQ',
+            label: 'QQQ',
+            status: 'reference_only',
+            reason: 'US growth and technology benchmark.',
+            source: 'no_ai_route_rules',
+            referenceQuote: {
+              currentPrice: 512.34,
+              price: 512.34,
+              changePercent: 0.87,
+              freshness: 'fresh',
+              source: 'unit_reference_quote',
+              status: 'available',
+              updateTime: '2026-07-08T09:31:00',
+            },
+          },
+        ],
+      },
+      aiUsed: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL'), {
+      target: { value: 'AAPL' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    const peerComparison = await screen.findByTestId('basic-query-peer-comparison');
+    expect(peerComparison).toHaveTextContent('参照价');
+    expect(peerComparison).toHaveTextContent('512.34');
+    expect(peerComparison).toHaveTextContent('+0.87%');
+    expect(peerComparison).toHaveTextContent('新鲜');
+
+    const watchPoints = screen.getByTestId('basic-query-watch-points');
+    expect(watchPoints).toHaveTextContent('参照行情');
+    expect(watchPoints).toHaveTextContent('QQQ');
+    expect(watchPoints).toHaveTextContent('512.34');
+    expect(watchPoints).not.toHaveTextContent('实时对比数值留给后续深度视图');
+  });
+
   it('shows ordinary-user account guardrails for no-AI quick queries and AI quota cost', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });

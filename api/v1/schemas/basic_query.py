@@ -117,6 +117,23 @@ class BasicWatchPointPayload(BaseModel):
     source: str = "no_ai_rules"
 
 
+class BasicReferenceQuotePayload(BaseModel):
+    """One lightweight quote for a free peer or market reference."""
+
+    stock_name: Optional[str] = None
+    current_price: Optional[float] = None
+    price: Optional[float] = None
+    change: Optional[float] = None
+    change_percent: Optional[float] = None
+    volume: Optional[float] = None
+    amount: Optional[float] = None
+    update_time: Optional[str] = None
+    freshness: str = Field("unavailable", pattern="^(fresh|cached|stale|unavailable)$")
+    source: str = "reference_quote"
+    status: str = Field("unavailable", pattern="^(available|unavailable)$")
+    error: Optional[str] = None
+
+
 class BasicComparisonTargetPayload(BaseModel):
     """One deterministic reference target for low-cost comparison context."""
 
@@ -125,6 +142,7 @@ class BasicComparisonTargetPayload(BaseModel):
     reason: str
     status: str = "reference_only"
     source: str = "no_ai_route_rules"
+    reference_quote: Optional[BasicReferenceQuotePayload] = None
 
 
 class BasicMarketBriefPayload(BaseModel):
@@ -159,6 +177,7 @@ class BasicPeerComparisonRowPayload(BaseModel):
     current_signal: str
     compare_next: str
     source: str = "no_ai_route_rules"
+    reference_quote: Optional[BasicReferenceQuotePayload] = None
 
 
 class BasicPeerComparisonPayload(BaseModel):

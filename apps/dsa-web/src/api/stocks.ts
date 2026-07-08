@@ -94,6 +94,20 @@ export type BasicStockSnapshot = {
         currentSignal: string;
         compareNext: string;
         source: string;
+        referenceQuote?: {
+          stockName?: string | null;
+          currentPrice?: number | null;
+          price?: number | null;
+          change?: number | null;
+          changePercent?: number | null;
+          volume?: number | null;
+          amount?: number | null;
+          updateTime?: string | null;
+          freshness: string;
+          source: string;
+          status: string;
+          error?: string | null;
+        } | null;
       }>;
     } | null;
     signalScore?: {
@@ -223,6 +237,20 @@ export type BasicStockSnapshot = {
       reason: string;
       status: string;
       source: string;
+      referenceQuote?: {
+        stockName?: string | null;
+        currentPrice?: number | null;
+        price?: number | null;
+        change?: number | null;
+        changePercent?: number | null;
+        volume?: number | null;
+        amount?: number | null;
+        updateTime?: string | null;
+        freshness: string;
+        source: string;
+        status: string;
+        error?: string | null;
+      } | null;
     }>;
   } | null;
   route?: {

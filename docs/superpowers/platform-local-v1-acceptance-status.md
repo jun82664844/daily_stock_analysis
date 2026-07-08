@@ -436,3 +436,13 @@ git diff --check
 - Frontend API maps `aShareSourceMode` to `a_share_source_mode`; HomePage tests cover the switch and probes.
 - Added `tests/test_platform_a_stock_data_ui_v61.py` and `scripts/verify_platform_a_stock_data_ui_v61.py`; the verifier prints `DSA_PLATFORM_A_STOCK_DATA_UI_V61_OK` only when required local checks pass.
 - V61 remains local-only. It is not public launch approval, not real payment, not production deployment, not market-data licensing approval, do not commit real API Key, and not investment advice.
+
+## 2026-07-08 Free Peer Reference Quotes V72 gate
+
+- Free no-AI comparison targets now can include lightweight `reference_quote` data: price, change percent, freshness, source, and availability status.
+- Peer comparison rows reuse the same `reference_quote` payload so the free comparison table shows concrete reference prices instead of only route-based hints.
+- Reference quote fetching uses cache and a short timeout; missing reference quotes degrade to unavailable and do not block the main stock snapshot.
+- When the primary platform reference quote source returns empty, the free lane can use a no-key Yahoo chart fallback for public benchmark references.
+- HomePage Chinese mode now shows `参照行情`, `参照价`, and `涨跌幅`; free mode displays available public/local reference quotes while premium/API mode can later improve source quality and freshness.
+- Added `tests/test_platform_free_peer_quotes_v72.py` and `scripts/verify_platform_free_peer_quotes_v72.py`; the verifier prints `DSA_PLATFORM_FREE_PEER_QUOTES_V72_OK` only when required local checks pass.
+- V72 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

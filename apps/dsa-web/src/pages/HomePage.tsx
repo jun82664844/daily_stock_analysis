@@ -5740,9 +5740,10 @@ const HomePage: React.FC = () => {
                           </span>
                         </div>
                         <div className="overflow-hidden rounded-lg border border-subtle/70">
-                          <div className="hidden grid-cols-[minmax(7rem,0.8fr)_minmax(8rem,0.8fr)_minmax(12rem,1.3fr)_minmax(12rem,1.2fr)] gap-2 border-b border-subtle/70 bg-surface/35 px-3 py-2 text-[11px] font-medium text-secondary-text md:grid">
+                          <div className="hidden grid-cols-[minmax(7rem,0.75fr)_minmax(8rem,0.75fr)_minmax(9rem,0.85fr)_minmax(12rem,1.2fr)_minmax(12rem,1.1fr)] gap-2 border-b border-subtle/70 bg-surface/35 px-3 py-2 text-[11px] font-medium text-secondary-text md:grid">
                             <div>{uiLanguage === 'en' ? 'Reference' : '参照对象'}</div>
                             <div>{uiLanguage === 'en' ? 'Role' : '角色'}</div>
+                            <div>{uiLanguage === 'en' ? 'Ref quote' : '参照行情'}</div>
                             <div>{uiLanguage === 'en' ? 'Current signal' : '本股位置'}</div>
                             <div>{uiLanguage === 'en' ? 'Next check' : '下一步对比'}</div>
                           </div>
@@ -5750,7 +5751,7 @@ const HomePage: React.FC = () => {
                             {basicSnapshot.intelligence.peerComparison.rows.map((row) => (
                               <div
                                 key={`${row.symbol}-${row.role}`}
-                                className="grid gap-2 px-3 py-3 text-xs md:grid-cols-[minmax(7rem,0.8fr)_minmax(8rem,0.8fr)_minmax(12rem,1.3fr)_minmax(12rem,1.2fr)]"
+                                className="grid gap-2 px-3 py-3 text-xs md:grid-cols-[minmax(7rem,0.75fr)_minmax(8rem,0.75fr)_minmax(9rem,0.85fr)_minmax(12rem,1.2fr)_minmax(12rem,1.1fr)]"
                               >
                                 <div className="min-w-0">
                                   <div className="font-semibold text-foreground">{row.symbol}</div>
@@ -5758,6 +5759,25 @@ const HomePage: React.FC = () => {
                                 </div>
                                 <div className="min-w-0 text-secondary-text">
                                   <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">{localizeGeneratedText(row.role, uiLanguage)}</span>
+                                </div>
+                                <div className="min-w-0 leading-relaxed text-secondary-text">
+                                  {row.referenceQuote?.status === 'available' ? (
+                                    <div className="space-y-0.5">
+                                      <div className="font-medium text-foreground">
+                                        {uiLanguage === 'en' ? 'Price' : '参照价'} {formatBasicNumber(row.referenceQuote.currentPrice ?? row.referenceQuote.price)}
+                                      </div>
+                                      <div>
+                                        {uiLanguage === 'en' ? 'Chg' : '涨跌'} {formatSignedBasicPercent(row.referenceQuote.changePercent)}
+                                      </div>
+                                      <div className="truncate text-[11px]">
+                                        {localizeRuntimeLabel(row.referenceQuote.freshness, uiLanguage)}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-secondary-text">
+                                      {uiLanguage === 'en' ? 'Quote unavailable' : '参照行情暂不可用'}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="min-w-0 leading-relaxed text-secondary-text">
                                   {localizeGeneratedText(row.currentSignal, uiLanguage)}
@@ -5805,22 +5825,48 @@ const HomePage: React.FC = () => {
                           <div className="text-sm font-semibold text-foreground">
                             {uiLanguage === 'en' ? 'Compare with' : '对比参照'}
                           </div>
-                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                          <div className="mt-2 grid gap-2">
                             {(basicSnapshot.intelligence?.comparisonTargets ?? []).map((item) => (
-                              <span
+                              <div
                                 key={`${item.symbol}-${item.label}`}
-                                className="max-w-full rounded-md border border-subtle/80 px-2 py-1 text-[11px] text-secondary-text"
+                                className="min-w-0 rounded-lg border border-subtle/80 bg-background/45 px-2.5 py-2 text-[11px] text-secondary-text"
                                 title={localizeGeneratedText(item.reason, uiLanguage)}
                               >
-                                <span className="font-medium text-foreground">{item.symbol}</span>
-                                <span className="ml-1">{localizeGeneratedText(item.label, uiLanguage)}</span>
-                              </span>
+                                <div className="flex min-w-0 items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="truncate font-medium text-foreground">
+                                      {item.symbol}
+                                      <span className="ml-1 text-secondary-text">{localizeGeneratedText(item.label, uiLanguage)}</span>
+                                    </div>
+                                    <div className="mt-0.5 truncate">{localizeGeneratedText(item.reason, uiLanguage)}</div>
+                                  </div>
+                                  <span className="shrink-0 rounded-md border border-subtle/80 px-1.5 py-0.5">
+                                    {localizeRuntimeLabel(item.referenceQuote?.freshness || item.status, uiLanguage)}
+                                  </span>
+                                </div>
+                                {item.referenceQuote?.status === 'available' ? (
+                                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                                    <div className="rounded-md border border-subtle/70 bg-surface/35 px-2 py-1">
+                                      <div className="text-[10px] text-secondary-text">{uiLanguage === 'en' ? 'Price' : '参照价'}</div>
+                                      <div className="text-sm font-semibold text-foreground">{formatBasicNumber(item.referenceQuote.currentPrice ?? item.referenceQuote.price)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-subtle/70 bg-surface/35 px-2 py-1">
+                                      <div className="text-[10px] text-secondary-text">{uiLanguage === 'en' ? 'Change' : '涨跌幅'}</div>
+                                      <div className="text-sm font-semibold text-foreground">{formatSignedBasicPercent(item.referenceQuote.changePercent)}</div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 rounded-md border border-subtle/70 bg-surface/35 px-2 py-1 text-[11px]">
+                                    {uiLanguage === 'en' ? 'Reference quote is temporarily unavailable.' : '参照行情暂不可用，刷新后可再对比。'}
+                                  </div>
+                                )}
+                              </div>
                             ))}
                           </div>
                           <div className="mt-3 text-[11px] leading-relaxed text-secondary-text">
                             {uiLanguage === 'en'
-                              ? 'Reference targets are route-based hints; realtime comparison values are reserved for a later deep view.'
-                              : '对比对象是基于市场通道的参考提示；实时对比数值留给后续深度视图。'}
+                              ? 'Free mode shows available public reference quotes; premium can switch the same comparison to steadier API-backed sources.'
+                              : '免费版会显示可用的公共参照行情；高级版可把同一对比切换到更稳定的 API 数据源。'}
                           </div>
                         </div>
                       </div>

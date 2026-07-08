@@ -1484,6 +1484,44 @@ Rollback:
 
 - Reverting this slice removes V71 fallback multimarket modules, V71 verifier, and V71 docs. V70 detail readability and earlier free query modules remain available if those slices are kept.
 
+## V72 Free Peer Quotes Manifest Addendum
+
+Purpose: make the free/no-AI peer and market comparison modules show concrete reference quote values when lightweight public/local data is available.
+
+Files:
+
+- `src/services/basic_query_service.py`
+- `api/v1/schemas/basic_query.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_market_data_cache.py`
+- `scripts/verify_platform_free_peer_quotes_v72.py`
+- `tests/test_platform_free_peer_quotes_v72.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v72-free-peer-quotes.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Expected marker:
+
+- `DSA_PLATFORM_FREE_PEER_QUOTES_V72_OK`
+
+Acceptance gates:
+
+- Backend `comparison_targets` and `peer_comparison.rows` can carry `reference_quote` with price, change percent, freshness, status, and source.
+- Frontend Chinese mode shows `参照行情`, `参照价`, `涨跌幅`, and localized freshness when the reference quote is available.
+- Missing reference quotes degrade without blocking the main stock snapshot.
+- A no-key Yahoo chart fallback can fill public benchmark reference quotes when the platform source returns empty.
+- Cache tests confirm repeated snapshots do not refetch the main quote or reference quotes.
+- Free and premium show the same visible modules; premium/API modes improve freshness, source links, configured feeds, and model depth.
+- No AI call, public search, production deployment, real payment, or real API Key is introduced.
+
+Rollback:
+
+- Reverting this slice removes V72 peer reference quote enrichment, V72 verifier, and V72 docs. V71 multimarket modules and earlier free query modules remain available if those slices are kept.
+
 Review boundary:
 
 - No AI calls and no public search in free quick mode.

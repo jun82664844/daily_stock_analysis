@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import os
 import time
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, Optional
 
@@ -23,6 +26,7 @@ _BASIC_QUERY_FETCH_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 )
 _DEFAULT_FETCH_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_FETCH_TIMEOUT_SEC", "4"))
 _DEFAULT_PROFILE_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_PROFILE_TIMEOUT_SEC", "2"))
+_DEFAULT_REFERENCE_QUOTE_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_REFERENCE_QUOTE_TIMEOUT_SEC", "1.2"))
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,7 @@ class BasicQueryService:
         cache: Optional[MarketDataCache] = None,
         fetch_timeout_seconds: Optional[float] = None,
         profile_timeout_seconds: Optional[float] = None,
+        reference_quote_timeout_seconds: Optional[float] = None,
         source_health: Optional[MarketSourceHealthRegistry] = None,
         a_share_enrichment_service: Optional[Any] = None,
     ):
@@ -72,6 +77,11 @@ class BasicQueryService:
         )
         self.profile_timeout_seconds = (
             _DEFAULT_PROFILE_TIMEOUT_SECONDS if profile_timeout_seconds is None else max(0.001, float(profile_timeout_seconds))
+        )
+        self.reference_quote_timeout_seconds = (
+            _DEFAULT_REFERENCE_QUOTE_TIMEOUT_SECONDS
+            if reference_quote_timeout_seconds is None
+            else max(0.001, float(reference_quote_timeout_seconds))
         )
 
     def get_snapshot(self, stock_code: str, *, force_refresh: bool = False) -> Dict[str, Any]:
@@ -776,6 +786,10 @@ class BasicQueryService:
         financial_summary, financial_status = self._financial_intelligence_summary(profile, route=route)
         quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
         warning_note = " Current market data is degraded." if warnings else ""
+        comparison_targets = self._comparison_targets_with_reference_quotes(
+            route=route,
+            profile=profile,
+        )
         return {
             "mode": "no_ai_low_cost",
             "ai_used": False,
@@ -792,6 +806,7 @@ class BasicQueryService:
                 quote=quote,
                 profile=profile,
                 indicators=indicators,
+                comparison_targets=comparison_targets,
             ),
             "signal_score": self._signal_score_payload(
                 route=route,
@@ -861,7 +876,7 @@ class BasicQueryService:
                 indicators=indicators,
                 warnings=warnings,
             ),
-            "comparison_targets": self._comparison_targets_payload(route=route, profile=profile),
+            "comparison_targets": comparison_targets,
             "boundary": "Information analysis only; not investment advice.",
         }
 
@@ -1190,12 +1205,14 @@ class BasicQueryService:
         quote: Dict[str, Any],
         profile: Optional[Dict[str, Any]],
         indicators: Dict[str, Any],
+        comparison_targets: Optional[list[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        targets = self._comparison_targets_payload(route=route, profile=profile)
+        targets = comparison_targets or self._comparison_targets_payload(route=route, profile=profile)
         current_signal = self._current_signal_summary(route=route, quote=quote, indicators=indicators)
         target_symbols = ", ".join(target["symbol"] for target in targets) if targets else route.data_source_lane
-        rows = [
-            {
+        rows = []
+        for target in targets:
+            row = {
                 "symbol": target["symbol"],
                 "label": target["label"],
                 "role": self._comparison_role_for_target(target=target, route=route),
@@ -1207,8 +1224,10 @@ class BasicQueryService:
                 ),
                 "source": "no_ai_route_rules",
             }
-            for target in targets
-        ]
+            reference_quote = target.get("reference_quote")
+            if isinstance(reference_quote, dict):
+                row["reference_quote"] = reference_quote
+            rows.append(row)
         return {
             "title": "Peer and market comparison",
             "summary": f"Compare {route.normalized_code} against {target_symbols} before reading it in isolation.",
@@ -1723,7 +1742,7 @@ class BasicQueryService:
         *,
         route: MarketRoute,
         profile: Optional[Dict[str, Any]],
-    ) -> list[Dict[str, str]]:
+    ) -> list[Dict[str, Any]]:
         targets: list[Dict[str, str]]
         if route.market == "cn":
             targets = [
@@ -1758,6 +1777,218 @@ class BasicQueryService:
             }
             for target in targets
         ]
+
+    def _comparison_targets_with_reference_quotes(
+        self,
+        *,
+        route: MarketRoute,
+        profile: Optional[Dict[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        targets = self._comparison_targets_payload(route=route, profile=profile)
+        quote_map = self._reference_quote_payloads_for_targets(targets[:3])
+        enriched: list[Dict[str, Any]] = []
+        for target in targets:
+            payload = dict(target)
+            reference_quote = quote_map.get(str(target.get("symbol") or ""))
+            if reference_quote:
+                payload["reference_quote"] = reference_quote
+            enriched.append(payload)
+        return enriched
+
+    def _reference_quote_payloads_for_targets(
+        self,
+        targets: Iterable[Dict[str, Any]],
+    ) -> Dict[str, Dict[str, Any]]:
+        target_list = [target for target in targets if target.get("symbol")]
+        if not target_list:
+            return {}
+
+        results: Dict[str, Dict[str, Any]] = {}
+        pending: Dict[concurrent.futures.Future, tuple[str, MarketRoute, float]] = {}
+
+        for target in target_list:
+            symbol = str(target.get("symbol") or "").strip()
+            if not symbol:
+                continue
+            target_route = self._resolve_route(symbol)
+            cache_key = f"quote:{target_route.normalized_code}"
+            hit = self.cache.get(cache_key)
+            if hit is not None:
+                source = self._payload_source(hit.value, hit.source or target_route.quote_sources[0])
+                results[symbol] = self._reference_quote_payload(
+                    hit.value,
+                    freshness=hit.freshness,
+                    source=source,
+                    status="available",
+                )
+                continue
+            started = time.perf_counter()
+            future = _BASIC_QUERY_FETCH_EXECUTOR.submit(self._fetch_reference_quote, target_route.normalized_code)
+            pending[future] = (symbol, target_route, started)
+
+        if pending:
+            done, not_done = concurrent.futures.wait(
+                pending,
+                timeout=self.reference_quote_timeout_seconds,
+                return_when=concurrent.futures.ALL_COMPLETED,
+            )
+            for future in not_done:
+                future.cancel()
+                symbol, target_route, started = pending[future]
+                elapsed_ms = self._elapsed_ms(started)
+                self.source_health.record_timeout(target_route.quote_sources[0], elapsed_ms=elapsed_ms)
+                results[symbol] = self._unavailable_reference_quote_payload(
+                    source=target_route.quote_sources[0],
+                    error="timeout",
+                )
+            for future in done:
+                symbol, target_route, started = pending[future]
+                source_id = target_route.quote_sources[0]
+                elapsed_ms = self._elapsed_ms(started)
+                try:
+                    quote = future.result()
+                except Exception:
+                    quote = None
+                if isinstance(quote, dict) and quote:
+                    quote = dict(quote)
+                    quote.setdefault("source", source_id)
+                    self.cache.set(
+                        f"quote:{target_route.normalized_code}",
+                        quote,
+                        source=quote.get("source") or source_id,
+                    )
+                    self.source_health.record_success(source_id, elapsed_ms=elapsed_ms)
+                    results[symbol] = self._reference_quote_payload(
+                        quote,
+                        freshness=str(quote.get("freshness") or "fresh"),
+                        source=str(quote.get("source") or source_id),
+                        status="available",
+                    )
+                else:
+                    self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+                    results[symbol] = self._unavailable_reference_quote_payload(
+                        source=source_id,
+                        error="unavailable",
+                    )
+        return results
+
+    def _fetch_reference_quote(self, code: str) -> Optional[Dict[str, Any]]:
+        quote = self.stock_service.get_realtime_quote(code)
+        if isinstance(quote, dict) and self._float_or_none(quote.get("current_price")) is not None:
+            return quote
+        yahoo_quote = self._fetch_reference_quote_from_yahoo_chart(code)
+        if yahoo_quote:
+            return yahoo_quote
+        return quote if isinstance(quote, dict) else None
+
+    def _fetch_reference_quote_from_yahoo_chart(self, code: str) -> Optional[Dict[str, Any]]:
+        symbol = self._yahoo_reference_symbol(code)
+        if not symbol:
+            return None
+        encoded = urllib.parse.quote(symbol, safe="")
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{encoded}?interval=1d&range=5d"
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 DSA local free reference quote"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.reference_quote_timeout_seconds) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            return None
+
+        result = (((payload or {}).get("chart") or {}).get("result") or [None])[0]
+        if not isinstance(result, dict):
+            return None
+        meta = result.get("meta") or {}
+        indicators = result.get("indicators") or {}
+        quote_rows = indicators.get("quote") or []
+        quote_row = quote_rows[0] if quote_rows and isinstance(quote_rows[0], dict) else {}
+        closes = [self._float_or_none(value) for value in (quote_row.get("close") or [])]
+        closes = [value for value in closes if value is not None]
+        current_price = self._float_or_none(meta.get("regularMarketPrice"))
+        if current_price is None and closes:
+            current_price = closes[-1]
+        previous_close = self._float_or_none(meta.get("chartPreviousClose") or meta.get("previousClose"))
+        if previous_close is None and len(closes) >= 2:
+            previous_close = closes[-2]
+        change = None
+        change_percent = None
+        if current_price is not None and previous_close not in (None, 0):
+            change = round(current_price - previous_close, 4)
+            change_percent = round((change / previous_close) * 100, 4)
+        timestamps = result.get("timestamp") or []
+        update_time = str(timestamps[-1]) if timestamps else None
+        if current_price is None:
+            return None
+        return {
+            "stock_code": code,
+            "stock_name": meta.get("longName") or meta.get("shortName") or symbol,
+            "current_price": current_price,
+            "change": change,
+            "change_percent": change_percent,
+            "volume": (quote_row.get("volume") or [None])[-1] if quote_row.get("volume") else None,
+            "amount": None,
+            "update_time": update_time,
+            "source": "yahoo_chart_reference",
+            "freshness": "fresh",
+        }
+
+    def _yahoo_reference_symbol(self, code: str) -> str:
+        raw = (code or "").strip()
+        upper = raw.upper()
+        if upper.endswith(".SH"):
+            return f"{raw[:-3]}.SS"
+        if upper.startswith("SH") and upper[2:].isdigit():
+            return f"{upper[2:]}.SS"
+        if upper.startswith("HK") and upper[2:].isdigit():
+            return f"{int(upper[2:]):04d}.HK"
+        if upper.endswith(".HK"):
+            stem = upper[:-3]
+            if stem.isdigit():
+                return f"{int(stem):04d}.HK"
+        return raw
+
+    def _reference_quote_payload(
+        self,
+        quote: Optional[Dict[str, Any]],
+        *,
+        freshness: str,
+        source: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        if not quote:
+            return self._unavailable_reference_quote_payload(source=source, error="unavailable")
+        normalized_freshness = freshness if freshness in {"fresh", "cached", "stale", "unavailable"} else "fresh"
+        current_price = self._float_or_none(quote.get("current_price"))
+        return {
+            "stock_name": quote.get("stock_name") or quote.get("name"),
+            "current_price": current_price,
+            "price": current_price,
+            "change": self._float_or_none(quote.get("change")),
+            "change_percent": self._float_or_none(quote.get("change_percent")),
+            "volume": self._float_or_none(quote.get("volume")),
+            "amount": self._float_or_none(quote.get("amount")),
+            "update_time": str(quote.get("update_time")) if quote.get("update_time") is not None else None,
+            "freshness": normalized_freshness,
+            "source": source or "reference_quote",
+            "status": status,
+        }
+
+    def _unavailable_reference_quote_payload(self, *, source: str, error: str) -> Dict[str, Any]:
+        return {
+            "current_price": None,
+            "price": None,
+            "change": None,
+            "change_percent": None,
+            "volume": None,
+            "amount": None,
+            "update_time": None,
+            "freshness": "unavailable",
+            "source": source or "reference_quote",
+            "status": "unavailable",
+            "error": error,
+        }
 
     def _financial_intelligence_summary(self, profile: Optional[Dict[str, Any]], *, route: MarketRoute) -> tuple[str, str]:
         if route.market == "crypto":

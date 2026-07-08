@@ -326,6 +326,156 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertIn("not investment advice", retention["boundary"])
         analysis_service.assert_not_called()
 
+    def test_no_ai_snapshot_enriches_free_comparison_targets_with_reference_quotes(self) -> None:
+        class ReferenceQuoteStockService:
+            quotes = {
+                "AAPL": {
+                    "stock_code": "AAPL",
+                    "stock_name": "Apple Inc.",
+                    "current_price": 200.0,
+                    "change_percent": 1.5,
+                    "volume": 1200000,
+                    "source": "unit_quote",
+                    "freshness": "fresh",
+                    "update_time": "2026-07-08T09:30:00",
+                },
+                "QQQ": {
+                    "stock_code": "QQQ",
+                    "stock_name": "Invesco QQQ Trust",
+                    "current_price": 512.34,
+                    "change_percent": 0.87,
+                    "volume": 2200000,
+                    "source": "unit_reference_quote",
+                    "freshness": "fresh",
+                    "update_time": "2026-07-08T09:31:00",
+                },
+                "^IXIC": {
+                    "stock_code": "^IXIC",
+                    "stock_name": "Nasdaq Composite",
+                    "current_price": 20234.56,
+                    "change_percent": -0.22,
+                    "volume": 0,
+                    "source": "unit_reference_quote",
+                    "freshness": "fresh",
+                    "update_time": "2026-07-08T09:31:00",
+                },
+                "XLK": {
+                    "stock_code": "XLK",
+                    "stock_name": "Technology Select Sector SPDR Fund",
+                    "current_price": 245.67,
+                    "change_percent": 1.11,
+                    "volume": 990000,
+                    "source": "unit_reference_quote",
+                    "freshness": "fresh",
+                    "update_time": "2026-07-08T09:31:00",
+                },
+            }
+
+            def get_realtime_quote(self, stock_code: str):
+                return dict(self.quotes[stock_code])
+
+            def get_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": stock_code,
+                    "source": "unit_history",
+                    "data": [
+                        {"date": f"2026-06-{day:02d}", "close": 180.0 + day, "volume": 1000 + day}
+                        for day in range(1, 22)
+                    ],
+                }
+
+            def get_basic_company_profile(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "company_name": "Apple Inc.",
+                    "sector": "Technology",
+                    "industry": "Consumer Electronics",
+                    "market_cap": 4500000000000,
+                    "pe_ratio": 31.2,
+                    "source": "unit_profile",
+                }
+
+        snapshot = BasicQueryService(
+            stock_service=ReferenceQuoteStockService(),
+            cache=MarketDataCache(default_ttl_seconds=60),
+        ).get_snapshot("AAPL")
+
+        targets = {item["symbol"]: item for item in snapshot["intelligence"]["comparison_targets"]}
+        qqq_quote = targets["QQQ"]["reference_quote"]
+        self.assertEqual(qqq_quote["current_price"], 512.34)
+        self.assertEqual(qqq_quote["price"], 512.34)
+        self.assertEqual(qqq_quote["change_percent"], 0.87)
+        self.assertEqual(qqq_quote["freshness"], "fresh")
+        self.assertEqual(qqq_quote["source"], "unit_reference_quote")
+        self.assertEqual(qqq_quote["status"], "available")
+
+        peer_rows = {row["symbol"]: row for row in snapshot["intelligence"]["peer_comparison"]["rows"]}
+        self.assertEqual(peer_rows["^IXIC"]["reference_quote"]["current_price"], 20234.56)
+        self.assertEqual(peer_rows["XLK"]["reference_quote"]["change_percent"], 1.11)
+        self.assertFalse(snapshot["ai_used"])
+
+    def test_no_ai_snapshot_uses_yahoo_reference_quote_fallback_when_platform_source_is_empty(self) -> None:
+        class EmptyReferenceQuoteStockService:
+            def get_realtime_quote(self, stock_code: str):
+                if stock_code == "AAPL":
+                    return {
+                        "stock_code": "AAPL",
+                        "stock_name": "Apple Inc.",
+                        "current_price": 200.0,
+                        "change_percent": 1.5,
+                        "volume": 1200000,
+                        "source": "unit_quote",
+                        "freshness": "fresh",
+                    }
+                return None
+
+            def get_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": stock_code,
+                    "source": "unit_history",
+                    "data": [
+                        {"date": f"2026-06-{day:02d}", "close": 180.0 + day, "volume": 1000 + day}
+                        for day in range(1, 22)
+                    ],
+                }
+
+            def get_basic_company_profile(self, stock_code: str):
+                return {
+                    "stock_code": stock_code,
+                    "company_name": "Apple Inc.",
+                    "sector": "Technology",
+                    "industry": "Consumer Electronics",
+                    "market_cap": 4500000000000,
+                    "pe_ratio": 31.2,
+                    "source": "unit_profile",
+                }
+
+        def yahoo_fallback(code: str):
+            return {
+                "stock_code": code,
+                "stock_name": code,
+                "current_price": 500.0 if code == "QQQ" else 20000.0,
+                "change_percent": 0.5 if code == "QQQ" else -0.1,
+                "source": "unit_yahoo_reference",
+                "freshness": "fresh",
+            }
+
+        service = BasicQueryService(
+            stock_service=EmptyReferenceQuoteStockService(),
+            cache=MarketDataCache(default_ttl_seconds=60),
+        )
+        with patch.object(service, "_fetch_reference_quote_from_yahoo_chart", side_effect=yahoo_fallback):
+            snapshot = service.get_snapshot("AAPL")
+
+        targets = {item["symbol"]: item for item in snapshot["intelligence"]["comparison_targets"]}
+        self.assertEqual(targets["QQQ"]["reference_quote"]["current_price"], 500.0)
+        self.assertEqual(targets["QQQ"]["reference_quote"]["source"], "unit_yahoo_reference")
+        self.assertEqual(targets["^IXIC"]["reference_quote"]["change_percent"], -0.1)
+        self.assertEqual(targets["XLK"]["reference_quote"]["status"], "available")
+        self.assertFalse(snapshot["ai_used"])
+
     def test_no_ai_snapshot_includes_news_center_and_kline_forecast_lab(self) -> None:
         class NewsKlineStockService:
             def get_realtime_quote(self, stock_code: str):

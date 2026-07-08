@@ -45,4 +45,8 @@ class MarketDataCacheTestCase(unittest.TestCase):
 
         self.assertEqual(first["quote"]["freshness"], "fresh")
         self.assertEqual(second["quote"]["freshness"], "cached")
-        stock_service.get_realtime_quote.assert_called_once_with("AAPL")
+        quote_calls = [call.args[0] for call in stock_service.get_realtime_quote.call_args_list]
+        self.assertEqual(quote_calls.count("AAPL"), 1)
+        self.assertEqual(quote_calls.count("QQQ"), 1)
+        self.assertEqual(quote_calls.count("^IXIC"), 1)
+        self.assertEqual(len(quote_calls), 3)
