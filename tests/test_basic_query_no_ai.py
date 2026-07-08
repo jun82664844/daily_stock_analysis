@@ -157,7 +157,23 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
                             "diagnostics": {"cache": {"hits": 0}, "rate_limited_channels": []},
                             "ai_used": False,
                             "public_search_used": False,
-                            "channels": [],
+                            "channels": [
+                                {
+                                    "category": "capital_flow",
+                                    "title": "Fund flow",
+                                    "summary": "Unit summary",
+                                    "status": "available",
+                                    "source": "unit",
+                                    "action": "Unit action",
+                                    "details": [
+                                        {
+                                            "label": "Main net",
+                                            "value": "12.0M",
+                                            "detail": "Preserved through response schema.",
+                                        }
+                                    ],
+                                }
+                            ],
                             "reader_summary": {
                                 "headline": "600519 A-share readout",
                                 "why_read": "Why this matters",
@@ -198,6 +214,9 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         self.assertEqual(reader_summary["headline"], "600519 A-share readout")
         self.assertEqual(reader_summary["key_facts"][0]["label"], "Today")
         self.assertEqual(reader_summary["miss_explanations"][0]["next_step"], "Refresh later.")
+        channel_details = body["intelligence"]["a_share_enrichment"]["channels"][0]["details"]
+        self.assertEqual(channel_details[0]["label"], "Main net")
+        self.assertEqual(channel_details[0]["detail"], "Preserved through response schema.")
 
     def test_service_snapshot_includes_no_ai_company_profile_when_available(self) -> None:
         class RichStockService:

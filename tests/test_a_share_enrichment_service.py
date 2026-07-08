@@ -393,6 +393,112 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         self.assertIn("公告原文", " ".join(reader_summary["premium_features"]))
         self.assertIn("仅作信息分析", reader_summary["boundary"])
 
+    def test_a_stock_data_summary_uses_chinese_price_copy(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/announcements"):
+                return {"checked": True, "items": []}
+            if url.endswith("/capital_flow"):
+                return {"checked": True, "items": []}
+            if url.endswith("/sector"):
+                return {"checked": True, "concepts": ["白酒"], "industry": "食品饮料"}
+            if url.endswith("/research"):
+                return {"checked": True, "items": []}
+            if url.endswith("/dragon_tiger"):
+                return {"checked": True, "items": []}
+            return {}
+
+        payload = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            min_interval_seconds=0,
+        ).get_enrichment(
+            "600519.SH",
+            stock_name="贵州茅台",
+            quote={"current_price": 1188.8, "change_percent": -1.5},
+            profile={"sector": "消费", "industry": "白酒"},
+        )
+
+        summary = payload["summary"]
+        self.assertIn("最新价 1188.8", summary)
+        self.assertIn("涨跌幅 -1.5%", summary)
+        self.assertNotIn("Last price", summary)
+        self.assertNotIn("change -1.5%", summary)
+
+    def test_a_stock_data_channels_include_v64_structured_details(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/announcements"):
+                return {
+                    "checked": True,
+                    "items": [
+                        {
+                            "title": "Dividend implementation announcement",
+                            "date": "2026-06-22",
+                            "type": "annual distribution",
+                            "url": "https://example.test/announcement",
+                        }
+                    ],
+                }
+            if url.endswith("/capital_flow"):
+                return {
+                    "checked": True,
+                    "items": [
+                        {
+                            "time": "2026-07-08 09:31",
+                            "main_net": 12000000,
+                            "large_net": 8000000,
+                            "super_net": 4000000,
+                        }
+                    ],
+                    "main_net": 12000000,
+                    "latest_main_net": 12000000,
+                    "main_net_ratio": 2.4,
+                }
+            if url.endswith("/sector"):
+                return {"checked": True, "concepts": ["Baijiu", "Consumption"], "industry": "Food & Beverage", "total": 2}
+            if url.endswith("/research"):
+                return {
+                    "checked": True,
+                    "items": [
+                        {
+                            "title": "Annual report review",
+                            "org": "Unit Securities",
+                            "rating": "Buy",
+                            "date": "2026-05-25",
+                        }
+                    ],
+                }
+            if url.endswith("/dragon_tiger"):
+                return {
+                    "checked": True,
+                    "items": [
+                        {
+                            "date": "2026-07-06",
+                            "reason": "daily price deviation",
+                            "net_buy": 9000000,
+                            "turnover": 3.2,
+                        }
+                    ],
+                }
+            return {}
+
+        payload = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            min_interval_seconds=0,
+        ).get_enrichment("600519", stock_name="贵州茅台", quote={"current_price": 1188.8, "change_percent": -1.5})
+
+        by_category = {item["category"]: item for item in payload["channels"]}
+        self.assertEqual(by_category["announcements"]["details"][0]["label"], "发布日期")
+        self.assertIn("2026-06-22", by_category["announcements"]["details"][0]["value"])
+        self.assertTrue(any(detail["label"] == "主力净额" for detail in by_category["capital_flow"]["details"]))
+        self.assertTrue(any(detail["label"] == "行业" for detail in by_category["sector"]["details"]))
+        self.assertTrue(any(detail["label"] == "评级" and detail["value"] == "Buy" for detail in by_category["research"]["details"]))
+        self.assertTrue(any(detail["label"] == "净买入" for detail in by_category["dragon_tiger"]["details"]))
+
     def test_checked_empty_fund_flow_reports_clear_degradation_not_reserved_lane(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService
 

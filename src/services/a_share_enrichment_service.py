@@ -433,6 +433,10 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_cninfo_or_f10",
                 action="深度模式可展开公告原文和来源链接。",
+                details=[
+                    self._detail("发布日期", date or "-", "公告披露日期"),
+                    self._detail("公告标题", title, str(item.get("type") or "最新公告")),
+                ],
             )
         if isinstance(payload, dict) and payload.get("checked"):
             return self._channel(
@@ -442,6 +446,7 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_cninfo_or_f10",
                 action="需要公告原文、PDF 或更长时间范围时，再打开深度模式。",
+                details=[self._detail("查询状态", "已查询未命中", "快速窗口暂无新公告")],
             )
         return self._channel(
             "announcements",
@@ -450,6 +455,7 @@ class AShareEnrichmentService:
             status="degraded",
             source="a_stock_data_poc_local_rules",
             action="Later versions can enable cached announcement fetching without calling external sources on every query.",
+            details=[self._detail("通道状态", "降级", "未启用公告实时抓取")],
         )
 
     def _capital_flow_channel(
@@ -463,6 +469,11 @@ class AShareEnrichmentService:
         ratio = self._float_or_none((payload or {}).get("main_net_ratio"))
         if main_net is not None:
             ratio_text = f", ratio {self._format_percent(ratio)}" if ratio is not None else ""
+            rows = (payload or {}).get("items") if isinstance(payload, dict) else []
+            latest = rows[-1] if isinstance(rows, list) and rows else {}
+            latest_main = self._float_or_none((payload or {}).get("latest_main_net"))
+            if latest_main is None:
+                latest_main = self._float_or_none((latest or {}).get("main_net"))
             return self._channel(
                 "capital_flow",
                 "资金流通道",
@@ -470,6 +481,12 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_eastmoney_fund_flow",
                 action="继续观察主力资金是否连续回流，不要只看单次分钟波动。",
+                details=[
+                    self._detail("主力净额", self._format_money(main_net), "近几条分钟记录合计"),
+                    self._detail("最新分钟", self._format_money(latest_main), str((latest or {}).get("time") or "最新记录")),
+                    self._detail("大单净额", self._format_money(self._float_or_none((latest or {}).get("large_net"))), "最新记录"),
+                    self._detail("超大单净额", self._format_money(self._float_or_none((latest or {}).get("super_net"))), "最新记录"),
+                ],
             )
         if isinstance(payload, dict) and payload.get("checked"):
             return self._channel(
@@ -479,6 +496,7 @@ class AShareEnrichmentService:
                 status="degraded",
                 source="a_stock_data_eastmoney_fund_flow",
                 action="先把资金流视为缺口项，不要只凭单次价格波动下结论。",
+                details=[self._detail("查询状态", "已查询未返回", "当前快速窗口无分钟级主力净额")],
             )
         change_percent = self._float_or_none((quote or {}).get("change_percent"))
         price_hint = f" Current change is {self._format_percent(change_percent)}." if change_percent is not None else ""
@@ -489,6 +507,7 @@ class AShareEnrichmentService:
             status="degraded",
             source="a_stock_data_poc_local_rules",
             action="Later versions can add cached daily fund flow by main, large, medium, and small orders.",
+            details=[self._detail("通道状态", "降级", "未启用资金流实时抓取")],
         )
 
     def _sector_channel(
@@ -513,6 +532,11 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_eastmoney_concept_blocks",
                 action="把涨跌、估值和资金流放到同板块里对比。",
+                details=[
+                    self._detail("行业", industry or "-", "公司行业标签"),
+                    self._detail("板块", " / ".join(concepts_list[:3]) or sector or " / ".join(bits[:3]), "可用于同类股对比"),
+                    self._detail("命中数量", str((payload or {}).get("total") or len(concepts_list) or len(bits)), "当前返回的板块数量"),
+                ],
             )
         return self._channel(
             "sector",
@@ -521,6 +545,7 @@ class AShareEnrichmentService:
             status="degraded",
             source="a_stock_data_poc_local_rules",
             action="缺少板块标签时，先用行情、估值和公告通道做基础判断，不要直接做同业强弱结论。",
+            details=[self._detail("查询状态", "未命中", "暂无可用板块标签")],
         )
 
     def _fallback_sector_bits(self, code: str, stock_name: str | None) -> list[str]:
@@ -556,6 +581,12 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_eastmoney_reportapi",
                 action="高级版可展开更多研报、PDF 和机构预测字段。",
+                details=[
+                    self._detail("发布日期", date or "-", "研报发布日期"),
+                    self._detail("机构", org or "-", "发布机构"),
+                    self._detail("评级", rating or "-", "机构评级"),
+                    self._detail("标题", title, "最新命中研报"),
+                ],
             )
         if isinstance(payload, dict) and payload.get("checked"):
             return self._channel(
@@ -565,6 +596,7 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_eastmoney_reportapi",
                 action="需要行业研报、PDF 和机构预测字段时，再打开深度模式。",
+                details=[self._detail("查询状态", "已查询未命中", "快速窗口暂无近期研报")],
             )
         return self._channel(
             "research",
@@ -573,6 +605,7 @@ class AShareEnrichmentService:
             status="degraded",
             source="a_stock_data_poc_local_rules",
             action="Deep mode can fetch research sources by symbol and industry.",
+            details=[self._detail("通道状态", "降级", "未启用研报实时抓取")],
         )
 
     def _dragon_tiger_channel(
@@ -593,6 +626,12 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_eastmoney_datacenter",
                 action="重点看机构席位和营业部买卖方向。",
+                details=[
+                    self._detail("上榜日期", date or "-", "龙虎榜交易日期"),
+                    self._detail("净买入", self._format_money(net_buy), "买卖净额"),
+                    self._detail("上榜原因", str(item.get("reason") or "-"), "异动原因"),
+                    self._detail("换手率", self._format_percent(self._float_or_none(item.get("turnover"))), "当日换手参考"),
+                ],
             )
         if isinstance(payload, dict) and payload.get("checked"):
             return self._channel(
@@ -602,6 +641,7 @@ class AShareEnrichmentService:
                 status="available",
                 source="a_stock_data_eastmoney_datacenter",
                 action="出现异动或涨跌停后再展开席位明细，减少数据源压力。",
+                details=[self._detail("30日状态", "未上榜", "近30日未命中龙虎榜记录")],
             )
         return self._channel(
             "dragon_tiger",
@@ -610,6 +650,7 @@ class AShareEnrichmentService:
             status="degraded",
             source="a_stock_data_poc_local_rules",
             action="Fetch seat details only after unusual moves or limit-up events to reduce source pressure.",
+            details=[self._detail("通道状态", "降级", "未启用席位实时抓取")],
         )
 
     def _channel(
@@ -621,6 +662,7 @@ class AShareEnrichmentService:
         status: str,
         source: str,
         action: str,
+        details: Optional[list[dict[str, str]]] = None,
     ) -> dict[str, Any]:
         return {
             "category": category,
@@ -629,8 +671,13 @@ class AShareEnrichmentService:
             "status": status,
             "source": source,
             "action": action,
+            "details": details or [],
             "updated_at": self._now_iso(),
         }
+
+    def _detail(self, label: str, value: Any, detail: str = "") -> dict[str, str]:
+        value_text = str(value if value not in (None, "") else "-")
+        return {"label": label, "value": value_text, "detail": str(detail or "")}
 
     def _default_http_get(self, url: str, *, params=None, headers=None, timeout=None) -> dict[str, Any]:
         if self._is_a_stock_data_url(url):
@@ -1082,12 +1129,12 @@ class AShareEnrichmentService:
         change = self._float_or_none((quote or {}).get("change_percent"))
         price_text = ""
         if price is not None:
-            price_text = f" Last price {self._format_number(price)}"
+            price_text = f" 最新价 {self._format_number(price)}"
             if change is not None:
-                price_text += f", change {self._format_percent(change)}"
+                price_text += f"，涨跌幅 {self._format_percent(change)}"
         status_text = "已接入" if status == "available" else "已降级"
-        context_text = f" Context: {context}." if context else ""
-        return f"{label} A股增强数据：公告、资金流、板块、研报和龙虎榜{status_text}.{context_text}{price_text}".strip()
+        context_text = f" 背景：{context}。" if context else ""
+        return f"{label} A股增强数据：公告、资金流、板块、研报和龙虎榜{status_text}。{context_text}{price_text}".strip()
 
     def _first_item(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
         items = payload.get("items") if isinstance(payload, dict) else None

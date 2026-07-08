@@ -171,6 +171,11 @@ export type BasicStockSnapshot = {
         status: string;
         source: string;
         action: string;
+        details?: Array<{
+          label?: string | null;
+          value?: string | null;
+          detail?: string | null;
+        }>;
         updatedAt?: string | null;
       }>;
       premiumUnlock: string;

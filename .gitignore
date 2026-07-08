@@ -124,6 +124,7 @@ verify_*.py
 !scripts/verify_platform_a_stock_data_ui_v61.py
 !scripts/verify_platform_a_stock_data_useful_v62.py
 !scripts/verify_platform_a_stock_data_experience_v63.py
+!scripts/verify_platform_a_stock_data_details_v64.py
 
 # ignore Claude workspace artifacts, but keep shared repo skills versioned
 .claude/*

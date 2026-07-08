@@ -4229,6 +4229,31 @@ const HomePage: React.FC = () => {
                               <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">
                                 {localizeGeneratedText(item.summary, uiLanguage)}
                               </p>
+                              {(item.details ?? []).length > 0 ? (
+                                <div
+                                  data-testid={`a-share-channel-details-${item.category}`}
+                                  className="mt-2 grid min-w-0 gap-1.5"
+                                >
+                                  {(item.details ?? []).slice(0, 4).map((detail, index) => (
+                                    <div
+                                      key={`${detail.label || 'detail'}-${index}`}
+                                      className="min-w-0 rounded-md border border-subtle/70 bg-background/30 px-2 py-1.5"
+                                    >
+                                      <div className="truncate text-[11px] text-secondary-text">
+                                        {localizeGeneratedText(detail.label || '-', uiLanguage)}
+                                      </div>
+                                      <div className="mt-0.5 truncate text-xs font-semibold text-foreground">
+                                        {localizeGeneratedText(detail.value || '-', uiLanguage)}
+                                      </div>
+                                      {detail.detail ? (
+                                        <div className="mt-0.5 line-clamp-1 text-[11px] text-muted-text">
+                                          {localizeGeneratedText(detail.detail, uiLanguage)}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
                               <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
                                 {localizeGeneratedText(item.action, uiLanguage)}
                               </p>

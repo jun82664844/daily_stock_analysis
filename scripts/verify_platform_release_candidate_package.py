@@ -67,6 +67,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-07-dsa-v61-a-stock-data-ui.md",
     "docs/superpowers/plans/2026-07-07-dsa-v62-a-stock-data-useful.md",
     "docs/superpowers/plans/2026-07-08-dsa-v63-a-stock-data-experience.md",
+    "docs/superpowers/plans/2026-07-08-dsa-v64-a-stock-data-details.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -117,6 +118,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_a_stock_data_ui_v61.py",
     "scripts/verify_platform_a_stock_data_useful_v62.py",
     "scripts/verify_platform_a_stock_data_experience_v63.py",
+    "scripts/verify_platform_a_stock_data_details_v64.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/services/a_share_enrichment_service.py",
@@ -176,6 +178,7 @@ REQUIRED_FILES = (
     "tests/test_platform_a_stock_data_ui_v61.py",
     "tests/test_platform_a_stock_data_useful_v62.py",
     "tests/test_platform_a_stock_data_experience_v63.py",
+    "tests/test_platform_a_stock_data_details_v64.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -229,6 +232,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_a_stock_data_ui_v61.py",
     "scripts/verify_platform_a_stock_data_useful_v62.py",
     "scripts/verify_platform_a_stock_data_experience_v63.py",
+    "scripts/verify_platform_a_stock_data_details_v64.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

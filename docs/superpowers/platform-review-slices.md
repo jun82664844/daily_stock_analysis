@@ -975,3 +975,31 @@ Review focus:
 - Missing or degraded lanes must be explained as checked-but-empty/degraded, not as silent blanks.
 - Premium copy may show unlocked features but must not block free no-AI query access.
 - `scripts/verify_platform_a_stock_data_experience_v63.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_EXPERIENCE_V63_OK` only when the V63 markers are present.
+
+## V64 A-Stock-Data Details Addendum
+
+Purpose: make A-share enrichment cards more useful by adding structured `details` rows to each channel. The raw cards still show summary/action/source, but users can now scan key fields such as announcement date, fund-flow net amount, industry, research rating, and dragon-tiger net buy.
+
+Files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_a_stock_data_details_v64.py`
+- `tests/test_platform_a_stock_data_details_v64.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v64-a-stock-data-details.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V64 remains local-only and does not approve production deployment, real payment, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and `public_search_used=false`.
+- `details` must be compact scan aids; they do not replace the channel summary/action text.
+- Missing or degraded lanes must remain explicit instead of silently disappearing.
+- `scripts/verify_platform_a_stock_data_details_v64.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_DETAILS_V64_OK` only when the V64 markers are present.

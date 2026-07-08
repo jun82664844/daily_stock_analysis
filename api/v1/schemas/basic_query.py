@@ -255,6 +255,14 @@ class BasicKlineForecastPayload(BaseModel):
     boundary: str = "Experimental model preview; information analysis only; not investment advice."
 
 
+class BasicAShareReaderFactPayload(BaseModel):
+    """One investor-readable fact for the A-share enrichment summary."""
+
+    label: str
+    value: str
+    detail: str
+
+
 class BasicAShareEnrichmentChannelPayload(BaseModel):
     """One local A-share enrichment channel inspired by a-stock-data."""
 
@@ -264,15 +272,8 @@ class BasicAShareEnrichmentChannelPayload(BaseModel):
     status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
     source: str = "a_stock_data_poc_adapter"
     action: str
+    details: List[BasicAShareReaderFactPayload] = Field(default_factory=list)
     updated_at: Optional[str] = None
-
-
-class BasicAShareReaderFactPayload(BaseModel):
-    """One investor-readable fact for the A-share enrichment summary."""
-
-    label: str
-    value: str
-    detail: str
 
 
 class BasicAShareReaderMissPayload(BaseModel):

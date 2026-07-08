@@ -1202,3 +1202,41 @@ Review boundary:
 - The summary must explain checked-but-empty/degraded channels without hiding raw channel cards.
 - Premium feature copy must not block free no-AI query access.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V64 A-Stock-Data Details Manifest Addendum
+
+Status: local-only usability/data-density upgrade for the A-share enrichment panel. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `tests/test_basic_query_no_ai.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_a_stock_data_details_v64.py`
+- `tests/test_platform_a_stock_data_details_v64.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v64-a-stock-data-details.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_A_STOCK_DATA_DETAILS_V64_OK`
+
+Suggested review/commit position:
+
+- After V63 first-read summary and before any paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes A-share channel `details`, the HomePage detail rows, V64 verifier, and V64 docs. V63 reader summary and V62 raw channels remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- `details` are compact scan aids and must not hide missing/degraded source state.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

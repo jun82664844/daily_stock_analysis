@@ -1094,6 +1094,10 @@ describe('HomePage', () => {
               source: 'a_stock_data_cninfo_or_f10',
               action: '深度模式可展开公告原文。',
               updatedAt: '2026-07-08T09:30:00Z',
+              details: [
+                { label: '发布日期', value: '2026-06-22', detail: '公告披露日期' },
+                { label: '公告标题', value: 'Dividend implementation announcement', detail: 'annual distribution' },
+              ],
             },
           ],
         },
@@ -1123,6 +1127,78 @@ describe('HomePage', () => {
     expect(readerSummary).toHaveTextContent('公告原文');
     expect(readerSummary).toHaveTextContent('资金流历史');
     expect(readerSummary).toHaveTextContent('仅作信息分析');
+  });
+
+  it('renders V64 structured A-share channel details in Chinese mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      market: 'cn',
+      quote: {
+        currentPrice: 1188.8,
+        changePercent: -1.5,
+        source: 'a_share_realtime',
+        freshness: 'fresh',
+      },
+      indicators: {},
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        aShareEnrichment: {
+          title: 'A股增强数据',
+          summary: '贵州茅台 A股增强数据',
+          status: 'available',
+          source: 'a_stock_data_skill_adapter',
+          sourceMode: 'a_stock_data',
+          aiUsed: false,
+          publicSearchUsed: false,
+          channels: [
+            {
+              category: 'capital_flow',
+              title: '资金流通道',
+              summary: '主力资金净额 12.0M。',
+              status: 'available',
+              source: 'a_stock_data_eastmoney_fund_flow',
+              action: '继续观察主力资金是否连续回流。',
+              details: [
+                { label: '主力净额', value: '12.0M', detail: '近几条分钟记录合计' },
+                { label: '最新分钟', value: '12.0M', detail: '2026-07-08 09:31' },
+              ],
+            },
+          ],
+          premiumUnlock: '高级版可展开更多来源。',
+          boundary: '仅作信息分析，不构成投资建议。',
+        },
+        items: [],
+        boundary: 'Information analysis only; not investment advice.',
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: '600519.SH' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    const enrichment = await screen.findByTestId('basic-query-a-share-enrichment');
+    expect(enrichment).toHaveTextContent('主力净额');
+    expect(enrichment).toHaveTextContent('12.0M');
+    expect(enrichment).toHaveTextContent('最新分钟');
+    expect(enrichment).toHaveTextContent('近几条分钟记录合计');
   });
 
   it('lets users switch A-share enrichment source mode and run sample probes', async () => {
