@@ -98,7 +98,7 @@
 - Free no-AI snapshots may show a `kline_forecast` lab preview built from quote, moving averages, trend, and volume-price signals.
 - The V57 K-line forecast lab is Kronos-ready but must expose `kronos_model_used=false` until a real Kronos/local-model adapter, model files, data license boundary, and performance gate are approved.
 - The forecast lab is an experimental information view. It must show the `not investment advice` boundary and must not present scenarios as trade instructions.
-- Premium messaging may explain that realtime news, filings, source links, sector comparison, Kronos inference, BYOK, and local-model lanes can be unlocked later, but it must not imply real payment or production readiness in local V1.
+- Free and premium pages should show the same visible modules in local V1. The product distinction is data channel quality: free mode uses network/local public sources, while premium/API modes can use platform API, user API, approved feeds, or local models for fresher, steadier, deeper output. The copy must not imply real payment or production readiness in local V1.
 
 ## Kronos Sandbox V58
 

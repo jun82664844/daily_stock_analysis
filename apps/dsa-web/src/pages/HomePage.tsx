@@ -207,7 +207,7 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'Valuation snapshot': '估值快照',
   'Trend windows': '周期趋势',
   'Data quality': '数据质量',
-  'Premium news': '高级资讯',
+  'Premium news': '高级 API 源',
   'BYOK or local model': '我的 API 或本地模型',
   'Move explanation': '波动解释',
   'Peer context': '同业背景',
@@ -392,7 +392,7 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   match = text.match(/^Treat stale or cached data as provisional and refresh before acting on changes\.$/);
   if (match) return '过期或缓存数据只作临时参考，解读变化前请先刷新。';
   match = text.match(/^Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details\.$/);
-  if (match) return '高级版可增加实时公告、资金流历史、研报 PDF、板块联动和龙虎榜席位明细。';
+  if (match) return '免费版展示同样A股增强入口并使用网络/本地公开源；高级版使用 API 获取实时公告、资金流历史、研报 PDF、板块联动和龙虎榜席位明细。';
   match = text.match(/^(.+?) has no usable sector tags yet; later versions can add Eastmoney concepts and industry mapping\.$/);
   if (match) return `${match[1]} 暂无可用板块标签；可切换数据源或刷新公司资料后再做同类股对比。`;
   match = text.match(/^Refresh profile data or enable sector sources before comparing peers\.$/);
@@ -582,7 +582,7 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   match = text.match(/^Latest research: (.+?)(?:; rating (.+?))?\.$/);
   if (match) return `最近研报：${match[1]}${match[2] ? `；评级 ${match[2]}` : ''}。`;
   match = text.match(/^Premium can expand research lists, PDFs, and institution forecast fields\.$/);
-  if (match) return '高级版可展开研报列表、PDF 和机构预测字段。';
+  if (match) return '免费版保留研报入口和摘要线索；高级版使用 API 展开研报列表、PDF 和机构预测字段。';
   match = text.match(/^(.+?) keeps a reserved Eastmoney \/ iFinD research lane; free quick mode does not fetch PDFs\.$/);
   if (match) return `${match[1]} 已预留东财 / iFinD 研报通道；免费快速模式不拉取 PDF。`;
   match = text.match(/^Deep mode can fetch research sources by symbol and industry\.$/);
@@ -598,11 +598,11 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
   match = text.match(/^Deep mode can expand original announcement text and source links\.$/);
   if (match) return '深度模式可展开公告原文和来源链接。';
   match = text.match(/^Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details\.$/);
-  if (match) return '高级版可展开公告原文、研报 PDF、资金流历史、板块联动和龙虎榜席位明细。';
+  if (match) return '免费版展示同样A股增强入口并使用网络/本地公开源；高级版使用 API 展开公告原文、研报 PDF、资金流历史、板块联动和龙虎榜席位明细。';
   match = text.match(/^(.+?) A-share enrichment is temporarily degraded; the basic quote snapshot remains available\.$/);
   if (match) return `${match[1]} 的 A股增强数据暂时降级；基础行情快照仍可继续使用。`;
   match = text.match(/^Premium can expand announcement, research, fund-flow, sector, and dragon-tiger sources\.$/);
-  if (match) return '高级版可展开公告、研报、资金流、板块和龙虎榜来源。';
+  if (match) return '免费版保留同样来源入口；高级版使用 API 展开公告、研报、资金流、板块和龙虎榜来源。';
 
   return localizeGeneratedTerms(text
     .replace(/^Price is above MA20 and short-term trend remains constructive\.$/, '价格位于 MA20 上方，短期趋势结构仍偏积极。')
@@ -652,12 +652,12 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
     .replace(/^No filing or announcement source is enabled in free no-AI mode for (.+?)\. Deep analysis can add filings, announcements, and source links when configured\.$/, '免费未用 AI 模式暂未启用 $1 公告或文件来源；配置后深度分析可补充公告、文件和来源链接。')
     .replace(/^Quote is stale; quick view uses cached quote and latest available history\.$/, '行情已过期；快速视图使用缓存行情和最新可用历史。')
     .replace(/^Refresh market data before treating the quick snapshot as current\.$/, '先刷新行情，再把快速快照当作当前数据解读。')
-    .replace(/^Premium can add realtime news, filings, source links, sector comparison, and AI summaries\.$/, '高级版可增加实时新闻、公告、来源链接、板块对比和 AI 摘要。')
+    .replace(/^Premium can add realtime news, filings, source links, sector comparison, and AI summaries\.$/, '免费版展示同样资讯入口并使用网络/本地公开源；高级版使用 API 获取实时新闻、公告、来源链接、板块对比和 AI 摘要。')
     .replace(/^Kronos adapter ready; local rules preview only; Kronos model not installed or invoked\.$/, 'Kronos 适配器已就绪；当前是本地规则预览，尚未运行 Kronos 模型。')
     .replace(/^Kronos adapter ready; local rules preview only\.$/, 'Kronos 适配器已就绪；当前是本地规则预览。')
     .replace(/^Kronos adapter ready; model not invoked because dependencies are missing: (.+)\.$/, 'Kronos 适配器已就绪；因依赖缺失尚未运行模型：$1。')
     .replace(/^Kronos model unavailable; missing dependencies: (.+)\.$/, 'Kronos 模型不可用；缺失依赖：$1。')
-    .replace(/^Premium can run a configured Kronos or local-model forecast lane after model\/data approval\.$/, '高级版可在模型和数据确认后运行 Kronos 或本地模型预测通道。')
+    .replace(/^Premium can run a configured Kronos or local-model forecast lane after model\/data approval\.$/, '免费版展示K线预测入口和本地规则预览；高级版使用 API 或已批准的本地模型运行更完整预测通道。')
     .replace(/^A-share lane focuses on quote, moving averages, volume-price behavior, and broad-market context without AI\.$/, 'A股通道聚焦行情、均线、量价行为和大盘背景，不调用 AI。')
     .replace(/^Today's quick read: price changed (.+?), stays (.+?), and volume is (.+?)\.$/, '今日快速解读：价格变化 $1，当前 $2，成交量 $3。')
     .replace(/^Lane (.+?) No AI used Information analysis only$/, (_, lane: string) => `通道 ${marketLaneLabel(lane, language)}；未用 AI；仅作信息分析`)
@@ -1986,8 +1986,8 @@ const HomePage: React.FC = () => {
         midStatus,
         risks: riskNotes,
         upgradeText: isEnglish
-          ? 'Unlock news, filings, fundamentals, sector comparison, and a longer AI report.'
-          : '可解锁新闻、公告、基本面、行业对比和 AI 长报告。',
+          ? 'Use API-backed channels when the same modules need fresher news, filings, fundamentals, sector comparison, or a longer AI report.'
+          : '同样模块需要更实时的资讯、公告、基本面、行业对比或 AI 长报告时，再使用 API 通道。',
       },
       cards: [
         {
@@ -2072,10 +2072,12 @@ const HomePage: React.FC = () => {
       : (isEnglish
           ? 'No major quick-rule risk was detected, but this remains an information-only snapshot.'
           : '快速规则未发现明显风险项，但当前仍只是信息分析快照。');
-    const upgradeBody = localizeGeneratedText(basicFreeReport.productBrief.upgradeText, uiLanguage);
     const supportPressure = isEnglish
       ? `Support ${basicFreeReport.productBrief.supportLevels}; resistance ${basicFreeReport.productBrief.pressureLevels}.`
       : `支撑 ${basicFreeReport.productBrief.supportLevels}；压力 ${basicFreeReport.productBrief.pressureLevels}。`;
+    const channelDifference = isEnglish
+      ? 'Free shows the same modules with web/local public sources; premium uses platform API, user API, or local models for fresher, steadier, and deeper reads.'
+      : '免费版看同样模块，使用网络/本地公开数据；高级版使用 API、我的 API 或本地模型提升实时性、稳定性和深度。';
     return {
       title: isEnglish ? 'Complete free quick read' : '免费版完整速读',
       subtitle: isEnglish
@@ -2101,8 +2103,8 @@ const HomePage: React.FC = () => {
             : `${localizeGeneratedSource(sourceLane, uiLanguage)}；行情状态：${freshness}；未使用 AI。`,
         },
         {
-          label: isEnglish ? 'Premium unlocks' : '高级版可解锁',
-          body: isEnglish ? upgradeBody : upgradeBody.replace(/^可解锁/, ''),
+          label: isEnglish ? 'Version difference' : '版本差异',
+          body: channelDifference,
         },
       ],
     };
@@ -3819,8 +3821,8 @@ const HomePage: React.FC = () => {
                         </h3>
                         <p className="mt-2 text-xs leading-relaxed text-secondary-text">
                           {uiLanguage === 'en'
-                            ? 'The free view highlights the useful first read: quote structure, support and resistance, risk boundaries, and what a deeper report can unlock.'
-                            : '免费版先给出可理解的一眼结论：行情结构、支撑压力、风险边界，以及高级分析可以继续解锁的内容。'}
+                            ? 'Free and premium show the same visible modules here; free uses web/local public sources, while API modes improve freshness, stability, and depth.'
+                            : '免费版和高级版在这里看到同样模块；免费版使用网络/本地数据，高级版使用 API 或模型通道提升实时性、稳定性和深度。'}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2 text-xs">
@@ -3931,10 +3933,12 @@ const HomePage: React.FC = () => {
                       </div>
                       <div className="min-w-0 rounded-lg border border-primary/30 bg-background/35 p-3">
                         <div className="text-xs font-medium text-primary">
-                          {uiLanguage === 'en' ? 'Upgrade unlocks' : '升级可解锁'}
+                          {uiLanguage === 'en' ? 'Data channel difference' : '数据通道差异'}
                         </div>
                         <p className="mt-2 text-xs leading-relaxed text-secondary-text">
-                          {localizeGeneratedText(basicFreeReport.productBrief.upgradeText, uiLanguage)}
+                          {uiLanguage === 'en'
+                            ? 'Free keeps the same feature entries with web/local public sources; premium uses platform API, user API, or approved local models for realtime news, filings, fundamentals, and longer reports.'
+                            : '免费版保留同样功能入口，默认走网络/本地公开数据；高级版走平台 API、我的 API 或本地模型，适合实时资讯、公告、基本面和长报告。'}
                         </p>
                         <Button
                           type="button"
@@ -4419,7 +4423,7 @@ const HomePage: React.FC = () => {
                               </div>
                               <div className="rounded-lg border border-primary/25 bg-primary/5 p-2.5">
                                 <div className="mb-2 text-xs font-semibold text-foreground">
-                                  {uiLanguage === 'en' ? 'Premium unlocks' : '高级版可解锁'}
+                                  {uiLanguage === 'en' ? 'Version difference' : '版本差异'}
                                 </div>
                                 <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
                                   {(basicSnapshot.intelligence.aShareEnrichment.readerSummary.premiumFeatures ?? []).map((feature) => (
@@ -4726,20 +4730,20 @@ const HomePage: React.FC = () => {
                       >
                         {[
                           [
-                            uiLanguage === 'en' ? 'Free no-AI' : '免费无AI',
-                            uiLanguage === 'en' ? 'Quote, MA, volume, profile, local information lanes.' : '行情、均线、成交量、公司资料和本地信息通道。',
+                            uiLanguage === 'en' ? 'Same modules' : '同样功能',
+                            uiLanguage === 'en' ? 'Free and premium both show quote, news, A-share enrichment, K-line forecast, history, and watchlist entries.' : '免费版和高级版都展示行情、资讯、A股增强、K线预测、历史和自选入口。',
                           ],
                           [
-                            uiLanguage === 'en' ? 'Premium news' : '高级资讯',
-                            uiLanguage === 'en' ? 'Realtime news, filings, source links, sector context.' : '实时资讯、公告、来源链接和板块背景。',
+                            uiLanguage === 'en' ? 'Free web sources' : '免费网络源',
+                            uiLanguage === 'en' ? 'Free mode uses web/local public sources, so cache, degraded lanes, or incomplete sources may appear.' : '免费版默认走网络/本地公开数据，可能出现缓存、降级或来源不完整提示。',
                           ],
                           [
-                            localizeGeneratedText('Kronos-ready', uiLanguage),
-                            uiLanguage === 'en' ? 'K-line forecast adapter lane after local model approval.' : '本地模型确认后可使用K线预测适配通道。',
+                            uiLanguage === 'en' ? 'Premium API sources' : '高级 API 源',
+                            uiLanguage === 'en' ? 'Premium uses platform API, user API, or authorized feeds to improve realtime news, filings, and reliability.' : '高级版走平台 API、我的 API 或授权数据源，优先解决实时资讯、公告和稳定性。',
                           ],
                           [
                             uiLanguage === 'en' ? 'BYOK or local model' : '我的 API 或本地模型',
-                            uiLanguage === 'en' ? 'Use platform API, user API key, or approved local model quota.' : '可使用平台 API、用户自带 API 密钥或已批准的本地模型额度。',
+                            uiLanguage === 'en' ? 'Kronos-ready forecasts and deeper AI reads can use user API, platform API, or approved local model quota.' : 'Kronos 已就绪后可运行预测；更深 AI 分析可使用我的 API、平台 API 或已批准的本地模型额度。',
                           ],
                         ].map(([title, detail]) => (
                           <div key={title} className="min-w-0 rounded-lg border border-subtle/80 bg-surface/35 p-3">
@@ -5068,7 +5072,9 @@ const HomePage: React.FC = () => {
                               {uiLanguage === 'en' ? 'Continue with deep analysis' : '继续深度分析'}
                             </div>
                             <div className="mt-1 text-xs leading-relaxed text-secondary-text">
-                              {basicFreeReport.productBrief.upgradeText}
+                              {uiLanguage === 'en'
+                                ? 'Use deep analysis when the same module needs API-backed freshness, source links, fundamentals, or a longer AI-written report.'
+                                : '当同样模块需要 API 级实时性、来源链接、基本面或更长 AI 报告时，再使用深度分析。'}
                             </div>
                           </div>
                           <Button

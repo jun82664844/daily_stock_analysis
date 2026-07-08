@@ -463,10 +463,10 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
                         {"category": "announcements", "title": "公告通道", "summary": "近公告可用于核对重大事项。", "status": "available", "source": "fixture", "action": "深度模式可展开公告来源。"},
                         {"category": "capital_flow", "title": "资金流通道", "summary": "主力资金净流入为正。", "status": "available", "source": "fixture", "action": "观察连续性。"},
                         {"category": "sector", "title": "板块通道", "summary": "食品饮料 / 白酒。", "status": "available", "source": "fixture", "action": "对比同板块。"},
-                        {"category": "research", "title": "研报通道", "summary": "有机构研报覆盖。", "status": "available", "source": "fixture", "action": "高级版可查看详情。"},
+                        {"category": "research", "title": "研报通道", "summary": "有机构研报覆盖。", "status": "available", "source": "fixture", "action": "免费版保留入口；高级版使用 API 查看详情。"},
                         {"category": "dragon_tiger", "title": "龙虎榜通道", "summary": "未见近期异常上榜。", "status": "degraded", "source": "fixture", "action": "刷新后复核。"},
                     ],
-                    "premium_unlock": "高级版可展开原始来源、PDF、席位明细和资金流历史。",
+                    "premium_unlock": "免费版保留同样入口；高级版使用 API 展开原始来源、PDF、席位明细和资金流历史。",
                     "boundary": "Information analysis only; not investment advice.",
                 }
 

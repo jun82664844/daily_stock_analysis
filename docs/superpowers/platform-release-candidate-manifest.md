@@ -1200,7 +1200,7 @@ Review boundary:
 
 - No AI calls and no public search in free quick mode.
 - The summary must explain checked-but-empty/degraded channels without hiding raw channel cards.
-- Premium feature copy must not block free no-AI query access.
+- Premium copy should describe a data-channel upgrade, not separate visible features: free and premium show the same modules, while premium/API modes use platform API, user API, approved feeds, or local models for fresher and deeper output.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
 
 ## V64 A-Stock-Data Details Manifest Addendum

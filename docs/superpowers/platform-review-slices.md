@@ -973,7 +973,7 @@ Review focus:
 - Free quick mode must remain `ai_used=false` and `public_search_used=false`.
 - The `reader_summary` must not hide channel cards; it is a first-read layer only.
 - Missing or degraded lanes must be explained as checked-but-empty/degraded, not as silent blanks.
-- Premium copy may show unlocked features but must not block free no-AI query access.
+- Premium copy should describe a data-channel upgrade, not separate visible features: free and premium show the same modules, while premium/API modes use platform API, user API, approved feeds, or local models for fresher and deeper output.
 - `scripts/verify_platform_a_stock_data_experience_v63.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_EXPERIENCE_V63_OK` only when the V63 markers are present.
 
 ## V64 A-Stock-Data Details Addendum

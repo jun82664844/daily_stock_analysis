@@ -798,7 +798,7 @@ describe('HomePage', () => {
     expect(aShareEnrichment).toHaveTextContent('研报通道');
     expect(aShareEnrichment).toHaveTextContent('龙虎榜通道');
     expect(aShareEnrichment).toHaveTextContent('主力资金净流入 120M');
-    expect(aShareEnrichment).toHaveTextContent('高级版可展开公告原文');
+    expect(aShareEnrichment).toHaveTextContent('高级版使用 API');
     expect(aShareEnrichment).toHaveTextContent('不构成投资建议');
     expect(aShareEnrichment).not.toHaveTextContent('Fund-flow channel');
     expect(aShareEnrichment).not.toHaveTextContent('Dragon-tiger channel');
@@ -1123,7 +1123,7 @@ describe('HomePage', () => {
     expect(readerSummary).toHaveTextContent('今日关键信息');
     expect(readerSummary).toHaveTextContent('为什么值得看');
     expect(readerSummary).toHaveTextContent('未命中说明');
-    expect(readerSummary).toHaveTextContent('高级版可解锁');
+    expect(readerSummary).toHaveTextContent('版本差异');
     expect(readerSummary).toHaveTextContent('公告原文');
     expect(readerSummary).toHaveTextContent('资金流历史');
     expect(readerSummary).toHaveTextContent('仅作信息分析');
@@ -1173,7 +1173,7 @@ describe('HomePage', () => {
               ],
             },
           ],
-          premiumUnlock: '高级版可展开更多来源。',
+          premiumUnlock: '免费版保留同样入口；高级版使用 API 展开更多来源。',
           boundary: '仅作信息分析，不构成投资建议。',
         },
         items: [],
@@ -2923,7 +2923,7 @@ describe('HomePage', () => {
     expect(valueSummary).toHaveTextContent('免费版重点结论');
     expect(valueSummary).toHaveTextContent('当前看点');
     expect(valueSummary).toHaveTextContent('风险边界');
-    expect(valueSummary).toHaveTextContent('升级可解锁');
+    expect(valueSummary).toHaveTextContent('数据通道差异');
     expect(valueSummary).toHaveTextContent('深度分析');
     const completeRead = screen.getByTestId('basic-query-free-complete-read');
     expect(valueSummary).toContainElement(completeRead);
@@ -2932,7 +2932,10 @@ describe('HomePage', () => {
     expect(completeRead).toHaveTextContent('风险边界');
     expect(completeRead).toHaveTextContent('下一步观察');
     expect(completeRead).toHaveTextContent('数据来源');
-    expect(completeRead).toHaveTextContent('高级版可解锁');
+    expect(completeRead).toHaveTextContent('版本差异');
+    expect(completeRead).toHaveTextContent('免费版看同样模块');
+    expect(completeRead).toHaveTextContent('高级版使用 API');
+    expect(completeRead).not.toHaveTextContent('高级版可解锁');
     expect(completeRead).not.toHaveTextContent('Trend confirmation');
     expect(completeRead).not.toHaveTextContent('Volume confirmation');
     expect(completeRead).not.toHaveTextContent('fresh');
@@ -2979,7 +2982,7 @@ describe('HomePage', () => {
     expect(newsCenter).toHaveTextContent('板块与同业通道');
     expect(newsCenter).toHaveTextContent('未用 AI');
     expect(newsCenter).toHaveTextContent('未用公共搜索');
-    expect(newsCenter).toHaveTextContent('高级版可增加实时新闻');
+    expect(newsCenter).toHaveTextContent('高级版使用 API');
     const klineForecast = screen.getByTestId('basic-query-kline-forecast-lab');
     expect(klineForecast).toHaveTextContent('K线预测实验室');
     expect(klineForecast).toHaveTextContent('未来 5 根K线');
@@ -3003,10 +3006,12 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-kronos-dependency-status')).toHaveTextContent('torch: 缺失');
     expect(screen.getByTestId('basic-query-kronos-backtest-summary')).toHaveTextContent('1 条记录');
     const premiumFeatureLadder = screen.getByTestId('basic-query-premium-feature-ladder');
-    expect(premiumFeatureLadder).toHaveTextContent('免费无AI');
-    expect(premiumFeatureLadder).toHaveTextContent('高级资讯');
+    expect(premiumFeatureLadder).toHaveTextContent('同样功能');
+    expect(premiumFeatureLadder).toHaveTextContent('免费网络源');
+    expect(premiumFeatureLadder).toHaveTextContent('高级 API 源');
     expect(premiumFeatureLadder).toHaveTextContent('Kronos 已就绪');
     expect(premiumFeatureLadder).toHaveTextContent('我的 API 或本地模型');
+    expect(premiumFeatureLadder).not.toHaveTextContent('高级资讯');
     const productBrief = screen.getByTestId('basic-query-product-brief');
     expect(productBrief).toHaveTextContent('关键结论');
     expect(productBrief).toHaveTextContent('支撑');

@@ -65,14 +65,14 @@ REQUIRED_MARKERS: dict[str, list[str]] = {
     "apps/dsa-web/src/pages/HomePage.tsx": [
         "basic-query-a-share-reader-summary",
         "未命中说明",
-        "高级版可解锁",
+        "版本差异",
         "Useful readout",
     ],
     "apps/dsa-web/src/pages/__tests__/HomePage.test.tsx": [
         "renders the V63 A-share reader summary in Chinese mode",
         "basic-query-a-share-reader-summary",
         "今日关键信息",
-        "高级版可解锁",
+        "版本差异",
     ],
     "scripts/verify_platform_a_stock_data_experience_v63.py": [
         OK_MARKER,
