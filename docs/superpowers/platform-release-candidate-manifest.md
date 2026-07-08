@@ -1277,3 +1277,39 @@ Review boundary:
 - News Center and K-line forecast must remain visible from the free summary as feature entries.
 - Diagnostics remain available for support/operator debugging but no longer dominate the free result.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V66 Productized Snapshot Manifest Addendum
+
+Status: local-only productized free-query dashboard upgrade. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_productized_snapshot_v66.py`
+- `tests/test_platform_productized_snapshot_v66.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v66-productized-snapshot.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_PRODUCTIZED_SNAPSHOT_V66_OK`
+
+Suggested review/commit position:
+
+- After V65 free-value summary and before any paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes the professional overview block, V66 verifier, and V66 docs. V65 free value summary and earlier no-AI query logic remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- Free and premium show the same visible modules; `免费网络源` and `高级 API 源` are data-channel differences, not separate visible feature walls.
+- The professional overview must show trend score, risk level, support/resistance, data channel, and module navigation before deeper details.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

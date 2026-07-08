@@ -1029,3 +1029,29 @@ Review focus:
 - The free summary must keep visible entries for News Center and K-line forecast so those features remain discoverable after query.
 - Data diagnostics should remain available but collapsed by default so free users see product value before technical internals.
 - `scripts/verify_platform_free_value_v65.py` must stay visible and print `DSA_PLATFORM_FREE_VALUE_V65_OK` only when the V65 markers are present.
+
+## V66 Productized Snapshot Addendum
+
+Purpose: make the free quick-query result read like a professional dashboard instead of a thin quote response. Free and premium now keep the same visible modules; the difference is the data channel, where free uses a free web source/local public data and premium uses an API-backed source, BYOK, platform API, or local model for fresher and deeper output.
+
+Files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_productized_snapshot_v66.py`
+- `tests/test_platform_productized_snapshot_v66.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v66-productized-snapshot.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V66 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and avoid public search by default.
+- `basic-query-professional-overview` must appear before the free value summary and show trend score, risk level, data channel, support/resistance, and module navigation.
+- Chinese mode must keep the new user-facing labels in Chinese: `专业速览`, `趋势评分`, `风险等级`, `数据通道`, `模块导航`, `行情概览`, `技术面`, `资讯中心`, and `K线预测`.
+- The copy must describe `免费网络源` and `高级 API 源` as channel differences, not locked features.
+- `scripts/verify_platform_productized_snapshot_v66.py` must stay visible and print `DSA_PLATFORM_PRODUCTIZED_SNAPSHOT_V66_OK` only when the V66 markers are present.

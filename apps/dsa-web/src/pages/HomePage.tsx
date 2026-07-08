@@ -2109,6 +2109,101 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicProfessionalOverview = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const hasDegradation = Boolean(
+      basicSnapshot.degradation
+        && basicSnapshot.degradation.status
+        && basicSnapshot.degradation.status !== 'ok',
+    );
+    const warningCount = (basicSnapshot.warnings ?? [])
+      .filter((warning) => warning.severity && warning.severity !== 'info')
+      .length;
+    const isFresh = basicSnapshot.quote.freshness === 'fresh';
+    const riskLevel = basicFreeReport.score >= 75 && isFresh && !hasDegradation && warningCount === 0
+      ? {
+          label: isEnglish ? 'Low' : '低',
+          tone: isEnglish ? 'Stable first read' : '首轮判断较稳',
+        }
+      : basicFreeReport.score >= 55 || (!hasDegradation && warningCount <= 1)
+        ? {
+            label: isEnglish ? 'Medium' : '中',
+            tone: isEnglish ? 'Confirm freshness and volume' : '先确认新鲜度与量能',
+          }
+        : {
+            label: isEnglish ? 'High' : '高',
+            tone: isEnglish ? 'Repair data before reading' : '先修复数据再解读',
+          };
+    const sourceTone = hasDegradation || !isFresh || warningCount > 0
+      ? (isEnglish ? 'some lanes degraded' : '部分通道降级')
+      : (isEnglish ? 'public lanes available' : '公开通道可用');
+    const moduleNav = [
+      {
+        label: isEnglish ? 'Quote overview' : '行情概览',
+        detail: isEnglish ? 'price, change, MA, profile' : '价格、涨跌、均线、资料',
+      },
+      {
+        label: isEnglish ? 'Technical view' : '技术面',
+        detail: isEnglish ? 'trend, volume, support/resistance' : '趋势、量价、支撑压力',
+      },
+      {
+        label: isEnglish ? 'News center' : '资讯中心',
+        detail: isEnglish ? 'news, filings, fundamentals lanes' : '资讯、公告、财务通道',
+      },
+      {
+        label: isEnglish ? 'K-line forecast' : 'K线预测',
+        detail: isEnglish ? 'local rules or configured model' : '本地规则或已配置模型',
+      },
+    ];
+    return {
+      title: isEnglish ? 'Professional overview' : '专业速览',
+      subtitle: isEnglish
+        ? 'Free mode shows the full dashboard structure. Premium mode upgrades the same modules with API-backed data sources.'
+        : '免费版展示完整看板结构；高级版在同样模块里切换到 API 数据源，提升实时性、稳定性和深度。',
+      stats: [
+        {
+          label: isEnglish ? 'Trend score' : '趋势评分',
+          value: `${basicFreeReport.score}/100`,
+          detail: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+        },
+        {
+          label: isEnglish ? 'Risk level' : '风险等级',
+          value: riskLevel.label,
+          detail: riskLevel.tone,
+        },
+        {
+          label: isEnglish ? 'Support / resistance' : '支撑 / 压力',
+          value: `${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)} / ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}`,
+          detail: isEnglish ? 'quick-rule levels' : '免费规则价位',
+        },
+        {
+          label: isEnglish ? 'Data channel' : '数据通道',
+          value: isEnglish ? 'Free web source' : '免费网络源',
+          detail: isEnglish
+            ? `Premium API source available; current lane ${localizeGeneratedSource(sourceLane, uiLanguage)}.`
+            : `高级 API 源可用；当前通道 ${localizeGeneratedSource(sourceLane, uiLanguage)}。`,
+        },
+      ],
+      moduleNav,
+      channels: [
+        {
+          label: isEnglish ? 'Free web source' : '免费网络源',
+          detail: `${localizeGeneratedSource(sourceLane, uiLanguage)} · ${sourceTone}`,
+        },
+        {
+          label: isEnglish ? 'Premium API source' : '高级 API 源',
+          detail: isEnglish ? 'platform API, user API, or local model' : '平台 API、我的 API 或本地模型',
+        },
+      ],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
@@ -3806,6 +3901,51 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {basicProfessionalOverview ? (
+                  <section
+                    data-testid="basic-query-professional-overview"
+                    className="mb-4 rounded-lg border border-primary/30 bg-background/35 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">{basicProfessionalOverview.title}</div>
+                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-secondary-text">
+                          {basicProfessionalOverview.subtitle}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2 text-[11px] text-secondary-text">
+                        {basicProfessionalOverview.channels.map((channel) => (
+                          <span key={channel.label} className="inline-flex max-w-full flex-col rounded-md border border-primary/30 bg-primary/10 px-2 py-1">
+                            <span className="font-medium text-primary">{channel.label}</span>
+                            <span className="max-w-[13rem] truncate">{channel.detail}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      {basicProfessionalOverview.stats.map((item) => (
+                        <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 bg-surface/45 p-2.5">
+                          <div className="truncate text-xs text-secondary-text">{item.label}</div>
+                          <div className="mt-1 truncate text-lg font-semibold text-foreground">{item.value}</div>
+                          <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">{item.detail}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md border border-subtle/70 bg-surface/35 p-2.5">
+                      <div className="text-xs font-medium text-primary">
+                        {uiLanguage === 'en' ? 'Module navigation' : '模块导航'}
+                      </div>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {basicProfessionalOverview.moduleNav.map((item) => (
+                          <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 bg-background/30 px-2.5 py-2">
+                            <div className="truncate text-xs font-semibold text-foreground">{item.label}</div>
+                            <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">{item.detail}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
                 {basicFreeReport ? (
                   <section
                     data-testid="basic-query-free-value-summary"
