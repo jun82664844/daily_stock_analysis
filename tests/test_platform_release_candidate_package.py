@@ -101,6 +101,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v70: bool = True,
         include_v71: bool = True,
         include_v72: bool = True,
+        include_v73: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -377,6 +378,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "free peer reference quotes\nsame visible modules\nshort timeout\n"
                 "API-backed sources\nDSA_PLATFORM_FREE_PEER_QUOTES_V72_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo AI calls\nNo public search\n"
+                "DSA V73 Free Broker Conversion Implementation Plan\n"
+                "broker-style decision cockpit\nbasic-query-broker-cockpit\n"
+                "DSA_PLATFORM_FREE_BROKER_CONVERSION_V73_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -450,6 +458,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_free_detail_readability_v70.py",
             "scripts/verify_platform_free_multimarket_v71.py",
             "scripts/verify_platform_free_peer_quotes_v72.py",
+            "scripts/verify_platform_free_broker_conversion_v73.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -520,6 +529,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_free_detail_readability_v70.py",
             "tests/test_platform_free_multimarket_v71.py",
             "tests/test_platform_free_peer_quotes_v72.py",
+            "tests/test_platform_free_broker_conversion_v73.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -783,6 +793,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v72 and rel_path in {
                 "scripts/verify_platform_free_peer_quotes_v72.py",
                 "tests/test_platform_free_peer_quotes_v72.py",
+            }:
+                continue
+            if not include_v73 and rel_path in {
+                "scripts/verify_platform_free_broker_conversion_v73.py",
+                "tests/test_platform_free_broker_conversion_v73.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -1132,6 +1147,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v72:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-08-dsa-v72-free-peer-quotes.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v73:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1969,6 +1991,20 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("scripts/verify_platform_free_peer_quotes_v72.py", missing)
         self.assertIn("tests/test_platform_free_peer_quotes_v72.py", missing)
         self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v72-free-peer-quotes.md", missing)
+
+    def test_reports_missing_free_broker_conversion_v73_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v73=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        missing = by_id["required_files_present"].metadata["missing_files"]
+        self.assertIn("scripts/verify_platform_free_broker_conversion_v73.py", missing)
+        self.assertIn("tests/test_platform_free_broker_conversion_v73.py", missing)
+        self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md", missing)
 
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:

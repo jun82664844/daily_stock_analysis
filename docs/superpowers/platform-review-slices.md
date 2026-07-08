@@ -1218,3 +1218,32 @@ Review notes:
 Acceptance:
 
 - `scripts/verify_platform_free_peer_quotes_v72.py` must stay visible and print `DSA_PLATFORM_FREE_PEER_QUOTES_V72_OK` only when V72 implementation, tests, docs, release package coverage, and git visibility markers are present.
+
+## V73 Free Broker Conversion Addendum
+
+Scope: local-only free query conversion upgrade. This slice reshapes the first result screen into a broker-style decision cockpit so visitors see a useful conclusion, evidence chain, risk boundary, and upgrade rationale before scrolling.
+
+Changed files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_broker_conversion_v73.py`
+- `tests/test_platform_free_broker_conversion_v73.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+
+Review notes:
+
+- The free first screen now answers `现在值不值得继续看` before presenting the deeper module ladder.
+- Free and premium users still see the same visible research structure; premium/API only improves real-time source links, configured feeds, and model depth.
+- The cockpit uses existing no-AI snapshot data and does not introduce AI calls, public search, real payment, production deployment, or real API Key handling.
+- Copy keeps the `不构成投资建议` boundary visible.
+
+Acceptance:
+
+- `scripts/verify_platform_free_broker_conversion_v73.py` must stay visible and print `DSA_PLATFORM_FREE_BROKER_CONVERSION_V73_OK` only when V73 implementation, tests, docs, release package coverage, and git visibility markers are present.

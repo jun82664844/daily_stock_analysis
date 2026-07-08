@@ -2134,6 +2134,77 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicBrokerCockpit = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const ma20 = toFiniteBasicNumber(pickBasicIndicator(basicSnapshot.indicators, 'ma20', 'MA20'));
+    const peerTargets = (basicSnapshot.intelligence?.comparisonTargets ?? [])
+      .slice(0, 3)
+      .map((item) => item.symbol || item.label)
+      .filter((value): value is string => Boolean(value));
+    const evidenceItems = [
+      {
+        label: isEnglish ? 'Price structure' : '价格结构',
+        value: isEnglish
+          ? `${formatBasicNumber(currentPrice)} vs MA20 ${formatBasicNumber(ma20)}`
+          : `最新价 ${formatBasicNumber(currentPrice)} / MA20 ${formatBasicNumber(ma20)}`,
+        detail: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+      },
+      {
+        label: isEnglish ? 'Peer reference' : '同业参照',
+        value: peerTargets.length > 0 ? peerTargets.join(' / ') : basicSnapshot.stockCode,
+        detail: isEnglish
+          ? 'Read the stock against market and sector references before acting.'
+          : '先和大盘、行业或同业参照比较，不孤立解读单只股票。',
+      },
+      {
+        label: isEnglish ? 'Data channel' : '数据通道',
+        value: localizeGeneratedSource(sourceLane, uiLanguage),
+        detail: isEnglish
+          ? `${localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage)} quote, no AI used in this quick read.`
+          : `${localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage)}行情，快速研判未使用 AI。`,
+      },
+    ];
+    const riskItems = [
+      ...(basicFreeReport.productBrief.risks ?? []).slice(0, 2).map((risk) => localizeGeneratedText(risk, uiLanguage)),
+      isEnglish
+        ? `Support ${basicFreeReport.productBrief.supportLevels}; resistance ${basicFreeReport.productBrief.pressureLevels}.`
+        : `支撑 ${basicFreeReport.productBrief.supportLevels}；压力 ${basicFreeReport.productBrief.pressureLevels}。`,
+      isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+    ].filter(Boolean);
+    return {
+      title: isEnglish ? 'Broker first-screen read' : '经纪人首屏研判',
+      question: isEnglish ? 'Is it worth continuing now?' : '现在值不值得继续看',
+      verdictLabel: isEnglish ? 'Verdict' : '结论',
+      verdict: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+      scoreLabel: isEnglish ? 'Research score' : '研究分',
+      score: `${basicFreeReport.score}/100`,
+      proofLabel: isEnglish ? 'Evidence chain' : '证据链',
+      riskLabel: isEnglish ? 'Risk boundary' : '风险边界',
+      upgradeLabel: isEnglish ? 'What upgrade solves' : '升级后解决什么',
+      freePromise: isEnglish
+        ? 'Free mode gives the complete research structure first.'
+        : '免费版先给完整研究结构',
+      premiumPromise: isEnglish
+        ? 'Premium switches to real-time APIs, source links, and deeper models.'
+        : '高级版换实时 API、来源链接和模型深度',
+      evidenceItems,
+      riskItems,
+      upgradeItems: isEnglish
+        ? ['Realtime news and filings', 'Steadier peer quotes', 'Kronos/API model depth', 'Saved history and watchlist tracking']
+        : ['实时资讯和公告链接', '更稳定的同业行情', 'Kronos/API 模型深度', '历史与自选持续跟踪'],
+      nextActions: isEnglish
+        ? ['Check price versus MA20', 'Compare QQQ / sector', 'Open deep mode only when source links are needed']
+        : ['先看价格是否守住 MA20', '再和 QQQ / 行业参照比较', '需要来源链接时再开深度模式'],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicCommercialJourney = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -4333,6 +4404,79 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {basicBrokerCockpit ? (
+                  <section
+                    data-testid="basic-query-broker-cockpit"
+                    className="mb-4 rounded-lg border border-primary/40 bg-primary/10 p-3"
+                  >
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="rounded-md border border-primary/40 bg-background/40 px-2 py-1 text-xs font-medium text-primary">
+                            {basicBrokerCockpit.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/80 bg-background/30 px-2 py-1 text-xs text-secondary-text">
+                            {basicBrokerCockpit.question}
+                          </span>
+                          <span className="rounded-md border border-primary/35 bg-background/30 px-2 py-1 text-xs font-medium text-primary">
+                            {basicBrokerCockpit.scoreLabel} {basicBrokerCockpit.score}
+                          </span>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                          <div className="text-xs font-medium text-primary">{basicBrokerCockpit.verdictLabel}</div>
+                          <h3 className="mt-1 text-xl font-semibold leading-snug text-foreground">
+                            {basicBrokerCockpit.verdict}
+                          </h3>
+                          <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                            {basicBrokerCockpit.freePromise}；{basicBrokerCockpit.premiumPromise}。
+                          </p>
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                          {basicBrokerCockpit.evidenceItems.map((item) => (
+                            <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 bg-background/30 p-2.5">
+                              <div className="text-xs font-medium text-primary">{item.label}</div>
+                              <div className="mt-1 truncate text-sm font-semibold text-foreground">{item.value}</div>
+                              <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">{item.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 space-y-2">
+                        <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
+                          <div className="text-xs font-medium text-primary">{basicBrokerCockpit.proofLabel}</div>
+                          <div className="mt-2 grid gap-1.5">
+                            {basicBrokerCockpit.nextActions.map((item) => (
+                              <div key={item} className="flex min-w-0 items-start gap-2 text-xs leading-relaxed text-secondary-text">
+                                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                                <span>{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
+                          <div className="text-xs font-medium text-primary">{basicBrokerCockpit.riskLabel}</div>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            {basicBrokerCockpit.riskItems.slice(0, 4).map((item) => (
+                              <span key={item} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-primary/30 bg-surface/40 p-3">
+                          <div className="text-xs font-medium text-primary">{basicBrokerCockpit.upgradeLabel}</div>
+                          <div className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
+                            {basicBrokerCockpit.upgradeItems.map((item) => (
+                              <div key={item} className="rounded-md border border-subtle/70 bg-background/30 px-2 py-1.5 text-xs text-secondary-text">
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
                 {basicCommercialJourney ? (
                   <section
                     data-testid="basic-query-commercial-journey"

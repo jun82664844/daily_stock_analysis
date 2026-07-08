@@ -446,3 +446,12 @@ git diff --check
 - HomePage Chinese mode now shows `参照行情`, `参照价`, and `涨跌幅`; free mode displays available public/local reference quotes while premium/API mode can later improve source quality and freshness.
 - Added `tests/test_platform_free_peer_quotes_v72.py` and `scripts/verify_platform_free_peer_quotes_v72.py`; the verifier prints `DSA_PLATFORM_FREE_PEER_QUOTES_V72_OK` only when required local checks pass.
 - V72 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-08 V73 Free Broker Conversion Acceptance
+
+- HomePage now renders `basic-query-broker-cockpit` directly after the main result summary, before the longer commercial journey and deeper detail modules.
+- The free no-AI result first screen now frames the query as `经纪人首屏研判`: `现在值不值得继续看`, `结论`, `证据链`, `风险边界`, and `升级后解决什么`.
+- Free and premium users still see the same visible research structure. The free copy says `免费版先给完整研究结构`; the premium copy says `高级版换实时 API、来源链接和模型深度`.
+- The cockpit is derived from existing no-AI snapshot data and does not introduce AI calls, public search, real payment, production deployment, or real API Key handling.
+- Added `tests/test_platform_free_broker_conversion_v73.py` and `scripts/verify_platform_free_broker_conversion_v73.py`; the verifier prints `DSA_PLATFORM_FREE_BROKER_CONVERSION_V73_OK` only when required local checks pass.
+- V73 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.

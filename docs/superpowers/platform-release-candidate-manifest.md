@@ -1529,3 +1529,36 @@ Review boundary:
 - Free and premium show the same visible modules; premium/API modes improve freshness, source links, configured feeds, and model depth.
 - Windows local startup must keep working when `lark_oapi` import raises `OSError`; the Feishu App Bot SDK should degrade to unavailable instead of preventing the API from starting.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V73 Free Broker Conversion Manifest Addendum
+
+Purpose: make the free/no-AI first screen feel like a professional broker read instead of a data dump, while keeping premium differentiation focused on fresher API sources, source links, and deeper models.
+
+Files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_broker_conversion_v73.py`
+- `tests/test_platform_free_broker_conversion_v73.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+
+Expected marker:
+
+- `DSA_PLATFORM_FREE_BROKER_CONVERSION_V73_OK`
+
+Acceptance gates:
+
+- HomePage renders `basic-query-broker-cockpit` immediately after the primary summary and before the existing commercial journey.
+- Chinese mode shows `经纪人首屏研判`, `现在值不值得继续看`, `证据链`, `风险边界`, and `升级后解决什么`.
+- Free copy says `免费版先给完整研究结构`; premium copy says `高级版换实时 API、来源链接和模型深度`.
+- The cockpit includes the `不构成投资建议` boundary and does not call AI or public search.
+
+Rollback:
+
+- Reverting this slice removes V73 cockpit rendering, V73 verifier, and V73 docs. V72 peer quotes and earlier free query modules remain available if those slices are kept.

@@ -2933,6 +2933,24 @@ describe('HomePage', () => {
     expect(commercialJourney).toHaveTextContent('我的 API');
     expect(commercialJourney).toHaveTextContent('不登录也能查');
     expect(commercialJourney).not.toHaveTextContent('Upgrade to unlock');
+    const brokerCockpit = screen.getByTestId('basic-query-broker-cockpit');
+    expect(brokerCockpit).toHaveTextContent('经纪人首屏研判');
+    expect(brokerCockpit).toHaveTextContent('现在值不值得继续看');
+    expect(brokerCockpit).toHaveTextContent('结论');
+    expect(brokerCockpit).toHaveTextContent('证据链');
+    expect(brokerCockpit).toHaveTextContent('风险边界');
+    expect(brokerCockpit).toHaveTextContent('升级后解决什么');
+    expect(brokerCockpit).toHaveTextContent('免费版先给完整研究结构');
+    expect(brokerCockpit).toHaveTextContent('高级版换实时 API、来源链接和模型深度');
+    expect(brokerCockpit).toHaveTextContent('不构成投资建议');
+    expect(
+      primarySummary.compareDocumentPosition(brokerCockpit)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      brokerCockpit.compareDocumentPosition(commercialJourney)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const dataDepthBoard = screen.getByTestId('basic-query-data-depth-board');
     expect(dataDepthBoard).toHaveTextContent('免费版真实数据面板');
     expect(dataDepthBoard).toHaveTextContent('美股重点数据');

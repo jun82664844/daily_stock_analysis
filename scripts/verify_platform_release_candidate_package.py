@@ -76,6 +76,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md",
     "docs/superpowers/plans/2026-07-08-dsa-v71-free-multimarket-modules.md",
     "docs/superpowers/plans/2026-07-08-dsa-v72-free-peer-quotes.md",
+    "docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -135,6 +136,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_free_detail_readability_v70.py",
     "scripts/verify_platform_free_multimarket_v71.py",
     "scripts/verify_platform_free_peer_quotes_v72.py",
+    "scripts/verify_platform_free_broker_conversion_v73.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/services/a_share_enrichment_service.py",
@@ -205,6 +207,7 @@ REQUIRED_FILES = (
     "tests/test_platform_free_detail_readability_v70.py",
     "tests/test_platform_free_multimarket_v71.py",
     "tests/test_platform_free_peer_quotes_v72.py",
+    "tests/test_platform_free_broker_conversion_v73.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -267,6 +270,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_detail_readability_v70.py",
     "scripts/verify_platform_free_multimarket_v71.py",
     "scripts/verify_platform_free_peer_quotes_v72.py",
+    "scripts/verify_platform_free_broker_conversion_v73.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 
