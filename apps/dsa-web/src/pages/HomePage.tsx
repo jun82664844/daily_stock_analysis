@@ -302,6 +302,10 @@ const SOURCE_ZH: Record<string, string> = {
   local_kline_rules_kronos_unavailable: '本地K线规则兜底',
   local_kline_rules_kronos_error: '本地K线错误兜底',
   kronos_model_local: '本地Kronos模型',
+  a_share_market_data: 'A股行情数据',
+  us_market_data: '美股行情数据',
+  hk_market_data: '港股行情数据',
+  crypto_market_data: '加密货币行情数据',
   a_share_realtime: 'A股实时行情',
   a_share_history: 'A股历史行情',
   us_realtime: '美股实时行情',
@@ -1922,7 +1926,7 @@ const HomePage: React.FC = () => {
         : (isEnglish ? 'Medium-term below MA20' : '中线低于 MA20');
     const riskNotes = [
       basicSnapshot.quote.freshness !== 'fresh'
-        ? (isEnglish ? 'Quote is not fresh; refresh before making comparisons.' : '行情不是 fresh，比较前应先刷新确认。')
+        ? (isEnglish ? 'Quote is not fresh; refresh before making comparisons.' : '行情不是最新，比较前应先刷新确认。')
         : null,
       basicSnapshot.degradation && basicSnapshot.degradation.status !== 'ok'
         ? basicSnapshot.degradation.message
@@ -2033,6 +2037,76 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicSnapshot, uiLanguage]);
+  const basicFreeCompleteRead = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const freshness = localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage);
+    const watchPoints = basicSnapshot.intelligence?.watchPoints ?? [];
+    const watchSummary = watchPoints.length > 0
+      ? watchPoints.slice(0, 2).map((item) => {
+          if (isEnglish) {
+            return `${item.title}: ${item.detail}`;
+          }
+          if (item.category === 'trend') {
+            return `趋势修复：观察价格能否改善均线位置，先确认${basicFreeReport.productBrief.shortStatus} / ${basicFreeReport.productBrief.midStatus}`;
+          }
+          if (item.category === 'volume') {
+            return '量能确认：观察成交量能否改善，避免只看价格波动';
+          }
+          if (item.category === 'risk') {
+            return '风险边界：先处理数据警示，再看支撑压力是否有效';
+          }
+          return localizeGeneratedText(item.detail || item.title, uiLanguage);
+        }).join('；')
+      : (isEnglish
+          ? 'Refresh once and compare price position, volume confirmation, and broad-market references.'
+          : '先刷新行情，再观察价格位置、量能确认和大盘参照是否同步。');
+    const riskSummary = basicFreeReport.productBrief.risks.length > 0
+      ? basicFreeReport.productBrief.risks.slice(0, 2).map((risk) => localizeGeneratedText(risk, uiLanguage)).join(' ')
+      : (isEnglish
+          ? 'No major quick-rule risk was detected, but this remains an information-only snapshot.'
+          : '快速规则未发现明显风险项，但当前仍只是信息分析快照。');
+    const upgradeBody = localizeGeneratedText(basicFreeReport.productBrief.upgradeText, uiLanguage);
+    const supportPressure = isEnglish
+      ? `Support ${basicFreeReport.productBrief.supportLevels}; resistance ${basicFreeReport.productBrief.pressureLevels}.`
+      : `支撑 ${basicFreeReport.productBrief.supportLevels}；压力 ${basicFreeReport.productBrief.pressureLevels}。`;
+    return {
+      title: isEnglish ? 'Complete free quick read' : '免费版完整速读',
+      subtitle: isEnglish
+        ? 'A richer first-screen report using quote, trend, volume, profile, local news lanes, and K-line preview without spending AI quota.'
+        : '不消耗 AI 额度，把行情、趋势、量价、公司资料、本地资讯通道和K线预览整理成一屏可读报告。',
+      items: [
+        {
+          label: isEnglish ? 'Opportunity lens' : '机会看点',
+          body: `${localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage)} ${supportPressure}`,
+        },
+        {
+          label: isEnglish ? 'Risk boundary' : '风险边界',
+          body: riskSummary,
+        },
+        {
+          label: isEnglish ? 'Next watchlist' : '下一步观察',
+          body: watchSummary,
+        },
+        {
+          label: isEnglish ? 'Data source' : '数据来源',
+          body: isEnglish
+            ? `${localizeGeneratedSource(sourceLane, uiLanguage)}; quote freshness: ${freshness}; AI not used.`
+            : `${localizeGeneratedSource(sourceLane, uiLanguage)}；行情状态：${freshness}；未使用 AI。`,
+        },
+        {
+          label: isEnglish ? 'Premium unlocks' : '高级版可解锁',
+          body: isEnglish ? upgradeBody : upgradeBody.replace(/^可解锁/, ''),
+        },
+      ],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
@@ -3758,6 +3832,37 @@ const HomePage: React.FC = () => {
                         </span>
                       </div>
                     </div>
+                    {basicFreeCompleteRead ? (
+                      <div
+                        data-testid="basic-query-free-complete-read"
+                        className="mt-3 rounded-lg border border-primary/25 bg-background/35 p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium text-primary">
+                              {basicFreeCompleteRead.title}
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                              {basicFreeCompleteRead.subtitle}
+                            </p>
+                          </div>
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                            {uiLanguage === 'en' ? 'No AI cost' : '不消耗AI'}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid gap-2 lg:grid-cols-5">
+                          {basicFreeCompleteRead.items.map((item) => (
+                            <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 bg-background/30 p-2.5">
+                              <div className="text-xs font-medium text-primary">{item.label}</div>
+                              <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-secondary-text">
+                                {item.body}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div
                       data-testid="basic-query-free-feature-entry"
                       className="mt-3 flex min-w-0 flex-col gap-2 rounded-lg border border-primary/25 bg-background/35 p-3 sm:flex-row sm:items-center sm:justify-between"

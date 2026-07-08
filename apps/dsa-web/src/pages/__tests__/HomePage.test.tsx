@@ -2925,6 +2925,18 @@ describe('HomePage', () => {
     expect(valueSummary).toHaveTextContent('风险边界');
     expect(valueSummary).toHaveTextContent('升级可解锁');
     expect(valueSummary).toHaveTextContent('深度分析');
+    const completeRead = screen.getByTestId('basic-query-free-complete-read');
+    expect(valueSummary).toContainElement(completeRead);
+    expect(completeRead).toHaveTextContent('免费版完整速读');
+    expect(completeRead).toHaveTextContent('机会看点');
+    expect(completeRead).toHaveTextContent('风险边界');
+    expect(completeRead).toHaveTextContent('下一步观察');
+    expect(completeRead).toHaveTextContent('数据来源');
+    expect(completeRead).toHaveTextContent('高级版可解锁');
+    expect(completeRead).not.toHaveTextContent('Trend confirmation');
+    expect(completeRead).not.toHaveTextContent('Volume confirmation');
+    expect(completeRead).not.toHaveTextContent('fresh');
+    expect(completeRead).not.toHaveTextContent('us_market_data');
     const featureEntry = screen.getByTestId('basic-query-free-feature-entry');
     expect(valueSummary).toContainElement(featureEntry);
     expect(valueSummary).toContainElement(screen.getByTestId('basic-query-feature-entry-news'));

@@ -29,11 +29,16 @@ class CheckResult:
 REQUIRED_MARKERS: dict[str, list[str]] = {
     "apps/dsa-web/src/pages/HomePage.tsx": [
         "basic-query-free-value-summary",
+        "basic-query-free-complete-read",
         "basic-query-free-feature-entry",
         "basic-query-feature-entry-news",
         "basic-query-feature-entry-kline",
         "basic-query-diagnostics-details",
         "免费版重点结论",
+        "免费版完整速读",
+        "机会看点",
+        "下一步观察",
+        "数据来源",
         "当前看点",
         "风险边界",
         "升级可解锁",
@@ -41,11 +46,16 @@ REQUIRED_MARKERS: dict[str, list[str]] = {
     ],
     "apps/dsa-web/src/pages/__tests__/HomePage.test.tsx": [
         "basic-query-free-value-summary",
+        "basic-query-free-complete-read",
         "basic-query-free-feature-entry",
         "basic-query-feature-entry-news",
         "basic-query-feature-entry-kline",
         "basic-query-diagnostics-details",
         "免费版重点结论",
+        "免费版完整速读",
+        "机会看点",
+        "下一步观察",
+        "数据来源",
         "升级可解锁",
     ],
     ".gitignore": [
