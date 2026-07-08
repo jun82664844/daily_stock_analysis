@@ -1151,6 +1151,8 @@ type MarketReviewNotice = {
   message: string;
 } | null;
 
+type BasicSnapshotViewMode = 'query' | 'quick';
+
 type RunFlowDrawerState =
   | { open: false }
   | { open: true; source: RunFlowSnapshotSource; title: string };
@@ -1173,6 +1175,7 @@ const HomePage: React.FC = () => {
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [basicSnapshot, setBasicSnapshot] = useState<BasicStockSnapshot | null>(null);
+  const [basicSnapshotViewMode, setBasicSnapshotViewMode] = useState<BasicSnapshotViewMode>('query');
   const [aShareSourceMode, setAShareSourceMode] = useState<AShareSourceMode>('a_stock_data');
   const [autocompleteCloseSignal, setAutocompleteCloseSignal] = useState(0);
   const restoredHistoryCenterFiltersRef = useRef(false);
@@ -1199,6 +1202,7 @@ const HomePage: React.FC = () => {
   const [basicRetentionBusy, setBasicRetentionBusy] = useState(false);
   const [basicRetentionStatus, setBasicRetentionStatus] = useState('');
   const [basicRetentionError, setBasicRetentionError] = useState('');
+  const [deepAnalysisNotice, setDeepAnalysisNotice] = useState('');
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -2874,15 +2878,18 @@ const HomePage: React.FC = () => {
     _stockName?: string,
     forceRefresh = false,
     sourceModeOverride?: AShareSourceMode,
+    viewMode: BasicSnapshotViewMode = 'query',
   ) => {
     const target = (stockCode || query).trim();
     if (!target || isQueryingBasic) {
       return null;
     }
 
+    setBasicSnapshotViewMode(viewMode);
     setAutocompleteCloseSignal((current) => current + 1);
     setIsQueryingBasic(true);
     setBasicQueryError(null);
+    setDeepAnalysisNotice('');
     setBasicRetentionStatus('');
     setBasicRetentionError('');
     setKronosForecastError('');
@@ -2930,14 +2937,14 @@ const HomePage: React.FC = () => {
     setAShareSourceMode(mode);
     const currentAShareCode = basicSnapshot?.market === 'cn' ? basicSnapshot.stockCode : '';
     if (currentAShareCode) {
-      void handleBasicQuery(currentAShareCode, undefined, true, mode);
+      void handleBasicQuery(currentAShareCode, undefined, true, mode, basicSnapshotViewMode);
     }
-  }, [basicSnapshot?.market, basicSnapshot?.stockCode, handleBasicQuery]);
+  }, [basicSnapshot?.market, basicSnapshot?.stockCode, basicSnapshotViewMode, handleBasicQuery]);
 
   const handleAShareSourceProbe = useCallback((symbol: string) => {
     setQuery(symbol);
-    void handleBasicQuery(symbol, undefined, true, aShareSourceMode);
-  }, [aShareSourceMode, handleBasicQuery, setQuery]);
+    void handleBasicQuery(symbol, undefined, true, aShareSourceMode, basicSnapshotViewMode);
+  }, [aShareSourceMode, basicSnapshotViewMode, handleBasicQuery, setQuery]);
 
   const handleRunKronosForecast = useCallback(async (requireModel = false) => {
     if (!basicSnapshot?.stockCode || isRunningKronosForecast) {
@@ -3347,6 +3354,7 @@ const HomePage: React.FC = () => {
       selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
       analysisDepth: AnalysisDepth = 'fast',
     ) => {
+      setDeepAnalysisNotice('');
       void submitAnalysis({
         stockCode,
         stockName,
@@ -3359,13 +3367,39 @@ const HomePage: React.FC = () => {
     [query, selectedAnalysisSkills, submitAnalysis],
   );
 
+  const handleDeepAnalyze = useCallback(
+    (
+      stockCode?: string,
+      stockName?: string,
+      selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
+    ) => {
+      if (platformEnabled && !platformSession) {
+        setAuthMode('login');
+        setAuthError('');
+        setDeepAnalysisNotice(uiLanguage === 'en'
+          ? 'Deep analysis requires login and a selected Platform API, user API, or local model. Free query and quick analysis remain available without AI.'
+          : '深度分析需要先登录，并选择平台 API、我的 API 或本地模型。免费查询和快速分析可继续使用，不消耗 AI。');
+        window.setTimeout(() => {
+          if (typeof platformAuthPanelRef.current?.scrollIntoView === 'function') {
+            platformAuthPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+        }, 0);
+        return;
+      }
+
+      handleSubmitAnalysis(stockCode, stockName, selectionSource, 'deep');
+    },
+    [handleSubmitAnalysis, platformEnabled, platformSession, uiLanguage],
+  );
+
   const handleQuickAnalyze = useCallback(
     (
       stockCode?: string,
       stockName?: string,
       _selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
     ) => {
-      void handleBasicQuery(stockCode, stockName);
+      void handleBasicQuery(stockCode, stockName, false, undefined, 'quick');
     },
     [handleBasicQuery],
   );
@@ -3805,7 +3839,7 @@ const HomePage: React.FC = () => {
                 variant="secondary"
                 size="md"
                 disabled={!query || isAnalyzing}
-                onClick={() => handleSubmitAnalysis(undefined, undefined, 'manual', 'deep')}
+                onClick={() => handleDeepAnalyze(undefined, undefined, 'manual')}
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
                 <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -4365,6 +4399,21 @@ const HomePage: React.FC = () => {
               />
             ) : null}
 
+            {deepAnalysisNotice ? (
+              <div
+                data-testid="deep-analysis-guard"
+                role="alert"
+                className="mb-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-foreground"
+              >
+                <div className="font-semibold text-primary">
+                  {uiLanguage === 'en' ? 'Deep analysis is an account feature' : '深度分析是登录后的增强功能'}
+                </div>
+                <div className="mt-1 leading-relaxed text-secondary-text">
+                  {deepAnalysisNotice}
+                </div>
+              </div>
+            ) : null}
+
             {basicSnapshot && !marketReviewReport ? (
               <div ref={basicSnapshotRef} data-testid="basic-query-snapshot" className="mb-4 max-w-4xl scroll-mt-4 rounded-xl border border-subtle bg-surface/75 p-4 shadow-soft-card">
                 <div
@@ -4418,6 +4467,73 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {basicSnapshotViewMode === 'quick' ? (
+                  <section
+                    data-testid="basic-query-mode-banner"
+                    className="mb-4 rounded-lg border border-primary/35 bg-primary/10 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Quick analysis mode' : '快速分析模式'}
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {uiLanguage === 'en'
+                            ? 'This view expands the current free web/local snapshot into a rule-based first read. It does not use AI quota.'
+                            : '已把当前免费网络/本地快照展开成规则化首轮研判，不使用 AI，也不消耗额度。'}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                        <span className="rounded-md border border-primary/40 bg-background/35 px-2 py-1 font-medium text-primary">
+                          {uiLanguage === 'en' ? 'No AI' : '未用 AI'}
+                        </span>
+                        <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1">
+                          {uiLanguage === 'en' ? 'Free rule read' : '免费规则研判'}
+                        </span>
+                        <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1">
+                          {uiLanguage === 'en' ? 'Deep analysis optional' : '可继续深度分析'}
+                        </span>
+                      </div>
+                    </div>
+                    {basicFreeReport ? (
+                      <div className="mt-3 grid gap-2 md:grid-cols-3">
+                        <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                          <div className="text-[11px] font-medium text-primary">
+                            {uiLanguage === 'en' ? 'First read' : '首轮结论'}
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                            {localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage)}
+                          </div>
+                          <div className="mt-1 text-[11px] text-secondary-text">
+                            {uiLanguage === 'en' ? 'Signal' : '信号'} {basicFreeReport.score}/100
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                          <div className="text-[11px] font-medium text-primary">
+                            {uiLanguage === 'en' ? 'Price map' : '价位地图'}
+                          </div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                            {uiLanguage === 'en' ? 'Support' : '支撑'} {localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}
+                          </div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                            {uiLanguage === 'en' ? 'Resistance' : '压力'} {localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                          <div className="text-[11px] font-medium text-primary">
+                            {uiLanguage === 'en' ? 'Next check' : '下一步观察'}
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                            {localizeGeneratedText(basicFreeReport.productBrief.shortStatus, uiLanguage)}
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-[11px] text-secondary-text">
+                            {localizeGeneratedText(basicFreeReport.productBrief.risks[0] || basicFreeReport.productBrief.midStatus, uiLanguage)}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
                 {basicBrokerCockpit ? (
                   <section
                     data-testid="basic-query-broker-cockpit"
@@ -4920,7 +5036,7 @@ const HomePage: React.FC = () => {
                           size="sm"
                           className="mt-3"
                           disabled={isAnalyzing}
-                          onClick={() => handleSubmitAnalysis(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual', 'deep')}
+                          onClick={() => handleDeepAnalyze(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual')}
                         >
                           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                           {t('home.deepAnalyze')}
@@ -6102,7 +6218,7 @@ const HomePage: React.FC = () => {
                             variant="secondary"
                             size="sm"
                             disabled={isAnalyzing}
-                            onClick={() => handleSubmitAnalysis(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual', 'deep')}
+                            onClick={() => handleDeepAnalyze(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual')}
                           >
                             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                             {uiLanguage === 'en' ? 'Deep analysis' : '深度分析'}
@@ -6363,7 +6479,7 @@ const HomePage: React.FC = () => {
                       size="sm"
                       data-testid="basic-query-refresh-market"
                       disabled={isQueryingBasic}
-                      onClick={() => void handleBasicQuery(basicSnapshot.stockCode, undefined, true)}
+                      onClick={() => void handleBasicQuery(basicSnapshot.stockCode, undefined, true, undefined, basicSnapshotViewMode)}
                     >
                       <RefreshCw className="h-4 w-4" aria-hidden="true" />
                       {uiLanguage === 'en' ? 'Refresh quote' : '刷新行情'}
@@ -6383,7 +6499,7 @@ const HomePage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       disabled={isAnalyzing}
-                      onClick={() => handleSubmitAnalysis(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual', 'deep')}
+                      onClick={() => handleDeepAnalyze(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual')}
                     >
                       <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                       {t('home.deepAnalyze')}

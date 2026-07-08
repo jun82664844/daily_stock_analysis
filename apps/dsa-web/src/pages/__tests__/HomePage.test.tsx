@@ -2546,6 +2546,8 @@ describe('HomePage', () => {
     });
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByTestId('basic-query-primary-summary')).toHaveTextContent('贵州茅台');
+    expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    expect(screen.getByTestId('basic-query-mode-banner')).toHaveTextContent('未用 AI');
     expect(screen.queryByText('Login required')).not.toBeInTheDocument();
   });
 
@@ -2593,6 +2595,8 @@ describe('HomePage', () => {
     });
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByTestId('basic-query-primary-summary')).toHaveTextContent('Apple Inc.');
+    expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    expect(screen.getByTestId('basic-query-mode-banner')).toHaveTextContent('未用 AI');
   });
 
   it('clears stale analysis connection errors after a successful no-AI query', async () => {
@@ -4978,6 +4982,36 @@ describe('HomePage', () => {
         analysisDepth: 'deep',
       }));
     });
+  });
+
+  it('shows a clear login and API mode guard when a guest clicks deep analysis', async () => {
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(null);
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-guest-deep',
+      status: 'pending',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
+    fireEvent.change(input, { target: { value: '600519' } });
+    fireEvent.click(screen.getByRole('button', { name: '深度分析' }));
+
+    const guard = await screen.findByTestId('deep-analysis-guard');
+    expect(guard).toHaveTextContent('深度分析需要先登录');
+    expect(guard).toHaveTextContent('平台 API、我的 API 或本地模型');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
   it('supports keyboard navigation in the strategy menu', async () => {
