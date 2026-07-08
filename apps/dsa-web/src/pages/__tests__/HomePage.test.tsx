@@ -130,6 +130,12 @@ const historyReport = {
   },
 };
 
+const openQuickAnalysisFromCurrentSnapshot = async () => {
+  await screen.findByTestId('basic-query-compact-overview');
+  fireEvent.click(screen.getAllByRole('button', { name: /快速分析|Quick analysis|Open quick analysis/ })[0]);
+  await screen.findByTestId('basic-query-mode-banner');
+};
+
 const marketReviewHistoryItem = {
   id: 2,
   queryId: 'market-review-q-1',
@@ -755,6 +761,7 @@ describe('HomePage', () => {
         aShareSourceMode: 'a_stock_data',
       });
     });
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const freeReport = await screen.findByTestId('basic-query-free-report');
     expect(freeReport).toHaveTextContent('未用 AI');
@@ -921,6 +928,7 @@ describe('HomePage', () => {
     const input = await screen.findByRole('textbox');
     fireEvent.change(input, { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const newsCenter = await screen.findByTestId('basic-query-news-center');
     expect(newsCenter).toHaveTextContent('科技 / 消费电子');
@@ -1019,6 +1027,7 @@ describe('HomePage', () => {
         aShareSourceMode: 'a_stock_data',
       });
     });
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const aShareEnrichment = await screen.findByTestId('basic-query-a-share-enrichment');
     expect(aShareEnrichment).toHaveTextContent('A股快速参考数据');
@@ -1123,6 +1132,7 @@ describe('HomePage', () => {
     const input = await screen.findByRole('textbox');
     fireEvent.change(input, { target: { value: '600519.SH' } });
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const readerSummary = await screen.findByTestId('basic-query-a-share-reader-summary');
     expect(readerSummary).toHaveTextContent('今日关键信息');
@@ -1198,6 +1208,7 @@ describe('HomePage', () => {
     const input = await screen.findByRole('textbox');
     fireEvent.change(input, { target: { value: '600519.SH' } });
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const enrichment = await screen.findByTestId('basic-query-a-share-enrichment');
     expect(enrichment).toHaveTextContent('主力净额');
@@ -1273,6 +1284,7 @@ describe('HomePage', () => {
     const input = await screen.findByRole('textbox');
     fireEvent.change(input, { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: 'Query' }));
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const sourcePanel = await screen.findByTestId('a-share-source-control');
     expect(sourcePanel).toHaveTextContent('A-share source');
@@ -3021,6 +3033,18 @@ describe('HomePage', () => {
     expect(primarySummary).toHaveTextContent('消费电子');
     expect(primarySummary).toHaveTextContent('4.5T');
     expect(primarySummary).toHaveTextContent('31.2');
+    const compactOverview = screen.getByTestId('basic-query-compact-overview');
+    expect(compactOverview).toHaveTextContent('行情速查');
+    expect(compactOverview).toHaveTextContent('点击快速分析查看完整免费研判');
+    expect(screen.queryByTestId('basic-query-broker-cockpit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('basic-query-commercial-journey')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('basic-query-kline-forecast-lab')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: '快速分析' })[0]);
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
     const commercialJourney = screen.getByTestId('basic-query-commercial-journey');
     expect(commercialJourney).toHaveTextContent('免费查询完整路径');
     expect(commercialJourney).toHaveTextContent('免费版已开放');
@@ -3631,6 +3655,7 @@ describe('HomePage', () => {
         target: { value: item.query },
       });
       fireEvent.click(screen.getByRole('button', { name: '查询' }));
+      await openQuickAnalysisFromCurrentSnapshot();
 
       const board = await screen.findByTestId('basic-query-data-depth-board');
       if (item.market === 'cn') {
@@ -3771,6 +3796,7 @@ describe('HomePage', () => {
         target: { value: item.query },
       });
       fireEvent.click(screen.getByRole('button', { name: '查询' }));
+      await openQuickAnalysisFromCurrentSnapshot();
 
       const peerTable = await screen.findByTestId('basic-query-peer-table');
       expect(peerTable).toHaveTextContent(item.expectedLabel);
@@ -3896,6 +3922,7 @@ describe('HomePage', () => {
       target: { value: 'AAPL' },
     });
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await openQuickAnalysisFromCurrentSnapshot();
 
     const peerComparison = await screen.findByTestId('basic-query-peer-comparison');
     expect(peerComparison).toHaveTextContent('参照价');

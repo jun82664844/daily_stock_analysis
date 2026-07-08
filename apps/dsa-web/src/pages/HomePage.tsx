@@ -4467,6 +4467,61 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {basicSnapshotViewMode === 'query' ? (
+                  <section
+                    data-testid="basic-query-compact-overview"
+                    className="mb-4 rounded-lg border border-primary/35 bg-primary/10 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">
+                          {uiLanguage === 'en' ? 'Quote lookup' : '行情速查'}
+                        </div>
+                        <h3 className="mt-1 text-base font-semibold leading-snug text-foreground">
+                          {uiLanguage === 'en'
+                            ? 'Core quote is ready. Open quick analysis for the complete free research read.'
+                            : '核心行情已就绪，点击快速分析查看完整免费研判。'}
+                        </h3>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {uiLanguage === 'en'
+                            ? 'Lookup keeps the page light: price, movement, moving averages, source and freshness. Quick analysis expands news, K-line forecast, peer comparison and risk checklist without using AI quota.'
+                            : '查询只保留价格、涨跌、均线、来源和新鲜度；快速分析会展开资讯、K线预测、同业对比和风险清单，仍不消耗 AI 额度。'}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={isQueryingBasic}
+                        onClick={() => handleQuickAnalyze(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual')}
+                      >
+                        <Sparkles className="h-4 w-4" aria-hidden="true" />
+                        {uiLanguage === 'en' ? 'Open quick analysis' : '查看快速分析'}
+                      </Button>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
+                      <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                        <div className="text-[11px] text-secondary-text">{uiLanguage === 'en' ? 'Price / change' : '价格 / 涨跌'}</div>
+                        <div className="mt-1 text-sm font-semibold text-foreground">
+                          {formatBasicNumber(basicSnapshot.quote.currentPrice)} / {formatSignedBasicPercent(basicSnapshot.quote.changePercent)}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                        <div className="text-[11px] text-secondary-text">{uiLanguage === 'en' ? 'Moving averages' : '均线'}</div>
+                        <div className="mt-1 text-sm font-semibold text-foreground">
+                          MA5 {formatBasicNumber(basicSnapshot.indicators['ma5'])} / MA20 {formatBasicNumber(basicSnapshot.indicators['ma20'])}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                        <div className="text-[11px] text-secondary-text">{uiLanguage === 'en' ? 'Source / freshness' : '来源 / 新鲜度'}</div>
+                        <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                          {localizeGeneratedSource(basicSnapshot.quote.source, uiLanguage)} / {localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage)}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
                 {basicSnapshotViewMode === 'quick' ? (
                   <section
                     data-testid="basic-query-mode-banner"
@@ -4534,7 +4589,7 @@ const HomePage: React.FC = () => {
                     ) : null}
                   </section>
                 ) : null}
-                {basicBrokerCockpit ? (
+                {basicSnapshotViewMode === 'quick' && basicBrokerCockpit ? (
                   <section
                     data-testid="basic-query-broker-cockpit"
                     className="mb-4 rounded-lg border border-primary/40 bg-primary/10 p-3"
@@ -4607,7 +4662,7 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                {basicCommercialJourney ? (
+                {basicSnapshotViewMode === 'quick' && basicCommercialJourney ? (
                   <section
                     data-testid="basic-query-commercial-journey"
                     className="mb-4 rounded-lg border border-primary/35 bg-primary/10 p-3"
@@ -4654,7 +4709,7 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                {basicDataDepthBoard ? (
+                {basicSnapshotViewMode === 'quick' && basicDataDepthBoard ? (
                   <section
                     data-testid="basic-query-data-depth-board"
                     className="mb-4 rounded-lg border border-primary/35 bg-surface/45 p-3"
@@ -4804,7 +4859,7 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                {basicProfessionalOverview ? (
+                {basicSnapshotViewMode === 'quick' && basicProfessionalOverview ? (
                   <section
                     data-testid="basic-query-professional-overview"
                     className="mb-4 rounded-lg border border-primary/30 bg-background/35 p-3"
@@ -4849,7 +4904,7 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                {basicFreeResearchBoard ? (
+                {basicSnapshotViewMode === 'quick' && basicFreeResearchBoard ? (
                   <section
                     data-testid="basic-query-free-research-board"
                     className="mb-4 rounded-lg border border-primary/30 bg-surface/45 p-3"
@@ -4896,7 +4951,7 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                {basicFreeReport ? (
+                {basicSnapshotViewMode === 'quick' && basicFreeReport ? (
                   <section
                     data-testid="basic-query-free-value-summary"
                     className="mb-4 rounded-lg border border-primary/35 bg-primary/10 p-3"
@@ -5045,7 +5100,7 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                {basicFreeReport ? (
+                {basicSnapshotViewMode === 'quick' && basicFreeReport ? (
                   <section
                     data-testid="basic-query-free-report"
                     className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3"
@@ -5204,7 +5259,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.retentionBrief ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.retentionBrief ? (
                       <div
                         data-testid="basic-query-retention-brief"
                         className="mb-3 rounded-lg border border-primary/30 bg-background/45 p-3"
@@ -5260,7 +5315,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.newsCenter ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.newsCenter ? (
                       <div
                         data-testid="basic-query-news-center"
                         className="mb-3 rounded-lg border border-primary/30 bg-background/40 p-3"
@@ -5338,7 +5393,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.aShareEnrichment ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.aShareEnrichment ? (
                       <div
                         data-testid="basic-query-a-share-enrichment"
                         className="mb-3 rounded-lg border border-primary/30 bg-background/40 p-3"
@@ -5602,7 +5657,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.klineForecast ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.klineForecast ? (
                       <div
                         data-testid="basic-query-kline-forecast-lab"
                         className="mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3"
@@ -5813,7 +5868,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {(basicSnapshot.intelligence?.newsCenter || basicSnapshot.intelligence?.aShareEnrichment || basicSnapshot.intelligence?.klineForecast) ? (
+                    {basicSnapshotViewMode === 'quick' && (basicSnapshot.intelligence?.newsCenter || basicSnapshot.intelligence?.aShareEnrichment || basicSnapshot.intelligence?.klineForecast) ? (
                       <div
                         data-testid="basic-query-premium-feature-ladder"
                         className="mb-3 grid gap-2 rounded-lg border border-primary/25 bg-background/35 p-3 md:grid-cols-4"
@@ -5845,7 +5900,7 @@ const HomePage: React.FC = () => {
                         ))}
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.items?.length ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.items?.length ? (
                       <div
                         data-testid="basic-query-intelligence-panel"
                         className="mb-3 rounded-lg border border-subtle bg-background/35 p-3"
@@ -5907,7 +5962,7 @@ const HomePage: React.FC = () => {
                         ) : null}
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.marketBrief ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.marketBrief ? (
                       <div
                         data-testid="basic-query-market-brief"
                         className="mb-3 rounded-lg border border-primary/25 bg-primary/5 p-3"
@@ -5945,7 +6000,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.freeInsights?.length ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.freeInsights?.length ? (
                       <div
                         data-testid="basic-query-free-insights"
                         className="mb-3 rounded-lg border border-subtle bg-background/35 p-3"
@@ -5995,7 +6050,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {basicSnapshot.intelligence?.peerComparison?.rows?.length ? (
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.peerComparison?.rows?.length ? (
                       <div
                         data-testid="basic-query-peer-comparison"
                         className="mb-3 rounded-lg border border-subtle bg-background/35 p-3"
@@ -6065,7 +6120,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
-                    {(basicSnapshot.intelligence?.watchPoints?.length || basicSnapshot.intelligence?.comparisonTargets?.length) ? (
+                    {basicSnapshotViewMode === 'quick' && (basicSnapshot.intelligence?.watchPoints?.length || basicSnapshot.intelligence?.comparisonTargets?.length) ? (
                       <div
                         data-testid="basic-query-watch-points"
                         className="mb-3 grid gap-3 rounded-lg border border-primary/25 bg-background/35 p-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(14rem,0.75fr)]"
@@ -6245,41 +6300,43 @@ const HomePage: React.FC = () => {
                     </div>
                   </section>
                 ) : null}
-                <div className="mb-4 grid gap-3 lg:grid-cols-2">
-                  <section
-                    data-testid="basic-query-quote-details"
-                    className="min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
-                  >
-                    <h3 className="mb-3 text-sm font-semibold text-foreground">
-                      {uiLanguage === 'en' ? 'Quote details' : '行情明细'}
-                    </h3>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {basicQuoteDetailItems.map((item) => (
-                        <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
-                          <div className="text-xs text-secondary-text">{item.label}</div>
-                          <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                  <section
-                    data-testid="basic-query-technical-details"
-                    className="min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
-                  >
-                    <h3 className="mb-3 text-sm font-semibold text-foreground">
-                      {uiLanguage === 'en' ? 'Technical overview' : '技术概览'}
-                    </h3>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {basicTechnicalDetailItems.map((item) => (
-                        <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
-                          <div className="text-xs text-secondary-text">{item.label}</div>
-                          <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                </div>
-                {basicSnapshot.profile ? (
+                {basicSnapshotViewMode === 'quick' ? (
+                  <div className="mb-4 grid gap-3 lg:grid-cols-2">
+                    <section
+                      data-testid="basic-query-quote-details"
+                      className="min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
+                    >
+                      <h3 className="mb-3 text-sm font-semibold text-foreground">
+                        {uiLanguage === 'en' ? 'Quote details' : '行情明细'}
+                      </h3>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {basicQuoteDetailItems.map((item) => (
+                          <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                            <div className="text-xs text-secondary-text">{item.label}</div>
+                            <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                    <section
+                      data-testid="basic-query-technical-details"
+                      className="min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
+                    >
+                      <h3 className="mb-3 text-sm font-semibold text-foreground">
+                        {uiLanguage === 'en' ? 'Technical overview' : '技术概览'}
+                      </h3>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {basicTechnicalDetailItems.map((item) => (
+                          <div key={item.label} className="min-w-0 rounded-md border border-subtle/70 px-3 py-2">
+                            <div className="text-xs text-secondary-text">{item.label}</div>
+                            <div className="mt-1 truncate text-sm font-medium text-foreground">{item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicSnapshot.profile ? (
                   <section
                     data-testid="basic-query-company-profile"
                     className="mb-4 min-w-0 rounded-lg border border-subtle bg-background/25 p-3"
