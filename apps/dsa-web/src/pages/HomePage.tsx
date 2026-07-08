@@ -2109,6 +2109,55 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicCommercialJourney = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    return {
+      title: isEnglish ? 'Free query journey' : '免费查询完整路径',
+      subtitle: isEnglish
+        ? 'Free mode already shows the same visible research flow. Premium changes the data source and model depth, not the page structure.'
+        : '免费版已开放同样的研究流程；高级版只换数据源和模型深度，不把核心页面结构藏起来。',
+      badges: [
+        isEnglish ? 'Guest query works' : '不登录也能查',
+        basicSnapshot.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi'),
+        isEnglish ? 'Free web source' : '免费网络源',
+        localizeGeneratedSource(sourceLane, uiLanguage),
+      ],
+      steps: [
+        {
+          title: isEnglish ? 'Read the conclusion first' : '先看结论',
+          body: isEnglish
+            ? `${localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage)} Check support and resistance before reading the rest.`
+            : `${localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage)} 先看支撑压力，再继续读研究模块。`,
+        },
+        {
+          title: isEnglish ? 'Then inspect research' : '再看研究',
+          body: isEnglish
+            ? 'Quote, technicals, news, K-line, peers, and risk are visible in free mode.'
+            : '行情、技术、资讯、K线、同业、风险这些模块免费版都能先看。',
+        },
+        {
+          title: isEnglish ? 'Decide whether to go deep' : '最后决定是否深度分析',
+          body: isEnglish
+            ? 'Use deep analysis only when you need longer news, filings, fundamentals, or model reasoning.'
+            : '只有需要更长资讯、公告、基本面或模型推理时，再点深度分析。',
+        },
+      ],
+      upgradeTitle: isEnglish ? 'Premium changes data sources' : '高级版只换数据源',
+      upgradeItems: isEnglish
+        ? ['Realtime news API', 'Filings / SEC API', 'Kronos / API model', 'My API']
+        : ['实时新闻 API', '公告/SEC API', 'Kronos/API 模型', '我的 API'],
+      moduleText: isEnglish
+        ? 'quote, technicals, news, K-line, peers, risk'
+        : '行情、技术、资讯、K线、同业、风险',
+    };
+  }, [basicFreeReport, basicSnapshot, t, uiLanguage]);
   const basicProfessionalOverview = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -3985,6 +4034,53 @@ const HomePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {basicCommercialJourney ? (
+                  <section
+                    data-testid="basic-query-commercial-journey"
+                    className="mb-4 rounded-lg border border-primary/35 bg-primary/10 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">{basicCommercialJourney.title}</div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {basicCommercialJourney.subtitle}
+                        </h3>
+                        <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          {basicCommercialJourney.badges.map((badge) => (
+                            <span key={badge} className="max-w-full truncate rounded-md border border-primary/30 bg-background/35 px-2 py-1">
+                              {badge}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="shrink-0 rounded-md border border-primary/30 bg-background/35 px-3 py-2 text-xs leading-relaxed text-secondary-text xl:w-72">
+                        <div className="font-medium text-primary">{basicCommercialJourney.upgradeTitle}</div>
+                        <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                          {basicCommercialJourney.upgradeItems.map((item) => (
+                            <span key={item} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
+                      {basicCommercialJourney.steps.map((step) => (
+                        <div key={step.title} className="min-w-0 rounded-md border border-subtle/70 bg-background/35 p-2.5">
+                          <div className="text-xs font-semibold text-foreground">{step.title}</div>
+                          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                            {step.body}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md border border-primary/25 bg-background/35 px-3 py-2 text-xs leading-relaxed text-secondary-text">
+                      {uiLanguage === 'en'
+                        ? `Free mode keeps ${basicCommercialJourney.moduleText} visible first; premium/API mode improves freshness, source links, and model depth.`
+                        : `免费版已开放 ${basicCommercialJourney.moduleText}；高级版/API 模式提升实时性、来源链接和模型深度。`}
+                    </div>
+                  </section>
+                ) : null}
                 {basicProfessionalOverview ? (
                   <section
                     data-testid="basic-query-professional-overview"

@@ -2919,6 +2919,24 @@ describe('HomePage', () => {
     expect(primarySummary).toHaveTextContent('消费电子');
     expect(primarySummary).toHaveTextContent('4.5T');
     expect(primarySummary).toHaveTextContent('31.2');
+    const commercialJourney = screen.getByTestId('basic-query-commercial-journey');
+    expect(commercialJourney).toHaveTextContent('免费查询完整路径');
+    expect(commercialJourney).toHaveTextContent('免费版已开放');
+    expect(commercialJourney).toHaveTextContent('先看结论');
+    expect(commercialJourney).toHaveTextContent('再看研究');
+    expect(commercialJourney).toHaveTextContent('最后决定是否深度分析');
+    expect(commercialJourney).toHaveTextContent('行情、技术、资讯、K线、同业、风险');
+    expect(commercialJourney).toHaveTextContent('高级版只换数据源');
+    expect(commercialJourney).toHaveTextContent('实时新闻 API');
+    expect(commercialJourney).toHaveTextContent('公告/SEC API');
+    expect(commercialJourney).toHaveTextContent('Kronos/API 模型');
+    expect(commercialJourney).toHaveTextContent('我的 API');
+    expect(commercialJourney).toHaveTextContent('不登录也能查');
+    expect(commercialJourney).not.toHaveTextContent('Upgrade to unlock');
+    expect(
+      primarySummary.compareDocumentPosition(commercialJourney)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const professionalOverview = screen.getByTestId('basic-query-professional-overview');
     expect(professionalOverview).toHaveTextContent('专业速览');
     expect(professionalOverview).toHaveTextContent('趋势评分');

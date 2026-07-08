@@ -1080,3 +1080,29 @@ Review focus:
 - `basic-query-free-research-board` must show `资讯雷达`, `K线推演`, `同业/板块`, and `风险解释` with concrete content, not placeholder-only copy.
 - Free and premium keep the same visible research modules; premium/API modes only improve freshness, source links, configured feeds, and model depth.
 - `scripts/verify_platform_free_research_board_v67.py` must stay visible and print `DSA_PLATFORM_FREE_RESEARCH_BOARD_V67_OK` only when V67 markers are present.
+
+## V68 Free Commercial Journey Addendum
+
+Purpose: make the top of the free query result feel like a complete guided report. The new journey block appears after the primary summary and before deeper modules, telling visitors what to read first, what research modules are already open, and why premium/API mode improves source quality rather than hiding the core page.
+
+Files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_commercial_journey_v68.py`
+- `tests/test_platform_free_commercial_journey_v68.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v68-free-commercial-journey.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V68 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and avoid public search by default.
+- `basic-query-commercial-journey` must show `免费查询完整路径`, `免费版已开放`, `不登录也能查`, and `高级版只换数据源`.
+- The block must explain same visible modules: quote, technicals, news, K-line, peers, and risk.
+- Premium/API copy must describe realtime news, filings/SEC, Kronos/API model, and BYOK as data-source/model-depth upgrades, not hard locks on the visible report.
+- `scripts/verify_platform_free_commercial_journey_v68.py` must stay visible and print `DSA_PLATFORM_FREE_COMMERCIAL_JOURNEY_V68_OK` only when V68 markers are present.

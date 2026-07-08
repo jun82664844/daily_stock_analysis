@@ -1349,3 +1349,39 @@ Review boundary:
 - The board must provide concrete scan content across news radar, K-line read, peer/sector context, and risk explanation.
 - Free and premium show the same visible research modules; API modes improve freshness, source links, configured feeds, and model depth.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V68 Free Commercial Journey Manifest Addendum
+
+Status: local-only free-result retention upgrade. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_commercial_journey_v68.py`
+- `tests/test_platform_free_commercial_journey_v68.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v68-free-commercial-journey.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_FREE_COMMERCIAL_JOURNEY_V68_OK`
+
+Suggested review/commit position:
+
+- After V67 free research board and before paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes the commercial journey block, V68 verifier, and V68 docs. V67 free research board, V66 professional overview, and V65 free value summary remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- The journey block must guide the free report reading order and explain the premium/API distinction without hiding core visible modules.
+- Guest query remains available; login is only for saved history/watchlist/account state.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
