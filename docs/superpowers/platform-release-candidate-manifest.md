@@ -1385,3 +1385,39 @@ Review boundary:
 - The journey block must guide the free report reading order and explain the premium/API distinction without hiding core visible modules.
 - Guest query remains available; login is only for saved history/watchlist/account state.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V69 Free Data Depth Manifest Addendum
+
+Status: local-only free-result data-value upgrade. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_data_depth_v69.py`
+- `tests/test_platform_free_data_depth_v69.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v69-free-data-depth.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_FREE_DATA_DEPTH_V69_OK`
+
+Suggested review/commit position:
+
+- After V68 free commercial journey and before paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes the free data depth board, V69 verifier, and V69 docs. V68 free commercial journey, V67 free research board, and earlier free query modules remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- The board must show concrete quote, technical, event, peer, and risk fields using existing snapshot data.
+- Free and premium show the same visible modules; premium/API modes improve freshness, source links, configured feeds, and model depth.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

@@ -2933,6 +2933,28 @@ describe('HomePage', () => {
     expect(commercialJourney).toHaveTextContent('我的 API');
     expect(commercialJourney).toHaveTextContent('不登录也能查');
     expect(commercialJourney).not.toHaveTextContent('Upgrade to unlock');
+    const dataDepthBoard = screen.getByTestId('basic-query-data-depth-board');
+    expect(dataDepthBoard).toHaveTextContent('免费版真实数据面板');
+    expect(dataDepthBoard).toHaveTextContent('美股重点数据');
+    expect(dataDepthBoard).toHaveTextContent('核心数据');
+    expect(dataDepthBoard).toHaveTextContent(/最新价\s*200/);
+    expect(dataDepthBoard).toHaveTextContent(/涨跌幅\s*\+1.5%/);
+    expect(dataDepthBoard).toHaveTextContent(/成交量\s*75.35M/);
+    expect(dataDepthBoard).toHaveTextContent(/总市值\s*4.5T/);
+    expect(dataDepthBoard).toHaveTextContent(/市盈率\s*31.2/);
+    expect(dataDepthBoard).toHaveTextContent('技术结构');
+    expect(dataDepthBoard).toHaveTextContent(/MA5\s*198/);
+    expect(dataDepthBoard).toHaveTextContent(/MA20\s*190/);
+    expect(dataDepthBoard).toHaveTextContent(/支撑\s*190/);
+    expect(dataDepthBoard).toHaveTextContent(/压力\s*205/);
+    expect(dataDepthBoard).toHaveTextContent('资讯与事件');
+    expect(dataDepthBoard).toHaveTextContent('SEC 文件通道');
+    expect(dataDepthBoard).toHaveTextContent('财务快照通道');
+    expect(dataDepthBoard).toHaveTextContent('同业与风险');
+    expect(dataDepthBoard).toHaveTextContent('QQQ');
+    expect(dataDepthBoard).toHaveTextContent('XLK');
+    expect(dataDepthBoard).toHaveTextContent('仅作信息分析，不构成投资建议');
+    expect(dataDepthBoard).not.toHaveTextContent('Free data depth board');
     expect(
       primarySummary.compareDocumentPosition(commercialJourney)
       & Node.DOCUMENT_POSITION_FOLLOWING,

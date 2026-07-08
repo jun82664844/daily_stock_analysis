@@ -2158,6 +2158,128 @@ const HomePage: React.FC = () => {
         : '行情、技术、资讯、K线、同业、风险',
     };
   }, [basicFreeReport, basicSnapshot, t, uiLanguage]);
+  const basicDataDepthBoard = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const market = basicSnapshot.market.toLowerCase();
+    const isAShare = market === 'cn' || market === 'a_share' || market === 'a-share';
+    const isUs = market === 'us';
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const newsItems = (basicSnapshot.intelligence?.newsCenter?.items ?? basicSnapshot.intelligence?.items ?? [])
+      .slice(0, 4);
+    const peerRows = basicSnapshot.intelligence?.peerComparison?.rows ?? [];
+    const comparisonTargets = basicSnapshot.intelligence?.comparisonTargets ?? [];
+    const peerLabels = (peerRows.length > 0
+      ? peerRows.slice(0, 3).map((row) => row.symbol || row.label)
+      : comparisonTargets.slice(0, 3).map((item) => item.symbol || item.label))
+      .filter((value): value is string => Boolean(value));
+    const profileContext = [
+      basicSnapshot.profile?.sector,
+      basicSnapshot.profile?.industry,
+    ].filter((value): value is string => Boolean(value));
+    const forecastSupport = toFiniteBasicNumber(basicSnapshot.intelligence?.klineForecast?.support);
+    const forecastResistance = toFiniteBasicNumber(basicSnapshot.intelligence?.klineForecast?.resistance);
+    const supportValue = forecastSupport !== null
+      ? formatBasicNumber(forecastSupport)
+      : localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage);
+    const resistanceValue = forecastResistance !== null
+      ? formatBasicNumber(forecastResistance)
+      : localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage);
+    const marketTitle = isAShare
+      ? (isEnglish ? 'A-share key data' : 'A股重点数据')
+      : isUs
+        ? (isEnglish ? 'US equity key data' : '美股重点数据')
+        : (isEnglish ? 'Market key data' : '市场重点数据');
+    const sectorText = profileContext.length > 0
+      ? profileContext.map((value) => localizeGeneratedTerms(value, uiLanguage)).join(' / ')
+      : localizeGeneratedSource(sourceLane, uiLanguage);
+    const eventPoints = newsItems.length > 0
+      ? newsItems.map((item) => localizeGeneratedText(item.title, uiLanguage))
+      : [
+          isEnglish ? 'News lane' : '资讯通道',
+          isEnglish ? 'Filings lane' : '公告通道',
+          isEnglish ? 'Financial snapshot lane' : '财务快照通道',
+        ];
+    const riskPoints = [
+      ...(basicFreeReport.productBrief.risks ?? []).slice(0, 2).map((risk) => localizeGeneratedText(risk, uiLanguage)),
+      ...(basicSnapshot.warnings ?? []).slice(0, 2).map((warning) => localizeGeneratedText(warning.message, uiLanguage)),
+      localizeGeneratedText(basicSnapshot.intelligence?.boundary || 'not investment advice', uiLanguage),
+    ].filter(Boolean);
+    const sameModulesText = isEnglish
+      ? 'Free mode shows concrete data first. Premium can switch the same cards to API-backed news, filings, funds, and model sources.'
+      : '免费版先展示可用的真实数据；高级版可把同样卡片切换到 API 资讯、公告、资金流和模型数据源。';
+    return {
+      title: isEnglish ? 'Free data depth board' : '免费版真实数据面板',
+      marketTitle,
+      subtitle: isEnglish
+        ? `${basicSnapshot.stockCode} data board with quote, technical structure, events, peers, and risk boundaries.`
+        : `${basicSnapshot.stockCode} 数据面板：行情、技术结构、资讯事件、同业参照和风险边界一起看。`,
+      tags: [
+        marketTitle,
+        basicSnapshot.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi'),
+        localizeGeneratedSource(sourceLane, uiLanguage),
+        isEnglish ? 'same visible modules' : '免费/高级同页面结构',
+      ],
+      cards: [
+        {
+          key: 'core',
+          title: isEnglish ? 'Core data' : '核心数据',
+          summary: sectorText,
+          metrics: [
+            { label: isEnglish ? 'Last price' : '最新价', value: formatBasicNumber(basicSnapshot.quote.currentPrice) },
+            { label: isEnglish ? 'Change' : '涨跌幅', value: formatSignedBasicPercent(basicSnapshot.quote.changePercent) },
+            { label: isEnglish ? 'Volume' : '成交量', value: formatBasicCompactNumber(basicSnapshot.quote.volume) },
+            { label: isEnglish ? 'Turnover' : '成交额', value: formatBasicCompactNumber(basicSnapshot.quote.amount) },
+            { label: isEnglish ? 'Market cap' : '总市值', value: formatBasicCompactNumber(basicSnapshot.profile?.marketCap) },
+            { label: isEnglish ? 'PE ratio' : '市盈率', value: formatBasicNumber(basicSnapshot.profile?.peRatio) },
+          ],
+        },
+        {
+          key: 'technical',
+          title: isEnglish ? 'Technical structure' : '技术结构',
+          summary: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+          metrics: [
+            { label: 'MA5', value: formatBasicNumber(pickBasicIndicator(basicSnapshot.indicators, 'ma5', 'MA5')) },
+            { label: 'MA20', value: formatBasicNumber(pickBasicIndicator(basicSnapshot.indicators, 'ma20', 'MA20')) },
+            { label: isEnglish ? '5d change' : '5日涨跌', value: formatSignedBasicPercent(pickBasicIndicator(basicSnapshot.indicators, 'priceChange5D', 'price_change_5d')) },
+            { label: isEnglish ? '20d change' : '20日涨跌', value: formatSignedBasicPercent(pickBasicIndicator(basicSnapshot.indicators, 'priceChange20D', 'price_change_20d')) },
+            { label: isEnglish ? 'Support' : '支撑', value: supportValue },
+            { label: isEnglish ? 'Resistance' : '压力', value: resistanceValue },
+          ],
+        },
+        {
+          key: 'events',
+          title: isEnglish ? 'Events and filings' : '资讯与事件',
+          summary: basicSnapshot.intelligence?.newsCenter?.summary
+            ? localizeGeneratedText(basicSnapshot.intelligence.newsCenter.summary, uiLanguage)
+            : (isEnglish ? 'Free mode keeps event lanes visible without public search or AI.' : '免费模式保留资讯事件通道，但默认不启用公共搜索或 AI。'),
+          metrics: eventPoints.map((point, index) => ({
+            label: isEnglish ? `Lane ${index + 1}` : `通道 ${index + 1}`,
+            value: point,
+          })),
+        },
+        {
+          key: 'peer-risk',
+          title: isEnglish ? 'Peers and risks' : '同业与风险',
+          summary: basicSnapshot.intelligence?.peerComparison?.summary
+            ? localizeGeneratedText(basicSnapshot.intelligence.peerComparison.summary, uiLanguage)
+            : (isEnglish ? 'Read the symbol against broad-market and sector references.' : '不要孤立看单只标的，先和大盘、行业或同业参照对比。'),
+          metrics: [
+            { label: isEnglish ? 'Peers' : '同业参照', value: peerLabels.length > 0 ? peerLabels.join(' / ') : basicSnapshot.stockCode },
+            { label: isEnglish ? 'Signal score' : '信号完整度', value: `${basicFreeReport.score}/100` },
+            { label: isEnglish ? 'Boundary' : '边界', value: isEnglish ? 'information analysis only' : '仅作信息分析，不构成投资建议' },
+          ],
+          points: riskPoints,
+        },
+      ],
+      footer: sameModulesText,
+    };
+  }, [basicFreeReport, basicSnapshot, t, uiLanguage]);
   const basicProfessionalOverview = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -4078,6 +4200,65 @@ const HomePage: React.FC = () => {
                       {uiLanguage === 'en'
                         ? `Free mode keeps ${basicCommercialJourney.moduleText} visible first; premium/API mode improves freshness, source links, and model depth.`
                         : `免费版已开放 ${basicCommercialJourney.moduleText}；高级版/API 模式提升实时性、来源链接和模型深度。`}
+                    </div>
+                  </section>
+                ) : null}
+                {basicDataDepthBoard ? (
+                  <section
+                    data-testid="basic-query-data-depth-board"
+                    className="mb-4 rounded-lg border border-primary/35 bg-surface/45 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">{basicDataDepthBoard.title}</div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {basicDataDepthBoard.marketTitle}
+                        </h3>
+                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-secondary-text">
+                          {basicDataDepthBoard.subtitle}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px] text-secondary-text xl:max-w-sm xl:justify-end">
+                        {basicDataDepthBoard.tags.map((tag) => (
+                          <span key={tag} className="max-w-full truncate rounded-md border border-primary/30 bg-primary/10 px-2 py-1">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      {basicDataDepthBoard.cards.map((card) => (
+                        <div
+                          key={card.key}
+                          data-testid={`basic-query-data-depth-${card.key}`}
+                          className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3"
+                        >
+                          <div className="text-sm font-semibold text-foreground">{card.title}</div>
+                          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                            {card.summary}
+                          </p>
+                          <div className="mt-3 grid gap-2">
+                            {card.metrics.map((metric) => (
+                              <div key={`${card.key}-${metric.label}`} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2">
+                                <div className="truncate text-[11px] text-secondary-text">{metric.label}</div>
+                                <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{metric.value}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {card.points?.length ? (
+                            <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                              {card.points.slice(0, 4).map((point, index) => (
+                                <span key={`${card.key}-${index}-${point}`} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                  {point}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md border border-primary/25 bg-background/35 px-3 py-2 text-xs leading-relaxed text-secondary-text">
+                      {basicDataDepthBoard.footer}
                     </div>
                   </section>
                 ) : null}

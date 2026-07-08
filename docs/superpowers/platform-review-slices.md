@@ -1106,3 +1106,28 @@ Review focus:
 - The block must explain same visible modules: quote, technicals, news, K-line, peers, and risk.
 - Premium/API copy must describe realtime news, filings/SEC, Kronos/API model, and BYOK as data-source/model-depth upgrades, not hard locks on the visible report.
 - `scripts/verify_platform_free_commercial_journey_v68.py` must stay visible and print `DSA_PLATFORM_FREE_COMMERCIAL_JOURNEY_V68_OK` only when V68 markers are present.
+
+## V69 Free Data Depth Addendum
+
+Purpose: make the free query result contain concrete useful data, not only retention copy. The new board appears after the commercial journey and summarizes quote, volume, valuation, technical structure, event lanes, peers, and risk boundaries with the same visible module structure that premium will later enrich through API-backed sources.
+
+Files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_data_depth_v69.py`
+- `tests/test_platform_free_data_depth_v69.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v69-free-data-depth.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V69 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and avoid public search by default.
+- `basic-query-data-depth-board` must show `免费版真实数据面板`, `美股重点数据`, `A股重点数据`, `核心数据`, `技术结构`, `资讯与事件`, and `同业与风险`.
+- The board should use existing snapshot fields and must not trigger extra AI/model/API/public-search cost.
+- `scripts/verify_platform_free_data_depth_v69.py` must stay visible and print `DSA_PLATFORM_FREE_DATA_DEPTH_V69_OK` only when V69 markers are present.
