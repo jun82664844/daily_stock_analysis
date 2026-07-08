@@ -1055,3 +1055,28 @@ Review focus:
 - Chinese mode must keep the new user-facing labels in Chinese: `专业速览`, `趋势评分`, `风险等级`, `数据通道`, `模块导航`, `行情概览`, `技术面`, `资讯中心`, and `K线预测`.
 - The copy must describe `免费网络源` and `高级 API 源` as channel differences, not locked features.
 - `scripts/verify_platform_productized_snapshot_v66.py` must stay visible and print `DSA_PLATFORM_PRODUCTIZED_SNAPSHOT_V66_OK` only when the V66 markers are present.
+
+## V67 Free Research Board Addendum
+
+Purpose: turn the free query result from a module list into a readable research board. The board summarizes news radar, K-line read, peer/sector context, and risk explanation directly after the professional overview, so free users see useful scan value before deeper details.
+
+Files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_research_board_v67.py`
+- `tests/test_platform_free_research_board_v67.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v67-free-research-board.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V67 remains local-only and does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and avoid public search by default.
+- `basic-query-free-research-board` must show `资讯雷达`, `K线推演`, `同业/板块`, and `风险解释` with concrete content, not placeholder-only copy.
+- Free and premium keep the same visible research modules; premium/API modes only improve freshness, source links, configured feeds, and model depth.
+- `scripts/verify_platform_free_research_board_v67.py` must stay visible and print `DSA_PLATFORM_FREE_RESEARCH_BOARD_V67_OK` only when V67 markers are present.

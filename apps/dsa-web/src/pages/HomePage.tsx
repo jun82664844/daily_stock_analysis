@@ -2204,6 +2204,90 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicFreeResearchBoard = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const newsCenter = basicSnapshot.intelligence?.newsCenter ?? null;
+    const klineForecast = basicSnapshot.intelligence?.klineForecast ?? null;
+    const peerRows = basicSnapshot.intelligence?.peerComparison?.rows ?? [];
+    const comparisonTargets = basicSnapshot.intelligence?.comparisonTargets ?? [];
+    const riskWatchPoints = (basicSnapshot.intelligence?.watchPoints ?? [])
+      .filter((item) => item.category === 'risk')
+      .map((item) => item.detail);
+    const pullbackScenarios = (klineForecast?.scenarios ?? [])
+      .filter((scenario) => scenario.direction === 'downside_risk')
+      .map((scenario) => scenario.trigger);
+    const newsItems = (newsCenter?.items ?? basicSnapshot.intelligence?.items ?? []).slice(0, 4);
+    const peerLabels = peerRows.length > 0
+      ? peerRows.slice(0, 3).map((row) => row.symbol || row.label)
+      : comparisonTargets.slice(0, 3).map((item) => item.symbol || item.label);
+    const profileContext = [basicSnapshot.profile?.sector, basicSnapshot.profile?.industry]
+      .filter(Boolean)
+      .map((value) => localizeGeneratedTerms(value, uiLanguage))
+      .join(' / ');
+    const riskLines = [
+      ...basicFreeReport.productBrief.risks.slice(0, 2),
+      newsCenter?.premiumUnlock,
+      ...riskWatchPoints.slice(0, 1),
+      ...pullbackScenarios.slice(0, 1),
+      klineForecast?.boundary,
+    ].filter((line): line is string => Boolean(line));
+    return {
+      title: isEnglish ? 'Free research board' : '免费研究看板',
+      subtitle: isEnglish
+        ? 'The same visible content is available in free mode; premium switches these lanes to API-backed data sources.'
+        : '同样内容，高级版换用 API 数据源；免费版先用网络/本地公开源把可读结论展示出来。',
+      channelTag: isEnglish ? 'No AI quick board' : '未用 AI 快速看板',
+      cards: [
+        {
+          key: 'news',
+          title: isEnglish ? 'Research radar' : '资讯雷达',
+          headline: newsCenter
+            ? localizeGeneratedText(newsCenter.title, uiLanguage)
+            : (isEnglish ? 'Local information lanes' : '本地资讯通道'),
+          body: newsCenter
+            ? localizeGeneratedText(newsCenter.summary, uiLanguage)
+            : (isEnglish ? 'Use free public/local lanes first; configure sources when realtime links are required.' : '先使用免费公开/本地通道；需要实时链接时再配置资讯源。'),
+          points: newsItems.map((item) => localizeGeneratedText(item.title, uiLanguage)),
+        },
+        {
+          key: 'kline',
+          title: isEnglish ? 'K-line read' : 'K线推演',
+          headline: klineForecast
+            ? `${localizeGeneratedHorizon(klineForecast.horizon, uiLanguage)} · ${localizeGeneratedStatus(klineForecast.direction, uiLanguage)}`
+            : (isEnglish ? 'Local rule preview' : '本地规则预览'),
+          body: klineForecast
+            ? localizeGeneratedText(klineForecast.adapterStatus, uiLanguage)
+            : (isEnglish ? 'K-line preview waits for enough price history or configured model data.' : 'K线预览等待足够历史行情或已配置模型数据。'),
+          points: [
+            `${isEnglish ? 'Support' : '支撑'} ${formatBasicNumber(klineForecast?.support)}`,
+            `${isEnglish ? 'Resistance' : '压力'} ${formatBasicNumber(klineForecast?.resistance)}`,
+            ...(klineForecast?.scenarios ?? []).slice(0, 2).map((scenario) => localizeGeneratedText(scenario.label, uiLanguage)),
+          ],
+        },
+        {
+          key: 'peer',
+          title: isEnglish ? 'Peers / sector' : '同业/板块',
+          headline: profileContext || (isEnglish ? `${basicSnapshot.market.toUpperCase()} references` : `${basicSnapshot.market.toUpperCase()} 参照`),
+          body: basicSnapshot.intelligence?.peerComparison?.summary
+            ? localizeGeneratedText(basicSnapshot.intelligence.peerComparison.summary, uiLanguage)
+            : (isEnglish ? 'Compare the symbol against broad-market and sector references before reading it alone.' : '解读单只股票前，先和大盘、行业或同业参照对比。'),
+          points: peerLabels.length > 0 ? peerLabels : [basicSnapshot.stockCode],
+        },
+        {
+          key: 'risk',
+          title: isEnglish ? 'Risk explanation' : '风险解释',
+          headline: isEnglish ? 'Read limits before acting' : '先看边界再解读',
+          body: riskLines.length > 0
+            ? localizeGeneratedText(riskLines[0], uiLanguage)
+            : (isEnglish ? 'Free quick mode is a checklist, not a trading instruction.' : '免费快速模式是检查清单，不是交易指令。'),
+          points: riskLines.slice(1, 4).map((line) => localizeGeneratedText(line, uiLanguage)),
+        },
+      ],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
   const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
@@ -3943,6 +4027,53 @@ const HomePage: React.FC = () => {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicFreeResearchBoard ? (
+                  <section
+                    data-testid="basic-query-free-research-board"
+                    className="mb-4 rounded-lg border border-primary/30 bg-surface/45 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-primary">{basicFreeResearchBoard.title}</div>
+                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-secondary-text">
+                          {basicFreeResearchBoard.subtitle}
+                        </p>
+                      </div>
+                      <span className="inline-flex shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                        {basicFreeResearchBoard.channelTag}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      {basicFreeResearchBoard.cards.map((card) => (
+                        <div
+                          key={card.key}
+                          data-testid={`basic-query-free-research-${card.key}`}
+                          className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3"
+                        >
+                          <div className="text-xs font-medium text-primary">{card.title}</div>
+                          <h4 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                            {card.headline}
+                          </h4>
+                          <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-secondary-text">
+                            {card.body}
+                          </p>
+                          <div className="mt-3 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            {card.points.filter(Boolean).slice(0, 5).map((point) => (
+                              <span key={point} className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                {point}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-xs leading-relaxed text-secondary-text">
+                      {uiLanguage === 'en'
+                        ? 'Free mode keeps these reads as local/public-data checklists. API modes improve freshness, source links, and model depth. Informational only, not investment advice.'
+                        : '免费版把这些内容作为本地/公开数据检查清单；API 模式提升实时性、来源链接和模型深度。仅作信息分析，不构成投资建议。'}
                     </div>
                   </section>
                 ) : null}

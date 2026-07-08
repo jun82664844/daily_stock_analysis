@@ -1313,3 +1313,39 @@ Review boundary:
 - Free and premium show the same visible modules; `免费网络源` and `高级 API 源` are data-channel differences, not separate visible feature walls.
 - The professional overview must show trend score, risk level, support/resistance, data channel, and module navigation before deeper details.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V67 Free Research Board Manifest Addendum
+
+Status: local-only free-content quality upgrade. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_research_board_v67.py`
+- `tests/test_platform_free_research_board_v67.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v67-free-research-board.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_FREE_RESEARCH_BOARD_V67_OK`
+
+Suggested review/commit position:
+
+- After V66 productized snapshot and before any paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes the free research board, V67 verifier, and V67 docs. V66 professional overview and V65 free value summary remain available if those slices are kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- The board must provide concrete scan content across news radar, K-line read, peer/sector context, and risk explanation.
+- Free and premium show the same visible research modules; API modes improve freshness, source links, configured feeds, and model depth.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
