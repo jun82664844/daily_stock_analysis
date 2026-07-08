@@ -148,6 +148,22 @@ export type BasicStockSnapshot = {
       updatedAt?: string | null;
       aiUsed: boolean;
       publicSearchUsed: boolean;
+      readerSummary?: {
+        headline?: string | null;
+        whyRead?: string | null;
+        keyFacts?: Array<{
+          label?: string | null;
+          value?: string | null;
+          detail?: string | null;
+        }>;
+        missExplanations?: Array<{
+          title?: string | null;
+          explanation?: string | null;
+          nextStep?: string | null;
+        }>;
+        premiumFeatures?: string[];
+        boundary?: string | null;
+      } | null;
       channels: Array<{
         category: string;
         title: string;

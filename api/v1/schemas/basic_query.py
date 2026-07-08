@@ -267,6 +267,33 @@ class BasicAShareEnrichmentChannelPayload(BaseModel):
     updated_at: Optional[str] = None
 
 
+class BasicAShareReaderFactPayload(BaseModel):
+    """One investor-readable fact for the A-share enrichment summary."""
+
+    label: str
+    value: str
+    detail: str
+
+
+class BasicAShareReaderMissPayload(BaseModel):
+    """One missing or degraded A-share enrichment note."""
+
+    title: str
+    explanation: str
+    next_step: str
+
+
+class BasicAShareReaderSummaryPayload(BaseModel):
+    """Reader-oriented A-share enrichment summary preserved through the API."""
+
+    headline: str
+    why_read: str
+    key_facts: List[BasicAShareReaderFactPayload] = Field(default_factory=list)
+    miss_explanations: List[BasicAShareReaderMissPayload] = Field(default_factory=list)
+    premium_features: List[str] = Field(default_factory=list)
+    boundary: str = "仅作信息分析，不构成投资建议。"
+
+
 class BasicAShareEnrichmentPayload(BaseModel):
     """Local A-share enrichment payload that never invokes AI or public search."""
 
@@ -281,6 +308,7 @@ class BasicAShareEnrichmentPayload(BaseModel):
     ai_used: bool = False
     public_search_used: bool = False
     channels: List[BasicAShareEnrichmentChannelPayload] = Field(default_factory=list)
+    reader_summary: Optional[BasicAShareReaderSummaryPayload] = None
     premium_unlock: str
     boundary: str = "Information analysis only; not investment advice."
 

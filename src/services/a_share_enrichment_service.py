@@ -113,11 +113,12 @@ class AShareEnrichmentService:
                 indicators=indicators,
             )
             any_available = any(item["status"] == "available" for item in channels)
+            summary_source = "basic_quote_snapshot"
             return {
                 "title": "A-share quick reference",
                 "summary": self._quick_reference_summary(stock_name or code),
                 "status": "available" if any_available else "degraded",
-                "source": "basic_quote_snapshot",
+                "source": summary_source,
                 "updated_at": self._now_iso(),
                 "ai_used": False,
                 "public_search_used": False,
@@ -125,6 +126,13 @@ class AShareEnrichmentService:
                 "skill": self._skill_metadata(),
                 "diagnostics": diagnostics,
                 "channels": channels,
+                "reader_summary": self._reader_summary(
+                    stock_name or code,
+                    channels=channels,
+                    quote=quote,
+                    profile=profile,
+                    source=summary_source,
+                ),
                 "premium_unlock": "Premium can add live announcements, fund-flow history, research PDFs, sector linkage, and dragon-tiger seat details.",
                 "boundary": "Information analysis only; not investment advice.",
             }
@@ -152,6 +160,13 @@ class AShareEnrichmentService:
             "skill": self._skill_metadata(),
             "diagnostics": diagnostics,
             "channels": channels,
+            "reader_summary": self._reader_summary(
+                stock_name or code,
+                channels=channels,
+                quote=quote,
+                profile=profile,
+                source=source,
+            ),
             "premium_unlock": "Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details.",
             "boundary": "Information analysis only; not investment advice.",
         }
@@ -945,6 +960,110 @@ class AShareEnrichmentService:
         response.raise_for_status()
         parsed = response.json()
         return parsed if isinstance(parsed, dict) else {}
+
+    def _reader_summary(
+        self,
+        label: str,
+        *,
+        channels: list[dict[str, Any]],
+        quote: dict[str, Any] | None,
+        profile: dict[str, Any] | None,
+        source: str,
+    ) -> dict[str, Any]:
+        available = [item for item in channels if item.get("status") == "available"]
+        explainable = [item for item in channels if self._needs_reader_explanation(item)]
+        price = self._float_or_none((quote or {}).get("current_price"))
+        change = self._float_or_none((quote or {}).get("change_percent"))
+        price_value = "行情待刷新"
+        if price is not None:
+            price_value = self._format_number(price)
+            if change is not None:
+                price_value = f"{price_value} / {self._format_percent(change)}"
+        hit_titles = [str(item.get("title") or item.get("category") or "") for item in available if item]
+        hit_text = "、".join(hit_titles[:3]) if hit_titles else "暂无明确命中"
+        soft_gap_titles = [str(item.get("title") or item.get("category") or "") for item in explainable if item]
+        soft_gap_text = "、".join(soft_gap_titles[:3]) if soft_gap_titles else "未发现明显缺口"
+        sector_context = " / ".join(
+            str(value)
+            for value in ((profile or {}).get("sector"), (profile or {}).get("industry"))
+            if value
+        )
+        why_bits = [
+            f"{label} 已完成公告、资金流、板块、研报和龙虎榜检查",
+            f"可读通道：{hit_text}",
+            f"需复核项：{soft_gap_text}",
+        ]
+        if sector_context:
+            why_bits.append(f"背景：{sector_context}")
+        return {
+            "headline": f"{label} A股增强速读",
+            "why_read": f"为什么值得看：{'；'.join(why_bits)}。",
+            "key_facts": [
+                {
+                    "label": "今日关键信息",
+                    "value": price_value,
+                    "detail": "先看价格、涨跌幅与当前通道命中情况。",
+                },
+                {
+                    "label": "已命中通道",
+                    "value": f"{len(available)}/{len(channels)}",
+                    "detail": hit_text,
+                },
+                {
+                    "label": "数据成本",
+                    "value": "未用 AI",
+                    "detail": "未使用公共搜索，优先使用行情、缓存或已配置数据源。",
+                },
+                {
+                    "label": "数据来源",
+                    "value": self._reader_source_label(source),
+                    "detail": "来源会随本地规则、a-stock-data 适配器或关闭状态变化。",
+                },
+            ],
+            "miss_explanations": [
+                {
+                    "title": str(item.get("title") or item.get("category") or "通道"),
+                    "explanation": str(item.get("summary") or "已查询，当前暂无可展示明细。"),
+                    "next_step": str(item.get("action") or "刷新或使用深度模式复核。"),
+                }
+                for item in explainable[:4]
+            ],
+            "premium_features": [
+                "公告原文与历史公告",
+                "资金流历史与主力净额明细",
+                "研报 PDF 与机构预测",
+                "板块联动与同业对比",
+                "龙虎榜席位明细",
+            ],
+            "boundary": "仅作信息分析，不构成投资建议。",
+        }
+
+    def _needs_reader_explanation(self, item: dict[str, Any]) -> bool:
+        text = " ".join(str(item.get(key) or "") for key in ("summary", "action", "status"))
+        if item.get("status") != "available":
+            return True
+        return any(
+            marker in text
+            for marker in (
+                "暂无",
+                "未命中",
+                "未返回",
+                "降级",
+                "reserved",
+                "not fetched",
+                "timed out",
+                "no usable",
+            )
+        )
+
+    def _reader_source_label(self, source: str) -> str:
+        if source == "a_stock_data_skill_adapter":
+            return "a-stock-data适配"
+        if source == "basic_quote_snapshot":
+            return "基础行情快照"
+        if source == "a_stock_data_poc_adapter":
+            return "本地规则"
+        return source or "本地数据源"
 
     def _summary(
         self,

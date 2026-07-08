@@ -1034,6 +1034,97 @@ describe('HomePage', () => {
     expect(aShareEnrichment).not.toHaveTextContent('External announcements');
   });
 
+  it('renders the V63 A-share reader summary in Chinese mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      market: 'cn',
+      quote: {
+        currentPrice: 1188.8,
+        changePercent: -1.5,
+        source: 'a_share_realtime',
+        freshness: 'fresh',
+      },
+      indicators: {},
+      intelligence: {
+        mode: 'no_ai_low_cost',
+        aiUsed: false,
+        aShareEnrichment: {
+          title: 'A-share enrichment',
+          summary: '贵州茅台 A股增强数据：公告、资金流、板块、研报和龙虎榜已检查。',
+          status: 'available',
+          source: 'a_stock_data_skill_adapter',
+          sourceMode: 'a_stock_data',
+          updatedAt: '2026-07-08T09:30:00Z',
+          aiUsed: false,
+          publicSearchUsed: false,
+          readerSummary: {
+            headline: '贵州茅台 A股增强速读',
+            whyRead: '为什么值得看：公告有新记录，板块背景可用，资金流和龙虎榜已查询但当前未命中。',
+            boundary: '仅作信息分析，不构成投资建议。',
+            keyFacts: [
+              { label: '今日关键信息', value: '1188.8 / -1.5%', detail: '行情来自 A 股快速通道。' },
+              { label: '已命中通道', value: '3/5', detail: '公告、板块、研报可读。' },
+              { label: '数据成本', value: '未用 AI', detail: '未使用公共搜索。' },
+            ],
+            missExplanations: [
+              {
+                title: '资金流通道',
+                explanation: '已查询，当前未返回分钟级主力净额。',
+                nextStep: '盘中刷新后再复核。',
+              },
+            ],
+            premiumFeatures: ['公告原文', '资金流历史', '研报 PDF', '板块联动', '龙虎榜席位明细'],
+          },
+          premiumUnlock: 'Premium can expand announcement source text, research PDFs, fund-flow history, sector linkage, and dragon-tiger seat details.',
+          boundary: 'Information analysis only; not investment advice.',
+          channels: [
+            {
+              category: 'announcements',
+              title: '公告通道',
+              summary: '2026-06-22 贵州茅台2025年年度权益分派实施公告',
+              status: 'available',
+              source: 'a_stock_data_cninfo_or_f10',
+              action: '深度模式可展开公告原文。',
+              updatedAt: '2026-07-08T09:30:00Z',
+            },
+          ],
+        },
+        items: [],
+        boundary: 'Information analysis only; not investment advice.',
+      },
+      aiUsed: false,
+    } as any);
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: '600519.SH' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    const readerSummary = await screen.findByTestId('basic-query-a-share-reader-summary');
+    expect(readerSummary).toHaveTextContent('今日关键信息');
+    expect(readerSummary).toHaveTextContent('为什么值得看');
+    expect(readerSummary).toHaveTextContent('未命中说明');
+    expect(readerSummary).toHaveTextContent('高级版可解锁');
+    expect(readerSummary).toHaveTextContent('公告原文');
+    expect(readerSummary).toHaveTextContent('资金流历史');
+    expect(readerSummary).toHaveTextContent('仅作信息分析');
+  });
+
   it('lets users switch A-share enrichment source mode and run sample probes', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(historyApi.getList).mockResolvedValue({

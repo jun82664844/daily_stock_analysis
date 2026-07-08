@@ -354,6 +354,45 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         self.assertFalse(payload["ai_used"])
         self.assertFalse(payload["public_search_used"])
 
+    def test_a_stock_data_payload_includes_v63_reader_summary(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        def fake_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/announcements"):
+                return {
+                    "checked": True,
+                    "items": [{"title": "贵州茅台2025年年度权益分派实施公告", "date": "2026-06-22"}],
+                }
+            if url.endswith("/capital_flow"):
+                return {"checked": True, "items": []}
+            if url.endswith("/sector"):
+                return {"checked": True, "concepts": ["白酒", "消费"], "industry": "食品饮料"}
+            if url.endswith("/research"):
+                return {"checked": True, "items": []}
+            if url.endswith("/dragon_tiger"):
+                return {"checked": True, "items": []}
+            return {}
+
+        payload = AShareEnrichmentService(
+            http_get=fake_http_get,
+            source_mode="a_stock_data",
+            min_interval_seconds=0,
+        ).get_enrichment(
+            "600519.SH",
+            stock_name="贵州茅台",
+            quote={"current_price": 1188.8, "change_percent": -1.5},
+            profile={"sector": "消费", "industry": "白酒"},
+        )
+
+        reader_summary = payload["reader_summary"]
+        self.assertIn("贵州茅台", reader_summary["headline"])
+        self.assertIn("为什么值得看", reader_summary["why_read"])
+        self.assertGreaterEqual(len(reader_summary["key_facts"]), 4)
+        self.assertTrue(any(item["label"] == "今日关键信息" for item in reader_summary["key_facts"]))
+        self.assertTrue(any("资金流通道" in item["title"] for item in reader_summary["miss_explanations"]))
+        self.assertIn("公告原文", " ".join(reader_summary["premium_features"]))
+        self.assertIn("仅作信息分析", reader_summary["boundary"])
+
     def test_checked_empty_fund_flow_reports_clear_degradation_not_reserved_lane(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService
 

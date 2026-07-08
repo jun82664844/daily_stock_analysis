@@ -1163,3 +1163,42 @@ Review boundary:
 - Empty or failed public-source channels must be explicit degraded cards.
 - Non-A-share inputs must not be routed through A-share source mode.
 - Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.
+
+## V63 A-Stock-Data Experience Manifest Addendum
+
+Status: local-only experience upgrade for the A-share enrichment panel. It does not approve production deployment, real payment, production secrets, market-data redistribution, or investment advice.
+
+New/updated files:
+
+- `.gitignore`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `api/v1/schemas/basic_query.py`
+- `tests/test_basic_query_no_ai.py`
+- `scripts/verify_platform_a_stock_data_experience_v63.py`
+- `tests/test_platform_a_stock_data_experience_v63.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-08-dsa-v63-a-stock-data-experience.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker:
+
+- `DSA_PLATFORM_A_STOCK_DATA_EXPERIENCE_V63_OK`
+
+Suggested review/commit position:
+
+- After V62 useful-data adapter and before any paid data-source, production data licensing, public deployment, or real payment work.
+
+Rollback note:
+
+- Reverting this slice removes `reader_summary`, the HomePage first-read summary block, V63 verifier, and V63 docs. V62 data channels remain available if their slice is kept.
+
+Review boundary:
+
+- No AI calls and no public search in free quick mode.
+- The summary must explain checked-but-empty/degraded channels without hiding raw channel cards.
+- Premium feature copy must not block free no-AI query access.
+- Do not commit real API Key, do not connect real payment, and do not treat this as investment advice.

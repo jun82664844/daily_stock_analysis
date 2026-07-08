@@ -158,6 +158,26 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
                             "ai_used": False,
                             "public_search_used": False,
                             "channels": [],
+                            "reader_summary": {
+                                "headline": "600519 A-share readout",
+                                "why_read": "Why this matters",
+                                "key_facts": [
+                                    {
+                                        "label": "Today",
+                                        "value": "1188.8",
+                                        "detail": "Unit response keeps reader summary through API schema.",
+                                    }
+                                ],
+                                "miss_explanations": [
+                                    {
+                                        "title": "Fund flow",
+                                        "explanation": "Missing in unit response.",
+                                        "next_step": "Refresh later.",
+                                    }
+                                ],
+                                "premium_features": ["Announcements"],
+                                "boundary": "Information analysis only; not investment advice.",
+                            },
                             "premium_unlock": "Premium can add more sources.",
                             "boundary": "Information analysis only; not investment advice.",
                         },
@@ -174,6 +194,10 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         body = response.json()
         self.assertEqual(captured_modes, ["a_stock_data"])
         self.assertEqual(body["intelligence"]["a_share_enrichment"]["source_mode"], "a_stock_data")
+        reader_summary = body["intelligence"]["a_share_enrichment"]["reader_summary"]
+        self.assertEqual(reader_summary["headline"], "600519 A-share readout")
+        self.assertEqual(reader_summary["key_facts"][0]["label"], "Today")
+        self.assertEqual(reader_summary["miss_explanations"][0]["next_step"], "Refresh later.")
 
     def test_service_snapshot_includes_no_ai_company_profile_when_available(self) -> None:
         class RichStockService:

@@ -946,3 +946,32 @@ Review focus:
 - `a_stock_data` mode may use a 2.5s default timeout for real public endpoints; local POC mode keeps the 1.2s fast fallback.
 - HomePage should default A-share inputs to `a_stock_data` but must not route AAPL/BTC/HK symbols through the A-share source mode.
 - `scripts/verify_platform_a_stock_data_useful_v62.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_USEFUL_V62_OK` only when the V62 markers are present.
+
+## V63 A-Stock-Data Experience Addendum
+
+Purpose: make the A-share enrichment block easier for ordinary users to understand by adding a first-read `reader_summary` above the raw channel cards. The summary explains why the result is worth reading, what channels were checked, which lanes are missing/degraded, and what premium can unlock.
+
+Files:
+
+- `.gitignore`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `api/v1/schemas/basic_query.py`
+- `tests/test_basic_query_no_ai.py`
+- `scripts/verify_platform_a_stock_data_experience_v63.py`
+- `tests/test_platform_a_stock_data_experience_v63.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/superpowers/plans/2026-07-08-dsa-v63-a-stock-data-experience.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus:
+
+- V63 remains local-only and does not approve production deployment, real payment, market-data redistribution, or investment advice.
+- Free quick mode must remain `ai_used=false` and `public_search_used=false`.
+- The `reader_summary` must not hide channel cards; it is a first-read layer only.
+- Missing or degraded lanes must be explained as checked-but-empty/degraded, not as silent blanks.
+- Premium copy may show unlocked features but must not block free no-AI query access.
+- `scripts/verify_platform_a_stock_data_experience_v63.py` must stay visible and print `DSA_PLATFORM_A_STOCK_DATA_EXPERIENCE_V63_OK` only when the V63 markers are present.

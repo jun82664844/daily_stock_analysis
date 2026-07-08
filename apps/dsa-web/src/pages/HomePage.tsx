@@ -4123,6 +4123,90 @@ const HomePage: React.FC = () => {
                             ))}
                           </div>
                         </div>
+                        {basicSnapshot.intelligence.aShareEnrichment.readerSummary ? (
+                          <div
+                            data-testid="basic-query-a-share-reader-summary"
+                            className="mb-3 rounded-lg border border-primary/25 bg-background/35 p-3"
+                          >
+                            <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-primary">
+                                  {uiLanguage === 'en' ? 'Useful readout' : '为什么值得看'}
+                                </div>
+                                <h5 className="mt-1 text-sm font-semibold text-foreground">
+                                  {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.readerSummary.headline, uiLanguage)}
+                                </h5>
+                              </div>
+                              <span className="shrink-0 rounded-md border border-subtle/70 px-2 py-1 text-[11px] text-secondary-text">
+                                {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.readerSummary.boundary, uiLanguage)}
+                              </span>
+                            </div>
+                            <p className="mb-3 text-xs leading-relaxed text-secondary-text">
+                              {localizeGeneratedText(basicSnapshot.intelligence.aShareEnrichment.readerSummary.whyRead, uiLanguage)}
+                            </p>
+                            <div className="mb-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                              {(basicSnapshot.intelligence.aShareEnrichment.readerSummary.keyFacts ?? []).map((item, index) => (
+                                <div
+                                  key={`${item.label || 'fact'}-${index}`}
+                                  className="min-w-0 rounded-lg border border-subtle/70 bg-surface/35 p-2.5"
+                                >
+                                  <div className="text-[11px] text-primary">
+                                    {localizeGeneratedText(item.label, uiLanguage)}
+                                  </div>
+                                  <div className="mt-1 truncate text-sm font-semibold text-foreground">
+                                    {localizeGeneratedText(item.value, uiLanguage)}
+                                  </div>
+                                  <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
+                                    {localizeGeneratedText(item.detail, uiLanguage)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="grid gap-2 lg:grid-cols-2">
+                              <div className="rounded-lg border border-subtle/70 bg-surface/25 p-2.5">
+                                <div className="mb-2 text-xs font-semibold text-foreground">
+                                  {uiLanguage === 'en' ? 'Missing or degraded notes' : '未命中说明'}
+                                </div>
+                                {(basicSnapshot.intelligence.aShareEnrichment.readerSummary.missExplanations ?? []).length > 0 ? (
+                                  <div className="space-y-2">
+                                    {(basicSnapshot.intelligence.aShareEnrichment.readerSummary.missExplanations ?? []).map((item, index) => (
+                                      <div key={`${item.title || 'miss'}-${index}`} className="text-xs leading-relaxed text-secondary-text">
+                                        <span className="font-medium text-foreground">
+                                          {localizeGeneratedText(item.title, uiLanguage)}
+                                        </span>
+                                        <span>：{localizeGeneratedText(item.explanation, uiLanguage)}</span>
+                                        {item.nextStep ? (
+                                          <span className="block text-[11px] text-muted-text">
+                                            {localizeGeneratedText(item.nextStep, uiLanguage)}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-secondary-text">
+                                    {uiLanguage === 'en' ? 'No obvious missing lane in this quick view.' : '本次快速视图没有明显缺口。'}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="rounded-lg border border-primary/25 bg-primary/5 p-2.5">
+                                <div className="mb-2 text-xs font-semibold text-foreground">
+                                  {uiLanguage === 'en' ? 'Premium unlocks' : '高级版可解锁'}
+                                </div>
+                                <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                                  {(basicSnapshot.intelligence.aShareEnrichment.readerSummary.premiumFeatures ?? []).map((feature) => (
+                                    <span
+                                      key={feature}
+                                      className="rounded-md border border-primary/25 bg-background/30 px-2 py-1"
+                                    >
+                                      {localizeGeneratedText(feature, uiLanguage)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                           {basicSnapshot.intelligence.aShareEnrichment.channels.map((item) => (
                             <div
