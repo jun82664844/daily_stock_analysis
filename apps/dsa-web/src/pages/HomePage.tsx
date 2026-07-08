@@ -3359,6 +3359,21 @@ const HomePage: React.FC = () => {
     [query, selectedAnalysisSkills, submitAnalysis],
   );
 
+  const handleQuickAnalyze = useCallback(
+    (
+      stockCode?: string,
+      stockName?: string,
+      selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
+    ) => {
+      if (platformEnabled) {
+        void handleBasicQuery(stockCode, stockName);
+        return;
+      }
+      handleSubmitAnalysis(stockCode, stockName, selectionSource, 'fast');
+    },
+    [handleBasicQuery, handleSubmitAnalysis, platformEnabled],
+  );
+
   useEffect(() => {
     const state = location.state as StockAnalysisNavigationState | null;
     const stockCode = typeof state?.stockCode === 'string' ? state.stockCode.trim() : '';
@@ -3782,8 +3797,8 @@ const HomePage: React.FC = () => {
                 type="button"
                 variant="secondary"
                 size="md"
-                disabled={!query || isAnalyzing}
-                onClick={() => handleSubmitAnalysis(undefined, undefined, 'manual', 'fast')}
+                disabled={!query || (platformEnabled ? isQueryingBasic : isAnalyzing)}
+                onClick={() => handleQuickAnalyze(undefined, undefined, 'manual')}
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
@@ -6361,8 +6376,8 @@ const HomePage: React.FC = () => {
                       type="button"
                       variant="secondary"
                       size="sm"
-                      disabled={isAnalyzing}
-                      onClick={() => handleSubmitAnalysis(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual', 'fast')}
+                      disabled={platformEnabled ? isQueryingBasic : isAnalyzing}
+                      onClick={() => handleQuickAnalyze(basicSnapshot.stockCode, basicSnapshot.stockName || undefined, 'manual')}
                     >
                       <Sparkles className="h-4 w-4" aria-hidden="true" />
                       {t('home.quickAnalyze')}
