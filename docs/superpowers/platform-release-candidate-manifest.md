@@ -1453,6 +1453,37 @@ Rollback note:
 
 - Reverting this slice removes the free detail readability layer, V70 verifier, and V70 docs. V69 free data depth and earlier free query modules remain available if those slices are kept.
 
+## V71 Free Multimarket Modules Manifest Addendum
+
+Purpose: make the free/no-AI result feel useful across A-share, US equity, HK equity, and crypto even when only basic quote and indicator data are available.
+
+Files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_multimarket_v71.py`
+- `tests/test_platform_free_multimarket_v71.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v71-free-multimarket-modules.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Expected marker:
+
+- `DSA_PLATFORM_FREE_MULTIMARKET_V71_OK`
+
+Acceptance gates:
+
+- Four market routes keep the same visible modules: A-share, US equity, HK equity, crypto.
+- Basic no-AI snapshots still show core data, technical structure, events checklist, peer comparison table, and K-line triggers.
+- Backend-provided English comparison targets are localized before rendering in Chinese mode.
+- Fallback rows are explicitly marked as local/free rules and remain information analysis only.
+- No AI call, public search, production deployment, real payment, or real API Key is introduced.
+
+Rollback:
+
+- Reverting this slice removes V71 fallback multimarket modules, V71 verifier, and V71 docs. V70 detail readability and earlier free query modules remain available if those slices are kept.
+
 Review boundary:
 
 - No AI calls and no public search in free quick mode.

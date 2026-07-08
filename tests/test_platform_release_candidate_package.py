@@ -99,6 +99,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         include_v68: bool = True,
         include_v69: bool = True,
         include_v70: bool = True,
+        include_v71: bool = True,
         env_text: str = SAFE_ENV,
     ) -> None:
         required_docs = {
@@ -362,6 +363,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "event checklist\npeer comparison table\nK-line triggers\n"
                 "DSA_PLATFORM_FREE_DETAIL_READABILITY_V70_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-08-dsa-v71-free-multimarket-modules.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo AI calls\nNo public search\n"
+                "free multimarket modules\nsame visible modules\nA-share\nUS equity\n"
+                "HK equity\ncrypto\npeer comparison table\nK-line triggers\n"
+                "DSA_PLATFORM_FREE_MULTIMARKET_V71_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -433,6 +441,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_free_commercial_journey_v68.py",
             "scripts/verify_platform_free_data_depth_v69.py",
             "scripts/verify_platform_free_detail_readability_v70.py",
+            "scripts/verify_platform_free_multimarket_v71.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -501,6 +510,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_free_commercial_journey_v68.py",
             "tests/test_platform_free_data_depth_v69.py",
             "tests/test_platform_free_detail_readability_v70.py",
+            "tests/test_platform_free_multimarket_v71.py",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):
@@ -754,6 +764,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             if not include_v70 and rel_path in {
                 "scripts/verify_platform_free_detail_readability_v70.py",
                 "tests/test_platform_free_detail_readability_v70.py",
+            }:
+                continue
+            if not include_v71 and rel_path in {
+                "scripts/verify_platform_free_multimarket_v71.py",
+                "tests/test_platform_free_multimarket_v71.py",
             }:
                 continue
             self._write_file(root, rel_path, "# verifier\n")
@@ -1089,6 +1104,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         if not include_v70:
             for rel_path in (
                 "docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md",
+            ):
+                path = root / rel_path
+                if path.exists():
+                    path.unlink()
+        if not include_v71:
+            for rel_path in (
+                "docs/superpowers/plans/2026-07-08-dsa-v71-free-multimarket-modules.md",
             ):
                 path = root / rel_path
                 if path.exists():
@@ -1898,6 +1920,20 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("scripts/verify_platform_free_detail_readability_v70.py", missing)
         self.assertIn("tests/test_platform_free_detail_readability_v70.py", missing)
         self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v70-free-detail-readability.md", missing)
+
+    def test_reports_missing_free_multimarket_v71_files(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            root = Path(temp_dir)
+            self._write_minimal_package(root, include_v71=False)
+
+            results = self._run_with_fake_git(root)
+
+        by_id = {result.check_id: result for result in results}
+        self.assertEqual(by_id["required_files_present"].status, "failed")
+        missing = by_id["required_files_present"].metadata["missing_files"]
+        self.assertIn("scripts/verify_platform_free_multimarket_v71.py", missing)
+        self.assertIn("tests/test_platform_free_multimarket_v71.py", missing)
+        self.assertIn("docs/superpowers/plans/2026-07-08-dsa-v71-free-multimarket-modules.md", missing)
 
     def test_reports_gitignored_verifier(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:

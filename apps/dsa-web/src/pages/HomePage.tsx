@@ -222,8 +222,28 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'Broad market': '大盘',
   'Nasdaq Composite': '纳斯达克综合指数',
   'Technology sector ETF': '科技行业 ETF',
+  'Hang Seng Index': '恒生指数',
+  'Tracker Fund': '盈富基金',
+  'Tracker Fund of Hong Kong': '盈富基金',
+  Ethereum: '以太坊',
+  Bitcoin: '比特币',
   'Index lens': '指数参照',
   'Sector lens': '行业参照',
+  'Peer asset': '同类资产',
+  'Crypto benchmark': '加密参照',
+  'Crypto beta': '加密参照',
+  'Hong Kong market reference.': '香港市场参照。',
+  'Hong Kong ETF market context.': '香港 ETF 市场参照。',
+  'Crypto market beta reference.': '加密市场贝塔参照。',
+  'Large-cap crypto rotation reference.': '大市值加密资产轮动参照。',
+  'US market index context.': '美股指数参照。',
+  'Sector context for Technology names.': '科技股行业参照。',
+  'HKEX filings lane': '港交所公告通道',
+  'Protocol and exchange events': '协议与交易所事件',
+  'Hong Kong filings and corporate actions are reserved for configured deep sources. Free mode shows the lane without public search calls.': '港股公告和公司行动保留给已配置的深度数据源；免费模式展示该通道，但不发起公共搜索。',
+  'Company profile exists, but key valuation and financial fields are unavailable in quick mode.': '公司资料存在，但快速模式暂未提供关键估值和财务字段。',
+  'Equity financial statements do not apply to crypto assets; use trend, liquidity, and risk-event context instead.': '加密资产不适用股票财务报表；请改用趋势、流动性和风险事件背景。',
+  'Equity filings do not apply to crypto. Free mode keeps an event lane for exchange notices, protocol risk, liquidity shifts, and regulatory headlines when configured.': '加密资产不适用股票公告；免费模式保留交易所通知、协议风险、流动性变化和监管新闻通道，待配置后使用。',
   'CSI 300': '沪深300',
   'SSE Composite': '上证指数',
   'Profile context': '资料背景',
@@ -326,6 +346,8 @@ const GENERATED_TERM_ZH: Record<string, string> = {
   'Consumer Electronics': '消费电子',
   Technology: '科技',
   a_share: 'A股',
+  'hk equity': '港股',
+  'crypto spot': '加密货币现货',
   'with incomplete MA20 context': 'MA20 背景不完整',
   'price above trend volume soft': '价格位于趋势上方但量能偏弱',
   yfinance_profile: '公司资料',
@@ -2169,6 +2191,8 @@ const HomePage: React.FC = () => {
     const market = basicSnapshot.market.toLowerCase();
     const isAShare = market === 'cn' || market === 'a_share' || market === 'a-share';
     const isUs = market === 'us';
+    const isHk = market === 'hk';
+    const isCrypto = market === 'crypto';
     const sourceLane = basicSnapshot.route?.dataSourceLane
       || basicSnapshot.route?.channel
       || basicSnapshot.diagnostics?.routeLane
@@ -2185,6 +2209,8 @@ const HomePage: React.FC = () => {
       basicSnapshot.profile?.sector,
       basicSnapshot.profile?.industry,
     ].filter((value): value is string => Boolean(value));
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const ma20 = toFiniteBasicNumber(pickBasicIndicator(basicSnapshot.indicators, 'ma20', 'MA20'));
     const forecastSupport = toFiniteBasicNumber(basicSnapshot.intelligence?.klineForecast?.support);
     const forecastResistance = toFiniteBasicNumber(basicSnapshot.intelligence?.klineForecast?.resistance);
     const supportValue = forecastSupport !== null
@@ -2197,7 +2223,11 @@ const HomePage: React.FC = () => {
       ? (isEnglish ? 'A-share key data' : 'A股重点数据')
       : isUs
         ? (isEnglish ? 'US equity key data' : '美股重点数据')
-        : (isEnglish ? 'Market key data' : '市场重点数据');
+        : isHk
+          ? (isEnglish ? 'HK equity key data' : '港股重点数据')
+          : isCrypto
+            ? (isEnglish ? 'Crypto key data' : '加密货币重点数据')
+            : (isEnglish ? 'Market key data' : '市场重点数据');
     const sectorText = profileContext.length > 0
       ? profileContext.map((value) => localizeGeneratedTerms(value, uiLanguage)).join(' / ')
       : localizeGeneratedSource(sourceLane, uiLanguage);
@@ -2232,6 +2262,47 @@ const HomePage: React.FC = () => {
           isEnglish ? 'Event checklist' : '事件清单',
           isEnglish ? 'No realtime event source is enabled in free mode.' : '免费模式暂未启用实时事件源。',
         ];
+    const fallbackPeerRows = (() => {
+      const changeText = formatSignedBasicPercent(basicSnapshot.quote.changePercent);
+      const trendText = currentPrice !== null && ma20 !== null && currentPrice >= ma20
+        ? (isEnglish ? 'above MA20' : '高于 MA20')
+        : (isEnglish ? 'below or near MA20' : '低于或接近 MA20');
+      const currentSignal = isEnglish
+        ? `${basicSnapshot.stockCode} is ${trendText} with ${changeText}; compare before reading it alone.`
+        : `${basicSnapshot.stockCode} 当前${trendText}，涨跌幅 ${changeText}；解读前先做市场参照。`;
+      const compareNext = isEnglish
+        ? 'Refresh and compare relative strength again.'
+        : '下次刷新时再比较相对强弱。';
+      const rows = isAShare
+        ? [
+            { symbol: '000300.SH', label: isEnglish ? 'CSI 300' : '沪深300', role: isEnglish ? 'Broad market' : '大盘' },
+            { symbol: '000001.SH', label: isEnglish ? 'SSE Composite' : '上证指数', role: isEnglish ? 'Index lens' : '指数参照' },
+          ]
+        : isUs
+          ? [
+              { symbol: 'QQQ', label: 'QQQ', role: isEnglish ? 'Broad market' : '大盘' },
+              { symbol: '^IXIC', label: isEnglish ? 'Nasdaq Composite' : '纳斯达克综合指数', role: isEnglish ? 'Index lens' : '指数参照' },
+              { symbol: 'XLK', label: isEnglish ? 'Technology sector ETF' : '科技行业 ETF', role: isEnglish ? 'Sector lens' : '行业参照' },
+            ]
+          : isHk
+            ? [
+                { symbol: '^HSI', label: isEnglish ? 'Hang Seng Index' : '恒生指数', role: isEnglish ? 'Broad market' : '大盘' },
+                { symbol: '2800.HK', label: isEnglish ? 'Tracker Fund of Hong Kong' : '盈富基金', role: isEnglish ? 'Index lens' : '指数参照' },
+              ]
+            : isCrypto
+              ? [
+                  { symbol: 'ETH-USD', label: isEnglish ? 'Ethereum' : '以太坊', role: isEnglish ? 'Peer asset' : '同类资产' },
+                  { symbol: 'BTC-USD', label: isEnglish ? 'Bitcoin' : '比特币', role: isEnglish ? 'Crypto benchmark' : '加密参照' },
+                ]
+              : [
+                  { symbol: basicSnapshot.stockCode, label: basicSnapshot.stockName || basicSnapshot.stockCode, role: isEnglish ? 'Reference' : '参照' },
+                ];
+      return rows.slice(0, 3).map((row) => ({
+        ...row,
+        currentSignal,
+        compareNext,
+      }));
+    })();
     const peerTableRows = peerRows.length > 0
       ? peerRows.slice(0, 3).map((row) => ({
           symbol: row.symbol,
@@ -2240,19 +2311,54 @@ const HomePage: React.FC = () => {
           currentSignal: localizeGeneratedText(row.currentSignal, uiLanguage),
           compareNext: localizeGeneratedText(row.compareNext, uiLanguage),
         }))
-      : comparisonTargets.slice(0, 3).map((item) => ({
-          symbol: item.symbol,
-          label: localizeGeneratedText(item.label, uiLanguage),
-          role: localizeGeneratedText(item.status, uiLanguage),
-          currentSignal: localizeGeneratedText(item.reason, uiLanguage),
-          compareNext: isEnglish ? 'Refresh and compare again.' : '刷新后再对比强弱。',
-        }));
-    const klineScenarios = (basicSnapshot.intelligence?.klineForecast?.scenarios ?? []).slice(0, 3).map((scenario) => ({
+      : comparisonTargets.length > 0
+        ? comparisonTargets.slice(0, 3).map((item) => ({
+            symbol: item.symbol,
+            label: localizeGeneratedText(item.label, uiLanguage),
+            role: localizeGeneratedText(item.status, uiLanguage),
+            currentSignal: localizeGeneratedText(item.reason, uiLanguage),
+            compareNext: isEnglish ? 'Refresh and compare again.' : '刷新后再对比强弱。',
+          }))
+        : fallbackPeerRows;
+    const fallbackKlineScenarios = [
+      {
+        label: isEnglish ? 'Trend checklist' : '趋势观察',
+        probability: currentPrice !== null && ma20 !== null && currentPrice >= ma20 ? 68 : 48,
+        trigger: ma20 !== null
+          ? (isEnglish ? `Watch whether price can hold MA20 ${formatBasicNumber(ma20)}.` : `观察价格能否守住 MA20 ${formatBasicNumber(ma20)}。`)
+          : (isEnglish ? 'Wait for moving-average context before interpreting the next bars.' : '等待均线数据补齐后再解读后续K线。'),
+        detail: isEnglish
+          ? 'Local free rules only; not model inference.'
+          : '免费版本地规则预览，不是模型推理。',
+      },
+      {
+        label: isEnglish ? 'Breakout confirmation' : '突破确认',
+        probability: currentPrice !== null && ma20 !== null && currentPrice >= ma20 ? 64 : 42,
+        trigger: resistanceValue !== '-'
+          ? (isEnglish ? `Price closes above resistance ${resistanceValue} with volume confirmation.` : `价格放量收在压力位 ${resistanceValue} 上方。`)
+          : (isEnglish ? 'Use the next refreshed high as resistance reference.' : '以下次刷新后的高点作为压力参照。'),
+        detail: isEnglish
+          ? 'Treat this as a next-refresh checklist, not a trading instruction.'
+          : '把它作为下一次刷新时的检查清单，不是交易指令。',
+      },
+      {
+        label: isEnglish ? 'Pullback risk' : '回落风险',
+        probability: currentPrice !== null && ma20 !== null && currentPrice >= ma20 ? 32 : 58,
+        trigger: supportValue !== '-'
+          ? (isEnglish ? `Price loses support ${supportValue} or source freshness degrades.` : `价格跌破支撑 ${supportValue}，或数据新鲜度下降。`)
+          : (isEnglish ? 'Source freshness or missing history weakens interpretation.' : '数据新鲜度下降或历史数据缺失会削弱解读。'),
+        detail: isEnglish
+          ? 'Recheck quote freshness and market reference before reading weakness.'
+          : '解读走弱前，先复核行情新鲜度和市场参照。',
+      },
+    ];
+    const backendKlineScenarios = (basicSnapshot.intelligence?.klineForecast?.scenarios ?? []).slice(0, 3).map((scenario) => ({
       label: localizeGeneratedText(scenario.label, uiLanguage),
       probability: scenario.probability,
       trigger: localizeGeneratedText(scenario.trigger, uiLanguage),
       detail: localizeGeneratedText(scenario.detail, uiLanguage),
     }));
+    const klineScenarios = backendKlineScenarios.length > 0 ? backendKlineScenarios : fallbackKlineScenarios;
     const sameModulesText = isEnglish
       ? 'Free mode shows concrete data first. Premium can switch the same cards to API-backed news, filings, funds, and model sources.'
       : '免费版先展示可用的真实数据；高级版可把同样卡片切换到 API 资讯、公告、资金流和模型数据源。';

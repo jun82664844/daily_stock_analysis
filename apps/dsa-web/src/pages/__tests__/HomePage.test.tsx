@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
@@ -3366,6 +3366,295 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 过期缓存 / H 缓存');
     expect(screen.getByTestId('basic-query-degradation')).toHaveTextContent('行情过期');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps the same free detail modules visible for all market routes with basic snapshots', async () => {
+    const cases = [
+      {
+        query: '600519.SH',
+        stockCode: '600519',
+        stockName: '贵州茅台',
+        market: 'cn',
+        lane: 'a_share_market_data',
+        channel: 'a_share_equity',
+        source: 'a_share_realtime',
+        marketTitle: 'A股重点数据',
+        laneLabel: 'A股行情数据',
+        peerLabel: '沪深300',
+        price: 1188.8,
+        ma5: 1195.78,
+        ma20: 1212.96,
+      },
+      {
+        query: 'AAPL',
+        stockCode: 'AAPL',
+        stockName: 'Apple Inc.',
+        market: 'us',
+        lane: 'us_market_data',
+        channel: 'us_equity',
+        source: 'yahoo_chart',
+        marketTitle: '美股重点数据',
+        laneLabel: '美股行情数据',
+        peerLabel: '纳斯达克综合指数',
+        price: 200,
+        ma5: 198,
+        ma20: 190,
+      },
+      {
+        query: '00700.HK',
+        stockCode: '00700.HK',
+        stockName: '腾讯控股',
+        market: 'hk',
+        lane: 'hk_market_data',
+        channel: 'hk_equity',
+        source: 'yahoo_chart',
+        marketTitle: '港股重点数据',
+        laneLabel: '港股行情数据',
+        peerLabel: '恒生指数',
+        price: 390.2,
+        ma5: 388,
+        ma20: 376,
+      },
+      {
+        query: 'BTC-USD',
+        stockCode: 'BTC-USD',
+        stockName: 'Bitcoin',
+        market: 'crypto',
+        lane: 'crypto_market_data',
+        channel: 'crypto_spot',
+        source: 'crypto_yahoo_chart',
+        marketTitle: '加密货币重点数据',
+        laneLabel: '加密货币行情数据',
+        peerLabel: '以太坊',
+        price: 108000,
+        ma5: 106800,
+        ma20: 102400,
+      },
+    ];
+
+    for (const item of cases) {
+      vi.clearAllMocks();
+      vi.mocked(historyApi.getList).mockResolvedValue({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+      vi.mocked(stocksApi.snapshot).mockResolvedValue({
+        stockCode: item.stockCode,
+        stockName: item.stockName,
+        market: item.market,
+        quote: {
+          currentPrice: item.price,
+          change: item.price * 0.012,
+          changePercent: 1.2,
+          open: item.price * 0.99,
+          high: item.price * 1.03,
+          low: item.price * 0.98,
+          prevClose: item.price * 0.988,
+          volume: 1200000,
+          amount: item.price * 1200000,
+          source: item.source,
+          freshness: 'fresh',
+        },
+        indicators: {
+          ma5: item.ma5,
+          ma20: item.ma20,
+          volumeChangeVsMa5: 8.6,
+          volumePriceSignal: 'price_volume_confirmed',
+        },
+        route: {
+          inputCode: item.query,
+          normalizedCode: item.stockCode,
+          market: item.market,
+          channel: item.channel,
+          dataSourceLane: item.lane,
+          quoteSources: [item.source],
+          historySources: [item.source],
+          aiRequired: false,
+        },
+        diagnostics: {
+          elapsedMs: 9,
+          quoteElapsedMs: 4,
+          historyElapsedMs: 5,
+          cache: { quote: 'miss', history: 'miss' },
+          sources: { quote: item.source, history: item.source },
+          freshness: { quote: 'fresh', history: 'fresh' },
+          timeouts: { quote: false, history: false },
+          errors: { quote: null, history: null },
+          fallback: { quote: 'live', history: 'live' },
+          sourceHealth: {
+            quote: { source: item.source, status: 'ok', consecutiveFailures: 0 },
+            history: { source: item.source, status: 'ok', consecutiveFailures: 0 },
+          },
+          persistentCache: { quote: 'memory', history: 'memory', mode: 'local_json' },
+          routeLane: item.lane,
+          performance: { status: 'ok', slowThresholdMs: 3000 },
+        },
+        aiUsed: false,
+      });
+      vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for free basic route'));
+
+      render(
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>,
+      );
+
+      fireEvent.change(await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL'), {
+        target: { value: item.query },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+      const board = await screen.findByTestId('basic-query-data-depth-board');
+      if (item.market === 'cn') {
+        expect(stocksApi.snapshot).toHaveBeenCalledWith(item.query, { aShareSourceMode: 'a_stock_data' });
+      } else {
+        expect(stocksApi.snapshot).toHaveBeenCalledWith(item.query);
+      }
+      expect(board).toHaveTextContent(item.marketTitle);
+      expect(board).toHaveTextContent(item.laneLabel);
+      expect(board).toHaveTextContent('核心数据');
+      expect(board).toHaveTextContent('技术结构');
+      expect(board).toHaveTextContent('资讯与事件');
+      expect(board).toHaveTextContent('同业与风险');
+      expect(screen.getByTestId('basic-query-data-detail-events')).toHaveTextContent('事件清单');
+      expect(screen.getByTestId('basic-query-kline-triggers')).toHaveTextContent('K线触发条件');
+      expect(screen.getByTestId('basic-query-kline-triggers')).toHaveTextContent('突破确认');
+      const peerTable = screen.getByTestId('basic-query-peer-table');
+      expect(peerTable).toHaveTextContent('同业对比表');
+      expect(peerTable).toHaveTextContent(item.peerLabel);
+      expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+      cleanup();
+    }
+  });
+
+  it('localizes backend comparison targets in the Chinese free detail view', async () => {
+    const cases = [
+      {
+        query: '00700.HK',
+        stockCode: 'HK00700',
+        stockName: '腾讯控股',
+        market: 'hk',
+        lane: 'hk_market_data',
+        label: 'Hang Seng Index',
+        status: 'Index lens',
+        reason: 'Hong Kong market reference.',
+        expectedLabel: '恒生指数',
+        expectedStatus: '指数参照',
+        expectedReason: '香港市场参照',
+      },
+      {
+        query: 'BTC-USD',
+        stockCode: 'BTC-USD',
+        stockName: 'Bitcoin',
+        market: 'crypto',
+        lane: 'crypto_market_data',
+        label: 'Ethereum',
+        status: 'Crypto beta',
+        reason: 'Large-cap crypto rotation reference.',
+        expectedLabel: '以太坊',
+        expectedStatus: '加密参照',
+        expectedReason: '大市值加密资产轮动参照',
+      },
+    ];
+
+    for (const item of cases) {
+      vi.clearAllMocks();
+      vi.mocked(historyApi.getList).mockResolvedValue({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+      vi.mocked(stocksApi.snapshot).mockResolvedValue({
+        stockCode: item.stockCode,
+        stockName: item.stockName,
+        market: item.market,
+        quote: {
+          currentPrice: item.market === 'hk' ? 431.2 : 63709.8,
+          change: 1.2,
+          changePercent: 0.3,
+          open: 430,
+          high: 445,
+          low: 424,
+          prevClose: 429,
+          volume: 2400000,
+          amount: 1030000000,
+          source: 'local_test',
+          freshness: 'fresh',
+        },
+        indicators: {
+          ma5: 424.64,
+          ma20: 440.6,
+          volumeChangeVsMa5: -12.5,
+          volumePriceSignal: 'neutral',
+        },
+        route: {
+          inputCode: item.query,
+          normalizedCode: item.stockCode,
+          market: item.market,
+          channel: item.market === 'crypto' ? 'crypto_spot' : 'hk_equity',
+          dataSourceLane: item.lane,
+          quoteSources: ['local_test'],
+          historySources: ['local_test'],
+          aiRequired: false,
+        },
+        diagnostics: {
+          elapsedMs: 10,
+          quoteElapsedMs: 5,
+          historyElapsedMs: 5,
+          cache: { quote: 'miss', history: 'miss' },
+          sources: { quote: 'local_test', history: 'local_test' },
+          freshness: { quote: 'fresh', history: 'fresh' },
+          timeouts: { quote: false, history: false },
+          errors: { quote: null, history: null },
+          fallback: { quote: 'live', history: 'live' },
+          sourceHealth: {
+            quote: { source: 'local_test', status: 'ok', consecutiveFailures: 0 },
+            history: { source: 'local_test', status: 'ok', consecutiveFailures: 0 },
+          },
+          persistentCache: { quote: 'memory', history: 'memory', mode: 'local_json' },
+          routeLane: item.lane,
+          performance: { status: 'ok', slowThresholdMs: 3000 },
+        },
+        intelligence: {
+          mode: 'free_rules',
+          aiUsed: false,
+          items: [],
+          comparisonTargets: [
+            {
+              symbol: item.market === 'hk' ? '^HSI' : 'ETH-USD',
+              label: item.label,
+              status: item.status,
+              reason: item.reason,
+              source: 'local_test',
+            },
+          ],
+        },
+        aiUsed: false,
+      });
+
+      render(
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>,
+      );
+
+      fireEvent.change(await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL'), {
+        target: { value: item.query },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+      const peerTable = await screen.findByTestId('basic-query-peer-table');
+      expect(peerTable).toHaveTextContent(item.expectedLabel);
+      expect(peerTable).toHaveTextContent(item.expectedStatus);
+      expect(peerTable).toHaveTextContent(item.expectedReason);
+      expect(peerTable).not.toHaveTextContent(item.label);
+      expect(peerTable).not.toHaveTextContent(item.status);
+      expect(peerTable).not.toHaveTextContent(item.reason);
+      cleanup();
+    }
   });
 
   it('shows ordinary-user account guardrails for no-AI quick queries and AI quota cost', async () => {

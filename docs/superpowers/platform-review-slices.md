@@ -1159,3 +1159,29 @@ Review focus:
 - The free and premium versions keep the same visible modules; premium/API mode only improves freshness, source links, configured feeds, and model depth.
 - `src/notification_sender/feishu_sender.py` must degrade when `lark_oapi` import raises `OSError`, so Windows local socket pressure does not prevent the API app from starting.
 - `scripts/verify_platform_free_detail_readability_v70.py` must stay visible and print `DSA_PLATFORM_FREE_DETAIL_READABILITY_V70_OK` only when V70 markers are present.
+
+## V71 Free Multimarket Modules Addendum
+
+Scope: local-only free query value upgrade. This slice keeps A-share, US equity, HK equity, and crypto free/no-AI results on the same visible module structure when the backend returns only a basic snapshot.
+
+Changed files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_multimarket_v71.py`
+- `tests/test_platform_free_multimarket_v71.py`
+- `docs/superpowers/plans/2026-07-08-dsa-v71-free-multimarket-modules.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `.gitignore`
+
+Review notes:
+
+- Free and premium users should see the same visible cards first; premium/API only changes source quality, freshness, model depth, and persistence.
+- Backend-provided English `comparisonTargets` must still be localized in Chinese mode; this covers Hong Kong and crypto live-result paths where fallback peers are not used.
+- No AI calls, no public search, no real payment, no production deployment, and no real API Key are part of this local boundary.
+- The fallback peer table and K-line triggers are local rules and source checklists only; they are not investment advice.
+
+Acceptance:
+
+- `scripts/verify_platform_free_multimarket_v71.py` must stay visible and print `DSA_PLATFORM_FREE_MULTIMARKET_V71_OK` only when V71 implementation, tests, docs, release package coverage, and git visibility markers are present.
