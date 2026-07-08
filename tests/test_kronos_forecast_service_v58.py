@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -41,6 +42,12 @@ class FakeKronosStockService:
                 for day in range(1, 22)
             ],
         }
+
+
+class SlowHistoryKronosStockService(FakeKronosStockService):
+    def get_history_data(self, stock_code: str, **_kwargs):
+        time.sleep(1.0)
+        return super().get_history_data(stock_code, **_kwargs)
 
 
 class KronosForecastServiceV58TestCase(unittest.TestCase):
@@ -127,6 +134,36 @@ class KronosForecastServiceV58TestCase(unittest.TestCase):
         self.assertEqual(availability["missing_dependencies"], [])
         self.assertEqual(availability["model_id"], "NeoQuasar/Kronos-mini")
         self.assertEqual(availability["tokenizer_id"], "NeoQuasar/Kronos-Tokenizer-2k")
+
+    def test_forecast_times_out_slow_history_and_returns_local_fallback(self) -> None:
+        from src.services.kronos_forecast_service import KronosForecastService
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            record_path = Path(temp_dir) / "kronos.jsonl"
+            with patch.dict("os.environ", {"KRONOS_ENABLED": "false", "KRONOS_RECORD_PATH": str(record_path)}):
+                service = KronosForecastService(
+                    stock_service=SlowHistoryKronosStockService(),
+                    dependency_probe=lambda: {
+                        "pandas": True,
+                        "torch": True,
+                        "einops": True,
+                        "safetensors": True,
+                        "huggingface_hub": True,
+                        "model": False,
+                    },
+                    data_timeout_seconds=0.05,
+                )
+
+                started = time.perf_counter()
+                result = service.forecast("600519", lookback=20, horizon=5)
+                elapsed = time.perf_counter() - started
+
+            self.assertLess(elapsed, 0.5)
+            self.assertEqual(result["status"], "model_disabled")
+            self.assertFalse(result["kronos_model_used"])
+            self.assertGreaterEqual(len(result["forecast_points"]), 5)
+            self.assertIn("Kronos market data fetch timed out; local rules fallback used.", result["warnings"])
+            self.assertIn("K-line context is short; confidence is capped.", result["warnings"])
 
 
 if __name__ == "__main__":

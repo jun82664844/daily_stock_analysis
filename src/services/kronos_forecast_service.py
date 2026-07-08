@@ -22,6 +22,7 @@ from src.services.stock_service import StockService
 
 _KRONOS_EXECUTOR = ThreadPoolExecutor(max_workers=max(1, int(os.getenv("KRONOS_MAX_CONCURRENT", "1"))))
 _KRONOS_SEMAPHORE = threading.BoundedSemaphore(max(1, int(os.getenv("KRONOS_MAX_CONCURRENT", "1"))))
+_KRONOS_DATA_EXECUTOR = ThreadPoolExecutor(max_workers=max(2, int(os.getenv("KRONOS_DATA_MAX_CONCURRENT", "2"))))
 
 
 def _utc_now() -> datetime:
@@ -78,6 +79,7 @@ class KronosForecastService:
         stock_service: Optional[StockService] = None,
         dependency_probe: Optional[Callable[[], Dict[str, bool]]] = None,
         cache_ttl_seconds: Optional[float] = None,
+        data_timeout_seconds: Optional[float] = None,
     ) -> None:
         self.stock_service = stock_service or StockService()
         self.basic_query_service = BasicQueryService(stock_service=self.stock_service)
@@ -86,6 +88,11 @@ class KronosForecastService:
             float(os.getenv("KRONOS_CACHE_TTL_SEC", "120"))
             if cache_ttl_seconds is None
             else max(0.0, float(cache_ttl_seconds))
+        )
+        self.data_timeout_seconds = (
+            float(os.getenv("KRONOS_DATA_TIMEOUT_SEC", "8"))
+            if data_timeout_seconds is None
+            else max(0.01, float(data_timeout_seconds))
         )
         self._cache: dict[tuple[str, int, int, bool], tuple[float, Dict[str, Any]]] = {}
         self._cache_lock = threading.Lock()
@@ -128,8 +135,7 @@ class KronosForecastService:
             cached.pop("anchor_close", None)
             return cached
 
-        quote = self.stock_service.get_realtime_quote(route.normalized_code) or {}
-        history = self.stock_service.get_history_data(route.normalized_code, period="daily", days=max(lookback + 10, 30)) or {}
+        quote, history, data_warnings = self._fetch_market_inputs(route, lookback=lookback)
         rows = self._history_rows(history.get("data") or [])
         recent_rows = rows[-lookback:] if rows else []
         signal = self._build_local_signal(route=route, quote=quote, rows=recent_rows)
@@ -160,7 +166,13 @@ class KronosForecastService:
             current_close=current_close,
             current_record_id=record_id,
         )
-        warnings = self._warnings(availability=availability, status=status, model_warning=model_warning, rows=recent_rows)
+        warnings = self._warnings(
+            availability=availability,
+            status=status,
+            model_warning=model_warning,
+            rows=recent_rows,
+            data_warnings=data_warnings,
+        )
         result = {
             "stock_code": route.normalized_code,
             "stock_name": quote.get("stock_name") or history.get("stock_name"),
@@ -215,6 +227,35 @@ class KronosForecastService:
     def _set_cached(self, cache_key: tuple[str, int, int, bool], payload: Dict[str, Any]) -> None:
         with self._cache_lock:
             self._cache[cache_key] = (time.time(), copy.deepcopy(payload))
+
+    def _fetch_market_inputs(self, route: MarketRoute, *, lookback: int) -> tuple[Dict[str, Any], Dict[str, Any], list[str]]:
+        days = max(lookback + 10, 30)
+        futures = {
+            "quote": _KRONOS_DATA_EXECUTOR.submit(self.stock_service.get_realtime_quote, route.normalized_code),
+            "history": _KRONOS_DATA_EXECUTOR.submit(
+                self.stock_service.get_history_data,
+                route.normalized_code,
+                period="daily",
+                days=days,
+            ),
+        }
+        quote: Dict[str, Any] = {}
+        history: Dict[str, Any] = {}
+        warnings: list[str] = []
+        for name, future in futures.items():
+            try:
+                result = future.result(timeout=self.data_timeout_seconds)
+            except TimeoutError:
+                future.cancel()
+                warnings.append("Kronos market data fetch timed out; local rules fallback used.")
+            except Exception as exc:
+                warnings.append(f"Kronos market data fetch degraded; {name} source failed: {type(exc).__name__}.")
+            else:
+                if name == "quote":
+                    quote = result or {}
+                else:
+                    history = result or {}
+        return quote, history, list(dict.fromkeys(warnings))
 
     def _history_rows(self, rows: Iterable[Dict[str, Any]]) -> list[Dict[str, Any]]:
         normalized: list[Dict[str, Any]] = []
@@ -441,8 +482,17 @@ class KronosForecastService:
             signal["scenarios"][0]["detail"] = "Real local Kronos model output; still experimental information analysis only."
         return signal
 
-    def _warnings(self, *, availability: Dict[str, Any], status: str, model_warning: str, rows: list[Dict[str, Any]]) -> list[str]:
+    def _warnings(
+        self,
+        *,
+        availability: Dict[str, Any],
+        status: str,
+        model_warning: str,
+        rows: list[Dict[str, Any]],
+        data_warnings: Optional[list[str]] = None,
+    ) -> list[str]:
         warnings: list[str] = []
+        warnings.extend(data_warnings or [])
         if status == "model_disabled":
             warnings.append("KRONOS_ENABLED is false; local rules fallback only.")
         if status == "model_unavailable":

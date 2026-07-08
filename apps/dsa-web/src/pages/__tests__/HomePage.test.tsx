@@ -349,7 +349,12 @@ describe('HomePage', () => {
         { timestamp: '2026-07-08', close: 202 },
       ],
       backtestSummary: { records: 1, evaluated: 1, hits: 1, hitRate: 1, lastEvaluatedAt: '2026-07-06T09:00:00' },
-      warnings: ['Kronos model unavailable; missing dependencies: torch, model.'],
+      warnings: [
+        'Kronos market data fetch timed out; local rules fallback used.',
+        'KRONOS_ENABLED is false; local rules fallback only.',
+        'K-line context is short; confidence is capped.',
+        'Kronos model unavailable; missing dependencies: torch, model.',
+      ],
       elapsedMs: 12,
       cacheHit: false,
       recordId: 'unit-kronos',
@@ -3124,6 +3129,12 @@ describe('HomePage', () => {
     const kronosResult = await screen.findByTestId('basic-query-kronos-live-result');
     expect(kronosResult).toHaveTextContent('模型不可用');
     expect(kronosResult).toHaveTextContent('本地规则兜底');
+    expect(kronosResult).toHaveTextContent('Kronos 行情数据获取超时，已使用本地规则兜底。');
+    expect(kronosResult).toHaveTextContent('KRONOS_ENABLED 未开启，当前仅使用本地规则兜底。');
+    expect(kronosResult).toHaveTextContent('K线上下文不足，置信度已降低。');
+    expect(kronosResult).not.toHaveTextContent('Kronos market data fetch timed out');
+    expect(kronosResult).not.toHaveTextContent('KRONOS_ENABLED is false');
+    expect(kronosResult).not.toHaveTextContent('K-line context is short');
     expect(screen.getByTestId('basic-query-kronos-dependency-status')).toHaveTextContent('torch: 缺失');
     expect(screen.getByTestId('basic-query-kronos-backtest-summary')).toHaveTextContent('1 条记录');
     const premiumFeatureLadder = screen.getByTestId('basic-query-premium-feature-ladder');
