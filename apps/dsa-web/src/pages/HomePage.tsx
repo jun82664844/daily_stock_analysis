@@ -2680,6 +2680,133 @@ const HomePage: React.FC = () => {
       },
     };
   }, [basicFreeReport, basicQuoteTrustPanel, basicSnapshot, uiLanguage]);
+  const basicVisualAnalystPage = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const indicators = basicSnapshot.indicators || {};
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
+    const ma5 = toFiniteBasicNumber(pickBasicIndicator(indicators, 'ma5', 'MA5'));
+    const ma20 = toFiniteBasicNumber(pickBasicIndicator(indicators, 'ma20', 'MA20'));
+    const prevClose = toFiniteBasicNumber(basicSnapshot.quote.prevClose);
+    const openPrice = toFiniteBasicNumber(basicSnapshot.quote.open);
+    const highPrice = toFiniteBasicNumber(basicSnapshot.quote.high);
+    const lowPrice = toFiniteBasicNumber(basicSnapshot.quote.low);
+    const volumeChange = toFiniteBasicNumber(pickBasicIndicator(indicators, 'volumeChangeVsMa5', 'volume_change_vs_ma5'));
+    const volumeMa5 = toFiniteBasicNumber(pickBasicIndicator(indicators, 'volumeMa5', 'volume_ma5'));
+    const trendPoints = basicSnapshot.trend?.points ?? [];
+    const fallbackTrendPoints = uniqueBasicLevels([prevClose, ma20, ma5, currentPrice])
+      .map((close) => ({ close }));
+    const sparkline = basicFreeReport.miniChart.sparkline
+      || buildBasicSparkline(trendPoints.length >= 2 ? trendPoints : fallbackTrendPoints);
+    const supportCandidates = uniqueBasicLevels([lowPrice, ma20, ma5, prevClose, openPrice]);
+    const resistanceCandidates = uniqueBasicLevels([highPrice, openPrice, prevClose, ma5, ma20]);
+    const supportNumber = currentPrice !== null
+      ? supportCandidates.filter((level) => level <= currentPrice).sort((left, right) => right - left)[0] ?? null
+      : supportCandidates.sort((left, right) => right - left)[0] ?? null;
+    const resistanceNumber = currentPrice !== null
+      ? resistanceCandidates.filter((level) => level >= currentPrice).sort((left, right) => left - right)[0] ?? null
+      : resistanceCandidates.sort((left, right) => left - right)[0] ?? null;
+    const rawVolumes = trendPoints
+      .map((point) => ({
+        label: String(point.date || '').slice(5) || (isEnglish ? 'day' : '日期'),
+        value: toFiniteBasicNumber(point.volume),
+      }))
+      .filter((point): point is { label: string; value: number } => point.value !== null)
+      .slice(-8);
+    const fallbackVolumes = [
+      volumeMa5 !== null ? { label: 'MA5', value: volumeMa5 } : null,
+      toFiniteBasicNumber(basicSnapshot.quote.volume) !== null
+        ? { label: isEnglish ? 'Now' : '当前', value: toFiniteBasicNumber(basicSnapshot.quote.volume) as number }
+        : null,
+    ].filter((point): point is { label: string; value: number } => Boolean(point));
+    const volumeSource = rawVolumes.length >= 2 ? rawVolumes : fallbackVolumes;
+    const maxVolume = Math.max(...volumeSource.map((point) => point.value), 1);
+    const volumeBars = volumeSource.map((point, index) => ({
+      ...point,
+      height: Math.max(18, Math.round((point.value / maxVolume) * 100)),
+      isLatest: index === volumeSource.length - 1,
+    }));
+    const trendStatus = currentPrice !== null && ma20 !== null
+      ? currentPrice >= ma20
+        ? (isEnglish ? 'Above MA20' : '站上 MA20')
+        : (isEnglish ? 'Below MA20' : '低于 MA20')
+      : (isEnglish ? 'MA20 incomplete' : 'MA20 不完整');
+    const volumeStatus = volumeChange !== null
+      ? volumeChange >= 20
+        ? (isEnglish ? 'Volume expanding' : '量能放大')
+        : volumeChange <= -20
+          ? (isEnglish ? 'Volume shrinking' : '量能收缩')
+          : (isEnglish ? 'Volume neutral' : '量能中性')
+      : (isEnglish ? 'Volume incomplete' : '量能不完整');
+    const scoreLabel = basicFreeReport.score >= 70
+      ? (isEnglish ? 'Constructive' : '偏积极')
+      : basicFreeReport.score >= 55
+        ? (isEnglish ? 'Watchable' : '可观察')
+        : (isEnglish ? 'Verify first' : '先复核');
+    const nextStep = basicSnapshot.quote.freshness !== 'fresh'
+      ? (isEnglish ? 'Refresh quote first, then read the signal.' : '先刷新行情，再解读信号。')
+      : basicFreeReport.score >= 70
+        ? (isEnglish ? 'Compare peers and inspect K-line triggers.' : '继续对比同业，并查看 K线触发条件。')
+        : (isEnglish ? 'Check risks and wait for stronger confirmation.' : '先看风险边界，等待更强确认。');
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || basicSnapshot.quote.source
+      || 'free_source';
+    return {
+      title: isEnglish ? 'Visual analyst page' : '可视化研判页',
+      subtitle: isEnglish
+        ? 'See the chart first, then read the conclusion: trend, volume, support/resistance, and the next broker-style step.'
+        : '先看图，再读结论：趋势、量价、支撑压力和经纪人下一步一次看清。',
+      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      source: localizeGeneratedSource(sourceLane, uiLanguage),
+      trendTitle: isEnglish ? 'Trend track' : '趋势轨道',
+      volumeTitle: isEnglish ? 'Volume-price confirmation' : '量价确认',
+      levelTitle: isEnglish ? 'Support / resistance' : '支撑压力',
+      nextTitle: isEnglish ? 'Broker next step' : '经纪人下一步',
+      freeTitle: isEnglish ? 'Visible in free' : '免费版可见',
+      premiumTitle: isEnglish ? 'Premium improves' : '高级版增强',
+      scoreLabel,
+      scoreValue: `${basicFreeReport.score}/100`,
+      conclusion: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+      priceValue: `${formatBasicNumber(currentPrice)} / ${formatSignedBasicPercent(changePercent)}`,
+      trendStatus,
+      trendDetail: currentPrice !== null && ma20 !== null
+        ? (isEnglish ? `Last ${formatBasicNumber(currentPrice)}, MA20 ${formatBasicNumber(ma20)}.` : `最新价 ${formatBasicNumber(currentPrice)}，MA20 ${formatBasicNumber(ma20)}。`)
+        : (isEnglish ? 'Refresh or wait for more history to complete moving-average context.' : '刷新或等待更多历史数据补齐均线背景。'),
+      volumeStatus,
+      volumeDetail: volumeChange !== null
+        ? (isEnglish ? `Volume versus MA5 ${formatSignedBasicPercent(volumeChange)}.` : `成交量相对 MA5 ${formatSignedBasicPercent(volumeChange)}。`)
+        : (isEnglish ? 'Volume history is not complete yet.' : '成交量历史暂不完整。'),
+      supportText: supportNumber !== null
+        ? formatBasicNumber(supportNumber)
+        : localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage),
+      resistanceText: resistanceNumber !== null
+        ? formatBasicNumber(resistanceNumber)
+        : localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage),
+      levelDetail: isEnglish
+        ? `Support ${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}; resistance ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}.`
+        : `支撑 ${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}；压力 ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}。`,
+      nextStep,
+      sparkline,
+      volumeBars,
+      freeItems: isEnglish
+        ? ['Trend chart', 'Volume bars', 'Support/resistance', 'News and peers', 'Risk checklist']
+        : ['趋势图', '量价条', '支撑压力', '资讯同业', '风险清单'],
+      premiumItems: isEnglish
+        ? ['Realtime API', 'Source links', 'Longer history', 'Model validation', 'Continuous alerts']
+        : ['实时 API', '原文链接', '更长历史', '模型验证', '持续提醒'],
+      actionLabels: {
+        refresh: isEnglish ? 'Refresh quote' : '刷新行情',
+        news: isEnglish ? 'Read news' : '看资讯',
+        peers: isEnglish ? 'Compare peers' : '看同业',
+        kline: isEnglish ? 'Inspect K-line' : '看K线',
+      },
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicFreeEventCenter = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -5822,6 +5949,201 @@ const HomePage: React.FC = () => {
                               {item}
                             </span>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicVisualAnalystPage ? (
+                  <section
+                    data-testid="basic-query-visual-analyst-page-v87"
+                    className="mb-4 rounded-lg border border-primary/50 bg-gradient-to-br from-background/75 via-primary/10 to-surface/70 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="rounded-md border border-primary/50 bg-primary/14 px-2 py-1 text-xs font-semibold text-primary">
+                            {basicVisualAnalystPage.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-[11px] text-secondary-text">
+                            {basicVisualAnalystPage.boundary}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-[11px] text-secondary-text">
+                            {basicVisualAnalystPage.source}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 text-lg font-semibold leading-snug text-foreground">
+                          {basicVisualAnalystPage.subtitle}
+                        </h3>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {basicVisualAnalystPage.conclusion}
+                        </p>
+                      </div>
+                      <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
+                        <div className="rounded-md border border-primary/35 bg-primary/10 px-3 py-2">
+                          <div className="text-[11px] text-secondary-text">{basicVisualAnalystPage.scoreLabel}</div>
+                          <div className="mt-1 text-lg font-semibold text-primary">{basicVisualAnalystPage.scoreValue}</div>
+                        </div>
+                        <div className="rounded-md border border-subtle/75 bg-background/35 px-3 py-2">
+                          <div className="text-[11px] text-secondary-text">{uiLanguage === 'en' ? 'Price / change' : '价格 / 涨跌'}</div>
+                          <div className="mt-1 text-sm font-semibold text-foreground">{basicVisualAnalystPage.priceValue}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+                      <div className="min-w-0 rounded-md border border-primary/35 bg-background/35 p-3">
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-foreground">{basicVisualAnalystPage.trendTitle}</div>
+                          <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] text-primary">
+                            {basicVisualAnalystPage.trendStatus}
+                          </span>
+                        </div>
+                        <div className="mt-3 h-32 rounded-md border border-subtle/60 bg-surface/45 p-2 text-primary">
+                          {basicVisualAnalystPage.sparkline ? (
+                            <svg
+                              aria-label={basicVisualAnalystPage.trendTitle}
+                              className="h-full w-full overflow-visible"
+                              preserveAspectRatio="none"
+                              role="img"
+                              viewBox="0 0 220 72"
+                            >
+                              <line className="stroke-subtle" x1="6" x2="214" y1="18" y2="18" strokeWidth="1" strokeDasharray="4 4" />
+                              <line className="stroke-subtle" x1="6" x2="214" y1="54" y2="54" strokeWidth="1" strokeDasharray="4 4" />
+                              <polygon
+                                className="fill-primary/10"
+                                points={basicVisualAnalystPage.sparkline.areaPoints}
+                              />
+                              <polyline
+                                className="fill-none stroke-primary"
+                                points={basicVisualAnalystPage.sparkline.linePoints}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="3"
+                              />
+                            </svg>
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-xs text-secondary-text">
+                              {uiLanguage === 'en' ? 'Trend chart awaits more history' : '趋势图等待更多历史数据'}
+                            </div>
+                          )}
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                          {basicVisualAnalystPage.trendDetail}
+                        </p>
+                      </div>
+                      <div className="grid min-w-0 gap-3">
+                        <div className="rounded-md border border-subtle/75 bg-background/35 p-3">
+                          <div className="text-sm font-semibold text-foreground">{basicVisualAnalystPage.levelTitle}</div>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div className="min-w-0 rounded-md border border-success/35 bg-success/10 px-3 py-2">
+                              <div className="text-[11px] text-secondary-text">{uiLanguage === 'en' ? 'Support' : '支撑'}</div>
+                              <div className="mt-1 truncate text-lg font-semibold text-foreground">{basicVisualAnalystPage.supportText}</div>
+                            </div>
+                            <div className="min-w-0 rounded-md border border-warning/35 bg-warning/10 px-3 py-2">
+                              <div className="text-[11px] text-secondary-text">{uiLanguage === 'en' ? 'Resistance' : '压力'}</div>
+                              <div className="mt-1 truncate text-lg font-semibold text-foreground">{basicVisualAnalystPage.resistanceText}</div>
+                            </div>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-secondary-text">
+                            {basicVisualAnalystPage.levelDetail}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-subtle/75 bg-background/35 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-semibold text-foreground">{basicVisualAnalystPage.volumeTitle}</div>
+                            <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-[11px] text-primary">
+                              {basicVisualAnalystPage.volumeStatus}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex h-20 items-end gap-1.5 rounded-md border border-subtle/60 bg-surface/35 px-2 py-2">
+                            {basicVisualAnalystPage.volumeBars.length > 0 ? (
+                              basicVisualAnalystPage.volumeBars.map((bar) => (
+                                <div key={`${bar.label}-${bar.value}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
+                                  <div
+                                    className={`rounded-t-sm ${bar.isLatest ? 'bg-primary' : 'bg-primary/45'}`}
+                                    style={{ height: `${bar.height}%` }}
+                                    title={`${bar.label}: ${formatBasicCompactNumber(bar.value)}`}
+                                  />
+                                </div>
+                              ))
+                            ) : (
+                              <div className="flex h-full flex-1 items-center justify-center text-xs text-secondary-text">
+                                {uiLanguage === 'en' ? 'Volume bars await history' : '量价条等待历史数据'}
+                              </div>
+                            )}
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-secondary-text">
+                            {basicVisualAnalystPage.volumeDetail}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                      <div className="min-w-0 rounded-md border border-primary/35 bg-primary/10 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicVisualAnalystPage.nextTitle}</div>
+                        <p className="mt-2 text-sm leading-relaxed text-secondary-text">
+                          {basicVisualAnalystPage.nextStep}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            disabled={isQueryingBasic}
+                            onClick={() => void handleBasicQuery(basicSnapshot.stockCode, undefined, true, undefined, basicSnapshotViewMode)}
+                          >
+                            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                            {basicVisualAnalystPage.actionLabels.refresh}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleBasicFeatureJump('basic-query-news-center')}
+                          >
+                            <Search className="h-4 w-4" aria-hidden="true" />
+                            {basicVisualAnalystPage.actionLabels.news}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleBasicFeatureJump('basic-query-peer-table')}
+                          >
+                            <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                            {basicVisualAnalystPage.actionLabels.peers}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleBasicFeatureJump('basic-query-kline-forecast-lab')}
+                          >
+                            <Sparkles className="h-4 w-4" aria-hidden="true" />
+                            {basicVisualAnalystPage.actionLabels.kline}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                        <div className="min-w-0 rounded-md border border-subtle/75 bg-background/35 p-3">
+                          <div className="text-xs font-semibold text-primary">{basicVisualAnalystPage.freeTitle}</div>
+                          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            {basicVisualAnalystPage.freeItems.map((item, index) => (
+                              <span key={`v87-free-${index}-${item}`} className="rounded-md border border-subtle/70 px-2 py-1">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded-md border border-primary/35 bg-background/35 p-3">
+                          <div className="text-xs font-semibold text-primary">{basicVisualAnalystPage.premiumTitle}</div>
+                          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-primary">
+                            {basicVisualAnalystPage.premiumItems.map((item, index) => (
+                              <span key={`v87-premium-${index}-${item}`} className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
