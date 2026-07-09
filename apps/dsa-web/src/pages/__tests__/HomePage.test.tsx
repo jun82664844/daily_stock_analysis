@@ -3063,6 +3063,16 @@ describe('HomePage', () => {
     expect(todayBriefCard).toHaveTextContent('高级版补齐');
     expect(todayBriefCard).toHaveTextContent('实时资讯/API');
     expect(todayBriefCard).toHaveTextContent('不构成投资建议');
+    const brokerThreeStep = within(todayBriefCard).getByTestId('basic-query-broker-three-step-card');
+    expect(brokerThreeStep).toHaveTextContent('经纪人三段判断');
+    expect(brokerThreeStep).toHaveTextContent('能不能看');
+    expect(brokerThreeStep).toHaveTextContent('可以继续看');
+    expect(brokerThreeStep).toHaveTextContent('为什么看');
+    expect(brokerThreeStep).toHaveTextContent('信号完整度 82/100');
+    expect(brokerThreeStep).toHaveTextContent('什么时候升级');
+    expect(brokerThreeStep).toHaveTextContent('需要实时资讯/API、来源链接或模型验证时升级');
+    expect(brokerThreeStep).toHaveTextContent('免费版先给判断框架');
+    expect(brokerThreeStep).toHaveTextContent('高级版补齐验证深度');
     const proDecisionCard = screen.getByTestId('basic-query-pro-decision-card');
     expect(
       todayBriefCard.compareDocumentPosition(proDecisionCard)

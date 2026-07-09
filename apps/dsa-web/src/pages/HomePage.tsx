@@ -2369,6 +2369,12 @@ const HomePage: React.FC = () => {
       || (isEnglish ? 'Verify quote freshness' : '先确认行情新鲜度');
     const hasFreshQuote = dataTrustValue === (isEnglish ? 'Realtime quote available' : '实时行情可用');
     const ma20Text = formatBasicNumber(ma20);
+    const score = basicFreeReport.score;
+    const canReadValue = score >= 70 && hasFreshQuote
+      ? (isEnglish ? 'Worth continuing' : '可以继续看')
+      : score >= 55
+        ? (isEnglish ? 'Watch, then verify' : '可以观察，先复核')
+        : (isEnglish ? 'Verify first' : '先复核再看');
     const nextAction = hasFreshQuote
       ? (isEnglish
         ? `Refresh live quote, then watch whether price holds MA20 ${ma20Text}.`
@@ -2390,7 +2396,7 @@ const HomePage: React.FC = () => {
       oneLineLabel: isEnglish ? 'One-line view' : '一句话看法',
       oneLine: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
       signalLabel: isEnglish ? 'Signal completeness' : '信号完整度',
-      signalValue: `${basicFreeReport.score}/100`,
+      signalValue: `${score}/100`,
       priceLabel: isEnglish ? 'Price / change' : '价格 / 涨跌',
       priceValue: `${formatBasicNumber(currentPrice)} / ${formatSignedBasicPercent(changePercent)}`,
       dataTrustLabel: isEnglish ? 'Data trust' : '数据可信度',
@@ -2408,6 +2414,33 @@ const HomePage: React.FC = () => {
       premiumItems: isEnglish
         ? ['Realtime news/API', 'Source links', 'Kronos/API model', 'Continuous tracking']
         : ['实时资讯/API', '来源链接', 'Kronos/API 模型', '持续跟踪'],
+      brokerTitle: isEnglish ? 'Broker three-step view' : '经纪人三段判断',
+      brokerFootnote: isEnglish
+        ? 'Free gives the decision frame first; Premium adds verification depth.'
+        : '免费版先给判断框架，高级版补齐验证深度。',
+      brokerSteps: [
+        {
+          label: isEnglish ? 'Can I keep reading?' : '能不能看',
+          value: canReadValue,
+          detail: hasFreshQuote
+            ? (isEnglish ? 'Quote is usable, so the first read can continue.' : '行情可用，可以继续读后面的结构。')
+            : (isEnglish ? 'Data is degraded; refresh before deeper reading.' : '数据有降级，先刷新再做深读。'),
+        },
+        {
+          label: isEnglish ? 'Why read it?' : '为什么看',
+          value: `${isEnglish ? 'Signal completeness' : '信号完整度'} ${score}/100`,
+          detail: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+        },
+        {
+          label: isEnglish ? 'When to upgrade?' : '什么时候升级',
+          value: isEnglish
+            ? 'Upgrade when realtime news/API, source links, or model validation are needed'
+            : '需要实时资讯/API、来源链接或模型验证时升级',
+          detail: isEnglish
+            ? 'Use Premium when the next question is verification depth, not just first-pass structure.'
+            : '当问题从“先看结构”变成“要验证来源和模型”时，再用高级版。',
+        },
+      ],
       boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
     };
   }, [basicFreeReport, basicQuoteTrustPanel, basicSnapshot, uiLanguage]);
@@ -5242,6 +5275,24 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
                         <div className="text-[11px] font-medium text-secondary-text">{basicTodayBriefCard.nextActionLabel}</div>
                         <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{basicTodayBriefCard.nextAction}</div>
+                      </div>
+                    </div>
+                    <div
+                      data-testid="basic-query-broker-three-step-card"
+                      className="mt-3 rounded-lg border border-primary/35 bg-background/35 p-3"
+                    >
+                      <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div className="text-sm font-semibold text-foreground">{basicTodayBriefCard.brokerTitle}</div>
+                        <div className="text-xs leading-relaxed text-secondary-text">{basicTodayBriefCard.brokerFootnote}</div>
+                      </div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-3">
+                        {basicTodayBriefCard.brokerSteps.map((step) => (
+                          <div key={step.label} className="min-w-0 rounded-md border border-subtle/80 bg-surface/45 p-2.5">
+                            <div className="text-[11px] font-medium text-primary">{step.label}</div>
+                            <div className="mt-1 text-sm font-semibold leading-snug text-foreground">{step.value}</div>
+                            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">{step.detail}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                     <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)]">
