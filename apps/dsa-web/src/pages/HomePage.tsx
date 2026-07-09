@@ -2807,6 +2807,90 @@ const HomePage: React.FC = () => {
       },
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicReadingRoadmap = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const signalScore = `${basicFreeReport.score}/100`;
+    const freshness = localizeRuntimeLabel(basicSnapshot.quote.freshness || 'unavailable', uiLanguage);
+    const support = localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage);
+    const resistance = localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage);
+    const conclusion = localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage);
+    const firstRisk = localizeGeneratedText(
+      basicFreeReport.productBrief.risks[0]
+      || basicSnapshot.warnings?.[0]?.message
+      || (isEnglish ? 'Use the free report as an observation checklist.' : '先把免费报告当作观察清单。'),
+      uiLanguage,
+    );
+    const peerRows = basicSnapshot.intelligence?.peerComparison?.rows ?? [];
+    const comparisonTargets = basicSnapshot.intelligence?.comparisonTargets ?? [];
+    const peers = (peerRows.length > 0
+      ? peerRows.slice(0, 3).map((row) => row.symbol || row.label)
+      : comparisonTargets.slice(0, 3).map((item) => item.symbol || item.label))
+      .filter((value): value is string => Boolean(value))
+      .join(' / ');
+    const klineDirection = localizeRuntimeLabel(
+      basicSnapshot.intelligence?.klineForecast?.direction
+      || basicSnapshot.intelligence?.klineForecast?.scenarios?.[0]?.direction
+      || 'pending',
+      uiLanguage,
+    );
+    return {
+      title: isEnglish ? '3-minute reading route' : '3分钟研判路线',
+      subtitle: isEnglish
+        ? 'Use the free report in order: conclusion, visual evidence, source checks, then K-line scenarios.'
+        : '按顺序读免费报告：先看结论，再看图形证据，再核对资讯同业，最后看 K线情景。',
+      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      freeTitle: isEnglish ? 'Free complete read' : '免费版可完整阅读',
+      premiumTitle: isEnglish ? 'Premium adds data sources' : '高级版补数据源',
+      freeDetail: isEnglish
+        ? 'The visible reading path is open to guests and free users.'
+        : '游客和免费用户都能完整阅读这条可见研判路径。',
+      premiumDetail: isEnglish
+        ? 'Premium changes source freshness, original links, model validation, and alert continuity.'
+        : '高级版补实时源、原文链接、模型验证和持续提醒。',
+      actionLabels: {
+        news: isEnglish ? 'Read news' : '看资讯',
+        peers: isEnglish ? 'Compare peers' : '看同业',
+        kline: isEnglish ? 'Inspect K-line' : '看K线',
+      },
+      steps: [
+        {
+          title: isEnglish ? 'Step 1: Read conclusion' : '第一步：看结论',
+          detail: isEnglish
+            ? `${conclusion} Signal completeness ${signalScore}.`
+            : `${conclusion} 信号完整度 ${signalScore}。`,
+          tag: isEnglish ? 'first read' : '先定方向',
+        },
+        {
+          title: isEnglish ? 'Step 2: Read visual evidence' : '第二步：看图形证据',
+          detail: isEnglish
+            ? `Trend, volume, support ${support}, resistance ${resistance}, freshness ${freshness}.`
+            : `趋势、量价、支撑 ${support}、压力 ${resistance}、新鲜度 ${freshness}。`,
+          tag: isEnglish ? 'chart proof' : '图形证据',
+        },
+        {
+          title: isEnglish ? 'Step 3: Check news and peers' : '第三步：核对资讯与同业',
+          detail: isEnglish
+            ? `Check source lanes and compare ${peers || basicSnapshot.market.toUpperCase()} before reading this symbol alone.`
+            : `先看来源通道，再与 ${peers || basicSnapshot.market.toUpperCase()} 对比，避免孤立解读。`,
+          tag: isEnglish ? 'source check' : '来源复核',
+        },
+        {
+          title: isEnglish ? 'Step 4: Inspect K-line scenarios' : '第四步：看K线情景',
+          detail: isEnglish
+            ? `Use ${klineDirection} and risk notes as a next-refresh checklist.`
+            : `把 ${klineDirection} 和风险点作为下一次刷新检查清单。`,
+          tag: isEnglish ? 'scenario' : '情景推演',
+        },
+      ],
+      risks: [
+        firstRisk,
+        isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+      ],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicFreeEventCenter = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -4149,7 +4233,7 @@ const HomePage: React.FC = () => {
   const handleBasicFeatureJump = useCallback((testId: string) => {
     const target = document.querySelector(`[data-testid="${testId}"]`);
     if (target instanceof HTMLElement && typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.scrollIntoView({ behavior: 'auto', block: 'center' });
     }
   }, []);
 
@@ -6146,6 +6230,108 @@ const HomePage: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicReadingRoadmap ? (
+                  <section
+                    data-testid="basic-query-reading-roadmap-v88"
+                    className="mb-4 rounded-lg border border-primary/45 bg-surface/70 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 font-semibold text-primary">
+                            {basicReadingRoadmap.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
+                            {basicReadingRoadmap.boundary}
+                          </span>
+                          <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
+                            {basicReadingRoadmap.freeTitle}
+                          </span>
+                          <span className="rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-warning">
+                            {basicReadingRoadmap.premiumTitle}
+                          </span>
+                        </div>
+                        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-secondary-text">
+                          {basicReadingRoadmap.subtitle}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-news-center')}
+                        >
+                          <Search className="h-4 w-4" aria-hidden="true" />
+                          {basicReadingRoadmap.actionLabels.news}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-peer-table')}
+                        >
+                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                          {basicReadingRoadmap.actionLabels.peers}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-kline-forecast-lab')}
+                        >
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          {basicReadingRoadmap.actionLabels.kline}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-4">
+                      {basicReadingRoadmap.steps.map((step, index) => (
+                        <div
+                          key={step.title}
+                          className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-3"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-primary/45 bg-primary/12 text-sm font-semibold text-primary">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-foreground">{step.title}</div>
+                              <div className="mt-1 text-[11px] font-medium text-primary">{step.tag}</div>
+                            </div>
+                          </div>
+                          <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-secondary-text">
+                            {step.detail}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      <div className="rounded-md border border-subtle/75 bg-background/35 p-3">
+                        <div className="text-xs font-semibold text-primary">{basicReadingRoadmap.freeTitle}</div>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {basicReadingRoadmap.freeDetail}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-primary/35 bg-primary/8 p-3">
+                        <div className="text-xs font-semibold text-primary">{basicReadingRoadmap.premiumTitle}</div>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {basicReadingRoadmap.premiumDetail}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                      {basicReadingRoadmap.risks.map((risk, index) => (
+                        <span
+                          key={`v88-risk-${index}-${risk}`}
+                          className="rounded-md border border-subtle/70 bg-background/35 px-2 py-1"
+                        >
+                          {risk}
+                        </span>
+                      ))}
                     </div>
                   </section>
                 ) : null}
