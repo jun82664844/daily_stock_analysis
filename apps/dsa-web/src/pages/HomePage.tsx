@@ -2436,6 +2436,118 @@ const HomePage: React.FC = () => {
       newsCards,
     };
   }, [basicSnapshot, uiLanguage]);
+  const basicEventRadar = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const symbol = basicSnapshot.stockCode;
+    const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const ma20 = toFiniteBasicNumber(pickBasicIndicator(basicSnapshot.indicators, 'ma20', 'MA20'));
+    const volumeChange = toFiniteBasicNumber(pickBasicIndicator(
+      basicSnapshot.indicators,
+      'volumeChangeVsMa5',
+      'volume_change_vs_ma5',
+    ));
+    const comparisonPeerLabels = (basicSnapshot.intelligence?.comparisonTargets ?? [])
+      .map((item) => item.symbol || item.label)
+      .filter((value): value is string => Boolean(value));
+    const routePeerLabels = (basicSnapshot.intelligence?.peerComparison?.rows ?? [])
+      .map((row) => row.symbol || row.label)
+      .filter((value): value is string => Boolean(value));
+    const peerLabels = Array.from(new Set(
+      (comparisonPeerLabels.length > 0 ? comparisonPeerLabels : routePeerLabels),
+    )).slice(0, 2);
+    const movementDirection = changePercent === null || changePercent === 0
+      ? (isEnglish ? 'flat' : '震荡')
+      : changePercent > 0
+        ? (isEnglish ? 'rose' : '上涨')
+        : (isEnglish ? 'fell' : '下跌');
+    const movementText = changePercent === null
+      ? (isEnglish ? `${symbol} has no change data yet` : `${symbol} 暂无涨跌幅数据`)
+      : isEnglish
+        ? `${symbol} ${movementDirection} ${formatBasicPercent(Math.abs(changePercent))}`
+        : `${symbol} ${movementDirection} ${formatBasicPercent(Math.abs(changePercent))}`;
+    const ma20Text = currentPrice !== null && ma20 !== null
+      ? currentPrice >= ma20
+        ? (isEnglish ? `Price is above MA20 ${formatBasicNumber(ma20)}` : `价格站上 MA20 ${formatBasicNumber(ma20)}`)
+        : (isEnglish ? `Price is below MA20 ${formatBasicNumber(ma20)}` : `价格跌破 MA20 ${formatBasicNumber(ma20)}`)
+      : (isEnglish ? 'MA20 context is incomplete' : 'MA20 背景暂不完整');
+    const volumeText = volumeChange !== null
+      ? volumeChange >= 0
+        ? (isEnglish ? `Volume is ${formatBasicPercent(volumeChange)} above MA5` : `成交量较 MA5 增加 ${formatBasicPercent(volumeChange)}`)
+        : (isEnglish ? `Volume is ${formatBasicPercent(Math.abs(volumeChange))} below MA5` : `成交量较 MA5 减少 ${formatBasicPercent(Math.abs(volumeChange))}`)
+      : (isEnglish ? 'Volume confirmation is incomplete' : '量能确认暂不完整');
+    const freshnessText = localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage);
+    const dataText = isEnglish
+      ? `Quote freshness: ${freshnessText}`
+      : `行情新鲜度：${freshnessText}`;
+    const supportText = localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage);
+    const resistanceText = localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage);
+    const peerText = peerLabels.length > 0 ? peerLabels.join(' / ') : (isEnglish ? 'market reference' : '市场参照');
+    const events = [
+      {
+        title: isEnglish ? 'Trend event' : '趋势事件',
+        status: currentPrice !== null && ma20 !== null && currentPrice >= ma20
+          ? (isEnglish ? 'positive' : '偏强')
+          : (isEnglish ? 'watch' : '观察'),
+        value: ma20Text,
+        detail: isEnglish
+          ? 'Read price location first, then confirm whether the next refresh keeps the same structure.'
+          : '先看价格位置，再确认下一次刷新是否维持同样结构。',
+      },
+      {
+        title: isEnglish ? 'Volume event' : '量能事件',
+        status: volumeChange !== null && volumeChange > 0
+          ? (isEnglish ? 'confirming' : '确认中')
+          : (isEnglish ? 'weak' : '偏弱'),
+        value: volumeText,
+        detail: isEnglish
+          ? 'Volume is only confirmation; do not read it without price and freshness.'
+          : '量能只做确认项，不能脱离价格位置和数据新鲜度单独解读。',
+      },
+      {
+        title: isEnglish ? 'Data event' : '数据事件',
+        status: freshnessText,
+        value: dataText,
+        detail: isEnglish
+          ? 'Refresh stale or cached data before comparing intraday moves.'
+          : '如果是过期或缓存行情，先刷新，再比较日内波动。',
+      },
+    ];
+    const whyLines = [
+      movementText,
+      ma20Text,
+      volumeText,
+      isEnglish ? `Compare against ${peerText} before reading it alone.` : `不要孤立解读，继续对比 ${peerText}。`,
+    ];
+    const nextSteps = [
+      isEnglish ? 'Refresh quote once and check freshness again.' : '刷新一次行情，重新确认数据新鲜度。',
+      isEnglish ? `Keep comparing ${peerText}.` : `继续对比 ${peerText}。`,
+      isEnglish ? `Watch support ${supportText} and resistance ${resistanceText}.` : `观察支撑 ${supportText} 和压力 ${resistanceText} 是否被突破或跌破。`,
+      isEnglish ? 'Use deep analysis when source links or filings are needed.' : '需要新闻公告原文时，再使用深度分析。',
+    ];
+    return {
+      title: isEnglish ? 'Event radar' : '事件雷达',
+      subtitle: isEnglish
+        ? 'A no-AI event read that turns price, MA20, volume, freshness and peers into a next-step checklist.'
+        : '不用 AI，把涨跌、MA20、量能、新鲜度和同业参照整理成下一步观察清单。',
+      whyTitle: isEnglish ? 'Why it moved' : '为什么涨跌',
+      eventTitle: isEnglish ? 'Key events' : '关键事件',
+      nextTitle: isEnglish ? 'Next watchlist' : '下一步观察',
+      upgradeTitle: isEnglish ? 'Premium fills in' : '高级版补齐',
+      boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+      whyLines,
+      events,
+      nextSteps,
+      upgradeItems: isEnglish
+        ? ['Realtime news/API', 'Filing source links', 'Kronos/API model', 'Continuous alerts']
+        : ['实时新闻/API', '公告原文链接', 'Kronos/API 模型', '持续跟踪提醒'],
+      score: `${basicFreeReport.score}/100`,
+      movementText,
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicCommercialJourney = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -4999,6 +5111,83 @@ const HomePage: React.FC = () => {
                                   </span>
                                 ) : null}
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicEventRadar ? (
+                  <section
+                    data-testid="basic-query-event-radar"
+                    className="mb-4 rounded-lg border border-primary/45 bg-primary/10 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-primary">{basicEventRadar.title}</div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {basicEventRadar.subtitle}
+                        </h3>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px] text-secondary-text xl:max-w-sm xl:justify-end">
+                        <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
+                          {basicEventRadar.score}
+                        </span>
+                        <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1">
+                          {basicEventRadar.boundary}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicEventRadar.whyTitle}</div>
+                        <div className="mt-2 grid gap-2">
+                          {basicEventRadar.whyLines.map((line, index) => (
+                            <div key={`${index}-${line}`} className="rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2 text-sm leading-relaxed text-secondary-text">
+                              {line}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicEventRadar.eventTitle}</div>
+                        <div className="mt-2 grid gap-2">
+                          {basicEventRadar.events.map((event) => (
+                            <div key={event.title} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 p-2.5">
+                              <div className="flex min-w-0 items-center justify-between gap-2">
+                                <div className="truncate text-xs font-semibold text-foreground">{event.title}</div>
+                                <span className="shrink-0 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                  {event.status}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-foreground">{event.value}</div>
+                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-secondary-text">
+                                {event.detail}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicEventRadar.nextTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicEventRadar.nextSteps.map((step, index) => (
+                            <div key={`${index}-${step}`} className="flex min-w-0 items-start gap-2 rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2 text-xs leading-relaxed text-secondary-text">
+                              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                              <span>{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-primary/35 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-primary">{basicEventRadar.upgradeTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicEventRadar.upgradeItems.map((item) => (
+                            <div key={item} className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-xs font-medium text-primary">
+                              {item}
                             </div>
                           ))}
                         </div>
