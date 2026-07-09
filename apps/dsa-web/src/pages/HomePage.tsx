@@ -1203,6 +1203,7 @@ const HomePage: React.FC = () => {
   const [historyReportMatchIndex, setHistoryReportMatchIndex] = useState(0);
   const [historyReportSectionStatus, setHistoryReportSectionStatus] = useState('');
   const [isQueryingBasic, setIsQueryingBasic] = useState(false);
+  const [basicPremiumPreviewOpen, setBasicPremiumPreviewOpen] = useState(false);
   const [basicQueryError, setBasicQueryError] = useState<ParsedApiError | null>(null);
   const [kronosForecast, setKronosForecast] = useState<KronosForecastResponse | null>(null);
   const [isRunningKronosForecast, setIsRunningKronosForecast] = useState(false);
@@ -2414,6 +2415,41 @@ const HomePage: React.FC = () => {
       premiumItems: isEnglish
         ? ['Realtime news/API', 'Source links', 'Kronos/API model', 'Continuous tracking']
         : ['实时资讯/API', '来源链接', 'Kronos/API 模型', '持续跟踪'],
+      premiumPreviewOpenLabel: isEnglish ? 'Preview what Premium adds' : '查看高级版会新增哪些内容',
+      premiumPreviewCloseLabel: isEnglish ? 'Hide Premium preview' : '收起高级版预览',
+      premiumPreviewTitle: isEnglish ? 'Premium report structure preview' : '高级版报告结构预览',
+      premiumPreviewSubtitle: isEnglish
+        ? 'Structure preview only; no quota is consumed.'
+        : '只展示结构，不消耗额度。',
+      premiumPreviewBoundary: isEnglish
+        ? 'This preview does not run AI analysis and does not spend quota.'
+        : '不会发起 AI 分析，不扣额度。',
+      premiumPreviewModules: [
+        {
+          title: isEnglish ? 'Realtime news/API' : '实时资讯/API',
+          detail: isEnglish
+            ? 'Switch the same report lane to API-backed news, filings, announcements, and fresher quote sources.'
+            : '把同一份报告切到 API 支持的资讯、公告、文件和更稳定行情源。',
+        },
+        {
+          title: isEnglish ? 'Source links' : '来源链接',
+          detail: isEnglish
+            ? 'Show source URL, update time, source health, and original-event context for easier verification.'
+            : '展示来源链接、更新时间、来源健康和原始事件上下文，方便复核。',
+        },
+        {
+          title: isEnglish ? 'Kronos/API model validation' : 'Kronos/API 模型验证',
+          detail: isEnglish
+            ? 'Use configured model lanes to validate K-line scenarios without turning them into trade instructions.'
+            : '用已配置模型通道验证 K 线情景，但不把模型输出当成交易指令。',
+        },
+        {
+          title: isEnglish ? 'Continuous tracking and history' : '持续跟踪与历史',
+          detail: isEnglish
+            ? 'Keep watchlist, historical snapshots, refresh state, and follow-up checkpoints together.'
+            : '把自选、历史快照、刷新状态和后续观察点放在一起持续跟踪。',
+        },
+      ],
       brokerTitle: isEnglish ? 'Broker three-step view' : '经纪人三段判断',
       brokerFootnote: isEnglish
         ? 'Free gives the decision frame first; Premium adds verification depth.'
@@ -3521,6 +3557,7 @@ const HomePage: React.FC = () => {
     setBasicRetentionStatus('');
     setBasicRetentionError('');
     setKronosForecastError('');
+    setBasicPremiumPreviewOpen(false);
     if (!forceRefresh) {
       setBasicSnapshot(null);
       setKronosForecast(null);
@@ -5319,8 +5356,44 @@ const HomePage: React.FC = () => {
                             </span>
                           ))}
                         </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => setBasicPremiumPreviewOpen((open) => !open)}
+                        >
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          {basicPremiumPreviewOpen
+                            ? basicTodayBriefCard.premiumPreviewCloseLabel
+                            : basicTodayBriefCard.premiumPreviewOpenLabel}
+                        </Button>
                       </div>
                     </div>
+                    {basicPremiumPreviewOpen ? (
+                      <div
+                        data-testid="basic-query-premium-preview-panel"
+                        className="mt-3 rounded-lg border border-primary/45 bg-surface/70 p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-foreground">{basicTodayBriefCard.premiumPreviewTitle}</div>
+                            <p className="mt-1 text-xs leading-relaxed text-secondary-text">{basicTodayBriefCard.premiumPreviewSubtitle}</p>
+                          </div>
+                          <span className="shrink-0 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                            {basicTodayBriefCard.premiumPreviewBoundary}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                          {basicTodayBriefCard.premiumPreviewModules.map((module) => (
+                            <div key={module.title} className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                              <div className="text-xs font-semibold text-primary">{module.title}</div>
+                              <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-secondary-text">{module.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </section>
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicProDecisionCard ? (

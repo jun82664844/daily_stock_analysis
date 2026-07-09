@@ -3073,6 +3073,20 @@ describe('HomePage', () => {
     expect(brokerThreeStep).toHaveTextContent('需要实时资讯/API、来源链接或模型验证时升级');
     expect(brokerThreeStep).toHaveTextContent('免费版先给判断框架');
     expect(brokerThreeStep).toHaveTextContent('高级版补齐验证深度');
+    expect(within(todayBriefCard).queryByTestId('basic-query-premium-preview-panel')).not.toBeInTheDocument();
+    fireEvent.click(within(todayBriefCard).getByRole('button', { name: '查看高级版会新增哪些内容' }));
+    const premiumPreviewPanel = within(todayBriefCard).getByTestId('basic-query-premium-preview-panel');
+    expect(premiumPreviewPanel).toHaveTextContent('高级版报告结构预览');
+    expect(premiumPreviewPanel).toHaveTextContent('只展示结构，不消耗额度');
+    expect(premiumPreviewPanel).toHaveTextContent('实时资讯/API');
+    expect(premiumPreviewPanel).toHaveTextContent('来源链接');
+    expect(premiumPreviewPanel).toHaveTextContent('Kronos/API 模型验证');
+    expect(premiumPreviewPanel).toHaveTextContent('持续跟踪与历史');
+    expect(premiumPreviewPanel).toHaveTextContent('不会发起 AI 分析，不扣额度');
+    expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    fireEvent.click(within(todayBriefCard).getByRole('button', { name: '收起高级版预览' }));
+    expect(within(todayBriefCard).queryByTestId('basic-query-premium-preview-panel')).not.toBeInTheDocument();
     const proDecisionCard = screen.getByTestId('basic-query-pro-decision-card');
     expect(
       todayBriefCard.compareDocumentPosition(proDecisionCard)
