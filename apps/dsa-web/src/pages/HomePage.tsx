@@ -2425,6 +2425,64 @@ const HomePage: React.FC = () => {
       premiumPreviewBoundary: isEnglish
         ? 'This preview does not run AI analysis and does not spend quota.'
         : '不会发起 AI 分析，不扣额度。',
+      premiumConversionTitle: isEnglish ? 'Upgrade value preview' : '升级价值预览',
+      premiumConversionSubtitle: isEnglish
+        ? 'Free keeps the same visible workflow; Premium switches the same modules to API-backed sources, source links, and approved model lanes.'
+        : '免费版同样可看完整流程；高级版把同样模块换成 API 数据源、原文链接和已批准模型通道。',
+      premiumConversionBoundary: isEnglish
+        ? 'Local preview only; real payment is not connected.'
+        : '本地预览，不接真实支付。',
+      premiumConversionColumns: {
+        free: isEnglish ? 'Free remains useful' : '免费版同样可看',
+        premium: isEnglish ? 'Premium switches to API sources' : '高级版换 API 数据源',
+      },
+      premiumConversionRows: [
+        {
+          title: isEnglish ? 'Realtime news originals' : '实时新闻原文',
+          free: isEnglish
+            ? 'Free keeps the event lane and first-pass checklist visible.'
+            : '免费版保留事件通道和首轮检查清单。',
+          premium: isEnglish
+            ? 'Premium/API mode adds original article links, update time, and source health.'
+            : '高级版/API 模式补原文链接、更新时间和来源健康。',
+        },
+        {
+          title: isEnglish ? 'Filings / SEC original links' : '公告/SEC 原文链接',
+          free: isEnglish
+            ? 'Free shows the filings lane and flags whether deeper source work is needed.'
+            : '免费版展示公告通道，并提示是否需要继续查来源。',
+          premium: isEnglish
+            ? 'Premium adds source documents, filings, and announcement detail when configured.'
+            : '高级版在配置后补公告原文、SEC/交易所文件和细节字段。',
+        },
+        {
+          title: isEnglish ? 'Peer strength API' : '同业强弱 API',
+          free: isEnglish
+            ? 'Free shows available peer or index references.'
+            : '免费版展示可用同业或指数参照。',
+          premium: isEnglish
+            ? 'Premium/API mode compares peers, ETFs, sectors, and relative strength more reliably.'
+            : '高级版/API 模式更稳定地对比同业、ETF、板块和相对强弱。',
+        },
+        {
+          title: isEnglish ? 'Kronos/API forecast' : 'Kronos/API 预测',
+          free: isEnglish
+            ? 'Free keeps local K-line rules and forecast entry visible.'
+            : '免费版保留本地 K 线规则和预测入口。',
+          premium: isEnglish
+            ? 'Premium can run approved Kronos, API, or local-model lanes after data checks.'
+            : '高级版可在数据确认后运行已批准的 Kronos、API 或本地模型通道。',
+        },
+        {
+          title: isEnglish ? 'Continuous tracking alerts' : '持续跟踪提醒',
+          free: isEnglish
+            ? 'Free lets users keep history, watchlist, and current snapshot context.'
+            : '免费版可保留历史、自选和当前快照上下文。',
+          premium: isEnglish
+            ? 'Premium improves scheduled follow-up checks, refresh history, and alert confidence.'
+            : '高级版增强定时复核、刷新历史和提醒可信度。',
+        },
+      ],
       premiumPreviewModules: [
         {
           title: isEnglish ? 'Realtime news/API' : '实时资讯/API',
@@ -5580,6 +5638,47 @@ const HomePage: React.FC = () => {
                               <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-secondary-text">{module.detail}</p>
                             </div>
                           ))}
+                        </div>
+                        <div
+                          data-testid="basic-query-premium-conversion-v84"
+                          className="mt-3 rounded-lg border border-primary/35 bg-primary/10 p-3"
+                        >
+                          <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-foreground">
+                                {basicTodayBriefCard.premiumConversionTitle}
+                              </div>
+                              <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                                {basicTodayBriefCard.premiumConversionSubtitle}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-xs font-medium text-primary">
+                              {basicTodayBriefCard.premiumConversionBoundary}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            <div className="rounded-md border border-subtle/70 bg-background/35 px-2.5 py-2 text-xs font-semibold text-secondary-text">
+                              {basicTodayBriefCard.premiumConversionColumns.free}
+                            </div>
+                            <div className="rounded-md border border-primary/35 bg-background/45 px-2.5 py-2 text-xs font-semibold text-primary">
+                              {basicTodayBriefCard.premiumConversionColumns.premium}
+                            </div>
+                          </div>
+                          <div className="mt-2 divide-y divide-subtle/70 rounded-md border border-subtle/70 bg-background/25">
+                            {basicTodayBriefCard.premiumConversionRows.map((row) => (
+                              <div key={row.title} className="grid gap-2 p-2.5 md:grid-cols-[minmax(8rem,0.7fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                                <div className="text-xs font-semibold text-foreground">
+                                  {row.title}
+                                </div>
+                                <p className="text-xs leading-relaxed text-secondary-text">
+                                  {row.free}
+                                </p>
+                                <p className="text-xs leading-relaxed text-primary">
+                                  {row.premium}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     ) : null}

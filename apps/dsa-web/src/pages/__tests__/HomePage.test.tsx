@@ -3083,6 +3083,16 @@ describe('HomePage', () => {
     expect(premiumPreviewPanel).toHaveTextContent('Kronos/API 模型验证');
     expect(premiumPreviewPanel).toHaveTextContent('持续跟踪与历史');
     expect(premiumPreviewPanel).toHaveTextContent('不会发起 AI 分析，不扣额度');
+    const premiumConversion = within(premiumPreviewPanel).getByTestId('basic-query-premium-conversion-v84');
+    expect(premiumConversion).toHaveTextContent('升级价值预览');
+    expect(premiumConversion).toHaveTextContent('免费版同样可看');
+    expect(premiumConversion).toHaveTextContent('高级版换 API 数据源');
+    expect(premiumConversion).toHaveTextContent('实时新闻原文');
+    expect(premiumConversion).toHaveTextContent('公告/SEC 原文链接');
+    expect(premiumConversion).toHaveTextContent('同业强弱 API');
+    expect(premiumConversion).toHaveTextContent('Kronos/API 预测');
+    expect(premiumConversion).toHaveTextContent('持续跟踪提醒');
+    expect(premiumConversion).toHaveTextContent('本地预览，不接真实支付');
     expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     fireEvent.click(within(todayBriefCard).getByRole('button', { name: '收起高级版预览' }));
