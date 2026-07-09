@@ -2586,6 +2586,100 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicFreeAnalystWorkbench = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const score = basicFreeReport.score;
+    const dataTrust = basicQuoteTrustPanel?.statusValue
+      || localizeRuntimeLabel(basicSnapshot.quote.freshness || 'unavailable', uiLanguage);
+    const support = localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage);
+    const resistance = localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage);
+    const conclusion = localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage);
+    const firstRisk = localizeGeneratedText(
+      basicFreeReport.productBrief.risks[0]
+      || basicFreeReport.productBrief.midStatus
+      || (isEnglish ? 'Treat this as an observation checklist only.' : '先当作观察清单，不要直接下结论。'),
+      uiLanguage,
+    );
+    const decisionValue = score >= 70
+      ? (isEnglish ? 'Worth continuing' : '值得继续看')
+      : score >= 55
+        ? (isEnglish ? 'Readable, verify first' : '可看，先复核')
+        : (isEnglish ? 'Verify data first' : '先复核数据');
+    const peerRows = basicSnapshot.intelligence?.peerComparison?.rows ?? [];
+    const comparisonTargets = basicSnapshot.intelligence?.comparisonTargets ?? [];
+    const peerText = peerRows.length > 0
+      ? peerRows.slice(0, 3).map((row) => row.symbol || row.label).filter(Boolean).join(' / ')
+      : comparisonTargets.slice(0, 3).map((item) => item.symbol || item.label).filter(Boolean).join(' / ');
+    const hasNews = Boolean(
+      basicSnapshot.intelligence?.newsCenter?.items?.length
+      || basicSnapshot.intelligence?.items?.length,
+    );
+    const klineDirection = localizeRuntimeLabel(
+      basicSnapshot.intelligence?.klineForecast?.direction
+      || basicSnapshot.intelligence?.klineForecast?.scenarios?.[0]?.direction
+      || 'pending',
+      uiLanguage,
+    );
+    const evidenceLine = isEnglish
+      ? `Support ${support}; resistance ${resistance}; data trust ${dataTrust}.`
+      : `支撑 ${support}；压力 ${resistance}；数据可信度 ${dataTrust}。`;
+    return {
+      title: isEnglish ? 'Free analyst workbench' : '免费研判工作台',
+      subtitle: isEnglish
+        ? 'Read it like a broker: conclusion, evidence, risk, and the next click first.'
+        : '像经纪人一样先看结论、证据、风险和下一步，再决定是否继续深挖。',
+      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      cards: [
+        {
+          label: isEnglish ? 'Worth continuing?' : '是否值得继续看',
+          value: decisionValue,
+          detail: isEnglish
+            ? `Signal completeness ${score}/100.`
+            : `信号完整度 ${score}/100。`,
+        },
+        {
+          label: isEnglish ? 'Main point now' : '当前最大看点',
+          value: conclusion,
+          detail: evidenceLine,
+        },
+        {
+          label: isEnglish ? 'Biggest risk' : '最大风险',
+          value: firstRisk,
+          detail: isEnglish
+            ? 'Refresh source freshness before treating the signal as stable.'
+            : '先刷新来源新鲜度，再把信号当作稳定参考。',
+        },
+        {
+          label: isEnglish ? 'Next path' : '下一步路径',
+          value: isEnglish ? 'News -> Peers -> K-line' : '看资讯 -> 看同业 -> 看K线',
+          detail: isEnglish
+            ? 'Use the same free workflow before deciding whether API depth is needed.'
+            : '先把免费工作流走完，再判断是否需要 API 深度。',
+        },
+      ],
+      freeTitle: isEnglish ? 'Free already opens' : '免费版已经开放',
+      premiumTitle: isEnglish ? 'Premium improves' : '高级版增强',
+      freeModules: [
+        isEnglish ? 'Quote and moving averages' : '行情与均线',
+        hasNews ? (isEnglish ? 'News/event lane' : '资讯事件通道') : (isEnglish ? 'News lane status' : '资讯通道状态'),
+        peerText ? `${isEnglish ? 'Peer reference' : '同业参照'} ${peerText}` : (isEnglish ? 'Peer/reference lane' : '同业参照通道'),
+        `${isEnglish ? 'K-line scenario' : 'K线情景'} ${klineDirection}`,
+        isEnglish ? 'Risk checklist' : '风险清单',
+      ],
+      premiumModules: isEnglish
+        ? ['Realtime API sources', 'Original links', 'Model validation', 'Continuous alerts']
+        : ['实时 API 数据源', '原文链接', '模型验证', '持续提醒'],
+      actionLabels: {
+        refresh: isEnglish ? 'Refresh quote' : '刷新行情',
+        news: isEnglish ? 'Read news' : '看资讯',
+        peers: isEnglish ? 'Compare peers' : '看同业',
+        kline: isEnglish ? 'Inspect K-line' : '看K线',
+      },
+    };
+  }, [basicFreeReport, basicQuoteTrustPanel, basicSnapshot, uiLanguage]);
   const basicFreeEventCenter = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -5639,6 +5733,98 @@ const HomePage: React.FC = () => {
                         {basicRetentionError || platformWatchlistError || basicRetentionStatus}
                       </div>
                     ) : null}
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicFreeAnalystWorkbench ? (
+                  <section
+                    data-testid="basic-query-free-analyst-workbench-v86"
+                    className="mb-4 rounded-lg border border-primary/45 bg-gradient-to-br from-primary/14 via-surface/75 to-background/40 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 text-xs font-semibold text-primary">
+                            {basicFreeAnalystWorkbench.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-[11px] text-secondary-text">
+                            {basicFreeAnalystWorkbench.boundary}
+                          </span>
+                        </div>
+                        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-secondary-text">
+                          {basicFreeAnalystWorkbench.subtitle}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={isQueryingBasic}
+                          onClick={() => void handleBasicQuery(basicSnapshot.stockCode, undefined, true, undefined, basicSnapshotViewMode)}
+                        >
+                          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                          {basicFreeAnalystWorkbench.actionLabels.refresh}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-news-center')}
+                        >
+                          <Search className="h-4 w-4" aria-hidden="true" />
+                          {basicFreeAnalystWorkbench.actionLabels.news}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-peer-table')}
+                        >
+                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                          {basicFreeAnalystWorkbench.actionLabels.peers}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-kline-forecast-lab')}
+                        >
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          {basicFreeAnalystWorkbench.actionLabels.kline}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-4">
+                      {basicFreeAnalystWorkbench.cards.map((card) => (
+                        <div key={card.label} className="min-w-0 rounded-md border border-subtle/75 bg-background/35 p-3">
+                          <div className="text-[11px] font-semibold text-primary">{card.label}</div>
+                          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{card.value}</div>
+                          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-secondary-text">{card.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                      <div className="min-w-0 rounded-md border border-primary/30 bg-background/35 p-3">
+                        <div className="text-xs font-semibold text-primary">{basicFreeAnalystWorkbench.freeTitle}</div>
+                        <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                          {basicFreeAnalystWorkbench.freeModules.map((item) => (
+                            <span key={`free-${item}`} className="max-w-full truncate rounded-md border border-subtle/70 px-2 py-1">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-primary/35 bg-primary/10 p-3">
+                        <div className="text-xs font-semibold text-primary">{basicFreeAnalystWorkbench.premiumTitle}</div>
+                        <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-primary">
+                          {basicFreeAnalystWorkbench.premiumModules.map((item) => (
+                            <span key={`premium-${item}`} className="max-w-full truncate rounded-md border border-primary/35 bg-background/35 px-2 py-1">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicTodayBriefCard ? (
