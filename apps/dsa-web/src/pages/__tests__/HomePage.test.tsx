@@ -3101,6 +3101,24 @@ describe('HomePage', () => {
     expect(freeEventCenter).toHaveTextContent('来源链接');
     expect(freeEventCenter).toHaveTextContent('Kronos/API 模型');
     expect(freeEventCenter).toHaveTextContent('不构成投资建议');
+    const defaultEventDetail = within(freeEventCenter).getByTestId('basic-query-free-event-detail-v83');
+    expect(defaultEventDetail).toHaveTextContent('事件详情');
+    expect(defaultEventDetail).toHaveTextContent('价格异动');
+    expect(defaultEventDetail).toHaveTextContent('来源状态');
+    expect(defaultEventDetail).toHaveTextContent('免费版下一步');
+    expect(defaultEventDetail).toHaveTextContent('高级版验证');
+    fireEvent.click(within(freeEventCenter).getByRole('button', { name: /资讯\/公告/ }));
+    const newsEventDetail = within(freeEventCenter).getByTestId('basic-query-free-event-detail-v83');
+    expect(newsEventDetail).toHaveTextContent('资讯/公告');
+    expect(newsEventDetail).toHaveTextContent('来源状态');
+    expect(newsEventDetail).toHaveTextContent('查看来源状态与原文链接');
+    expect(newsEventDetail).toHaveTextContent('免费版下一步');
+    expect(newsEventDetail).toHaveTextContent('高级版验证');
+    fireEvent.click(within(freeEventCenter).getByRole('button', { name: /同业参照/ }));
+    const peerEventDetail = within(freeEventCenter).getByTestId('basic-query-free-event-detail-v83');
+    expect(peerEventDetail).toHaveTextContent('同业参照');
+    expect(peerEventDetail).toHaveTextContent('对照同业/指数强弱');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     const proDecisionCard = screen.getByTestId('basic-query-pro-decision-card');
     expect(
       todayBriefCard.compareDocumentPosition(proDecisionCard)

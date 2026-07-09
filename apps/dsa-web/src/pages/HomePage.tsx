@@ -1204,6 +1204,7 @@ const HomePage: React.FC = () => {
   const [historyReportSectionStatus, setHistoryReportSectionStatus] = useState('');
   const [isQueryingBasic, setIsQueryingBasic] = useState(false);
   const [basicPremiumPreviewOpen, setBasicPremiumPreviewOpen] = useState(false);
+  const [basicEventCenterActiveIndex, setBasicEventCenterActiveIndex] = useState(0);
   const [basicQueryError, setBasicQueryError] = useState<ParsedApiError | null>(null);
   const [kronosForecast, setKronosForecast] = useState<KronosForecastResponse | null>(null);
   const [isRunningKronosForecast, setIsRunningKronosForecast] = useState(false);
@@ -2557,6 +2558,78 @@ const HomePage: React.FC = () => {
     const peerDetail = peerLabels.length > 0
       ? (isEnglish ? 'Use peers to avoid reading one stock in isolation.' : '用同业/指数参照，避免只看单只股票。')
       : (isEnglish ? 'Premium can add sector and peer APIs.' : '高级版可补充板块和同业 API。');
+    const localizedSourceLane = localizeGeneratedSource(sourceLane, uiLanguage);
+    const quoteSourceStatus = isEnglish
+      ? `${localizedSourceLane}; quote freshness ${freshness}.`
+      : `${localizedSourceLane}；行情状态：${freshness}。`;
+    const newsSourceStatus = firstNews
+      ? `${localizeGeneratedSource(firstNews.source, uiLanguage)} · ${basicIntelligenceStatusLabel(firstNews.status, uiLanguage)}`
+      : (isEnglish
+          ? 'Realtime public search is not enabled in free mode.'
+          : '免费模式未开启实时公共搜索。');
+    const fundamentalSourceStatus = basicSnapshot.profile?.source
+      ? `${localizeGeneratedSource(basicSnapshot.profile.source, uiLanguage)} · ${localizeRuntimeLabel(basicSnapshot.profile.freshness || 'available', uiLanguage)}`
+      : (isEnglish ? 'Profile fields come from the current quick snapshot.' : '公司资料来自当前快速快照。');
+    const peerSourceStatus = peerLabels.length > 0
+      ? (isEnglish ? `Current references: ${peerValue}.` : `当前参照：${peerValue}。`)
+      : (isEnglish ? 'Peer references are pending in the free quick snapshot.' : '免费快照里的同业参照仍待补充。');
+    const timeline = [
+      {
+        label: isEnglish ? 'Price move' : '价格异动',
+        detailTitle: isEnglish ? 'Price move' : '价格异动',
+        value: currentPrice !== null
+          ? `${formatBasicNumber(currentPrice)} / ${formatSignedBasicPercent(changePercent)}`
+          : formatSignedBasicPercent(changePercent),
+        detail: `${movementText} ${trendText} ${volumeText}`,
+        sourceStatus: quoteSourceStatus,
+        freeNext: isEnglish
+          ? 'Recheck price, MA20, and volume together before reading the rest.'
+          : '先复核价格、MA20 和量能是否同向，再看后面的事件。',
+        premiumVerify: isEnglish
+          ? 'Premium can compare multi-source quotes and volume history.'
+          : '高级版可用多源 API 校验价格和成交量历史。',
+      },
+      {
+        label: isEnglish ? 'News / filings' : '资讯/公告',
+        detailTitle: isEnglish ? 'News / filings' : '资讯/公告',
+        value: newsTitle,
+        detail: newsSummary,
+        sourceStatus: newsSourceStatus,
+        freeNext: isEnglish
+          ? 'Treat this lane as a source checklist before deeper reading.'
+          : '把资讯/公告通道当作来源检查清单，先判断是否需要深挖。',
+        premiumVerify: isEnglish
+          ? 'View source status and original links.'
+          : '查看来源状态与原文链接。',
+      },
+      {
+        label: isEnglish ? 'Fundamental backdrop' : '基本面背景',
+        detailTitle: isEnglish ? 'Fundamental backdrop' : '基本面背景',
+        value: profileValue,
+        detail: fundamentalDetail,
+        sourceStatus: fundamentalSourceStatus,
+        freeNext: isEnglish
+          ? 'Check whether valuation and business background explain the move.'
+          : '先看估值和公司背景是否能解释这次价格波动。',
+        premiumVerify: isEnglish
+          ? 'Premium can add financial APIs, filings, and transcript context.'
+          : '高级版可补财务 API、公告原文和业绩会背景。',
+      },
+      {
+        label: isEnglish ? 'Peer reference' : '同业参照',
+        detailTitle: isEnglish ? 'Peer reference' : '同业参照',
+        value: peerValue,
+        detail: peerDetail,
+        sourceStatus: peerSourceStatus,
+        freeNext: isEnglish
+          ? 'Compare relative strength against peers or indexes.'
+          : '对照同业/指数强弱。',
+        premiumVerify: isEnglish
+          ? 'Premium can run sector, ETF, and peer-relative API checks.'
+          : '高级版可做行业、ETF 和同业相对强弱 API 校验。',
+      },
+    ];
+    const activeIndex = Math.min(Math.max(basicEventCenterActiveIndex, 0), timeline.length - 1);
     return {
       title: isEnglish ? 'Free news and event center' : '免费资讯与事件中心',
       subtitle: isEnglish
@@ -2570,33 +2643,15 @@ const HomePage: React.FC = () => {
       freshnessLabel: isEnglish ? 'Freshness' : '新鲜度',
       freshnessValue: freshness,
       timelineTitle: isEnglish ? 'Event timeline' : '事件时间线',
+      detailTitle: isEnglish ? 'Event details' : '事件详情',
+      sourceStatusLabel: isEnglish ? 'Source status' : '来源状态',
+      freeNextLabel: isEnglish ? 'Free next step' : '免费版下一步',
+      premiumVerifyLabel: isEnglish ? 'Premium verification' : '高级版验证',
       freeTitle: isEnglish ? 'Free can do now' : '免费版可立即做',
       premiumTitle: isEnglish ? 'Premium verifies further' : '高级版补充验证',
       boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
-      timeline: [
-        {
-          label: isEnglish ? 'Price move' : '价格异动',
-          value: currentPrice !== null
-            ? `${formatBasicNumber(currentPrice)} / ${formatSignedBasicPercent(changePercent)}`
-            : formatSignedBasicPercent(changePercent),
-          detail: `${movementText} ${trendText} ${volumeText}`,
-        },
-        {
-          label: isEnglish ? 'News / filings' : '资讯/公告',
-          value: newsTitle,
-          detail: newsSummary,
-        },
-        {
-          label: isEnglish ? 'Fundamental backdrop' : '基本面背景',
-          value: profileValue,
-          detail: fundamentalDetail,
-        },
-        {
-          label: isEnglish ? 'Peer reference' : '同业参照',
-          value: peerValue,
-          detail: peerDetail,
-        },
-      ],
+      timeline,
+      activeItem: timeline[activeIndex],
       freeActions: isEnglish
         ? [
             'Read the price move together with MA20 and volume.',
@@ -2612,7 +2667,7 @@ const HomePage: React.FC = () => {
         ? ['Realtime news/API', 'Source links', 'Kronos/API model', 'Continuous tracking']
         : ['实时资讯/API', '来源链接', 'Kronos/API 模型', '持续跟踪'],
     };
-  }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  }, [basicEventCenterActiveIndex, basicFreeReport, basicSnapshot, uiLanguage]);
   const basicSourceRecoveryPanel = useMemo(() => {
     if (!basicSnapshot) {
       return null;
@@ -3691,6 +3746,7 @@ const HomePage: React.FC = () => {
     setBasicRetentionError('');
     setKronosForecastError('');
     setBasicPremiumPreviewOpen(false);
+    setBasicEventCenterActiveIndex(0);
     if (!forceRefresh) {
       setBasicSnapshot(null);
       setKronosForecast(null);
@@ -5569,13 +5625,66 @@ const HomePage: React.FC = () => {
                         <div className="text-xs font-semibold text-foreground">{basicFreeEventCenter.timelineTitle}</div>
                         <div className="mt-2 grid gap-2 md:grid-cols-2">
                           {basicFreeEventCenter.timeline.map((item, index) => (
-                            <div key={`${index}-${item.label}`} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 p-2.5">
+                            <button
+                              key={`${index}-${item.label}`}
+                              type="button"
+                              data-testid={`basic-query-free-event-timeline-${index}`}
+                              aria-pressed={basicEventCenterActiveIndex === index}
+                              onClick={() => setBasicEventCenterActiveIndex(index)}
+                              className={`min-w-0 rounded-md border p-2.5 text-left transition-colors ${
+                                basicEventCenterActiveIndex === index
+                                  ? 'border-primary/55 bg-primary/12 shadow-soft-card'
+                                  : 'border-subtle/70 bg-surface/35 hover:border-primary/40 hover:bg-primary/5'
+                              }`}
+                            >
                               <div className="text-[11px] font-medium text-primary">{item.label}</div>
                               <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{item.value}</div>
                               <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">{item.detail}</p>
-                            </div>
+                            </button>
                           ))}
                         </div>
+                        {basicFreeEventCenter.activeItem ? (
+                          <div
+                            data-testid="basic-query-free-event-detail-v83"
+                            className="mt-3 rounded-lg border border-primary/35 bg-primary/10 p-3"
+                          >
+                            <div className="text-xs font-semibold text-primary">
+                              {basicFreeEventCenter.detailTitle}
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-foreground">
+                              {basicFreeEventCenter.activeItem.detailTitle}
+                            </div>
+                            <p className="mt-2 text-xs leading-relaxed text-secondary-text">
+                              {basicFreeEventCenter.activeItem.detail}
+                            </p>
+                            <div className="mt-3 grid gap-2 md:grid-cols-3">
+                              <div className="min-w-0 rounded-md border border-subtle/70 bg-background/35 p-2">
+                                <div className="text-[11px] font-medium text-primary">
+                                  {basicFreeEventCenter.sourceStatusLabel}
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                                  {basicFreeEventCenter.activeItem.sourceStatus}
+                                </p>
+                              </div>
+                              <div className="min-w-0 rounded-md border border-subtle/70 bg-background/35 p-2">
+                                <div className="text-[11px] font-medium text-primary">
+                                  {basicFreeEventCenter.freeNextLabel}
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                                  {basicFreeEventCenter.activeItem.freeNext}
+                                </p>
+                              </div>
+                              <div className="min-w-0 rounded-md border border-primary/35 bg-background/45 p-2">
+                                <div className="text-[11px] font-medium text-primary">
+                                  {basicFreeEventCenter.premiumVerifyLabel}
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                                  {basicFreeEventCenter.activeItem.premiumVerify}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                     <div className="mt-3 grid gap-3 xl:grid-cols-2">
