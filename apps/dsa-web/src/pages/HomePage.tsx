@@ -2480,6 +2480,139 @@ const HomePage: React.FC = () => {
       boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
     };
   }, [basicFreeReport, basicQuoteTrustPanel, basicSnapshot, uiLanguage]);
+  const basicFreeEventCenter = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const symbol = basicSnapshot.stockCode;
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
+    const ma20 = toFiniteBasicNumber(pickBasicIndicator(basicSnapshot.indicators, 'ma20', 'MA20'));
+    const volumeChange = toFiniteBasicNumber(pickBasicIndicator(
+      basicSnapshot.indicators,
+      'volumeChangeVsMa5',
+      'volume_change_vs_ma5',
+    ));
+    const marketCap = basicSnapshot.profile?.marketCap;
+    const peRatio = basicSnapshot.profile?.peRatio;
+    const newsItems = (
+      basicSnapshot.intelligence?.newsCenter?.items?.length
+        ? basicSnapshot.intelligence.newsCenter.items
+        : basicSnapshot.intelligence?.items ?? []
+    ).slice(0, 3);
+    const firstNews = newsItems[0] ?? null;
+    const peerRows = basicSnapshot.intelligence?.peerComparison?.rows ?? [];
+    const comparisonTargets = basicSnapshot.intelligence?.comparisonTargets ?? [];
+    const peerLabels = (peerRows.length > 0
+      ? peerRows.slice(0, 3).map((row) => row.symbol || row.label)
+      : comparisonTargets.slice(0, 3).map((item) => item.symbol || item.label))
+      .filter((value): value is string => Boolean(value));
+    const profileContext = [
+      basicSnapshot.profile?.sector,
+      basicSnapshot.profile?.industry,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => localizeGeneratedTerms(value, uiLanguage));
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const freshness = localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage);
+    const movementText = changePercent !== null
+      ? (isEnglish
+          ? `${symbol} moved ${formatSignedBasicPercent(changePercent)}; first check whether the move is backed by trend, volume, and event context.`
+          : `${symbol} 涨跌幅 ${formatSignedBasicPercent(changePercent)}；先看这次波动是否有趋势、量能和事件背景支撑。`)
+      : (isEnglish
+          ? `${symbol} has no change percentage yet; treat the event read as provisional.`
+          : `${symbol} 暂无涨跌幅；先把事件解读当作临时观察清单。`);
+    const trendText = currentPrice !== null && ma20 !== null
+      ? currentPrice >= ma20
+        ? (isEnglish ? `Price is above MA20 ${formatBasicNumber(ma20)}.` : `价格站上 MA20 ${formatBasicNumber(ma20)}。`)
+        : (isEnglish ? `Price is below MA20 ${formatBasicNumber(ma20)}.` : `价格低于 MA20 ${formatBasicNumber(ma20)}。`)
+      : (isEnglish ? 'MA20 context is incomplete.' : 'MA20 背景暂不完整。');
+    const volumeText = volumeChange !== null
+      ? (isEnglish
+          ? `Volume is ${formatBasicPercent(Math.abs(volumeChange))} ${volumeChange >= 0 ? 'above' : 'below'} MA5.`
+          : `成交量较 MA5 ${volumeChange >= 0 ? '增加' : '减少'} ${formatBasicPercent(Math.abs(volumeChange))}。`)
+      : (isEnglish ? 'Volume confirmation is incomplete.' : '量能确认暂不完整。');
+    const newsTitle = firstNews
+      ? localizeGeneratedText(firstNews.title, uiLanguage)
+      : (isEnglish ? 'No realtime headline configured' : '未配置实时标题源');
+    const newsSummary = firstNews
+      ? localizeGeneratedText(firstNews.summary, uiLanguage)
+      : (isEnglish
+          ? 'Free mode keeps the news lane visible and avoids public search cost.'
+          : '免费模式保留资讯通道，但不启用公共搜索成本。');
+    const profileValue = profileContext.length > 0
+      ? profileContext.join(' / ')
+      : localizeGeneratedSource(sourceLane, uiLanguage);
+    const fundamentalDetail = [
+      marketCap ? `${isEnglish ? 'market cap' : '总市值'} ${formatBasicNumber(marketCap)}` : '',
+      peRatio ? `${isEnglish ? 'PE' : '市盈率'} ${formatBasicNumber(peRatio)}` : '',
+    ].filter(Boolean).join(isEnglish ? '; ' : '；') || (isEnglish ? 'Profile fields are limited.' : '公司资料字段有限。');
+    const peerValue = peerLabels.length > 0
+      ? peerLabels.join(' / ')
+      : (isEnglish ? 'Market reference pending' : '市场参照待补充');
+    const peerDetail = peerLabels.length > 0
+      ? (isEnglish ? 'Use peers to avoid reading one stock in isolation.' : '用同业/指数参照，避免只看单只股票。')
+      : (isEnglish ? 'Premium can add sector and peer APIs.' : '高级版可补充板块和同业 API。');
+    return {
+      title: isEnglish ? 'Free news and event center' : '免费资讯与事件中心',
+      subtitle: isEnglish
+        ? 'Free mode turns price movement, news lanes, fundamentals, peers, and source freshness into one event checklist.'
+        : '免费版把价格波动、资讯公告、基本面、同业参照和数据新鲜度合并成一张事件清单。',
+      whyTitle: isEnglish ? 'Why it is worth checking today' : '为什么今天值得看',
+      whyText: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+      noAiLabel: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      sourceLabel: isEnglish ? 'Free web/local sources' : '免费网络/本地源',
+      sourceValue: localizeGeneratedSource(sourceLane, uiLanguage),
+      freshnessLabel: isEnglish ? 'Freshness' : '新鲜度',
+      freshnessValue: freshness,
+      timelineTitle: isEnglish ? 'Event timeline' : '事件时间线',
+      freeTitle: isEnglish ? 'Free can do now' : '免费版可立即做',
+      premiumTitle: isEnglish ? 'Premium verifies further' : '高级版补充验证',
+      boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+      timeline: [
+        {
+          label: isEnglish ? 'Price move' : '价格异动',
+          value: currentPrice !== null
+            ? `${formatBasicNumber(currentPrice)} / ${formatSignedBasicPercent(changePercent)}`
+            : formatSignedBasicPercent(changePercent),
+          detail: `${movementText} ${trendText} ${volumeText}`,
+        },
+        {
+          label: isEnglish ? 'News / filings' : '资讯/公告',
+          value: newsTitle,
+          detail: newsSummary,
+        },
+        {
+          label: isEnglish ? 'Fundamental backdrop' : '基本面背景',
+          value: profileValue,
+          detail: fundamentalDetail,
+        },
+        {
+          label: isEnglish ? 'Peer reference' : '同业参照',
+          value: peerValue,
+          detail: peerDetail,
+        },
+      ],
+      freeActions: isEnglish
+        ? [
+            'Read the price move together with MA20 and volume.',
+            'Use the visible news/filing lane as a source checklist.',
+            'Compare peers before deciding whether to go deeper.',
+          ]
+        : [
+            '把价格波动、MA20 和量能放在一起看。',
+            '把资讯/公告通道当作来源复核清单。',
+            '先对照同业/指数，再决定是否深挖。',
+          ],
+      premiumActions: isEnglish
+        ? ['Realtime news/API', 'Source links', 'Kronos/API model', 'Continuous tracking']
+        : ['实时资讯/API', '来源链接', 'Kronos/API 模型', '持续跟踪'],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicSourceRecoveryPanel = useMemo(() => {
     if (!basicSnapshot) {
       return null;
@@ -5394,6 +5527,86 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicFreeEventCenter ? (
+                  <section
+                    data-testid="basic-query-free-event-center-v82"
+                    className="mb-4 rounded-lg border border-primary/45 bg-surface/60 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 font-semibold text-primary">
+                            {basicFreeEventCenter.title}
+                          </span>
+                          <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
+                            {basicFreeEventCenter.noAiLabel}
+                          </span>
+                          <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1 text-secondary-text">
+                            {basicFreeEventCenter.sourceLabel}: {basicFreeEventCenter.sourceValue}
+                          </span>
+                          <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1 text-secondary-text">
+                            {basicFreeEventCenter.freshnessLabel}: {basicFreeEventCenter.freshnessValue}
+                          </span>
+                        </div>
+                        <h3 className="mt-3 text-lg font-semibold leading-snug text-foreground">
+                          {basicFreeEventCenter.subtitle}
+                        </h3>
+                      </div>
+                      <span className="shrink-0 rounded-md border border-subtle/80 bg-background/35 px-2 py-1 text-xs text-secondary-text">
+                        {basicFreeEventCenter.boundary}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                      <div className="min-w-0 rounded-lg border border-primary/30 bg-primary/10 p-3">
+                        <div className="text-xs font-semibold text-primary">{basicFreeEventCenter.whyTitle}</div>
+                        <p className="mt-2 text-sm font-semibold leading-relaxed text-foreground">
+                          {basicFreeEventCenter.whyText}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-xs font-semibold text-foreground">{basicFreeEventCenter.timelineTitle}</div>
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          {basicFreeEventCenter.timeline.map((item, index) => (
+                            <div key={`${index}-${item.label}`} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 p-2.5">
+                              <div className="text-[11px] font-medium text-primary">{item.label}</div>
+                              <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{item.value}</div>
+                              <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">{item.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicFreeEventCenter.freeTitle}</div>
+                        <div className="mt-2 grid gap-2">
+                          {basicFreeEventCenter.freeActions.map((item, index) => (
+                            <div
+                              key={`${index}-${item}`}
+                              className="flex min-w-0 items-start gap-2 rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2 text-xs leading-relaxed text-secondary-text"
+                            >
+                              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-primary/35 bg-primary/10 p-3">
+                        <div className="text-sm font-semibold text-primary">{basicFreeEventCenter.premiumTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicFreeEventCenter.premiumActions.map((item, index) => (
+                            <div
+                              key={`${index}-${item}`}
+                              className="rounded-md border border-primary/25 bg-background/35 px-2.5 py-2 text-xs font-medium text-primary"
+                            >
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicProDecisionCard ? (

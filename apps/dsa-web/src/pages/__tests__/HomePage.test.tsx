@@ -3087,6 +3087,20 @@ describe('HomePage', () => {
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     fireEvent.click(within(todayBriefCard).getByRole('button', { name: '收起高级版预览' }));
     expect(within(todayBriefCard).queryByTestId('basic-query-premium-preview-panel')).not.toBeInTheDocument();
+    const freeEventCenter = screen.getByTestId('basic-query-free-event-center-v82');
+    expect(freeEventCenter).toHaveTextContent('免费资讯与事件中心');
+    expect(freeEventCenter).toHaveTextContent('为什么今天值得看');
+    expect(freeEventCenter).toHaveTextContent('未用 AI，不扣额度');
+    expect(freeEventCenter).toHaveTextContent('价格异动');
+    expect(freeEventCenter).toHaveTextContent('资讯/公告');
+    expect(freeEventCenter).toHaveTextContent('基本面背景');
+    expect(freeEventCenter).toHaveTextContent('同业参照');
+    expect(freeEventCenter).toHaveTextContent('免费版可立即做');
+    expect(freeEventCenter).toHaveTextContent('高级版补充验证');
+    expect(freeEventCenter).toHaveTextContent('实时资讯/API');
+    expect(freeEventCenter).toHaveTextContent('来源链接');
+    expect(freeEventCenter).toHaveTextContent('Kronos/API 模型');
+    expect(freeEventCenter).toHaveTextContent('不构成投资建议');
     const proDecisionCard = screen.getByTestId('basic-query-pro-decision-card');
     expect(
       todayBriefCard.compareDocumentPosition(proDecisionCard)
