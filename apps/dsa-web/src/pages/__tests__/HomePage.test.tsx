@@ -3048,7 +3048,26 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    const todayBriefCard = screen.getByTestId('basic-query-today-brief-card');
+    expect(todayBriefCard).toHaveTextContent('今日看点摘要');
+    expect(todayBriefCard).toHaveTextContent('一句话看法');
+    expect(todayBriefCard).toHaveTextContent('AAPL');
+    expect(todayBriefCard).toHaveTextContent('200');
+    expect(todayBriefCard).toHaveTextContent('+1.5%');
+    expect(todayBriefCard).toHaveTextContent('数据可信度');
+    expect(todayBriefCard).toHaveTextContent('实时行情可用');
+    expect(todayBriefCard).toHaveTextContent('下一步动作');
+    expect(todayBriefCard).toHaveTextContent('刷新实时行情');
+    expect(todayBriefCard).toHaveTextContent('风险边界');
+    expect(todayBriefCard).toHaveTextContent('免费版已给出');
+    expect(todayBriefCard).toHaveTextContent('高级版补齐');
+    expect(todayBriefCard).toHaveTextContent('实时资讯/API');
+    expect(todayBriefCard).toHaveTextContent('不构成投资建议');
     const proDecisionCard = screen.getByTestId('basic-query-pro-decision-card');
+    expect(
+      todayBriefCard.compareDocumentPosition(proDecisionCard)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(proDecisionCard).toHaveTextContent('专业研判总览');
     expect(proDecisionCard).toHaveTextContent('继续研究优先级');
     expect(proDecisionCard).toHaveTextContent('82/100');
