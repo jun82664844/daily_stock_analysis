@@ -1569,6 +1569,13 @@ const HomePage: React.FC = () => {
     if (!target || platformWatchlistBusy) {
       return;
     }
+    if (!platformSession) {
+      setAuthMode('register');
+      setPlatformWatchlistError('');
+      setBasicRetentionStatus('');
+      setBasicRetentionError(uiLanguage === 'en' ? 'Register or login to save this watchlist item.' : '注册或登录后可保存自选。');
+      return;
+    }
     setPlatformWatchlistBusy(true);
     setPlatformWatchlistError('');
     setBasicRetentionError('');
@@ -1584,7 +1591,7 @@ const HomePage: React.FC = () => {
     } finally {
       setPlatformWatchlistBusy(false);
     }
-  }, [basicSnapshot?.stockCode, platformWatchlistBusy, query, uiLanguage]);
+  }, [basicSnapshot?.stockCode, platformSession, platformWatchlistBusy, query, uiLanguage]);
 
   const handleSaveCurrentBasicSnapshotToHistory = useCallback(async () => {
     if (!basicSnapshot || basicRetentionBusy) {
@@ -2539,6 +2546,46 @@ const HomePage: React.FC = () => {
       boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
     };
   }, [basicFreeReport, basicQuoteTrustPanel, basicSnapshot, uiLanguage]);
+  const basicNextActionsWorkflow = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    return {
+      title: isEnglish ? 'Next action workflow' : '下一步工作流',
+      subtitle: isEnglish
+        ? 'Keep reading without AI quota: refresh the quote, inspect news, compare peers, review K-line scenarios, or save the symbol.'
+        : '不消耗 AI 额度继续阅读：刷新行情、查看资讯、对照同业、看 K 线情景，或保存自选。',
+      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      actions: [
+        {
+          key: 'refresh',
+          label: isEnglish ? 'Refresh quote' : '刷新行情',
+          detail: isEnglish ? 'Recheck price and freshness before reading.' : '先确认价格和新鲜度。',
+        },
+        {
+          key: 'news',
+          label: isEnglish ? 'Read news' : '看资讯',
+          detail: isEnglish ? 'Jump to news and filing lanes.' : '跳到资讯/公告通道。',
+        },
+        {
+          key: 'peers',
+          label: isEnglish ? 'Compare peers' : '看同业',
+          detail: isEnglish ? 'Jump to peer and index references.' : '跳到同业/指数参照。',
+        },
+        {
+          key: 'kline',
+          label: isEnglish ? 'Inspect K-line' : '看K线',
+          detail: isEnglish ? 'Jump to the K-line forecast lab.' : '跳到 K 线预测实验室。',
+        },
+        {
+          key: 'watchlist',
+          label: isEnglish ? 'Save watchlist' : '保存自选',
+          detail: isEnglish ? 'Login can persist watchlist state.' : '登录后保留自选状态。',
+        },
+      ],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicFreeEventCenter = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -5503,6 +5550,93 @@ const HomePage: React.FC = () => {
                             {localizeGeneratedText(basicFreeReport.productBrief.risks[0] || basicFreeReport.productBrief.midStatus, uiLanguage)}
                           </div>
                         </div>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicNextActionsWorkflow ? (
+                  <section
+                    data-testid="basic-query-next-actions-v85"
+                    className="mb-4 rounded-lg border border-primary/40 bg-primary/10 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-primary">{basicNextActionsWorkflow.title}</div>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {basicNextActionsWorkflow.subtitle}
+                        </p>
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/45 bg-background/35 px-2 py-1 text-[11px] font-medium text-primary">
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                        {basicNextActionsWorkflow.boundary}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-5">
+                      {basicNextActionsWorkflow.actions.map((action) => {
+                        const Icon = action.key === 'refresh'
+                          ? RefreshCw
+                          : action.key === 'news'
+                            ? Search
+                            : action.key === 'peers'
+                              ? BarChart3
+                              : action.key === 'kline'
+                                ? Sparkles
+                                : Plus;
+                        const disabled = action.key === 'refresh'
+                          ? isQueryingBasic
+                          : action.key === 'watchlist'
+                            ? platformWatchlistBusy
+                            : false;
+                        const onActionClick = () => {
+                          if (action.key === 'refresh') {
+                            void handleBasicQuery(basicSnapshot.stockCode, undefined, true, undefined, basicSnapshotViewMode);
+                            return;
+                          }
+                          if (action.key === 'news') {
+                            handleBasicFeatureJump('basic-query-news-center');
+                            return;
+                          }
+                          if (action.key === 'peers') {
+                            handleBasicFeatureJump('basic-query-peer-table');
+                            return;
+                          }
+                          if (action.key === 'kline') {
+                            handleBasicFeatureJump('basic-query-kline-forecast-lab');
+                            return;
+                          }
+                          void handleAddCurrentQueryToPlatformWatchlist();
+                        };
+                        return (
+                          <div key={action.key} className="min-w-0 rounded-md border border-subtle/75 bg-background/35 p-2.5">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-9 w-full justify-start"
+                              disabled={disabled}
+                              onClick={onActionClick}
+                              data-testid={`basic-query-next-action-${action.key}`}
+                            >
+                              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{action.label}</span>
+                            </Button>
+                            <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-secondary-text">
+                              {action.detail}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {basicRetentionError || platformWatchlistError || basicRetentionStatus ? (
+                      <div
+                        data-testid="basic-query-next-actions-status"
+                        className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+                          basicRetentionError || platformWatchlistError
+                            ? 'border-danger/50 bg-danger/10 text-danger'
+                            : 'border-success/45 bg-success/10 text-success'
+                        }`}
+                      >
+                        {basicRetentionError || platformWatchlistError || basicRetentionStatus}
                       </div>
                     ) : null}
                   </section>

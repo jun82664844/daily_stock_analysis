@@ -3048,6 +3048,20 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    const nextActions = screen.getByTestId('basic-query-next-actions-v85');
+    expect(nextActions).toHaveTextContent('下一步工作流');
+    expect(nextActions).toHaveTextContent('刷新行情');
+    expect(nextActions).toHaveTextContent('看资讯');
+    expect(nextActions).toHaveTextContent('看同业');
+    expect(nextActions).toHaveTextContent('看K线');
+    expect(nextActions).toHaveTextContent('保存自选');
+    expect(nextActions).toHaveTextContent('未用 AI，不扣额度');
+    fireEvent.click(within(nextActions).getByRole('button', { name: '保存自选' }));
+    expect(nextActions).toHaveTextContent('注册或登录后可保存自选');
+    fireEvent.click(within(nextActions).getByRole('button', { name: '看资讯' }));
+    fireEvent.click(within(nextActions).getByRole('button', { name: '看同业' }));
+    fireEvent.click(within(nextActions).getByRole('button', { name: '看K线' }));
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     const todayBriefCard = screen.getByTestId('basic-query-today-brief-card');
     expect(todayBriefCard).toHaveTextContent('今日看点摘要');
     expect(todayBriefCard).toHaveTextContent('一句话看法');
@@ -3168,6 +3182,11 @@ describe('HomePage', () => {
     fireEvent.click(within(quoteTrustPanel).getByRole('button', { name: '刷新实时行情' }));
     await waitFor(() => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(3);
+    });
+    expect(stocksApi.snapshot).toHaveBeenLastCalledWith('AAPL', { refresh: true });
+    fireEvent.click(within(screen.getByTestId('basic-query-next-actions-v85')).getByRole('button', { name: '刷新行情' }));
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledTimes(4);
     });
     expect(stocksApi.snapshot).toHaveBeenLastCalledWith('AAPL', { refresh: true });
     const verifiedDataBoard = screen.getByTestId('basic-query-verified-data-board');
