@@ -1203,6 +1203,7 @@ const HomePage: React.FC = () => {
   const [basicRetentionStatus, setBasicRetentionStatus] = useState('');
   const [basicRetentionError, setBasicRetentionError] = useState('');
   const [deepAnalysisNotice, setDeepAnalysisNotice] = useState('');
+  const [deepAnalysisInlineNotice, setDeepAnalysisInlineNotice] = useState('');
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -1232,6 +1233,7 @@ const HomePage: React.FC = () => {
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const basicSnapshotRef = useRef<HTMLDivElement | null>(null);
   const platformAuthPanelRef = useRef<HTMLDivElement | null>(null);
+  const deepInlineGuardRef = useRef<HTMLDivElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -2890,6 +2892,7 @@ const HomePage: React.FC = () => {
     setIsQueryingBasic(true);
     setBasicQueryError(null);
     setDeepAnalysisNotice('');
+    setDeepAnalysisInlineNotice('');
     setBasicRetentionStatus('');
     setBasicRetentionError('');
     setKronosForecastError('');
@@ -3355,6 +3358,7 @@ const HomePage: React.FC = () => {
       analysisDepth: AnalysisDepth = 'fast',
     ) => {
       setDeepAnalysisNotice('');
+      setDeepAnalysisInlineNotice('');
       void submitAnalysis({
         stockCode,
         stockName,
@@ -3374,13 +3378,18 @@ const HomePage: React.FC = () => {
       selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
     ) => {
       if (platformEnabled && !platformSession) {
+        const loginNotice = uiLanguage === 'en'
+          ? 'Deep analysis requires login and a selected Platform API, user API, or local model. Free query and quick analysis remain available without AI.'
+          : '深度分析需要先登录，并选择平台 API、我的 API 或本地模型。免费查询和快速分析可继续使用，不消耗 AI。';
         setAuthMode('login');
         setAuthError('');
-        setDeepAnalysisNotice(uiLanguage === 'en'
-          ? 'Deep analysis requires login and a selected Platform API, user API, or local model. Free query and quick analysis remain available without AI.'
-          : '深度分析需要先登录，并选择平台 API、我的 API 或本地模型。免费查询和快速分析可继续使用，不消耗 AI。');
+        setDeepAnalysisNotice(loginNotice);
+        setDeepAnalysisInlineNotice(loginNotice);
         window.setTimeout(() => {
-          if (typeof platformAuthPanelRef.current?.scrollIntoView === 'function') {
+          const inlineTarget = deepInlineGuardRef.current;
+          if (typeof inlineTarget?.scrollIntoView === 'function') {
+            inlineTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else if (typeof platformAuthPanelRef.current?.scrollIntoView === 'function') {
             platformAuthPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
           platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
@@ -5768,11 +5777,43 @@ const HomePage: React.FC = () => {
                           </div>
                           {kronosForecastError ? (
                             <div data-testid="basic-query-kronos-error" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-                              {kronosForecastError}
+                              <div className="font-semibold">
+                                {uiLanguage === 'en' ? 'Kronos did not finish this run' : 'Kronos 本次没有跑通'}
+                              </div>
+                              <p className="mt-1 leading-relaxed">
+                                {uiLanguage === 'en'
+                                  ? 'This is usually a local model, proxy, or dependency timeout. The page keeps the local K-line rules preview, and free quote lookup is not affected.'
+                                  : '这通常是本地模型、网络代理或依赖超时导致；页面会保留本地K线规则预览，不影响免费行情查询。'}
+                              </p>
+                              <p className="mt-1 leading-relaxed text-danger/90">
+                                {kronosForecastError}
+                              </p>
                             </div>
                           ) : null}
                           {kronosForecast ? (
                             <div data-testid="basic-query-kronos-live-result" className="mt-3 space-y-3">
+                              <div
+                                data-testid="basic-query-kronos-readiness-summary"
+                                className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-secondary-text"
+                              >
+                                <div className="font-semibold text-primary">
+                                  {uiLanguage === 'en' ? 'This is not a failed run' : '这不是运行失败'}
+                                </div>
+                                <p className="mt-1 leading-relaxed">
+                                  {kronosForecast.kronosModelUsed
+                                    ? (uiLanguage === 'en'
+                                      ? 'The real Kronos model responded for this check; keep treating it as an experimental model preview.'
+                                      : '真实 Kronos 模型已响应本次检查；仍按实验性模型预览理解。')
+                                    : (uiLanguage === 'en'
+                                      ? 'Using local K-line rules fallback. Real Kronos model is not enabled yet.'
+                                      : '当前使用本地K线规则兜底。真实 Kronos 模型尚未启用。')}
+                                </p>
+                                <p className="mt-1 leading-relaxed">
+                                  {uiLanguage === 'en'
+                                    ? 'Premium can run the full forecast after model or API lane approval; this preview remains informational only, not investment advice.'
+                                    : '高级版可在模型或 API 通道确认后启用完整预测；当前预览仅作信息分析，不构成投资建议。'}
+                                </p>
+                              </div>
                               <div className="flex min-w-0 flex-wrap gap-2 text-xs text-secondary-text">
                                 <span className="rounded-md border border-subtle/70 px-2 py-1">
                                   {localizeGeneratedStatus(kronosForecast.status, uiLanguage)}
@@ -6563,6 +6604,33 @@ const HomePage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+                {deepAnalysisInlineNotice ? (
+                  <div
+                    ref={deepInlineGuardRef}
+                    data-testid="basic-query-deep-inline-guard"
+                    role="alert"
+                    className="mt-3 rounded-lg border border-primary/35 bg-primary/5 px-3 py-2 text-xs text-secondary-text"
+                  >
+                    <div className="font-semibold text-primary">
+                      {uiLanguage === 'en' ? 'Deep analysis needs an account' : '深度分析需要先登录'}
+                    </div>
+                    <p className="mt-1 leading-relaxed">
+                      {deepAnalysisInlineNotice}
+                    </p>
+                    <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+                      <span className="rounded-md border border-subtle/70 px-2 py-1">
+                        {uiLanguage === 'en'
+                          ? 'Choose Platform API, BYOK, or local model after login'
+                          : '登录后可选择平台 API、我的 API 或本地模型'}
+                      </span>
+                      <span className="rounded-md border border-subtle/70 px-2 py-1">
+                        {uiLanguage === 'en'
+                          ? 'Free query and quick analysis remain available'
+                          : '当前免费查询和快速分析仍可继续使用'}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mt-3 text-xs text-secondary-text">
                   {t('home.basicSource')}: {localizeGeneratedSource(basicSnapshot.quote.source, uiLanguage)}
                   {basicSnapshot.route ? (

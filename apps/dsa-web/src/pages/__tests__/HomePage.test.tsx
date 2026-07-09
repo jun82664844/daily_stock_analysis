@@ -3248,6 +3248,11 @@ describe('HomePage', () => {
       });
     });
     const kronosResult = await screen.findByTestId('basic-query-kronos-live-result');
+    const kronosReadiness = screen.getByTestId('basic-query-kronos-readiness-summary');
+    expect(kronosReadiness).toHaveTextContent('这不是运行失败');
+    expect(kronosReadiness).toHaveTextContent('当前使用本地K线规则兜底');
+    expect(kronosReadiness).toHaveTextContent('真实 Kronos 模型尚未启用');
+    expect(kronosReadiness).toHaveTextContent('高级版可在模型或 API 通道确认后启用完整预测');
     expect(kronosResult).toHaveTextContent('模型不可用');
     expect(kronosResult).toHaveTextContent('本地规则兜底');
     expect(kronosResult).toHaveTextContent('Kronos 行情数据获取超时，已使用本地规则兜底。');
@@ -5038,6 +5043,50 @@ describe('HomePage', () => {
     const guard = await screen.findByTestId('deep-analysis-guard');
     expect(guard).toHaveTextContent('深度分析需要先登录');
     expect(guard).toHaveTextContent('平台 API、我的 API 或本地模型');
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows the deep-analysis guard next to the current snapshot when a guest clicks the snapshot deep action', async () => {
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(null);
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: { currentPrice: 200, changePercent: 1.5, source: 'unit_quote', freshness: 'fresh' },
+      indicators: { ma5: 198, ma20: 190 },
+      aiUsed: false,
+    } as any);
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-guest-snapshot-deep',
+      status: 'pending',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL'), {
+      target: { value: 'AAPL' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await screen.findByTestId('basic-query-compact-overview');
+
+    const deepButtons = screen.getAllByRole('button', { name: '深度分析' });
+    fireEvent.click(deepButtons[deepButtons.length - 1]);
+
+    const inlineGuard = await screen.findByTestId('basic-query-deep-inline-guard');
+    expect(inlineGuard).toHaveTextContent('深度分析需要先登录');
+    expect(inlineGuard).toHaveTextContent('登录后可选择平台 API、我的 API 或本地模型');
+    expect(inlineGuard).toHaveTextContent('当前免费查询和快速分析仍可继续使用');
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
