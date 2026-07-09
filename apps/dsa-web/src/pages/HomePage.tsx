@@ -2214,6 +2214,39 @@ const HomePage: React.FC = () => {
         : ['先看价格是否守住 MA20', '再和 QQQ / 行业参照比较', '需要来源链接时再开深度模式'],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicProDecisionCard = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport || !basicBrokerCockpit) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const score = basicFreeReport.score;
+    const priority = score >= 75
+      ? (isEnglish ? 'High' : '高')
+      : score >= 55
+        ? (isEnglish ? 'Medium' : '中')
+        : (isEnglish ? 'Watch first' : '先观察');
+    return {
+      title: isEnglish ? 'Professional decision overview' : '专业研判总览',
+      priorityLabel: isEnglish ? 'Research priority' : '继续研究优先级',
+      priorityValue: `${priority} · ${score}/100`,
+      oneLineLabel: isEnglish ? 'One-line read' : '一句话结论',
+      oneLine: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+      evidenceLabel: isEnglish ? 'Key evidence' : '关键证据',
+      evidenceItems: basicBrokerCockpit.evidenceItems.slice(0, 3),
+      riskLabel: isEnglish ? 'Check risks first' : '风险先看',
+      riskItems: basicBrokerCockpit.riskItems.slice(0, 3),
+      upgradeLabel: isEnglish ? 'Premium fills the gaps' : '升级后补齐',
+      upgradeItems: isEnglish
+        ? ['Realtime API', 'Source links', 'Model depth', 'Continuous tracking']
+        : ['实时 API', '原文链接', '模型深度', '持续跟踪'],
+      freeOpenLabel: isEnglish ? 'Free mode already includes' : '免费版已开放',
+      freeOpenModules: isEnglish
+        ? 'quote, technicals, news, K-line, peers, risk'
+        : '行情、技术、资讯、K线、同业、风险',
+      premiumLabel: isEnglish ? 'Premium improves' : '高级版增强',
+      boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+    };
+  }, [basicBrokerCockpit, basicFreeReport, basicSnapshot, uiLanguage]);
   const basicCommercialJourney = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -4596,6 +4629,82 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicProDecisionCard ? (
+                  <section
+                    data-testid="basic-query-pro-decision-card"
+                    className="mb-4 rounded-lg border border-primary/45 bg-primary/10 p-3"
+                  >
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="rounded-md border border-primary/40 bg-background/40 px-2 py-1 text-xs font-semibold text-primary">
+                            {basicProDecisionCard.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1 text-xs text-secondary-text">
+                            {basicProDecisionCard.priorityLabel}
+                            <span className="ml-1 font-semibold text-foreground">{basicProDecisionCard.priorityValue}</span>
+                          </span>
+                          <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1 text-xs text-secondary-text">
+                            {basicProDecisionCard.boundary}
+                          </span>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                          <div className="text-xs font-medium text-primary">{basicProDecisionCard.oneLineLabel}</div>
+                          <h3 className="mt-1 text-xl font-semibold leading-snug text-foreground">
+                            {basicProDecisionCard.oneLine}
+                          </h3>
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-3">
+                          {basicProDecisionCard.evidenceItems.map((item) => (
+                            <div key={item.label} className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-2.5">
+                              <div className="text-xs font-medium text-primary">{item.label}</div>
+                              <div className="mt-1 truncate text-sm font-semibold text-foreground">{item.value}</div>
+                              <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">{item.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 space-y-2">
+                        <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
+                          <div className="text-xs font-medium text-primary">{basicProDecisionCard.evidenceLabel}</div>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            {basicProDecisionCard.evidenceItems.map((item) => (
+                              <span key={`${item.label}-${item.value}`} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                {item.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-warning/35 bg-warning/10 p-3">
+                          <div className="text-xs font-medium text-warning">{basicProDecisionCard.riskLabel}</div>
+                          <div className="mt-2 grid gap-1.5 text-xs leading-relaxed text-secondary-text">
+                            {basicProDecisionCard.riskItems.map((item, index) => (
+                              <div key={`${index}-${item}`} className="rounded-md border border-subtle/70 bg-background/30 px-2 py-1">
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-primary/30 bg-surface/45 p-3">
+                          <div className="text-xs font-medium text-primary">{basicProDecisionCard.upgradeLabel}</div>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                            <span className="max-w-full rounded-md border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-primary">
+                              {basicProDecisionCard.freeOpenLabel}: {basicProDecisionCard.freeOpenModules}
+                            </span>
+                            <span className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                              {basicProDecisionCard.premiumLabel}
+                            </span>
+                            {basicProDecisionCard.upgradeItems.map((item) => (
+                              <span key={item} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicBrokerCockpit ? (

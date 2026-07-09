@@ -3045,6 +3045,27 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    const proDecisionCard = screen.getByTestId('basic-query-pro-decision-card');
+    expect(proDecisionCard).toHaveTextContent('专业研判总览');
+    expect(proDecisionCard).toHaveTextContent('继续研究优先级');
+    expect(proDecisionCard).toHaveTextContent('82/100');
+    expect(proDecisionCard).toHaveTextContent('一句话结论');
+    expect(proDecisionCard).toHaveTextContent('关键证据');
+    expect(proDecisionCard).toHaveTextContent('价格结构');
+    expect(proDecisionCard).toHaveTextContent('同业参照');
+    expect(proDecisionCard).toHaveTextContent('风险先看');
+    expect(proDecisionCard).toHaveTextContent('升级后补齐');
+    expect(proDecisionCard).toHaveTextContent('免费版已开放');
+    expect(proDecisionCard).toHaveTextContent('行情、技术、资讯、K线、同业、风险');
+    expect(proDecisionCard).toHaveTextContent('高级版增强');
+    expect(proDecisionCard).toHaveTextContent('实时 API');
+    expect(proDecisionCard).toHaveTextContent('原文链接');
+    expect(proDecisionCard).toHaveTextContent('模型深度');
+    expect(proDecisionCard).toHaveTextContent('不构成投资建议');
+    expect(
+      primarySummary.compareDocumentPosition(proDecisionCard)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const commercialJourney = screen.getByTestId('basic-query-commercial-journey');
     expect(commercialJourney).toHaveTextContent('免费查询完整路径');
     expect(commercialJourney).toHaveTextContent('免费版已开放');
