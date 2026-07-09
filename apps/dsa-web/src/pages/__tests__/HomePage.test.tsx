@@ -2704,7 +2704,10 @@ describe('HomePage', () => {
         country: 'United States',
         marketCap: 4500000000000,
         peRatio: 31.2,
+        pbRatio: 48.6,
         dividendYield: 0.5,
+        revenue: 451442000000,
+        netProfit: 122575500000,
         source: 'unit_profile',
         freshness: 'fresh',
       },
@@ -3066,6 +3069,34 @@ describe('HomePage', () => {
       primarySummary.compareDocumentPosition(proDecisionCard)
       & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    const verifiedDataBoard = screen.getByTestId('basic-query-verified-data-board');
+    expect(verifiedDataBoard).toHaveTextContent('真实数据增强');
+    expect(verifiedDataBoard).toHaveTextContent('数据可信度');
+    expect(verifiedDataBoard).toHaveTextContent('行情源');
+    expect(verifiedDataBoard).toHaveTextContent('Yahoo 图表');
+    expect(verifiedDataBoard).toHaveTextContent('公司资料源');
+    expect(verifiedDataBoard).toHaveTextContent('公司资料');
+    expect(verifiedDataBoard).toHaveTextContent('缓存状态');
+    expect(verifiedDataBoard).toHaveTextContent('实时获取');
+    expect(verifiedDataBoard).toHaveTextContent('来源健康');
+    expect(verifiedDataBoard).toHaveTextContent('同业/板块实况');
+    expect(verifiedDataBoard).toHaveTextContent('QQQ');
+    expect(verifiedDataBoard).toHaveTextContent('XLK');
+    expect(verifiedDataBoard).toHaveTextContent('财务基础');
+    expect(verifiedDataBoard).toHaveTextContent('总市值');
+    expect(verifiedDataBoard).toHaveTextContent('4.5T');
+    expect(verifiedDataBoard).toHaveTextContent('市盈率');
+    expect(verifiedDataBoard).toHaveTextContent('31.2');
+    expect(verifiedDataBoard).toHaveTextContent('市净率');
+    expect(verifiedDataBoard).toHaveTextContent('48.6');
+    expect(verifiedDataBoard).toHaveTextContent('股息率');
+    expect(verifiedDataBoard).toHaveTextContent('0.5%');
+    expect(verifiedDataBoard).toHaveTextContent('资讯/公告状态');
+    expect(verifiedDataBoard).toHaveTextContent('SEC 文件通道');
+    expect(verifiedDataBoard).toHaveTextContent('财务快照通道');
+    expect(verifiedDataBoard).toHaveTextContent('免费版使用公开/本地源');
+    expect(verifiedDataBoard).toHaveTextContent('高级版使用 API 和原文链接');
+    expect(verifiedDataBoard).toHaveTextContent('不构成投资建议');
     const commercialJourney = screen.getByTestId('basic-query-commercial-journey');
     expect(commercialJourney).toHaveTextContent('免费查询完整路径');
     expect(commercialJourney).toHaveTextContent('免费版已开放');

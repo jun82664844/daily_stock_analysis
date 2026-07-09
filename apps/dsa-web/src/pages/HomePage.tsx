@@ -2247,6 +2247,195 @@ const HomePage: React.FC = () => {
       boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
     };
   }, [basicBrokerCockpit, basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicVerifiedDataBoard = useMemo(() => {
+    if (!basicSnapshot) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const profile = basicSnapshot.profile;
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const sourceLabel = (source: unknown): string => {
+      const raw = String(source ?? '');
+      if (raw === 'yahoo_chart') {
+        return isEnglish ? 'Yahoo chart data' : 'Yahoo 图表数据';
+      }
+      return localizeGeneratedSource(raw, uiLanguage);
+    };
+    const quoteFreshness = localizeRuntimeLabel(basicSnapshot.quote.freshness, uiLanguage);
+    const profileFreshness = localizeRuntimeLabel(profile?.freshness || 'missing', uiLanguage);
+    const cacheModes = [
+      basicSnapshot.diagnostics?.cache?.quote,
+      basicSnapshot.diagnostics?.cache?.history,
+    ].filter((value): value is string => Boolean(value));
+    const cacheValue = cacheModes.length > 0 && cacheModes.every((value) => value === 'miss')
+      ? (isEnglish ? 'Live fetch' : '实时获取')
+      : cacheModes.some((value) => value === 'hit')
+        ? (isEnglish ? 'Cache hit' : '缓存命中')
+        : localizeRuntimeLabel(cacheModes.join(' / ') || 'unavailable', uiLanguage);
+    const sourceHealthItems = Object.values(basicSnapshot.diagnostics?.sourceHealth ?? {})
+      .map((item) => localizeRuntimeLabel(item?.status || item?.source || '-', uiLanguage))
+      .filter((value) => value && value !== '-');
+    const sourceHealthValue = sourceHealthItems.length > 0
+      ? Array.from(new Set(sourceHealthItems)).join(' / ')
+      : localizeRuntimeLabel('unavailable', uiLanguage);
+    const trustCards = [
+      {
+        label: isEnglish ? 'Quote source' : '行情源',
+        value: `${sourceLabel(basicSnapshot.quote.source)} / ${quoteFreshness}`,
+        detail: isEnglish
+          ? 'Price, change, volume, moving-average context and refresh state are shown together.'
+          : '行情、涨跌、成交量、均线背景和刷新状态放在一起看。',
+      },
+      {
+        label: isEnglish ? 'Company profile source' : '公司资料源',
+        value: `${sourceLabel(profile?.source)} / ${profileFreshness}`,
+        detail: isEnglish
+          ? 'Sector, industry and valuation fields explain what the price is being compared against.'
+          : '板块、行业和估值字段用于解释价格处在什么背景里。',
+      },
+      {
+        label: isEnglish ? 'Cache state' : '缓存状态',
+        value: cacheValue,
+        detail: isEnglish
+          ? `Lane ${marketLaneLabel(sourceLane, uiLanguage)}; free mode keeps speed high with cache-aware fallback.`
+          : `通道 ${marketLaneLabel(sourceLane, uiLanguage)}；免费版用缓存感知降级保证速度。`,
+      },
+      {
+        label: isEnglish ? 'Source health' : '来源健康',
+        value: sourceHealthValue,
+        detail: isEnglish
+          ? 'Treat degraded or stale sources as provisional until the next refresh.'
+          : '来源降级或行情过期时，先当作临时参考，刷新后再解读。',
+      },
+    ];
+    const financialMetrics = [
+      {
+        label: isEnglish ? 'Market cap' : '总市值',
+        value: formatBasicCompactNumber(profile?.marketCap),
+        detail: isEnglish ? 'Company size baseline' : '先判断公司体量',
+      },
+      {
+        label: isEnglish ? 'PE ratio' : '市盈率',
+        value: formatBasicNumber(profile?.peRatio),
+        detail: isEnglish ? 'Profit valuation reference' : '盈利估值参考',
+      },
+      {
+        label: isEnglish ? 'PB ratio' : '市净率',
+        value: formatBasicNumber(profile?.pbRatio),
+        detail: isEnglish ? 'Book valuation reference' : '账面估值参考',
+      },
+      {
+        label: isEnglish ? 'Dividend yield' : '股息率',
+        value: formatBasicPercent(profile?.dividendYield),
+        detail: isEnglish ? 'Shareholder return context' : '股东回报背景',
+      },
+      {
+        label: isEnglish ? 'Revenue' : '营收',
+        value: formatBasicCompactNumber(profile?.revenue),
+        detail: isEnglish ? 'Business scale context' : '业务规模背景',
+      },
+      {
+        label: isEnglish ? 'Net profit' : '净利润',
+        value: formatBasicCompactNumber(profile?.netProfit),
+        detail: isEnglish ? 'Profit quality context' : '盈利质量背景',
+      },
+    ];
+    const peerCandidates = [
+      ...(basicSnapshot.intelligence?.peerComparison?.rows ?? []).map((row) => ({
+        symbol: row.symbol,
+        label: row.label,
+        role: row.role,
+        currentSignal: row.currentSignal,
+        compareNext: row.compareNext,
+        referenceQuote: row.referenceQuote,
+      })),
+      ...(basicSnapshot.intelligence?.comparisonTargets ?? []).map((item) => ({
+        symbol: item.symbol,
+        label: item.label,
+        role: item.status,
+        currentSignal: item.reason,
+        compareNext: item.source,
+        referenceQuote: item.referenceQuote,
+      })),
+    ];
+    const seenPeers = new Set<string>();
+    const peerRows = peerCandidates
+      .filter((row) => {
+        const key = row.symbol || row.label;
+        if (!key || seenPeers.has(key)) {
+          return false;
+        }
+        seenPeers.add(key);
+        return true;
+      })
+      .slice(0, 5)
+      .map((row) => {
+        const quoteValue = row.referenceQuote
+          ? `${formatBasicNumber(row.referenceQuote.currentPrice ?? row.referenceQuote.price)} / ${formatSignedBasicPercent(row.referenceQuote.changePercent)}`
+          : (isEnglish ? 'Reference relation' : '参照关系');
+        return {
+          symbol: row.symbol || row.label,
+          label: localizeGeneratedText(row.label, uiLanguage),
+          role: localizeGeneratedText(row.role, uiLanguage),
+          quoteValue,
+          currentSignal: localizeGeneratedText(row.currentSignal, uiLanguage),
+          compareNext: localizeGeneratedText(row.compareNext, uiLanguage),
+        };
+      });
+    const newsItems = (
+      basicSnapshot.intelligence?.newsCenter?.items?.length
+        ? basicSnapshot.intelligence.newsCenter.items
+        : basicSnapshot.intelligence?.items ?? []
+    ).slice(0, 4);
+    const newsCards = (newsItems.length > 0 ? newsItems : [
+      {
+        category: 'news',
+        title: isEnglish ? 'News lane' : '资讯通道',
+        summary: isEnglish ? 'Realtime public news is not enabled in free local mode.' : '免费本地模式暂未开启实时公共资讯。',
+        status: 'degraded',
+        source: 'free_rules',
+        action: isEnglish ? 'Use configured feeds or deep mode for links.' : '需要链接时使用配置资讯源或深度模式。',
+      },
+      {
+        category: 'announcements',
+        title: isEnglish ? 'Filings lane' : '公告/文件通道',
+        summary: isEnglish ? 'Filings and source links are reserved for configured feeds.' : '公告原文和来源链接留给已配置数据源。',
+        status: 'degraded',
+        source: 'free_rules',
+        action: isEnglish ? 'Upgrade or configure a source before treating it as complete.' : '升级或配置来源后再当作完整信息。',
+      },
+    ]).map((item) => {
+      const actionText = 'action' in item ? item.action : '';
+      return {
+        category: localizeGeneratedText(item.category, uiLanguage),
+        title: localizeGeneratedText(item.title, uiLanguage),
+        summary: localizeGeneratedText(item.summary, uiLanguage),
+        status: basicIntelligenceStatusLabel(item.status, uiLanguage),
+        source: sourceLabel(item.source),
+        action: localizeGeneratedText(actionText, uiLanguage),
+      };
+    });
+    return {
+      title: isEnglish ? 'Verified free data' : '真实数据增强',
+      subtitle: isEnglish
+        ? 'Free mode now exposes the data chain behind the snapshot: source, freshness, peers, fundamentals and event lanes.'
+        : '免费版把快照背后的数据链路直接展开：来源、新鲜度、同业、财务和资讯公告通道都能先看。',
+      trustTitle: isEnglish ? 'Data credibility' : '数据可信度',
+      peerTitle: isEnglish ? 'Peer and sector live context' : '同业/板块实况',
+      financialTitle: isEnglish ? 'Financial basics' : '财务基础',
+      newsTitle: isEnglish ? 'News and filings status' : '资讯/公告状态',
+      freeLabel: isEnglish ? 'Free uses public/local sources' : '免费版使用公开/本地源',
+      premiumLabel: isEnglish ? 'Premium uses APIs and source links' : '高级版使用 API 和原文链接',
+      boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+      trustCards,
+      financialMetrics,
+      peerRows,
+      newsCards,
+    };
+  }, [basicSnapshot, uiLanguage]);
   const basicCommercialJourney = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -4702,6 +4891,116 @@ const HomePage: React.FC = () => {
                               </span>
                             ))}
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicVerifiedDataBoard ? (
+                  <section
+                    data-testid="basic-query-verified-data-board"
+                    className="mb-4 rounded-lg border border-primary/40 bg-surface/50 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-primary">{basicVerifiedDataBoard.title}</div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {basicVerifiedDataBoard.subtitle}
+                        </h3>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px] text-secondary-text xl:max-w-sm xl:justify-end">
+                        <span className="rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-primary">
+                          {basicVerifiedDataBoard.freeLabel}
+                        </span>
+                        <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1">
+                          {basicVerifiedDataBoard.premiumLabel}
+                        </span>
+                        <span className="rounded-md border border-subtle/80 bg-background/35 px-2 py-1">
+                          {basicVerifiedDataBoard.boundary}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicVerifiedDataBoard.trustTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicVerifiedDataBoard.trustCards.map((card) => (
+                            <div key={card.label} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 p-2.5">
+                              <div className="text-xs font-medium text-primary">{card.label}</div>
+                              <div className="mt-1 truncate text-sm font-semibold text-foreground">{card.value}</div>
+                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-secondary-text">
+                                {card.detail}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicVerifiedDataBoard.financialTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicVerifiedDataBoard.financialMetrics.map((metric) => (
+                            <div key={metric.label} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2">
+                              <div className="truncate text-[11px] text-secondary-text">{metric.label}</div>
+                              <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{metric.value}</div>
+                              <div className="mt-0.5 truncate text-[11px] text-secondary-text">{metric.detail}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicVerifiedDataBoard.peerTitle}</div>
+                        <div className="mt-2 grid gap-1.5 text-xs text-secondary-text">
+                          {basicVerifiedDataBoard.peerRows.length > 0 ? basicVerifiedDataBoard.peerRows.map((row) => (
+                            <div
+                              key={`${row.symbol}-${row.label}`}
+                              className="grid gap-1 rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2 md:grid-cols-[0.75fr_0.85fr_1fr_1.1fr]"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate font-semibold text-foreground">{row.symbol}</span>
+                                <span className="block truncate text-[11px]">{row.label}</span>
+                              </span>
+                              <span className="min-w-0 truncate">{row.role}</span>
+                              <span className="min-w-0 truncate font-medium text-foreground">{row.quoteValue}</span>
+                              <span className="min-w-0 line-clamp-2">{row.currentSignal || row.compareNext}</span>
+                            </div>
+                          )) : (
+                            <div className="rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2">
+                              {uiLanguage === 'en' ? 'No peer reference is available yet.' : '暂无同业参照，先用行情和财务基础判断。'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-subtle/80 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicVerifiedDataBoard.newsTitle}</div>
+                        <div className="mt-2 grid gap-2">
+                          {basicVerifiedDataBoard.newsCards.map((item, index) => (
+                            <div key={`${item.title}-${index}`} className="min-w-0 rounded-md border border-subtle/70 bg-surface/35 p-2.5">
+                              <div className="flex min-w-0 items-center justify-between gap-2">
+                                <div className="min-w-0 truncate text-xs font-semibold text-foreground">{item.title}</div>
+                                <span className="shrink-0 rounded-md border border-subtle/70 px-1.5 py-0.5 text-[10px] text-secondary-text">
+                                  {item.status}
+                                </span>
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-secondary-text">
+                                {item.summary}
+                              </p>
+                              <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
+                                <span className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">
+                                  {item.category}
+                                </span>
+                                <span className="rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                  {item.source}
+                                </span>
+                                {item.action ? (
+                                  <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
+                                    {item.action}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
