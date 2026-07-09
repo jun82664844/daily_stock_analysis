@@ -778,6 +778,7 @@ const localizeRuntimeLabel = (value: unknown, language: string): string => {
     fresh: '新鲜',
     stale: '过期',
     stale_cache: '过期缓存',
+    stale_disk_cache: '过期磁盘缓存',
     stale_quote: '行情过期',
     delayed: '延迟',
     missing: '缺失',
@@ -789,11 +790,18 @@ const localizeRuntimeLabel = (value: unknown, language: string): string => {
     hit: '命中',
     miss: '未命中',
     cache: '缓存',
+    cache_first: '优先缓存',
+    force_refresh: '强制刷新',
+    refresh: '刷新',
     live: '实时',
     memory: '内存',
     disk: '磁盘',
+    disk_cache: '磁盘缓存',
     local_json: '本地缓存',
     local_disk: '本地磁盘',
+    cooling_down: '冷却中',
+    timeout: '超时',
+    failed: '失败',
     private: '私有',
     separate: '独立',
     unknown_lane: '未知通道',
@@ -2347,6 +2355,100 @@ const HomePage: React.FC = () => {
         ? ['Multi-source API comparison', 'Abnormal price review', 'Source links', 'Refresh history tracking']
         : ['多源 API 对照', '异常价格复核', '原文事件链接', '刷新历史追踪'],
       cards,
+    };
+  }, [basicSnapshot, uiLanguage]);
+  const basicSourceRecoveryPanel = useMemo(() => {
+    if (!basicSnapshot) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const quoteFreshnessRaw = String(
+      basicSnapshot.quote.freshness
+      || basicSnapshot.diagnostics?.freshness?.quote
+      || '',
+    ).toLowerCase();
+    const historyFreshnessRaw = String(basicSnapshot.diagnostics?.freshness?.history || '').toLowerCase();
+    const quoteCacheRaw = String(basicSnapshot.diagnostics?.cache?.quote || '').toLowerCase();
+    const historyCacheRaw = String(basicSnapshot.diagnostics?.cache?.history || '').toLowerCase();
+    const quoteFallbackRaw = String(basicSnapshot.diagnostics?.fallback?.quote || '').toLowerCase();
+    const historyFallbackRaw = String(basicSnapshot.diagnostics?.fallback?.history || '').toLowerCase();
+    const healthStatuses = Object.values(basicSnapshot.diagnostics?.sourceHealth ?? {})
+      .map((item) => String(item?.status || '').toLowerCase())
+      .filter(Boolean);
+    const hasStaleOrCache = [
+      quoteFreshnessRaw,
+      historyFreshnessRaw,
+      quoteCacheRaw,
+      historyCacheRaw,
+      quoteFallbackRaw,
+      historyFallbackRaw,
+    ].some((value) => (
+      value.includes('stale')
+      || value.includes('cache')
+      || value.includes('cached')
+      || value.includes('expired')
+      || value === 'hit'
+    ));
+    const hasCooldown = healthStatuses.some((status) => status.includes('cool') || status.includes('down') || status.includes('fail'));
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const reasonCards = [
+      {
+        label: isEnglish ? 'Why stale/cache is shown' : '为什么提示过期/缓存',
+        value: hasStaleOrCache
+          ? (isEnglish ? 'Cache or stale fallback is active' : '缓存或过期兜底已启用')
+          : (isEnglish ? 'Live path looks available' : '实时路径看起来可用'),
+        detail: isEnglish
+          ? `Quote ${localizeRuntimeLabel(quoteFreshnessRaw || 'unavailable', uiLanguage)}, cache ${localizeRuntimeLabel(quoteCacheRaw || 'unavailable', uiLanguage)}, fallback ${localizeRuntimeLabel(quoteFallbackRaw || 'unavailable', uiLanguage)}.`
+          : `行情 ${localizeRuntimeLabel(quoteFreshnessRaw || 'unavailable', uiLanguage)}，缓存 ${localizeRuntimeLabel(quoteCacheRaw || 'unavailable', uiLanguage)}，兜底 ${localizeRuntimeLabel(quoteFallbackRaw || 'unavailable', uiLanguage)}。`,
+      },
+      {
+        label: isEnglish ? 'Affected lane' : '受影响通道',
+        value: marketLaneLabel(sourceLane, uiLanguage),
+        detail: isEnglish
+          ? `History ${localizeRuntimeLabel(historyFreshnessRaw || 'unavailable', uiLanguage)}; fallback ${localizeRuntimeLabel(historyFallbackRaw || 'unavailable', uiLanguage)}.`
+          : `历史 ${localizeRuntimeLabel(historyFreshnessRaw || 'unavailable', uiLanguage)}；兜底 ${localizeRuntimeLabel(historyFallbackRaw || 'unavailable', uiLanguage)}。`,
+      },
+      {
+        label: isEnglish ? 'Recovery priority' : '修复优先级',
+        value: hasCooldown
+          ? (isEnglish ? 'Wait or retry after cooldown' : '等待冷却或稍后重试')
+          : hasStaleOrCache
+            ? (isEnglish ? 'Refresh before interpreting' : '先刷新再解读')
+            : (isEnglish ? 'Normal monitoring' : '正常观察'),
+        detail: isEnglish
+          ? 'Free mode keeps usable cached data visible instead of blocking the whole report.'
+          : '免费版会保留可用缓存数据，不会因为单个来源慢就让整份报告不可用。',
+      },
+    ];
+    const freeActions = [
+      isEnglish ? 'Click refresh live quote first' : '先点刷新实时行情',
+      isEnglish ? 'Compare price, update time and moving averages before reading signals' : '对照价格、更新时间和均线后再读信号',
+      isEnglish ? 'Retry later when network or proxy looks unstable' : '网络或代理异常时稍后重试',
+      basicSnapshot.market === 'cn'
+        ? (isEnglish ? 'For A-shares, compare the local rule lane with a-stock-data adapter' : 'A股可对照本地规则和 a-stock-data 适配通道')
+        : (isEnglish ? 'Compare market ETF/index context before reading the stock alone' : '先对照指数/ETF 背景，不要只看单股'),
+    ];
+    const premiumItems = [
+      isEnglish ? 'Multi-source API comparison' : '多源 API 对照',
+      isEnglish ? 'Automatic prewarm and recovery' : '自动预热和恢复',
+      isEnglish ? 'Abnormal price alert and audit trail' : '异常价格告警和审计轨迹',
+      isEnglish ? 'Source links and realtime event feeds' : '原文链接和实时事件源',
+    ];
+    return {
+      title: isEnglish ? 'Data source recovery guide' : '数据源修复建议',
+      subtitle: isEnglish
+        ? 'This panel turns stale/cache warnings into clear next actions so free users can still judge the snapshot.'
+        : '把过期/缓存提示变成可执行步骤，让免费用户也知道下一步该怎么复核。',
+      freeTitle: isEnglish ? 'Free mode can do now' : '免费版现在可做',
+      premiumTitle: isEnglish ? 'Premium fills the gaps' : '高级版补齐',
+      refreshLabel: isEnglish ? 'Refresh live quote' : '刷新实时行情',
+      boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
+      reasonCards,
+      freeActions,
+      premiumItems,
     };
   }, [basicSnapshot, uiLanguage]);
   const basicVerifiedDataBoard = useMemo(() => {
@@ -5157,6 +5259,77 @@ const HomePage: React.FC = () => {
                             {item}
                           </span>
                         ))}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicSourceRecoveryPanel ? (
+                  <section
+                    data-testid="basic-query-source-recovery-panel"
+                    className="mb-4 rounded-lg border border-warning/35 bg-warning/10 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-warning">{basicSourceRecoveryPanel.title}</div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {basicSourceRecoveryPanel.subtitle}
+                        </h3>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
+                        <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-xs text-secondary-text">
+                          {basicSourceRecoveryPanel.boundary}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          data-testid="basic-query-source-recovery-refresh"
+                          disabled={isQueryingBasic}
+                          onClick={() => void handleBasicQuery(basicSnapshot.stockCode, undefined, true, undefined, basicSnapshotViewMode)}
+                        >
+                          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                          {basicSourceRecoveryPanel.refreshLabel}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                      {basicSourceRecoveryPanel.reasonCards.map((card) => (
+                        <div key={card.label} className="min-w-0 rounded-md border border-subtle/75 bg-background/35 p-2.5">
+                          <div className="text-xs font-medium text-warning">{card.label}</div>
+                          <div className="mt-1 text-sm font-semibold text-foreground">{card.value}</div>
+                          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                            {card.detail}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                      <div className="min-w-0 rounded-md border border-subtle/75 bg-background/35 p-3">
+                        <div className="text-sm font-semibold text-foreground">{basicSourceRecoveryPanel.freeTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicSourceRecoveryPanel.freeActions.map((item, index) => (
+                            <div
+                              key={`${index}-${item}`}
+                              className="flex min-w-0 items-start gap-2 rounded-md border border-subtle/70 bg-surface/35 px-2.5 py-2 text-xs leading-relaxed text-secondary-text"
+                            >
+                              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-primary/35 bg-primary/10 p-3">
+                        <div className="text-sm font-semibold text-primary">{basicSourceRecoveryPanel.premiumTitle}</div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {basicSourceRecoveryPanel.premiumItems.map((item, index) => (
+                            <div
+                              key={`${index}-${item}`}
+                              className="rounded-md border border-primary/25 bg-background/35 px-2.5 py-2 text-xs font-medium text-primary"
+                            >
+                              {item}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </section>

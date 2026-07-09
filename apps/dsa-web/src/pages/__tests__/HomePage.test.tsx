@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
@@ -1639,7 +1639,7 @@ describe('HomePage', () => {
     });
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(await screen.findByTestId('basic-query-snapshot')).toHaveTextContent('1,688');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('force_refresh');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('强制刷新');
     expect(screen.queryByTestId('history-report-freshness-boundary')).not.toBeInTheDocument();
   });
 
@@ -3080,7 +3080,7 @@ describe('HomePage', () => {
     expect(quoteTrustPanel).toHaveTextContent('可正常解读');
     expect(quoteTrustPanel).toHaveTextContent('高级版补齐');
     expect(quoteTrustPanel).toHaveTextContent('多源 API 对照');
-    fireEvent.click(screen.getByRole('button', { name: '刷新实时行情' }));
+    fireEvent.click(within(quoteTrustPanel).getByRole('button', { name: '刷新实时行情' }));
     await waitFor(() => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(3);
     });
@@ -3532,8 +3532,99 @@ describe('HomePage', () => {
     });
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(screen.getByTestId('basic-query-snapshot')).toHaveTextContent('210');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('force_refresh');
-    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q refresh / H refresh');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('强制刷新');
+    expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 刷新 / H 刷新');
+  });
+
+  it('explains stale data recovery and premium source gaps in quick mode', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: {
+        currentPrice: 200,
+        changePercent: 1.5,
+        source: 'yahoo_chart',
+        freshness: 'stale',
+      },
+      indicators: {
+        ma5: 198,
+        ma20: 190,
+        volumeChangeVsMa5: 12.5,
+      },
+      profile: {
+        companyName: 'Apple Inc.',
+        sector: 'Technology',
+        industry: 'Consumer Electronics',
+        marketCap: 4500000000000,
+        peRatio: 31.2,
+        source: 'unit_profile',
+        freshness: 'fresh',
+      },
+      trend: {
+        window: 2,
+        source: 'unit_history',
+        minClose: 190,
+        maxClose: 200,
+        changePercent: 5.2,
+        points: [
+          { date: '2026-07-01', close: 190, volume: 70000000 },
+          { date: '2026-07-02', close: 200, volume: 75352800 },
+        ],
+      },
+      diagnostics: {
+        elapsedMs: 18,
+        quoteElapsedMs: 8,
+        historyElapsedMs: 10,
+        cache: { quote: 'hit', history: 'hit' },
+        sources: { quote: 'yahoo_chart', history: 'yfinance' },
+        freshness: { quote: 'stale', history: 'stale' },
+        fallback: { quote: 'stale_disk_cache', history: 'stale_disk_cache' },
+        persistentCache: { quote: 'memory', history: 'memory', mode: 'local_json' },
+        refresh: { mode: 'cache_first', requested: false },
+        sourceHealth: {
+          quote: { source: 'unit_quote', status: 'ok', consecutiveFailures: 0 },
+          history: { source: 'unit_history', status: 'cooling_down', consecutiveFailures: 2 },
+        },
+        routeLane: 'us_market_data',
+        performance: { status: 'ok', slowThresholdMs: 3000 },
+      },
+      aiUsed: false,
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for source recovery'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByRole('textbox');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getAllByRole('button', { name: '快速分析' })[0]);
+
+    const recoveryPanel = await screen.findByTestId('basic-query-source-recovery-panel');
+    expect(recoveryPanel).toHaveTextContent('数据源修复建议');
+    expect(recoveryPanel).toHaveTextContent('为什么提示过期/缓存');
+    expect(recoveryPanel).toHaveTextContent('免费版现在可做');
+    expect(recoveryPanel).toHaveTextContent('先点刷新实时行情');
+    expect(recoveryPanel).toHaveTextContent('网络或代理异常时稍后重试');
+    expect(recoveryPanel).toHaveTextContent('高级版补齐');
+    expect(recoveryPanel).toHaveTextContent('多源 API 对照');
+    expect(recoveryPanel).toHaveTextContent('自动预热和恢复');
+    expect(recoveryPanel).toHaveTextContent('过期磁盘缓存');
+    expect(recoveryPanel).not.toHaveTextContent('stale_disk_cache');
+    fireEvent.click(screen.getByTestId('basic-query-source-recovery-refresh'));
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenLastCalledWith('AAPL', { refresh: true });
+    });
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
   it('shows quick query route and degradation warnings without submitting AI analysis', async () => {
