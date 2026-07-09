@@ -3069,6 +3069,22 @@ describe('HomePage', () => {
       primarySummary.compareDocumentPosition(proDecisionCard)
       & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    const quoteTrustPanel = screen.getByTestId('basic-query-quote-trust-panel');
+    expect(quoteTrustPanel).toHaveTextContent('行情可信度');
+    expect(quoteTrustPanel).toHaveTextContent('实时行情可用');
+    expect(quoteTrustPanel).toHaveTextContent('刷新动作');
+    expect(quoteTrustPanel).toHaveTextContent('刷新实时行情');
+    expect(quoteTrustPanel).toHaveTextContent('来源对照');
+    expect(quoteTrustPanel).toHaveTextContent('Yahoo 图表数据');
+    expect(quoteTrustPanel).toHaveTextContent('分析口吻');
+    expect(quoteTrustPanel).toHaveTextContent('可正常解读');
+    expect(quoteTrustPanel).toHaveTextContent('高级版补齐');
+    expect(quoteTrustPanel).toHaveTextContent('多源 API 对照');
+    fireEvent.click(screen.getByRole('button', { name: '刷新实时行情' }));
+    await waitFor(() => {
+      expect(stocksApi.snapshot).toHaveBeenCalledTimes(3);
+    });
+    expect(stocksApi.snapshot).toHaveBeenLastCalledWith('AAPL', { refresh: true });
     const verifiedDataBoard = screen.getByTestId('basic-query-verified-data-board');
     expect(verifiedDataBoard).toHaveTextContent('真实数据增强');
     expect(verifiedDataBoard).toHaveTextContent('数据可信度');

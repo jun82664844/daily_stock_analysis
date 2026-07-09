@@ -2247,6 +2247,108 @@ const HomePage: React.FC = () => {
       boundary: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议。',
     };
   }, [basicBrokerCockpit, basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicQuoteTrustPanel = useMemo(() => {
+    if (!basicSnapshot) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const sourceLabel = (source: unknown): string => {
+      const raw = String(source ?? '');
+      if (raw === 'yahoo_chart') {
+        return isEnglish ? 'Yahoo chart data' : 'Yahoo 图表数据';
+      }
+      if (raw === 'crypto_yahoo_chart') {
+        return isEnglish ? 'Yahoo crypto chart data' : 'Yahoo 加密行情图表';
+      }
+      return localizeGeneratedSource(raw, uiLanguage);
+    };
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const quoteFreshnessRaw = String(
+      basicSnapshot.quote.freshness
+      || basicSnapshot.diagnostics?.freshness?.quote
+      || '',
+    ).toLowerCase();
+    const quoteCacheRaw = String(basicSnapshot.diagnostics?.cache?.quote || '').toLowerCase();
+    const quoteFallbackRaw = String(basicSnapshot.diagnostics?.fallback?.quote || '').toLowerCase();
+    const quoteHealthRaw = Object.values(basicSnapshot.diagnostics?.sourceHealth ?? {})
+      .map((item) => String(item?.status || '').toLowerCase())
+      .filter(Boolean);
+    const refreshModeRaw = String(basicSnapshot.diagnostics?.refresh?.mode || '').toLowerCase();
+    const isFreshQuote = ['fresh', 'live', 'realtime', 'real_time'].some((token) => quoteFreshnessRaw.includes(token));
+    const usesCacheOrStale = [quoteFreshnessRaw, quoteCacheRaw, quoteFallbackRaw].some((value) => (
+      value.includes('cache')
+      || value.includes('cached')
+      || value.includes('stale')
+      || value.includes('expired')
+      || value === 'hit'
+    ));
+    const hasSourceIssue = quoteHealthRaw.some((status) => !['ok', 'healthy', 'live', 'fresh', 'success'].includes(status));
+    const forceRefreshRequested = basicSnapshot.diagnostics?.refresh?.requested === true || refreshModeRaw.includes('force');
+    const dataStateValue = currentPrice === null
+      ? (isEnglish ? 'Price missing, verify first' : '价格缺失，需复核')
+      : isFreshQuote && !usesCacheOrStale && !hasSourceIssue
+        ? (isEnglish ? 'Realtime quote available' : '实时行情可用')
+        : (isEnglish ? 'Stale or cached quote' : '过期或缓存行情');
+    const refreshActionValue = forceRefreshRequested
+      ? (isEnglish ? 'Force refresh requested' : '已请求强制刷新')
+      : isFreshQuote && !usesCacheOrStale
+        ? (isEnglish ? 'Refresh again to confirm' : '可再次刷新确认')
+        : (isEnglish ? 'Refresh before interpretation' : '先刷新再解读');
+    const sourceLane = basicSnapshot.route?.dataSourceLane
+      || basicSnapshot.route?.channel
+      || basicSnapshot.diagnostics?.routeLane
+      || `${basicSnapshot.market.toUpperCase()} market data`;
+    const sourceCompareValue = `${sourceLabel(basicSnapshot.quote.source)} / ${marketLaneLabel(sourceLane, uiLanguage)}`;
+    const analysisToneValue = dataStateValue === (isEnglish ? 'Realtime quote available' : '实时行情可用')
+      ? (isEnglish ? 'Normal interpretation allowed' : '可正常解读')
+      : (isEnglish ? 'Use as a watchlist checklist' : '先作为观察清单');
+    const sourceHealthValue = quoteHealthRaw.length > 0
+      ? Array.from(new Set(quoteHealthRaw.map((status) => localizeRuntimeLabel(status, uiLanguage)))).join(' / ')
+      : localizeRuntimeLabel('unavailable', uiLanguage);
+    const cards = [
+      {
+        label: isEnglish ? 'Data state' : '数据状态',
+        value: dataStateValue,
+        detail: isEnglish
+          ? `Freshness ${localizeRuntimeLabel(quoteFreshnessRaw || 'unavailable', uiLanguage)}; source health ${sourceHealthValue}.`
+          : `新鲜度 ${localizeRuntimeLabel(quoteFreshnessRaw || 'unavailable', uiLanguage)}；来源健康 ${sourceHealthValue}。`,
+      },
+      {
+        label: isEnglish ? 'Refresh action' : '刷新动作',
+        value: refreshActionValue,
+        detail: isEnglish
+          ? 'One click forces the quote/history lane to bypass cache when the backend supports it.'
+          : '一键走强制刷新，在后端支持时绕过缓存重新取行情和历史。',
+      },
+      {
+        label: isEnglish ? 'Source comparison' : '来源对照',
+        value: sourceCompareValue,
+        detail: isEnglish
+          ? `Cache ${localizeRuntimeLabel(quoteCacheRaw || 'unavailable', uiLanguage)}; fallback ${localizeRuntimeLabel(quoteFallbackRaw || 'unavailable', uiLanguage)}.`
+          : `缓存 ${localizeRuntimeLabel(quoteCacheRaw || 'unavailable', uiLanguage)}；兜底 ${localizeRuntimeLabel(quoteFallbackRaw || 'unavailable', uiLanguage)}。`,
+      },
+      {
+        label: isEnglish ? 'Analysis tone' : '分析口吻',
+        value: analysisToneValue,
+        detail: isEnglish
+          ? 'When the source is stale, the free report downgrades the language instead of pretending certainty.'
+          : '如果行情过期，免费研判会降级表达，不会把临时数据说成确定结论。',
+      },
+    ];
+    return {
+      title: isEnglish ? 'Quote trust' : '行情可信度',
+      subtitle: isEnglish
+        ? 'Before reading signals, confirm whether the quote is fresh, cached, degraded, or worth refreshing.'
+        : '读信号前先确认这次行情是实时、缓存、降级，还是应该先刷新。',
+      statusValue: dataStateValue,
+      refreshLabel: isEnglish ? 'Refresh live quote' : '刷新实时行情',
+      upgradeLabel: isEnglish ? 'Premium fills the gaps' : '高级版补齐',
+      upgradeItems: isEnglish
+        ? ['Multi-source API comparison', 'Abnormal price review', 'Source links', 'Refresh history tracking']
+        : ['多源 API 对照', '异常价格复核', '原文事件链接', '刷新历史追踪'],
+      cards,
+    };
+  }, [basicSnapshot, uiLanguage]);
   const basicVerifiedDataBoard = useMemo(() => {
     if (!basicSnapshot) {
       return null;
@@ -5004,6 +5106,57 @@ const HomePage: React.FC = () => {
                             ))}
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicQuoteTrustPanel ? (
+                  <section
+                    data-testid="basic-query-quote-trust-panel"
+                    className="mb-4 rounded-lg border border-primary/40 bg-surface/55 p-3"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-primary">{basicQuoteTrustPanel.title}</div>
+                        <h3 className="mt-1 text-lg font-semibold leading-snug text-foreground">
+                          {basicQuoteTrustPanel.subtitle}
+                        </h3>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
+                        <span className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                          {basicQuoteTrustPanel.statusValue}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={isQueryingBasic}
+                          onClick={() => void handleBasicQuery(basicSnapshot.stockCode, undefined, true, undefined, basicSnapshotViewMode)}
+                        >
+                          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                          {basicQuoteTrustPanel.refreshLabel}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      {basicQuoteTrustPanel.cards.map((card) => (
+                        <div key={card.label} className="min-w-0 rounded-md border border-subtle/75 bg-background/35 p-2.5">
+                          <div className="text-xs font-medium text-primary">{card.label}</div>
+                          <div className="mt-1 truncate text-sm font-semibold text-foreground">{card.value}</div>
+                          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-secondary-text">
+                            {card.detail}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-md border border-primary/30 bg-primary/10 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-xs font-semibold text-primary">{basicQuoteTrustPanel.upgradeLabel}</div>
+                      <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text sm:justify-end">
+                        {basicQuoteTrustPanel.upgradeItems.map((item) => (
+                          <span key={item} className="max-w-full rounded-md border border-primary/25 bg-background/35 px-1.5 py-0.5 text-primary">
+                            {item}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   </section>
