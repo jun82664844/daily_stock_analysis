@@ -3,7 +3,8 @@ import { lazy } from 'react';
 import type React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { buildRouteRecoveryUrl, RouteErrorBoundary, RouteOutletBoundary } from '../RouteBoundary';
+import { RouteErrorBoundary, RouteOutletBoundary } from '../RouteBoundary';
+import { buildRouteRecoveryUrl } from '../routeRecovery';
 import { Shell } from '../Shell';
 
 vi.mock('../../../contexts/AuthContext', () => ({

@@ -2138,7 +2138,7 @@ const HomePage: React.FC = () => {
         },
       ],
     };
-  }, [basicSnapshot, uiLanguage]);
+  }, [basicSnapshot, t, uiLanguage]);
   const basicDecisionJourneyV91 = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;

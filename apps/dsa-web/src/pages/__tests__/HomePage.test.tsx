@@ -6,6 +6,7 @@ import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
 import { platformApi } from '../../api/platform';
 import { stocksApi } from '../../api/stocks';
+import type { BasicStockSnapshot } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { useStockPoolStore } from '../../stores';
@@ -431,7 +432,7 @@ describe('HomePage', () => {
       quote: { currentPrice: 200, changePercent: 1.5, source: 'unit_quote', freshness: 'fresh' },
       indicators: { ma5: 198, ma20: 190 },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({ taskId: 'task-v93-trial', status: 'pending' });
 
     render(
@@ -478,7 +479,7 @@ describe('HomePage', () => {
         },
         warnings: [],
         aiUsed: false,
-      } as any)
+      } as unknown as BasicStockSnapshot)
       .mockResolvedValueOnce({
         stockCode: 'AAPL',
         stockName: 'Apple Inc.',
@@ -493,7 +494,7 @@ describe('HomePage', () => {
         },
         warnings: [{ code: 'quote_stale', severity: 'warning', message: 'stale' }],
         aiUsed: false,
-      } as any);
+      } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -905,7 +906,7 @@ describe('HomePage', () => {
         performance: { status: 'ok' },
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -1082,7 +1083,7 @@ describe('HomePage', () => {
         performance: { status: 'ok' },
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -1175,7 +1176,7 @@ describe('HomePage', () => {
         performance: { status: 'ok' },
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -1286,7 +1287,7 @@ describe('HomePage', () => {
         boundary: 'Information analysis only; not investment advice.',
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -1362,7 +1363,7 @@ describe('HomePage', () => {
         boundary: 'Information analysis only; not investment advice.',
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -1438,7 +1439,7 @@ describe('HomePage', () => {
         boundary: 'Information analysis only; not investment advice.',
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -2707,7 +2708,7 @@ describe('HomePage', () => {
         boundary: 'Information analysis only; not investment advice.',
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for guest quick analysis'));
 
     render(
@@ -2756,7 +2757,7 @@ describe('HomePage', () => {
         boundary: 'Information analysis only; not investment advice.',
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run while platform status is still loading'));
 
     render(
@@ -2812,7 +2813,7 @@ describe('HomePage', () => {
         boundary: 'Information analysis only; not investment advice.',
       },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
 
     render(
       <MemoryRouter>
@@ -5593,7 +5594,7 @@ describe('HomePage', () => {
       quote: { currentPrice: 200, changePercent: 1.5, source: 'unit_quote', freshness: 'fresh' },
       indicators: { ma5: 198, ma20: 190 },
       aiUsed: false,
-    } as any);
+    } as unknown as BasicStockSnapshot);
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
       taskId: 'task-guest-snapshot-deep',
       status: 'pending',

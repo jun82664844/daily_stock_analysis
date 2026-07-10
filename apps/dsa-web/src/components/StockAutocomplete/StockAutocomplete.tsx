@@ -5,7 +5,7 @@
  * Supports keyboard navigation, IME input method, graceful degradation
  */
 
-import { Component, useRef, useEffect, useState } from 'react';
+import { Component, useCallback, useRef, useEffect, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -138,10 +138,10 @@ function StockAutocompleteInner({
     });
   };
 
-  const closeSuggestions = () => {
+  const closeSuggestions = useCallback(() => {
     close();
     setDropdownStyle(null);
-  };
+  }, [close]);
 
   // Sync external value with internal query (only when value truly changes)
   useEffect(() => {
@@ -181,9 +181,11 @@ function StockAutocompleteInner({
       return;
     }
     prevCloseSignalRef.current = closeSignal;
+    // closeSignal is an imperative parent signal, so resetting local UI state is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     closeSuggestions();
     inputRef.current?.blur();
-  }, [closeSignal]);
+  }, [closeSignal, closeSuggestions]);
 
   // Keyboard event handling
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {

@@ -3,6 +3,11 @@ import { Component, Suspense } from 'react';
 import type { ErrorInfo } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import {
+  buildRouteRecoveryUrl,
+  getRouteChunkReloadKey,
+  isRecoverableRouteChunkError,
+} from './routeRecovery';
 
 type PageLoadingFallbackProps = {
   fullPage?: boolean;
@@ -38,35 +43,7 @@ type RouteErrorBoundaryState = {
 };
 
 const CHUNK_RELOAD_KEY_PREFIX = 'dsa:route-chunk-reload:';
-const ROUTE_RECOVERY_PARAM = 'dsa_route_reload';
 const chunkReloadFallbackAttempts = new Set<string>();
-
-const routeChunkErrorMarkers = [
-  'failed to fetch dynamically imported module',
-  'error loading dynamically imported module',
-  'importing a module script failed',
-  'chunkloaderror',
-  'loading chunk',
-] as const;
-
-const getErrorText = (error: unknown): string => {
-  if (error instanceof Error) {
-    return `${error.name} ${error.message} ${error.stack ?? ''}`;
-  }
-  return String(error ?? '');
-};
-
-export const isRecoverableRouteChunkError = (error: unknown): boolean => {
-  const message = getErrorText(error).toLowerCase();
-  return routeChunkErrorMarkers.some((marker) => message.includes(marker));
-};
-
-const getRouteChunkReloadKey = (error: unknown): string => {
-  const message = getErrorText(error);
-  const assetMatch = message.match(/\/assets\/[^\s'")]+/i)?.[0];
-  const signature = assetMatch ?? message.slice(0, 180);
-  return `${CHUNK_RELOAD_KEY_PREFIX}${signature}`;
-};
 
 const wasRouteChunkReloadAttempted = (key: string): boolean => {
   try {
@@ -82,12 +59,6 @@ const markRouteChunkReloadAttempted = (key: string): void => {
   } catch {
     chunkReloadFallbackAttempts.add(key);
   }
-};
-
-export const buildRouteRecoveryUrl = (currentHref: string, timestamp = Date.now()): string => {
-  const url = new URL(currentHref, window.location.origin);
-  url.searchParams.set(ROUTE_RECOVERY_PARAM, String(timestamp));
-  return url.toString();
 };
 
 const recoverRoutePage = (): void => {
@@ -109,7 +80,7 @@ export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, Route
       return;
     }
 
-    const reloadKey = getRouteChunkReloadKey(error);
+    const reloadKey = getRouteChunkReloadKey(error, CHUNK_RELOAD_KEY_PREFIX);
     if (wasRouteChunkReloadAttempted(reloadKey)) {
       return;
     }
