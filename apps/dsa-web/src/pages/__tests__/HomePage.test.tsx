@@ -617,6 +617,17 @@ describe('HomePage', () => {
       </UiLanguageProvider>,
     );
 
+    expect(await screen.findByTestId('platform-auth-login-tab')).toHaveTextContent('Login');
+    expect(screen.getByTestId('platform-auth-register-tab')).toHaveTextContent('Register');
+    expect(screen.getByTestId('platform-auth-email')).toHaveAttribute('placeholder', 'Email');
+    expect(screen.getByTestId('platform-auth-password')).toHaveAttribute('placeholder', 'Password');
+    expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('Login');
+    fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
+    expect(screen.getByTestId('platform-auth-confirm-password')).toHaveAttribute('placeholder', 'Confirm password');
+    expect(screen.getByTestId('platform-auth-verification-code')).toHaveAttribute('placeholder', 'Verification code');
+    expect(screen.getByTestId('platform-auth-send-code')).toHaveTextContent('Send code');
+    expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('Register');
+    fireEvent.click(screen.getByTestId('platform-auth-login-tab'));
     fireEvent.change(await screen.findByTestId('platform-auth-email'), { target: { value: 'login@example.com' } });
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'bad-password' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
@@ -3048,49 +3059,37 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
-    const firstScreenFocus = screen.getByTestId('basic-query-first-screen-focus-v90');
+    const decisionJourney = screen.getByTestId('basic-query-decision-journey-v91');
     expect(
-      screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(firstScreenFocus)
+      screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(decisionJourney)
       & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(firstScreenFocus).toHaveTextContent('首屏聚焦');
-    expect(firstScreenFocus).toHaveTextContent('第一屏先看四件事');
-    expect(firstScreenFocus).toHaveTextContent('结论');
-    expect(firstScreenFocus).toHaveTextContent('证据');
-    expect(firstScreenFocus).toHaveTextContent('风险');
-    expect(firstScreenFocus).toHaveTextContent('升级差异');
-    expect(firstScreenFocus).toHaveTextContent('下方模块降为证据库');
-    expect(firstScreenFocus).toHaveTextContent('免费版不锁内容');
-    expect(firstScreenFocus).toHaveTextContent('未用 AI，不扣额度');
-    fireEvent.click(within(firstScreenFocus).getByRole('button', { name: '看决策台' }));
-    fireEvent.click(within(firstScreenFocus).getByRole('button', { name: '看证据库' }));
-    fireEvent.click(within(firstScreenFocus).getByRole('button', { name: '看升级差异' }));
+    expect(decisionJourney).toHaveTextContent('V91 专业免费研判');
+    expect(decisionJourney).toHaveTextContent('用户决策闭环');
+    expect(decisionJourney).toHaveTextContent('结论');
+    expect(decisionJourney).toHaveTextContent('价位地图');
+    expect(decisionJourney).toHaveTextContent('风险边界');
+    expect(decisionJourney).toHaveTextContent('关键证据');
+    expect(decisionJourney).toHaveTextContent('美股重点');
+    expect(decisionJourney).toHaveTextContent('财报与 SEC 文件');
+    expect(decisionJourney).toHaveTextContent('证据库');
+    expect(decisionJourney).toHaveTextContent('免费版包含');
+    expect(decisionJourney).toHaveTextContent('高级版增强');
+    expect(decisionJourney).toHaveTextContent('未用 AI，不扣额度');
+    expect(decisionJourney).toHaveTextContent('仅作信息分析，不构成投资建议');
+    const evidenceLibrary = within(decisionJourney).getByTestId('decision-journey-evidence-library');
+    expect(evidenceLibrary).toHaveTextContent('行情量价');
+    expect(evidenceLibrary).toHaveTextContent('技术证据');
+    expect(evidenceLibrary).toHaveTextContent('资讯事件');
+    expect(evidenceLibrary).toHaveTextContent('基本面');
+    expect(evidenceLibrary).toHaveTextContent('来源可信度');
+    expect(within(decisionJourney).getByTestId('decision-journey-price-chart')).toBeInTheDocument();
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
-    const brokerDecisionDesk = screen.getByTestId('basic-query-broker-decision-desk-v89');
-    expect(
-      firstScreenFocus.compareDocumentPosition(brokerDecisionDesk)
-      & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(brokerDecisionDesk)
-      & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(brokerDecisionDesk).toHaveTextContent('经纪人决策台');
-    expect(brokerDecisionDesk).toHaveTextContent('先给结论');
-    expect(brokerDecisionDesk).toHaveTextContent('机会窗口');
-    expect(brokerDecisionDesk).toHaveTextContent('风险边界');
-    expect(brokerDecisionDesk).toHaveTextContent('证据确认');
-    expect(brokerDecisionDesk).toHaveTextContent('高级版补强');
-    expect(brokerDecisionDesk).toHaveTextContent('免费版看到同样结构');
-    expect(brokerDecisionDesk).toHaveTextContent('未用 AI，不扣额度');
-    expect(brokerDecisionDesk).toHaveTextContent('仅作信息分析，不构成投资建议');
-    fireEvent.click(within(brokerDecisionDesk).getByRole('button', { name: '看证据' }));
-    fireEvent.click(within(brokerDecisionDesk).getByRole('button', { name: '看风险' }));
-    fireEvent.click(within(brokerDecisionDesk).getByRole('button', { name: '看升级差异' }));
-    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('basic-query-first-screen-focus-v90')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('basic-query-broker-decision-desk-v89')).not.toBeInTheDocument();
     const nextActions = screen.getByTestId('basic-query-next-actions-v85');
     expect(
-      brokerDecisionDesk.compareDocumentPosition(nextActions)
+      decisionJourney.compareDocumentPosition(nextActions)
       & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(nextActions).toHaveTextContent('下一步工作流');

@@ -10,6 +10,8 @@ import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type Kro
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
+import { DecisionJourneyV91 } from '../components/analysis/DecisionJourneyV91';
+import { buildDecisionJourneyModel } from '../components/analysis/decisionJourneyModel';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { HistoryList, StockHistoryTrendDrawer, StockBar } from '../components/history';
@@ -2088,6 +2090,28 @@ const HomePage: React.FC = () => {
       ],
     };
   }, [basicSnapshot, uiLanguage]);
+  const basicDecisionJourneyV91 = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const fallbackRisk = uiLanguage === 'en'
+      ? 'Refresh stale or incomplete data before interpreting the signal.'
+      : '行情过期或数据不完整时，先刷新再解读信号。';
+    return buildDecisionJourneyModel({
+      snapshot: basicSnapshot,
+      language: uiLanguage === 'en' ? 'en' : 'zh',
+      conclusion: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+      score: basicFreeReport.score,
+      risk: localizeGeneratedText(
+        basicFreeReport.productBrief.risks[0]
+          || basicFreeReport.productBrief.midStatus
+          || fallbackRisk,
+        uiLanguage,
+      ),
+      support: localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage),
+      resistance: localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage),
+    });
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicFreeCompleteRead = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport) {
       return null;
@@ -2229,117 +2253,6 @@ const HomePage: React.FC = () => {
       nextActions: isEnglish
         ? ['Check price versus MA20', 'Compare QQQ / sector', 'Open deep mode only when source links are needed']
         : ['先看价格是否守住 MA20', '再和 QQQ / 行业参照比较', '需要来源链接时再开深度模式'],
-    };
-  }, [basicFreeReport, basicSnapshot, uiLanguage]);
-  const basicBrokerDecisionDesk = useMemo(() => {
-    if (!basicSnapshot || !basicFreeReport || !basicBrokerCockpit) {
-      return null;
-    }
-    const isEnglish = uiLanguage === 'en';
-    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
-    const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
-    const support = localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage);
-    const resistance = localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage);
-    const firstEvidence = basicBrokerCockpit.evidenceItems[0];
-    const secondEvidence = basicBrokerCockpit.evidenceItems[1];
-    const firstRisk = basicBrokerCockpit.riskItems[0]
-      || (isEnglish ? 'Keep this as an information-only checklist.' : '先把这次结果作为信息分析清单。');
-    return {
-      title: isEnglish ? 'Broker decision desk' : '经纪人决策台',
-      subtitle: isEnglish
-        ? 'A broker-style first screen: conclusion, opportunity, risk, evidence, and the premium data gap.'
-        : '像经纪人一样先看结论、机会、风险、证据和高级版补强点。',
-      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
-      disclaimer: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议',
-      freeLabel: isEnglish ? 'Free shows the same structure' : '免费版看到同样结构',
-      premiumLabel: isEnglish ? 'Premium strengthens sources' : '高级版补强',
-      actionLabels: {
-        evidence: isEnglish ? 'See evidence' : '看证据',
-        risk: isEnglish ? 'See risk' : '看风险',
-        upgrade: isEnglish ? 'See upgrade gap' : '看升级差异',
-      },
-      cards: [
-        {
-          key: 'verdict',
-          label: isEnglish ? 'Conclusion first' : '先给结论',
-          headline: basicBrokerCockpit.verdict,
-          detail: isEnglish
-            ? `Research score ${basicBrokerCockpit.score}; price ${formatBasicNumber(currentPrice)} (${formatSignedBasicPercent(changePercent)}).`
-            : `研究分 ${basicBrokerCockpit.score}；最新价 ${formatBasicNumber(currentPrice)}（${formatSignedBasicPercent(changePercent)}）。`,
-        },
-        {
-          key: 'opportunity',
-          label: isEnglish ? 'Opportunity window' : '机会窗口',
-          headline: isEnglish
-            ? `Support ${support}; resistance ${resistance}`
-            : `支撑 ${support}；压力 ${resistance}`,
-          detail: secondEvidence?.detail || basicBrokerCockpit.nextActions[0],
-        },
-        {
-          key: 'risk',
-          label: isEnglish ? 'Risk boundary' : '风险边界',
-          headline: firstRisk,
-          detail: isEnglish
-            ? 'Read risk before chasing the move; stale or incomplete data should be refreshed first.'
-            : '追涨跌前先看风险；行情过期或数据不完整时，先刷新再解读。',
-        },
-        {
-          key: 'evidence',
-          label: isEnglish ? 'Evidence confirmation' : '证据确认',
-          headline: firstEvidence?.value || basicBrokerCockpit.proofLabel,
-          detail: firstEvidence?.detail || basicBrokerCockpit.nextActions.join('；'),
-        },
-      ],
-      upgradeItems: basicBrokerCockpit.upgradeItems.slice(0, 4),
-    };
-  }, [basicBrokerCockpit, basicFreeReport, basicSnapshot, uiLanguage]);
-  const basicFirstScreenFocus = useMemo(() => {
-    if (!basicSnapshot || !basicFreeReport) {
-      return null;
-    }
-    const isEnglish = uiLanguage === 'en';
-    const firstRisk = basicFreeReport.productBrief.risks[0]
-      || basicFreeReport.productBrief.midStatus
-      || basicFreeReport.productBrief.shortStatus;
-    return {
-      title: isEnglish ? 'First-screen focus' : '首屏聚焦',
-      subtitle: isEnglish
-        ? 'Read four things first; use lower modules as the evidence library.'
-        : '第一屏先看四件事；下方模块降为证据库。',
-      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
-      freeLabel: isEnglish ? 'Free does not lock content' : '免费版不锁内容',
-      secondaryLabel: isEnglish ? 'Lower modules become evidence library' : '下方模块降为证据库',
-      actionLabels: {
-        desk: isEnglish ? 'Decision desk' : '看决策台',
-        evidence: isEnglish ? 'Evidence library' : '看证据库',
-        upgrade: isEnglish ? 'Upgrade gap' : '看升级差异',
-      },
-      points: [
-        {
-          key: 'conclusion',
-          label: isEnglish ? 'Conclusion' : '结论',
-          detail: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
-        },
-        {
-          key: 'evidence',
-          label: isEnglish ? 'Evidence' : '证据',
-          detail: isEnglish
-            ? `Support ${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}; resistance ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}.`
-            : `支撑 ${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}；压力 ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}。`,
-        },
-        {
-          key: 'risk',
-          label: isEnglish ? 'Risk' : '风险',
-          detail: localizeGeneratedText(firstRisk, uiLanguage),
-        },
-        {
-          key: 'upgrade',
-          label: isEnglish ? 'Upgrade gap' : '升级差异',
-          detail: isEnglish
-            ? 'Premium improves source freshness, links, and model depth; free keeps the same reading structure.'
-            : '高级版增强数据新鲜度、来源链接和模型深度；免费版保留同样阅读结构。',
-        },
-      ],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicProDecisionCard = useMemo(() => {
@@ -5508,7 +5421,7 @@ const HomePage: React.FC = () => {
                       data-testid="platform-auth-login-tab"
                       className={`rounded-md px-2 py-1 ${authMode === 'login' ? 'bg-primary text-primary-foreground' : 'text-secondary-text hover:text-foreground'}`}
                     >
-                      登录
+                      {uiLanguage === 'en' ? 'Login' : '登录'}
                     </button>
                     <button
                       type="button"
@@ -5516,7 +5429,7 @@ const HomePage: React.FC = () => {
                       data-testid="platform-auth-register-tab"
                       className={`rounded-md px-2 py-1 ${authMode === 'register' ? 'bg-primary text-primary-foreground' : 'text-secondary-text hover:text-foreground'}`}
                     >
-                      注册
+                      {uiLanguage === 'en' ? 'Register' : '注册'}
                     </button>
                     {authError ? <span className="text-danger" data-testid="platform-auth-error">{authError}</span> : null}
                   </div>
@@ -5533,7 +5446,7 @@ const HomePage: React.FC = () => {
                         setAuthError('');
                       }}
                       data-testid="platform-auth-email"
-                      placeholder="邮箱"
+                      placeholder={uiLanguage === 'en' ? 'Email' : '邮箱'}
                       className="h-8 w-44 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
                     />
                     <input
@@ -5546,7 +5459,7 @@ const HomePage: React.FC = () => {
                         setAuthError('');
                       }}
                       data-testid="platform-auth-password"
-                      placeholder="密码"
+                      placeholder={uiLanguage === 'en' ? 'Password' : '密码'}
                       className="h-8 w-36 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
                     />
                     {authMode === 'register' ? (
@@ -5561,7 +5474,7 @@ const HomePage: React.FC = () => {
                             setAuthError('');
                           }}
                           data-testid="platform-auth-confirm-password"
-                          placeholder={uiLanguage === 'en' ? 'Confirm' : '确认密码'}
+                          placeholder={uiLanguage === 'en' ? 'Confirm password' : '确认密码'}
                           className="h-8 w-36 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
                         />
                         <input
@@ -5575,7 +5488,7 @@ const HomePage: React.FC = () => {
                             setAuthError('');
                           }}
                           data-testid="platform-auth-verification-code"
-                          placeholder={uiLanguage === 'en' ? 'Code' : '验证码'}
+                          placeholder={uiLanguage === 'en' ? 'Verification code' : '验证码'}
                           className="h-8 w-24 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text"
                         />
                         <Button
@@ -5601,7 +5514,9 @@ const HomePage: React.FC = () => {
                       onClick={() => void handlePlatformAuth()}
                       data-testid="platform-auth-submit"
                     >
-                      {authMode === 'register' ? '注册' : '登录'}
+                      {authMode === 'register'
+                        ? (uiLanguage === 'en' ? 'Register' : '注册')
+                        : (uiLanguage === 'en' ? 'Login' : '登录')}
                     </Button>
                     {authMode === 'register' && authVerificationStatus ? (
                       <span className="text-success" data-testid="platform-auth-verification-status">
@@ -5970,171 +5885,18 @@ const HomePage: React.FC = () => {
                     ) : null}
                   </section>
                 ) : null}
-                {basicSnapshotViewMode === 'quick' && basicFirstScreenFocus ? (
-                  <section
-                    data-testid="basic-query-first-screen-focus-v90"
-                    className="mb-4 rounded-lg border border-primary/45 bg-gradient-to-r from-primary/14 via-surface/75 to-background/45 p-3 shadow-soft-card"
-                  >
-                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
-                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 font-semibold text-primary">
-                            {basicFirstScreenFocus.title}
-                          </span>
-                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
-                            {basicFirstScreenFocus.boundary}
-                          </span>
-                          <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
-                            {basicFirstScreenFocus.freeLabel}
-                          </span>
-                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
-                            {basicFirstScreenFocus.secondaryLabel}
-                          </span>
-                        </div>
-                        <h3 className="mt-2 text-lg font-semibold leading-snug text-foreground">
-                          {basicFirstScreenFocus.subtitle}
-                        </h3>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleBasicFeatureJump('basic-query-broker-decision-desk-v89')}
-                        >
-                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                          {basicFirstScreenFocus.actionLabels.desk}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleBasicFeatureJump('basic-query-visual-analyst-page-v87')}
-                        >
-                          <Search className="h-4 w-4" aria-hidden="true" />
-                          {basicFirstScreenFocus.actionLabels.evidence}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleBasicFeatureJump('basic-query-commercial-journey')}
-                        >
-                          <Sparkles className="h-4 w-4" aria-hidden="true" />
-                          {basicFirstScreenFocus.actionLabels.upgrade}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-2 lg:grid-cols-4">
-                      {basicFirstScreenFocus.points.map((point) => (
-                        <div
-                          key={point.key}
-                          className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-3"
-                        >
-                          <div className="text-xs font-semibold text-primary">{point.label}</div>
-                          <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-secondary-text">
-                            {point.detail}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-                {basicSnapshotViewMode === 'quick' && basicBrokerDecisionDesk ? (
-                  <section
-                    data-testid="basic-query-broker-decision-desk-v89"
-                    className="mb-4 rounded-lg border border-primary/50 bg-gradient-to-br from-primary/16 via-surface/75 to-background/45 p-3 shadow-soft-card"
-                  >
-                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
-                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 font-semibold text-primary">
-                            {basicBrokerDecisionDesk.title}
-                          </span>
-                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
-                            {basicBrokerDecisionDesk.boundary}
-                          </span>
-                          <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
-                            {basicBrokerDecisionDesk.freeLabel}
-                          </span>
-                          <span className="rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-warning">
-                            {basicBrokerDecisionDesk.premiumLabel}
-                          </span>
-                        </div>
-                        <h3 className="mt-2 text-xl font-semibold leading-snug text-foreground">
-                          {basicBrokerDecisionDesk.subtitle}
-                        </h3>
-                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                          {basicBrokerDecisionDesk.disclaimer}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleBasicFeatureJump('basic-query-visual-analyst-page-v87')}
-                        >
-                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                          {basicBrokerDecisionDesk.actionLabels.evidence}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleBasicFeatureJump('basic-query-free-analyst-workbench-v86')}
-                        >
-                          <Search className="h-4 w-4" aria-hidden="true" />
-                          {basicBrokerDecisionDesk.actionLabels.risk}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleBasicFeatureJump('basic-query-commercial-journey')}
-                        >
-                          <Sparkles className="h-4 w-4" aria-hidden="true" />
-                          {basicBrokerDecisionDesk.actionLabels.upgrade}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid gap-2 lg:grid-cols-4">
-                      {basicBrokerDecisionDesk.cards.map((card) => (
-                        <div
-                          key={card.key}
-                          className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-3"
-                        >
-                          <div className="text-xs font-semibold text-primary">{card.label}</div>
-                          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-                            {card.headline}
-                          </div>
-                          <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-secondary-text">
-                            {card.detail}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 rounded-md border border-primary/30 bg-primary/8 p-3">
-                      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-primary">{basicBrokerDecisionDesk.premiumLabel}</div>
-                          <p className="mt-1 text-xs leading-relaxed text-secondary-text">
-                            {basicBrokerDecisionDesk.freeLabel}；{basicBrokerDecisionDesk.premiumLabel}。
-                          </p>
-                        </div>
-                        <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] text-primary">
-                          {basicBrokerDecisionDesk.upgradeItems.map((item) => (
-                            <span
-                              key={item}
-                              className="max-w-full rounded-md border border-primary/35 bg-background/35 px-2 py-1"
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </section>
+                {basicSnapshotViewMode === 'quick' && basicDecisionJourneyV91 ? (
+                  <DecisionJourneyV91
+                    model={basicDecisionJourneyV91}
+                    onJump={(target) => {
+                      const targetId = target === 'events'
+                        ? 'basic-query-news-center'
+                        : target === 'kline'
+                          ? 'basic-query-kline-forecast-lab'
+                          : 'basic-query-commercial-journey';
+                      handleBasicFeatureJump(targetId);
+                    }}
+                  />
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicNextActionsWorkflow ? (
                   <section
