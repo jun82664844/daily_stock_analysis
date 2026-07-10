@@ -14,9 +14,11 @@
 
 ## Plans
 
-- Free users can run basic queries and limited quick AI analysis.
+- Anonymous and free users can run the public no-AI lookup and quick-research lane without consuming model quota.
+- A signed-in free user receives 5 weekly platform-API quick-analysis trials in the `ai_quick` bucket. The API trial action must be visibly separate from no-AI quick research and must disclose the remaining count before submission.
 - Free users cannot use platform-key deep analysis unless the plan policy is changed.
-- Pro users get higher quick/deep AI limits.
+- Pro users get higher quick/deep AI limits and may choose the platform API, a saved user-owned API key, or an approved local model. BYOK and local-model requests retain their separate abuse-control buckets.
+- Exhausting the free platform-API trial must not disable anonymous/free no-AI lookup or quick research.
 - `premium` is retained as a backward-compatible local alias for the same paid tier as `pro`.
 - Enterprise users may have unlimited limits or contract-defined limits.
 
@@ -52,6 +54,7 @@
 - Platform-user watchlists are private to each signed-in user and separate from the global `STOCK_LIST` configuration watchlist.
 - Watchlist refresh uses the no-AI quick snapshot lane for A-share, US equity, HK equity, and crypto spot symbols, and must not consume AI quota.
 - The watchlist board may display price, change percent, route lane, freshness, degradation status, and warning codes, but row actions must reuse the existing quick snapshot path instead of triggering deep/AI analysis.
+- The watchlist refresh may present a daily review summary with strongest move, weakest move, and data-quality flag count. It remains no-AI and private to the signed-in user.
 - The ordinary-user public flow must allow local register/login, account summary, quick query, add-current watchlist, and refresh-watchlist operations without exposing admin navigation or plaintext API keys.
 
 ## Query Workspace
@@ -66,7 +69,15 @@
 - Manual current-snapshot refresh uses `snapshot?refresh=true`; it bypasses snapshot cache, updates local market cache after a deterministic quote/history fetch, and must not submit AI analysis.
 - Refresh diagnostics must expose `force_refresh`, quote/history cache state, source, freshness, fallback, and source health.
 - Refresh failures or unavailable upstream market sources must degrade visibly instead of being presented as complete fresh data.
+- When the normal US/HK daily-history manager returns no rows or fails, the local service may use bounded Yahoo Chart daily history as `yahoo_chart_history`. A-share symbols must not be routed into this US/HK fallback.
 - Historical AI reports must be visibly labeled as historical output and not current quote data. Refreshing current quote from a historical report must use the no-AI `snapshot?refresh=true` path and must not submit AI analysis.
+
+## A-share History Resilience V94
+
+- Direct local history retrieval uses a bounded `HISTORY_FETCH_TIMEOUT_SEC` budget, defaulting to 12 seconds, and exposes `history_timeout` or `history_unavailable` when no usable rows are available.
+- The provider manager may bound individual provider calls within the total history budget. A slow provider must not block the next local request indefinitely.
+- Pytdx public-host discovery is disabled by default when no `PYTDX_SERVERS` or `PYTDX_HOST`/`PYTDX_PORT` is configured. Explicit `PYTDX_AUTO_DISCOVERY_ENABLED=true` remains an opt-in local diagnostic mode.
+- A-share history remains separate from the US/HK Yahoo history fallback. Timeout and stale states must remain visible and must not be presented as fresh data.
 
 ## History Export
 
@@ -120,6 +131,17 @@
 - The current snapshot UI may show free no-AI quota, platform API AI quota, BYOK quota/readiness, and local-model quota/capacity together, but must not expose plaintext API keys, tokens, secrets, or passwords.
 - Logout and login should reload private history/watchlist state. Saved records remain informational analysis only and are not investment advice.
 
+## Free Retention And API Trial V93
+
+- The HomePage must distinguish three actions: public lookup, no-AI quick research, and API-backed AI analysis. “Quick analysis” must not silently consume an API trial.
+- Async platform API analysis reserves its quota before queue admission; duplicate or failed queue submissions release the reservation by unique reference.
+- Anonymous free lookup may read the public no-AI stock snapshot, daily history, and Kronos preview paths; private history reports, watchlists, account state, and AI analysis remain authenticated.
+- Guests may see the API-trial offer, but clicking it only opens/focuses registration or login; it must not block or erase the current free snapshot.
+- The same-symbol comparison stores only bounded quote/indicator observations in versioned browser storage. It must not store credentials, API keys, account data, full reports, or another user’s private data.
+- A second query for the same market/symbol may compare price, daily move, MA20 position, signal score, freshness, volume signal, and warning count against the prior browser observation.
+- The comparison must truthfully label first-observation, unchanged, and changed states and remain no-AI.
+- The local daily-watchlist review, browser comparison, and Yahoo history fallback are retention aids only. They do not constitute investment advice or a production-market-data SLA.
+
 ## Local V1 Billing Boundary
 
 - Billing routes exist for contract testing.
@@ -139,3 +161,34 @@
 - Reports are informational analysis only.
 - Prices and indicators come from data providers and carry source/freshness metadata.
 - Historical reports are historical snapshots and should not be confused with fresh queries.
+
+## Free API Trial Result Loop V95
+
+- A signed-in free user may use only the bounded weekly platform-API trial bucket; this flow does not create an unlimited free API lane.
+- A successful asynchronous trial submission must preserve its accepted task id in the client state when the backend returns one.
+- The accepted task must enter the local active-task list before SSE updates are applied, so a fast completion event cannot leave the result card stuck in a pending state.
+- The HomePage must show a localized pending/processing state and bounded progress while the trial task is active.
+- Completed tasks must state that history was refreshed. Failed or cancelled tasks must remain visibly failed and must not be presented as a completed report.
+- No plaintext API key, token, provider secret, or task payload is written to browser storage by this result loop.
+- No-AI lookup remains available while the trial task runs. Pro users may continue to select platform API, BYOK, or local model according to their separate quota buckets.
+- This is a local-only retention improvement. It does not approve real payment, production API keys, hosting SLA, or investment advice.
+
+## Free Trial Report Conversion V96
+
+- A completed free platform-API trial should automatically open the newly created report instead of leaving the user on the no-AI snapshot.
+- The client must match a report created after trial submission, for the same normalized stock symbol, and outside the pre-submit history-id baseline. An older report must not be reopened as the trial result.
+- History-list refreshes may replace an in-flight lookup. The newest lookup must be allowed to match the report; a cancelled older lookup must not keep the flow locked.
+- The opened report may show a localized premium-options band for the signed-in free user. It must explain the existing Platform API, user API, and local-model choices without hiding the report content.
+- The premium-options action navigates to the existing account page. It must not create checkout, change plan, or imply that real payment is enabled.
+- The V96 flow remains local-only, uses the existing bounded weekly trial quota, stores no credentials, and does not constitute investment advice.
+
+## Free Retention Funnel V97
+
+- The local retention funnel accepts only five events: `free_query_completed`, `registration_completed`, `api_trial_submitted`, `trial_report_opened`, and `premium_options_viewed`.
+- Public event writes are rate-limitable and accept only a versioned browser session id plus a fixed source. Arbitrary metadata, email, stock code, report text, API keys, tokens, and payment data are rejected.
+- The browser session id is hashed before persistence. The raw id must never be written to platform audit storage or returned by admin APIs.
+- Duplicate event/session pairs are suppressed for the same local day so UI re-renders and repeated clicks do not inflate the ledger.
+- The administrator funnel is admin-only and uses a bounded 1-90 day window. It returns aggregate unique-session counts, reached-from-start counts, drop-off counts, and conversion percentages without session or user identifiers.
+- General admin audit output strips the internal retention session hash and may expose only the fixed event source.
+- Frontend tracking is best-effort. Telemetry failure must never block free lookup, registration, API-trial submission, report opening, or account navigation.
+- V97 remains local-only, no-AI aggregation. It is not cross-site tracking, production analytics approval, real payment, or investment advice.

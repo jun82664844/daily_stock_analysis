@@ -12,15 +12,26 @@
 import logging
 import json
 import os
+import re
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
 from src.repositories.stock_repo import StockRepository
 from src.services.stock_code_utils import normalize_crypto_symbol
 
 logger = logging.getLogger(__name__)
+
+
+def _positive_env_float(name: str, default: float) -> float:
+    try:
+        return max(0.1, float(os.environ.get(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+_HISTORY_FETCH_TIMEOUT_SECONDS = _positive_env_float("HISTORY_FETCH_TIMEOUT_SEC", 12.0)
 
 
 class StockService:
@@ -135,11 +146,23 @@ class StockService:
             from data_provider.base import DataFetcherManager
             
             manager = DataFetcherManager()
-            df, source = manager.get_daily_data(stock_code, days=days)
+            df, source = manager.get_daily_data(
+                stock_code,
+                days=days,
+                timeout_seconds=_HISTORY_FETCH_TIMEOUT_SECONDS,
+            )
             
             if df is None or df.empty:
                 logger.warning(f"获取 {stock_code} 历史数据失败")
-                return {"stock_code": stock_code, "period": period, "data": []}
+                public_history = self._get_public_yahoo_history_data(stock_code, period=period, days=days)
+                if public_history is not None:
+                    return public_history
+                return {
+                    "stock_code": stock_code,
+                    "period": period,
+                    "source": source or "history_empty",
+                    "data": [],
+                }
             
             # 获取股票名称
             stock_name = manager.get_stock_name(stock_code)
@@ -168,15 +191,32 @@ class StockService:
                 "stock_code": stock_code,
                 "stock_name": stock_name,
                 "period": period,
+                "source": source,
                 "data": data,
             }
             
         except ImportError:
             logger.warning("DataFetcherManager 未找到，返回空数据")
-            return {"stock_code": stock_code, "period": period, "data": []}
+            public_history = self._get_public_yahoo_history_data(stock_code, period=period, days=days)
+            if public_history is not None:
+                return public_history
+            return {
+                "stock_code": stock_code,
+                "period": period,
+                "source": "history_unavailable",
+                "data": [],
+            }
         except Exception as e:
             logger.error(f"获取历史数据失败: {e}", exc_info=True)
-            return {"stock_code": stock_code, "period": period, "data": []}
+            public_history = self._get_public_yahoo_history_data(stock_code, period=period, days=days)
+            if public_history is not None:
+                return public_history
+            return {
+                "stock_code": stock_code,
+                "period": period,
+                "source": "history_timeout" if "timeout" in str(e).lower() else "history_unavailable",
+                "data": [],
+            }
 
     def get_basic_company_profile(self, stock_code: str) -> Optional[Dict[str, Any]]:
         """Fetch lightweight public company facts for the no-AI quick lane."""
@@ -288,7 +328,7 @@ class StockService:
         except ValueError:
             return 3.0
 
-    def _load_crypto_yahoo_chart(
+    def _load_public_yahoo_chart(
         self,
         symbol: str,
         *,
@@ -303,7 +343,7 @@ class StockService:
             with urllib.request.urlopen(request, timeout=self._crypto_yahoo_timeout()) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except Exception as exc:
-            logger.info("[crypto_quote] Yahoo chart unavailable for %s: %s", symbol, exc)
+            logger.info("[yahoo_chart] request unavailable for %s: %s", symbol, exc)
             return None
 
         try:
@@ -311,6 +351,110 @@ class StockService:
         except (KeyError, IndexError, TypeError):
             return None
         return result if isinstance(result, dict) else None
+
+    @staticmethod
+    def _public_yahoo_history_range(days: int) -> str:
+        requested = max(5, int(days or 30))
+        if requested <= 30:
+            return "1mo"
+        if requested <= 90:
+            return "3mo"
+        if requested <= 180:
+            return "6mo"
+        return "1y"
+
+    def _get_public_yahoo_history_data(
+        self,
+        stock_code: str,
+        *,
+        period: str,
+        days: int,
+    ) -> Optional[Dict[str, Any]]:
+        if not self._supports_public_history_fallback(stock_code):
+            return None
+        symbol = self._to_yfinance_profile_symbol(stock_code)
+        if not symbol:
+            return None
+        result = self._load_public_yahoo_chart(
+            symbol,
+            range_value=self._public_yahoo_history_range(days),
+            interval="1d",
+        )
+        if not result:
+            return None
+
+        try:
+            meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
+            timestamps = result.get("timestamp") if isinstance(result.get("timestamp"), list) else []
+            quote_container = (result.get("indicators") or {}).get("quote")
+            if isinstance(quote_container, list):
+                quote_block = quote_container[0] if quote_container and isinstance(quote_container[0], dict) else {}
+            elif isinstance(quote_container, dict):
+                quote_block = quote_container
+            else:
+                quote_block = {}
+            rows = []
+            start_index = max(0, len(timestamps) - max(1, int(days or 30)))
+            for index in range(start_index, len(timestamps)):
+                def _value(name: str):
+                    values = quote_block.get(name) or []
+                    if not isinstance(values, list):
+                        return None
+                    return values[index] if index < len(values) else None
+
+                close = _value("close")
+                if close is None:
+                    continue
+                try:
+                    date_value = datetime.fromtimestamp(int(timestamps[index]), tz=timezone.utc).strftime("%Y-%m-%d")
+                except (OSError, OverflowError, TypeError, ValueError):
+                    continue
+                rows.append({
+                    "date": date_value,
+                    "open": _value("open"),
+                    "high": _value("high"),
+                    "low": _value("low"),
+                    "close": close,
+                    "volume": _value("volume"),
+                    "amount": None,
+                    "change_percent": None,
+                })
+        except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
+            logger.info("[public_history] malformed Yahoo chart payload for %s: %s", symbol, exc)
+            return None
+        if not rows:
+            return None
+        return {
+            "stock_code": stock_code,
+            "stock_name": meta.get("shortName") or meta.get("longName") or symbol,
+            "period": period,
+            "source": "yahoo_chart_history",
+            "data": rows,
+        }
+
+    @staticmethod
+    def _supports_public_history_fallback(stock_code: str) -> bool:
+        code = (stock_code or "").strip().upper()
+        if not code or normalize_crypto_symbol(code) is not None:
+            return False
+        if code.endswith((".SH", ".SZ", ".BJ", ".SS", ".T", ".KS", ".KQ", ".TW", ".TO", ".L", ".AX")) \
+                or code.startswith(("SH", "SZ", "BJ")):
+            return False
+        if code.startswith("HK") and code[2:].isdigit():
+            return True
+        if code.endswith(".HK") and code[:-3].isdigit():
+            return True
+        normalized_us = code[:-3] if code.endswith(".US") else code
+        return bool(re.fullmatch(r"[A-Z]{1,5}(?:\.[A-Z])?", normalized_us))
+
+    def _load_crypto_yahoo_chart(
+        self,
+        symbol: str,
+        *,
+        range_value: str,
+        interval: str,
+    ) -> Optional[Dict[str, Any]]:
+        return self._load_public_yahoo_chart(symbol, range_value=range_value, interval=interval)
 
     def _get_crypto_realtime_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         result = self._load_crypto_yahoo_chart(symbol, range_value="2d", interval="1d")
@@ -377,7 +521,7 @@ class StockService:
                 continue
             rows.append(
                 {
-                    "date": datetime.utcfromtimestamp(int(timestamps[index])).strftime("%Y-%m-%d"),
+                    "date": datetime.fromtimestamp(int(timestamps[index]), tz=timezone.utc).strftime("%Y-%m-%d"),
                     "open": _value("open"),
                     "high": _value("high"),
                     "low": _value("low"),

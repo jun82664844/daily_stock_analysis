@@ -96,6 +96,7 @@ class StockHistoryResponse(BaseModel):
     stock_code: str = Field(..., description="股票代码")
     stock_name: Optional[str] = Field(None, description="股票名称")
     period: str = Field(..., description="K 线周期")
+    source: Optional[str] = Field(None, description="历史数据来源")
     data: List[KLineData] = Field(default_factory=list, description="K 线数据列表")
     
     model_config = ConfigDict(json_schema_extra={

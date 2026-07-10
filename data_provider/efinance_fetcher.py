@@ -51,6 +51,14 @@ except (ValueError, TypeError):
     )
     _EF_CALL_TIMEOUT = 30
 
+try:
+    _EF_HISTORY_CALL_TIMEOUT = max(
+        1.0,
+        float(os.environ.get("EFINANCE_HISTORY_CALL_TIMEOUT", "8")),
+    )
+except (ValueError, TypeError):
+    _EF_HISTORY_CALL_TIMEOUT = 8.0
+
 from src.patches.eastmoney_patch import eastmoney_patch
 from src.config import get_config
 from .base import (
@@ -431,7 +439,7 @@ class EfinanceFetcher(BaseFetcher):
                 end=end_date_fmt,
                 klt=101,  # 日线
                 fqt=1,    # 前复权
-                timeout=60,
+                timeout=_EF_HISTORY_CALL_TIMEOUT,
             )
             
             api_elapsed = time.time() - api_start
@@ -525,7 +533,7 @@ class EfinanceFetcher(BaseFetcher):
                 fqt=1,    # forward-adjusted
                 quote_id_mode=True,
                 use_id_cache=False,
-                timeout=60,
+                timeout=_EF_HISTORY_CALL_TIMEOUT,
             )
 
             api_elapsed = time.time() - api_start

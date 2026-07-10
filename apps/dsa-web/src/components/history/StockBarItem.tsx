@@ -41,10 +41,22 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
     .replace('市场阶段：', '')
     .replace('Market phase: ', '');
 
+  const handleOpen = () => onClick(item.id);
+
+  const handleOpenKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    handleOpen();
+  };
+
   return (
-    <button
-      type="button"
-      onClick={() => onClick(item.id)}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleOpen}
+      onKeyDown={handleOpenKeyDown}
       aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
       className={`home-history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
         isViewing ? 'home-history-item-selected' : ''
@@ -149,6 +161,6 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
           </div>
         </div>
       </div>
-    </button>
+    </div>
   );
 };

@@ -391,6 +391,66 @@ class PlatformAccountService:
         )
         return status
 
+    def release_feature_quota(
+        self,
+        user_id: int,
+        feature: str,
+        *,
+        api_key_mode: str = "platform",
+        quantity: int = 1,
+        reference_id: str,
+        today: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """Release a reservation that was created for work which was not accepted.
+
+        Reservations use a unique reference so duplicate task submissions and
+        queue failures can return only their own units without touching older
+        usage records.
+        """
+        user = self.get_user(user_id)
+        if user is None:
+            raise ValueError("platform user not found")
+        policy = get_feature_policy(feature, plan=user.plan, api_key_mode=api_key_mode)
+        multiplier = max(1, int(quantity or 1))
+        release_units = max(0, multiplier * max(int(policy.cost_units), int(policy.server_abuse_units)))
+        if release_units <= 0 or not reference_id:
+            return self.get_feature_quota_status(user_id, policy.quota_bucket, today=today)
+
+        period_start = _week_start(today)
+        with self.db.session_scope() as session:
+            event = session.execute(
+                select(PlatformUsageEvent)
+                .where(
+                    and_(
+                        PlatformUsageEvent.user_id == int(user_id),
+                        PlatformUsageEvent.feature == policy.feature,
+                        PlatformUsageEvent.quota_bucket == policy.quota_bucket,
+                        PlatformUsageEvent.reference_id == reference_id,
+                        PlatformUsageEvent.period_start == period_start,
+                    )
+                )
+                .order_by(PlatformUsageEvent.id.desc())
+            ).scalars().first()
+            if event is not None:
+                current_units = max(0, int(event.units or 0))
+                if current_units <= release_units:
+                    session.delete(event)
+                else:
+                    event.units = current_units - release_units
+                    event.quantity = max(0, int(event.quantity or 0) - multiplier)
+
+        _record_audit(
+            int(user.id),
+            "quota_released",
+            {
+                "feature": policy.feature,
+                "quota_bucket": policy.quota_bucket,
+                "units": release_units,
+                "reference_id": reference_id,
+            },
+        )
+        return self.get_feature_quota_status(user_id, policy.quota_bucket, today=today)
+
     def reserve_analysis_quota(
         self,
         user_id: int,

@@ -8,7 +8,7 @@ import time
 from types import SimpleNamespace
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.exc import IntegrityError
 
@@ -30,6 +30,8 @@ from api.v1.schemas.platform import (
     PlatformRegistrationVerificationRequest,
     PlatformRegistrationVerificationResponse,
     PlatformRegisterRequest,
+    PlatformRetentionEventRequest,
+    PlatformRetentionEventResponse,
     PlatformSnapshotHistorySaveRequest,
     PlatformSnapshotHistorySaveResponse,
     PlatformStatusResponse,
@@ -55,6 +57,7 @@ from src.platform_accounts import (
 )
 from src.platform_audit import PlatformAuditLogger, redact_metadata
 from src.platform_rate_limit import check_platform_rate_limit
+from src.platform_retention_funnel import PlatformRetentionFunnelService
 from src.platform_watchlist import PlatformWatchlistService
 from src.storage import DatabaseManager
 from src.services.local_functional_status import build_local_functional_status
@@ -364,6 +367,21 @@ async def platform_quota(request: Request):
     return PlatformAccountService().get_quota_status(int(identity.user_id))
 
 
+@router.post("/retention/events", response_model=PlatformRetentionEventResponse)
+async def platform_retention_event(request: Request, body: PlatformRetentionEventRequest):
+    identity = platform_identity_from_request(request)
+    user_id = int(identity.user_id) if identity is not None and identity.user_id is not None else None
+    limited = check_platform_rate_limit(request, "retention_events", user_id=user_id)
+    if limited is not None:
+        return limited
+    return PlatformRetentionFunnelService().record_event(
+        event=body.event,
+        session_id=body.session_id,
+        source=body.source,
+        user_id=user_id,
+    )
+
+
 @router.get("/watchlist", response_model=PlatformWatchlistResponse)
 async def platform_watchlist(request: Request):
     identity = _require_identity(request)
@@ -553,6 +571,10 @@ async def platform_admin_usage(request: Request):
                 }
             )
     audit_events = PlatformAuditLogger().list_events(limit=100)
+    for event in audit_events:
+        if str(event.get("action") or "").startswith("retention_"):
+            source = (event.get("metadata") or {}).get("source")
+            event["metadata"] = {"source": source} if source else {}
     return {"usage": usage, "audit_events": audit_events}
 
 
@@ -575,6 +597,20 @@ async def platform_admin_ops_health(request: Request):
     identity = _require_admin_identity(request)
     _audit(user_id=identity.user_id, action="admin_ops_health_viewed", metadata={})
     return build_platform_ops_health_status()
+
+
+@router.get("/admin/retention-funnel")
+async def platform_admin_retention_funnel(
+    request: Request,
+    window_days: int = Query(default=30, ge=1, le=90),
+):
+    identity = _require_admin_identity(request)
+    _audit(
+        user_id=identity.user_id,
+        action="admin_retention_funnel_viewed",
+        metadata={"window_days": window_days},
+    )
+    return PlatformRetentionFunnelService().build_summary(window_days=window_days)
 
 
 @router.patch("/admin/users/{user_id}/plan", response_model=PlatformAuthResponse)

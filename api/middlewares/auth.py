@@ -29,6 +29,7 @@ EXEMPT_PATHS = frozenset({
     "/api/v1/platform/login",
     "/api/v1/platform/register",
     "/api/v1/platform/register/verification-code",
+    "/api/v1/platform/retention/events",
     "/api/v1/platform/status",
     "/api/v1/billing/webhook",
     "/api/health",
@@ -64,7 +65,9 @@ def _public_no_ai_query_path(request: Request) -> bool:
         return False
     path = request.url.path.rstrip("/")
     return path.startswith("/api/v1/stocks/") and (
-        path.endswith("/snapshot") or path.endswith("/kronos-forecast")
+        path.endswith("/snapshot")
+        or path.endswith("/history")
+        or path.endswith("/kronos-forecast")
     )
 
 

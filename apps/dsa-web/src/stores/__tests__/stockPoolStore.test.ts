@@ -587,6 +587,32 @@ describe('stockPoolStore', () => {
     }));
   });
 
+  it('returns the accepted task id so a retention flow can track its result', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-trial-1',
+      stockCode: '600519',
+      status: 'pending',
+      message: 'accepted',
+    } as never);
+
+    const result = await useStockPoolStore.getState().submitAnalysis({
+      stockCode: '600519',
+      analysisDepth: 'fast',
+      apiKeyMode: 'platform',
+    });
+
+    expect(result).toEqual({ accepted: true, taskId: 'task-trial-1' });
+    expect(useStockPoolStore.getState().activeTasks).toEqual([
+      expect.objectContaining({
+        taskId: 'task-trial-1',
+        stockCode: '600519',
+        status: 'pending',
+        progress: 0,
+        reportType: 'brief',
+      }),
+    ]);
+  });
+
   it('submits analysis with the selected API key mode', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
       taskId: 'task-user-key-1',

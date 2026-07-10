@@ -752,6 +752,7 @@ def get_stock_history(
             stock_code=stock_code,
             stock_name=result.get("stock_name"),
             period=period,
+            source=result.get("source"),
             data=data
         )
     

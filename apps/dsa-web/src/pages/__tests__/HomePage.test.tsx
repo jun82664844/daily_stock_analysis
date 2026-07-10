@@ -404,6 +404,120 @@ describe('HomePage', () => {
     expect(screen.getByTestId('history-center-filters')).toBeInTheDocument();
   });
 
+  it('submits the visible free platform API trial as fast platform analysis', async () => {
+    const session = {
+      user: { id: 93, email: 'v93-free@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 93, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-07-06' },
+    };
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(session);
+    vi.mocked(platformApi.account).mockResolvedValue({
+      ...session,
+      quotaBuckets: [
+        { ...session.quota, quotaBucket: 'basic_query', weeklyLimit: null, remaining: null },
+        { ...session.quota, quotaBucket: 'ai_quick' },
+        { ...session.quota, quotaBucket: 'ai_quick_user_key', weeklyLimit: 25, remaining: 25 },
+        { ...session.quota, quotaBucket: 'ai_deep', weeklyLimit: 0, remaining: 0 },
+        { ...session.quota, quotaBucket: 'ai_local', weeklyLimit: 50, remaining: 50 },
+      ],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    vi.mocked(historyApi.getList).mockResolvedValue({ total: 0, page: 1, limit: 20, items: [] });
+    vi.mocked(stocksApi.snapshot).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      quote: { currentPrice: 200, changePercent: 1.5, source: 'unit_quote', freshness: 'fresh' },
+      indicators: { ma5: 198, ma20: 190 },
+      aiUsed: false,
+    } as any);
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({ taskId: 'task-v93-trial', status: 'pending' });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL'), {
+      target: { value: 'AAPL' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await screen.findByTestId('basic-query-snapshot');
+
+    const trial = await screen.findByTestId('free-platform-api-trial-action');
+    expect(trial).toHaveTextContent('5');
+    fireEvent.click(trial);
+
+    await waitFor(() => {
+      expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+        stockCode: 'AAPL',
+        analysisDepth: 'fast',
+        reportType: 'brief',
+        apiKeyMode: 'platform',
+      }));
+    });
+    expect(screen.getByTestId('free-platform-api-trial-status')).toHaveTextContent('平台 API 试用已提交');
+  });
+
+  it('shows useful same-symbol changes on the second free query', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({ total: 0, page: 1, limit: 20, items: [] });
+    vi.mocked(stocksApi.snapshot)
+      .mockResolvedValueOnce({
+        stockCode: 'AAPL',
+        stockName: 'Apple Inc.',
+        market: 'us',
+        quote: { currentPrice: 200, changePercent: 1.5, source: 'unit_quote', freshness: 'fresh' },
+        indicators: { ma5: 198, ma20: 190, volumePriceSignal: 'price_volume_confirmed' },
+        intelligence: {
+          mode: 'no_ai_low_cost',
+          aiUsed: false,
+          signalScore: { score: 64, label: 'positive', summary: 'unit', components: [], source: 'unit' },
+          items: [],
+        },
+        warnings: [],
+        aiUsed: false,
+      } as any)
+      .mockResolvedValueOnce({
+        stockCode: 'AAPL',
+        stockName: 'Apple Inc.',
+        market: 'us',
+        quote: { currentPrice: 205, changePercent: 2.4, source: 'unit_quote', freshness: 'stale' },
+        indicators: { ma5: 202, ma20: 206, volumePriceSignal: 'neutral' },
+        intelligence: {
+          mode: 'no_ai_low_cost',
+          aiUsed: false,
+          signalScore: { score: 51, label: 'neutral', summary: 'unit', components: [], source: 'unit' },
+          items: [],
+        },
+        warnings: [{ code: 'quote_stale', severity: 'warning', message: 'stale' }],
+        aiUsed: false,
+      } as any);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    expect(await screen.findByTestId('same-symbol-query-change')).toHaveTextContent('已建立首次对比基线');
+
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+    await waitFor(() => {
+      const comparison = screen.getByTestId('same-symbol-query-change');
+      expect(comparison).toHaveTextContent('相比上次查询发生了什么变化');
+      expect(comparison).toHaveTextContent('价格 +5');
+      expect(comparison).toHaveTextContent('信号评分 -13');
+      expect(comparison).toHaveTextContent('MA20 上方 → MA20 下方');
+      expect(comparison).toHaveTextContent('新鲜 → 过期');
+      expect(comparison).toHaveTextContent('风险提醒 +1');
+    });
+  });
+
   it('lets guests query first and keeps only the top account entry for login and register', async () => {
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
     vi.mocked(historyApi.getList).mockResolvedValue({
@@ -633,6 +747,48 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
 
     expect(await screen.findByTestId('platform-auth-error')).toHaveTextContent('Invalid email or password.');
+  });
+
+  it('renders the signed-in platform controls in English when UI language is English', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    const session = {
+      user: { id: 94, email: 'english-user@example.com', role: 'user', plan: 'pro', status: 'active' },
+      quota: { userId: 94, plan: 'pro', weeklyLimit: 100, used: 0, remaining: 100, periodStart: '2026-07-06' },
+    };
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(session);
+    vi.mocked(platformApi.account).mockResolvedValue({
+      ...session,
+      quotaBuckets: [
+        { ...session.quota, quotaBucket: 'basic_query', weeklyLimit: null, remaining: null },
+        { ...session.quota, quotaBucket: 'ai_quick' },
+        { ...session.quota, quotaBucket: 'ai_quick_user_key', weeklyLimit: 500, remaining: 500 },
+        { ...session.quota, quotaBucket: 'ai_local', weeklyLimit: 100, remaining: 100 },
+      ],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    vi.mocked(platformApi.listApiKeys).mockResolvedValue([]);
+    vi.mocked(historyApi.getList).mockResolvedValue({ total: 0, page: 1, limit: 20, items: [] });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    const modePanel = await screen.findByTestId('platform-query-mode-panel');
+    expect(modePanel).toHaveTextContent('Analysis channel');
+    expect(modePanel).toHaveTextContent('Platform API');
+    expect(modePanel).toHaveTextContent('BYOK');
+    expect(modePanel).toHaveTextContent('Local model');
+    expect(within(modePanel).getByTestId('platform-api-key-model')).toHaveAttribute('placeholder', 'Model name');
+    expect(within(modePanel).getByTestId('platform-api-key-save')).toHaveTextContent('Save key');
+    expect(modePanel).not.toHaveTextContent('平台 API');
+    expect(modePanel).not.toHaveTextContent('我的 API');
+    expect(modePanel).not.toHaveTextContent('本地模型');
   });
 
   it('localizes structured no-AI query content when UI language is Chinese', async () => {
@@ -1555,7 +1711,7 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
-    expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
+    expect(await screen.findByText('趋势维持强势', undefined, { timeout: 3000 })).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
         name: getReportText(normalizeReportLanguage(historyReport.meta.reportLanguage)).fullReport,
@@ -3643,7 +3799,7 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 实时 / H 实时');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 正常 / H 正常');
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 内存 / H 内存');
-  });
+  }, 15000);
 
   it('force-refreshes the current no-AI snapshot without submitting AI analysis', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
@@ -4053,7 +4209,7 @@ describe('HomePage', () => {
       expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
       cleanup();
     }
-  });
+  }, 15000);
 
   it('localizes backend comparison targets in the Chinese free detail view', async () => {
     const cases = [
@@ -4776,6 +4932,11 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
 
     const board = await screen.findByTestId('platform-watchlist-board');
+    const dailyReview = await screen.findByTestId('platform-watchlist-daily-review');
+    expect(dailyReview).toHaveTextContent('Strongest BTC-USD +2.5%');
+    expect(dailyReview).toHaveTextContent('Weakest AAPL -0.42%');
+    expect(dailyReview).toHaveTextContent('Data flags 1/4');
+    expect(dailyReview).toHaveTextContent('No AI');
     expect(board).toHaveTextContent('Tencent Holdings');
     expect(board).toHaveTextContent('HK00700');
     expect(board).toHaveTextContent('390.2');

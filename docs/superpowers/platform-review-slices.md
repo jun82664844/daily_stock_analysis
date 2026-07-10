@@ -4,6 +4,16 @@ Date: 2026-07-02
 
 Scope: review slicing for the local V1/V2 platform release-candidate package. This is not a commit plan executed by the agent. Do not run `git add`, `git commit`, or `git push` until a human review owner explicitly approves the slice.
 
+V94 local addendum: A-share history resilience files are included in the existing backend/tests/docs slices:
+
+- `data_provider/base.py`
+- `data_provider/efinance_fetcher.py`
+- `data_provider/pytdx_fetcher.py`
+- `src/services/stock_service.py`
+- `tests/test_efinance_history_timeout.py`
+- `tests/test_platform_history_resilience_v94.py`
+- `docs/superpowers/plans/2026-07-10-dsa-v94-a-share-history-resilience.md`
+
 No-go: real payment disabled, no public deployment, no production secrets, no real API keys in code/docs/logs, and all analysis copy must keep "not investment advice" / "不构成投资建议". Do not commit real API Key.
 
 ## Inventory
@@ -1247,3 +1257,149 @@ Review notes:
 Acceptance:
 
 - `scripts/verify_platform_free_broker_conversion_v73.py` must stay visible and print `DSA_PLATFORM_FREE_BROKER_CONVERSION_V73_OK` only when V73 implementation, tests, docs, release package coverage, and git visibility markers are present.
+
+## V93 Free Retention And API Trial Addendum
+
+Scope: local-only free retention upgrade. Guests keep the no-AI research entry; signed-in free users receive a bounded weekly platform-API trial. Premium users may continue to use the platform API, their own API key, or a configured local model according to quota policy.
+
+Changed files:
+
+- `api/v1/endpoints/analysis.py`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/stocks.py`
+- `src/platform_accounts.py`
+- `src/services/stock_service.py`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/stores/stockPoolStore.ts`
+- `apps/dsa-web/src/components/retention/FreeApiTrialPanelV93.tsx`
+- `apps/dsa-web/src/components/retention/QueryChangeSummaryV93.tsx`
+- `apps/dsa-web/src/components/retention/queryChangeTracker.ts`
+- `apps/dsa-web/src/components/retention/__tests__/FreeApiTrialPanelV93.test.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/queryChangeTracker.test.ts`
+- `tests/test_platform_free_retention_v93.py`
+- `tests/test_auth_api.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-10-dsa-v93-free-retention-and-api-trial.md`
+- `scripts/verify_platform_release_candidate_package.py`
+
+Review focus:
+
+- Free API trial quota is reserved before asynchronous queue admission and released when duplicate or failed submissions are rejected; it must not create hidden platform-model cost.
+- Guest no-AI lookup remains available without login. Login is required only for saved history, watchlist, account state, and the bounded platform-API trial.
+- API trial feedback must show success, rejection, or failure in the active UI language; browser storage failure must not be presented as a valid historical comparison.
+- Public Yahoo history fallback accepts supported US/HK-style symbols only and must not be used for A-share, Japan, Korea, Taiwan, Canada, or Australia exchange symbols.
+- Same visible research modules remain available in free mode; premium/API improves freshness, source links, configured feeds, and model depth.
+- No real payment, production deployment, production secrets, or investment advice is part of this local slice.
+
+## V95 Free API Trial Result Loop Addendum
+
+Scope: local-only retention UX for the bounded free platform-API trial.
+
+Changed files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/stores/stockPoolStore.ts`
+- `apps/dsa-web/src/stores/__tests__/stockPoolStore.test.ts`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `apps/dsa-web/src/components/retention/FreeApiTrialTaskStatusV95.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/FreeApiTrialTaskStatusV95.test.tsx`
+- `tests/test_platform_free_retention_v93.py`
+- `tests/test_auth_api.py`
+- `docs/superpowers/plans/2026-07-10-dsa-v95-free-api-trial-result-loop.md`
+
+Review focus:
+
+- The accepted task id is carried from async submission into the HomePage result card.
+- Accepted tasks are registered locally before SSE terminal events are merged.
+- Pending, processing, completed, failed, and cancelled states are mapped honestly and localized.
+- Completion reports history refresh; failure does not masquerade as a usable report.
+- The weekly quota boundary and no-AI guest path remain unchanged.
+- No payment, production key, public search, or unbounded platform API spend is introduced.
+
+Acceptance:
+
+- Targeted frontend tests and HomePage regression tests pass.
+- The production frontend build passes.
+- The three platform browser E2E paths pass, including the completed free-trial result loop.
+- The combined 128-test backend command passes without platform-auth environment leakage.
+- Release package coverage includes every V95 file.
+
+## V96 Free Trial Report Conversion Addendum
+
+Scope: local-only conversion UX after a bounded free platform-API trial completes.
+
+Changed files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `apps/dsa-web/src/components/retention/FreeApiTrialConversionV96.tsx`
+- `apps/dsa-web/src/components/retention/freeApiTrialReport.ts`
+- `apps/dsa-web/src/components/retention/__tests__/FreeApiTrialConversionV96.test.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/freeApiTrialReport.test.ts`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-10-dsa-v96-free-trial-report-conversion.md`
+
+Review focus:
+
+- Only a same-symbol report created after the trial began and outside the history baseline may be auto-opened.
+- History refresh races must not leave the report hidden or open an older record.
+- The conversion band is localized, leaves the complete report visible, and routes only to the existing account page.
+- Free weekly quota, no-AI lookup, platform/BYOK/local separation, and local-only payment boundaries remain unchanged.
+
+Acceptance:
+
+- Helper and conversion-component tests pass.
+- HomePage and stock-pool regression tests pass.
+- The browser E2E proves registration, free lookup, one platform-API trial, automatic report opening, report content, and account navigation.
+- Production frontend build and existing backend/release/local-operability gates pass.
+
+## V97 Free Retention Funnel Addendum
+
+Scope: local-only, privacy-bounded measurement of the free-user conversion path.
+
+Changed files:
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/platform.py`
+- `src/platform_retention_funnel.py`
+- `tests/test_platform_retention_funnel_v97.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/utils/retentionFunnel.ts`
+- `apps/dsa-web/src/utils/__tests__/retentionFunnel.test.ts`
+- `apps/dsa-web/src/components/admin/RetentionFunnelPanelV97.tsx`
+- `apps/dsa-web/src/components/admin/__tests__/RetentionFunnelPanelV97.test.tsx`
+- `apps/dsa-web/src/components/history/StockBarItem.tsx`
+- `apps/dsa-web/src/components/i18n/UiLanguageToggle.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/Shell.test.tsx`
+- `apps/dsa-web/src/components/report/__tests__/ReportMarkdownDrawer.test.tsx`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AdminPage.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-10-dsa-v97-free-retention-funnel.md`
+
+Review focus:
+
+- The event endpoint is the only new anonymous write boundary and must remain exact-path exempt, rate-limitable, schema-forbidden for extra fields, and fixed to five events/five sources.
+- The raw browser session id never leaves the request-processing boundary; only a 24-character SHA-256 prefix is stored for local aggregation.
+- The admin summary is monotonic from the free-query cohort and never returns internal hashes or user identifiers.
+- The general admin audit response removes retention hashes even though the internal service still needs them for aggregation.
+- Telemetry calls are best-effort and cannot change quota, analysis, report, registration, or navigation outcomes.
+- No real payment, production tracking provider, cookies beyond existing local session behavior, real API Key, or investment advice is introduced.
+
+Acceptance:
+
+- Backend V97 tests prove whitelist validation, hashing, deduplication, ownership, admin authorization, aggregate math, and audit-response redaction.
+- Frontend tests prove stable local session behavior and complete Chinese/English funnel labels.
+- Browser E2E proves the five events follow the actual guest-to-account flow in order.
+- Build, platform regressions, release package, V1 operability, V2 readiness, live 8018, and dirty-tree gates pass.

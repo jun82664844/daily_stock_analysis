@@ -61,6 +61,40 @@ export interface PlatformAdminUsageResponse {
   auditEvents: PlatformAuditEvent[];
 }
 
+export type PlatformRetentionEventName =
+  | 'free_query_completed'
+  | 'registration_completed'
+  | 'api_trial_submitted'
+  | 'trial_report_opened'
+  | 'premium_options_viewed';
+
+export type PlatformRetentionEventSource = 'home' | 'registration' | 'trial' | 'report' | 'account';
+
+export interface PlatformRetentionEventResponse {
+  event: PlatformRetentionEventName;
+  accepted: boolean;
+  duplicate: boolean;
+  aiUsed: boolean;
+}
+
+export interface PlatformRetentionFunnelStage {
+  event: PlatformRetentionEventName;
+  uniqueSessions: number;
+  reachedFromStart: number;
+  droppedFromPrevious: number;
+  conversionFromPreviousPct: number;
+  conversionFromStartPct: number;
+}
+
+export interface PlatformRetentionFunnelResponse {
+  mode: 'local_only' | string;
+  windowDays: number;
+  generatedAt?: string | null;
+  totalSessions: number;
+  stages: PlatformRetentionFunnelStage[];
+  aiUsed: boolean;
+}
+
 export interface PlatformApiKeyItem {
   id?: number | null;
   provider: string;
@@ -388,6 +422,15 @@ export const platformApi = {
     return toCamelCase<PlatformSnapshotHistorySaveResponse>(response.data);
   },
 
+  trackRetentionEvent: async (data: {
+    event: PlatformRetentionEventName;
+    sessionId: string;
+    source: PlatformRetentionEventSource;
+  }): Promise<PlatformRetentionEventResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/retention/events', data);
+    return toCamelCase<PlatformRetentionEventResponse>(response.data);
+  },
+
   listApiKeys: async (): Promise<PlatformApiKeyItem[]> => {
     const response = await apiClient.get<Record<string, unknown>[]>('/api/v1/platform/api-keys');
     return toCamelCase<PlatformApiKeyItem[]>(response.data);
@@ -432,6 +475,12 @@ export const platformApi = {
   adminOpsHealth: async (): Promise<PlatformOpsHealthResponse> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/admin/ops-health');
     return toCamelCase<PlatformOpsHealthResponse>(response.data);
+  },
+  adminRetentionFunnel: async (windowDays = 30): Promise<PlatformRetentionFunnelResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/admin/retention-funnel', {
+      params: { window_days: windowDays },
+    });
+    return toCamelCase<PlatformRetentionFunnelResponse>(response.data);
   },
   updateUserPlan: async (userId: number, plan: PlatformPlan): Promise<PlatformAuthPayload> => {
     const response = await apiClient.patch<Record<string, unknown>>(

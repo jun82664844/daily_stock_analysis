@@ -5,13 +5,19 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
-import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
+import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
 import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
 import { DecisionJourneyV91 } from '../components/analysis/DecisionJourneyV91';
 import { buildDecisionJourneyModel } from '../components/analysis/decisionJourneyModel';
+import { FreeApiTrialPanelV93 } from '../components/retention/FreeApiTrialPanelV93';
+import { FreeApiTrialConversionV96 } from '../components/retention/FreeApiTrialConversionV96';
+import { FreeApiTrialTaskStatusV95 } from '../components/retention/FreeApiTrialTaskStatusV95';
+import { QueryChangeSummaryV93 } from '../components/retention/QueryChangeSummaryV93';
+import { findNewTrialHistoryItem } from '../components/retention/freeApiTrialReport';
+import { buildQueryObservation, compareQueryObservations, readPriorQueryObservation, storeQueryObservation, type QueryChangeSummary, type QueryObservation } from '../components/retention/queryChangeTracker';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { HistoryList, StockBar } from '../components/history';
@@ -24,6 +30,7 @@ import type { AnalysisDepth, AnalysisReport, ApiKeyMode, HistoryFilters, History
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { downloadTextFile } from '../utils/downloadText';
+import { getRetentionSessionId } from '../utils/retentionFunnel';
 
 const LazyTaskPanel = lazy(() => import('../components/tasks/TaskPanel')
   .then((module) => ({ default: module.TaskPanel })));
@@ -1202,6 +1209,7 @@ const HomePage: React.FC = () => {
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [basicSnapshot, setBasicSnapshot] = useState<BasicStockSnapshot | null>(null);
   const [basicSnapshotViewMode, setBasicSnapshotViewMode] = useState<BasicSnapshotViewMode>('query');
+  const [basicQueryChange, setBasicQueryChange] = useState<QueryChangeSummary | null>(null);
   const [aShareSourceMode, setAShareSourceMode] = useState<AShareSourceMode>('a_stock_data');
   const [autocompleteCloseSignal, setAutocompleteCloseSignal] = useState(0);
   const restoredHistoryCenterFiltersRef = useRef(false);
@@ -1230,6 +1238,14 @@ const HomePage: React.FC = () => {
   const [basicRetentionBusy, setBasicRetentionBusy] = useState(false);
   const [basicRetentionStatus, setBasicRetentionStatus] = useState('');
   const [basicRetentionError, setBasicRetentionError] = useState('');
+  const [freeTrialTaskId, setFreeTrialTaskId] = useState<string | null>(null);
+  const [freeTrialTaskStatus, setFreeTrialTaskStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | null>(null);
+  const [freeTrialTaskProgress, setFreeTrialTaskProgress] = useState(0);
+  const [freeTrialStockCode, setFreeTrialStockCode] = useState('');
+  const [freeTrialAutoOpenedRecordId, setFreeTrialAutoOpenedRecordId] = useState<number | null>(null);
+  const freeTrialHistoryBaselineRef = useRef<Set<number>>(new Set());
+  const freeTrialStartedAtRef = useRef(0);
+  const retentionSessionIdRef = useRef<string | null>(null);
   const [deepAnalysisNotice, setDeepAnalysisNotice] = useState('');
   const [deepAnalysisInlineNotice, setDeepAnalysisInlineNotice] = useState('');
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
@@ -1409,6 +1425,20 @@ const HomePage: React.FC = () => {
     await loadPlatformAccount(session);
   }, [loadPlatformAccount]);
 
+  const trackRetentionEvent = useCallback((
+    event: PlatformRetentionEventName,
+    source: PlatformRetentionEventSource,
+  ) => {
+    try {
+      const sessionId = retentionSessionIdRef.current
+        || getRetentionSessionId(window.localStorage);
+      retentionSessionIdRef.current = sessionId;
+      void platformApi.trackRetentionEvent({ event, sessionId, source }).catch(() => undefined);
+    } catch {
+      // Retention telemetry must never block a user workflow.
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
     platformApi.status()
@@ -1468,6 +1498,9 @@ const HomePage: React.FC = () => {
         ? await platformApi.register(email, authPassword, verificationCode)
         : await platformApi.login(email, authPassword);
       await loadPlatformAccount(payload);
+      if (authMode === 'register') {
+        trackRetentionEvent('registration_completed', 'registration');
+      }
       setAuthPassword('');
       setAuthPasswordConfirm('');
       setAuthVerificationCode('');
@@ -1491,7 +1524,7 @@ const HomePage: React.FC = () => {
     } finally {
       setAuthBusy(false);
     }
-  }, [authEmail, authMode, authPassword, authPasswordConfirm, authVerificationCode, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery, uiLanguage]);
+  }, [authEmail, authMode, authPassword, authPasswordConfirm, authVerificationCode, basicSnapshot?.stockCode, loadInitialHistory, loadMarketReviewHistory, loadPlatformAccount, loadStockBar, query, refreshActiveTasks, resetDashboardState, setQuery, trackRetentionEvent, uiLanguage]);
 
   const handleRequestRegistrationCode = useCallback(async () => {
     const email = authEmail.trim();
@@ -4017,8 +4050,31 @@ const HomePage: React.FC = () => {
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
-  const platformWatchlistBoardItems = platformWatchlistRefresh?.items ?? [];
+  const platformWatchlistBoardItems = useMemo(
+    () => platformWatchlistRefresh?.items ?? [],
+    [platformWatchlistRefresh?.items],
+  );
   const platformWatchlistCount = platformWatchlist?.total ?? platformWatchlistItems.length;
+  const platformWatchlistDailyReview = useMemo(() => {
+    if (platformWatchlistBoardItems.length === 0) {
+      return null;
+    }
+    const ranked = platformWatchlistBoardItems
+      .filter((item) => typeof item.changePercent === 'number' && Number.isFinite(item.changePercent))
+      .slice()
+      .sort((left, right) => (right.changePercent ?? 0) - (left.changePercent ?? 0));
+    const flagged = platformWatchlistBoardItems.filter((item) => (
+      item.degradationStatus !== 'ok'
+      || item.freshness !== 'fresh'
+      || item.warningCodes.length > 0
+    )).length;
+    return {
+      strongest: ranked[0] ?? null,
+      weakest: ranked[ranked.length - 1] ?? null,
+      flagged,
+      total: platformWatchlistBoardItems.length,
+    };
+  }, [platformWatchlistBoardItems]);
   const workspaceHistoryCountText = uiLanguage === 'en'
     ? `${stockHistoryTotal ?? 0} reports`
     : `${stockHistoryTotal ?? 0} 份报告`;
@@ -4218,7 +4274,21 @@ const HomePage: React.FC = () => {
       const snapshot = Object.keys(options).length > 0
         ? await stocksApi.snapshot(target, options)
         : await stocksApi.snapshot(target);
+      const observation = buildQueryObservation(snapshot);
+      let previousObservation: QueryObservation | null = null;
+      let observationStored = false;
+      try {
+        previousObservation = readPriorQueryObservation(window.localStorage, observation.market, observation.stockCode);
+        observationStored = storeQueryObservation(window.localStorage, observation);
+      } catch {
+        // Restricted browser storage must not block a free market-data query.
+      }
+      const comparison = compareQueryObservations(previousObservation, observation);
+      setBasicQueryChange(observationStored ? comparison : { ...comparison, kind: 'unavailable' });
       setBasicSnapshot(snapshot);
+      if (!snapshot.aiUsed) {
+        trackRetentionEvent('free_query_completed', 'home');
+      }
       clearError();
       return snapshot;
     } catch (err: unknown) {
@@ -4227,7 +4297,7 @@ const HomePage: React.FC = () => {
     } finally {
       setIsQueryingBasic(false);
     }
-  }, [aShareSourceMode, clearError, clearMarketReviewState, isQueryingBasic, query, setQuery]);
+  }, [aShareSourceMode, clearError, clearMarketReviewState, isQueryingBasic, query, setQuery, trackRetentionEvent]);
 
   useEffect(() => {
     const snapshotSourceMode = basicSnapshot?.intelligence?.aShareEnrichment?.sourceMode;
@@ -4707,12 +4777,188 @@ const HomePage: React.FC = () => {
     (
       stockCode?: string,
       stockName?: string,
-      _selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
+      selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
     ) => {
+      void selectionSource;
       void handleBasicQuery(stockCode, stockName, false, undefined, 'quick');
     },
     [handleBasicQuery],
   );
+
+  const handlePlatformApiTrial = useCallback(async () => {
+    if (!basicSnapshot || isAnalyzing) {
+      return;
+    }
+    if (!platformSession) {
+      setAuthMode('register');
+      setAuthError('');
+      setBasicRetentionError('');
+      setBasicRetentionStatus(uiLanguage === 'en'
+        ? 'Sign in or register to use the weekly platform API trial. Your current free snapshot stays available.'
+        : '登录或注册后即可使用每周平台 API 试用；当前免费快照会保留。');
+      window.setTimeout(() => {
+        platformAuthPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+      }, 0);
+      return;
+    }
+    if (platformAiQuickQuota?.remaining !== null && platformAiQuickQuota?.remaining !== undefined && platformAiQuickQuota.remaining <= 0) {
+      setBasicRetentionError(uiLanguage === 'en' ? 'This week’s platform API trial is used up.' : '本周平台 API 试用额度已用完。');
+      return;
+    }
+
+    setBasicRetentionError('');
+    setBasicRetentionStatus('');
+    setFreeTrialTaskId(null);
+    setFreeTrialTaskStatus(null);
+    setFreeTrialTaskProgress(0);
+    freeTrialHistoryBaselineRef.current = new Set(historyItems.map((item) => item.id));
+    freeTrialStartedAtRef.current = Date.now();
+    setFreeTrialStockCode('');
+    setFreeTrialAutoOpenedRecordId(null);
+    setApiKeyMode('platform');
+    const submitted = await submitAnalysis({
+      stockCode: basicSnapshot.stockCode,
+      stockName: basicSnapshot.stockName || undefined,
+      originalQuery: basicSnapshot.stockCode,
+      selectionSource: 'manual',
+      skills: selectedAnalysisSkills,
+      analysisDepth: 'fast',
+      apiKeyMode: 'platform',
+    });
+    const accepted = submitted === true || (typeof submitted === 'object' && submitted.accepted);
+    const taskId = typeof submitted === 'object' ? submitted.taskId : undefined;
+    if (accepted) {
+      trackRetentionEvent('api_trial_submitted', 'trial');
+      setFreeTrialStockCode(basicSnapshot.stockCode);
+      setFreeTrialTaskId(taskId || null);
+      setFreeTrialTaskStatus(taskId ? 'pending' : null);
+      setFreeTrialTaskProgress(0);
+      setBasicRetentionStatus(uiLanguage === 'en'
+        ? 'Platform API trial submitted. Follow the analysis task or open history when it completes.'
+        : '平台 API 试用已提交；任务完成后可在运行任务或历史报告中查看。');
+      await loadPlatformAccount(platformSession);
+    } else {
+      setBasicRetentionError(uiLanguage === 'en'
+        ? 'The platform API trial could not be submitted. Check the analysis error and try again.'
+        : '平台 API 试用提交失败，请查看分析错误后重试。');
+    }
+  }, [
+    basicSnapshot,
+    historyItems,
+    isAnalyzing,
+    loadPlatformAccount,
+    platformAiQuickQuota?.remaining,
+    platformSession,
+    selectedAnalysisSkills,
+    setApiKeyMode,
+    submitAnalysis,
+    trackRetentionEvent,
+    uiLanguage,
+  ]);
+
+  useEffect(() => {
+    if (!freeTrialTaskId) {
+      return;
+    }
+    const task = activeTasks.find((item) => item.taskId === freeTrialTaskId);
+    if (!task) {
+      return;
+    }
+    const nextStatus: 'pending' | 'processing' | 'completed' | 'failed' = task.status === 'pending'
+      ? 'pending'
+      : task.status === 'completed'
+      ? 'completed'
+      : task.status === 'failed' || task.status === 'cancelled'
+        ? 'failed'
+        : 'processing';
+    setFreeTrialTaskStatus(nextStatus);
+    setFreeTrialTaskProgress(task.progress || 0);
+    if (nextStatus === 'completed') {
+      setBasicRetentionError('');
+      setBasicRetentionStatus(uiLanguage === 'en'
+        ? 'Trial report completed and history refreshed.'
+        : '\u8bd5\u7528\u62a5\u544a\u5df2\u5b8c\u6210\uff0c\u5386\u53f2\u62a5\u544a\u5df2\u5237\u65b0\u3002');
+    } else if (nextStatus === 'failed') {
+      setBasicRetentionError(uiLanguage === 'en'
+        ? 'The platform API trial failed. Check the analysis error and try again.'
+        : '\u5e73\u53f0 API \u8bd5\u7528\u5931\u8d25\uff0c\u8bf7\u67e5\u770b\u5206\u6790\u9519\u8bef\u540e\u91cd\u8bd5\u3002');
+    }
+  }, [activeTasks, freeTrialTaskId, uiLanguage]);
+
+  useEffect(() => {
+    if (
+      freeTrialTaskStatus !== 'completed'
+      || !freeTrialStockCode
+      || freeTrialAutoOpenedRecordId !== null
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const openTrialReport = (item: HistoryItem) => {
+      if (cancelled) {
+        return;
+      }
+      setFreeTrialAutoOpenedRecordId(item.id);
+      trackRetentionEvent('trial_report_opened', 'report');
+      clearMarketReviewState();
+      setBasicSnapshot(null);
+      setBasicQueryError(null);
+      void selectHistoryItem(item.id);
+      setSidebarOpen(false);
+    };
+    const currentMatch = findNewTrialHistoryItem(
+      historyItems,
+      freeTrialStockCode,
+      freeTrialHistoryBaselineRef.current,
+      freeTrialStartedAtRef.current,
+    );
+    if (currentMatch) {
+      openTrialReport(currentMatch);
+      return;
+    }
+
+    void (async () => {
+      try {
+        for (let attempt = 0; attempt < 4 && !cancelled; attempt += 1) {
+          const response = await historyApi.getList({
+            stockCode: freeTrialStockCode,
+            sort: 'newest',
+            page: 1,
+            limit: 20,
+          });
+          const match = findNewTrialHistoryItem(
+            response.items,
+            freeTrialStockCode,
+            freeTrialHistoryBaselineRef.current,
+            freeTrialStartedAtRef.current,
+          );
+          if (match) {
+            openTrialReport(match);
+            return;
+          }
+          if (attempt < 3) {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+          }
+        }
+      } catch {
+        // The regular history refresh remains available if the immediate lookup is unavailable.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    clearMarketReviewState,
+    freeTrialAutoOpenedRecordId,
+    freeTrialStockCode,
+    freeTrialTaskStatus,
+    historyItems,
+    selectHistoryItem,
+    trackRetentionEvent,
+  ]);
 
   useEffect(() => {
     const state = location.state as StockAnalysisNavigationState | null;
@@ -5275,7 +5521,7 @@ const HomePage: React.FC = () => {
                         data-testid="platform-watchlist-refresh"
                       >
                         <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                        {uiLanguage === 'en' ? 'Refresh watchlist' : '刷新自选'}
+                        {uiLanguage === 'en' ? 'Build today’s review' : '生成今日复盘'}
                       </Button>
                     </div>
                     {platformWatchlistRefresh ? (
@@ -5299,6 +5545,36 @@ const HomePage: React.FC = () => {
                             {marketLaneLabel(lane, uiLanguage)}
                           </span>
                         ))}
+                      </div>
+                    ) : null}
+                    {platformWatchlistDailyReview ? (
+                      <div
+                        data-testid="platform-watchlist-daily-review"
+                        role="status"
+                        aria-live="polite"
+                        className="flex min-w-0 flex-wrap items-center gap-2 border-y border-subtle py-2 text-xs text-secondary-text"
+                      >
+                        <span className="font-semibold text-foreground">
+                          {uiLanguage === 'en' ? 'Today’s watchlist review' : '今日自选复盘'}
+                        </span>
+                        {platformWatchlistDailyReview.strongest ? (
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            {uiLanguage === 'en' ? 'Strongest' : '最强'} {platformWatchlistDailyReview.strongest.stockCode} {formatSignedBasicPercent(platformWatchlistDailyReview.strongest.changePercent)}
+                          </span>
+                        ) : null}
+                        {platformWatchlistDailyReview.weakest ? (
+                          <span className="rounded-md border border-subtle px-2 py-1">
+                            {uiLanguage === 'en' ? 'Weakest' : '最弱'} {platformWatchlistDailyReview.weakest.stockCode} {formatSignedBasicPercent(platformWatchlistDailyReview.weakest.changePercent)}
+                          </span>
+                        ) : null}
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {uiLanguage === 'en'
+                            ? `Data flags ${platformWatchlistDailyReview.flagged}/${platformWatchlistDailyReview.total}`
+                            : `数据提醒 ${platformWatchlistDailyReview.flagged}/${platformWatchlistDailyReview.total}`}
+                        </span>
+                        <span className="rounded-md border border-subtle px-2 py-1">
+                          {uiLanguage === 'en' ? 'No AI; click a symbol to inspect' : '未用 AI；点击标的查看详情'}
+                        </span>
                       </div>
                     ) : null}
                     {platformWatchlistBoardItems.length > 0 ? (
@@ -5371,7 +5647,7 @@ const HomePage: React.FC = () => {
                         data-testid="platform-mode-platform"
                         className={`px-2.5 py-1 ${apiKeyMode === 'platform' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                       >
-                        平台 API
+                        {uiLanguage === 'en' ? 'Platform API' : '平台 API'}
                       </button>
                       <button
                         type="button"
@@ -5380,7 +5656,7 @@ const HomePage: React.FC = () => {
                         data-testid="platform-mode-user"
                         className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'user' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                       >
-                        我的 API
+                        {uiLanguage === 'en' ? 'BYOK' : '我的 API'}
                       </button>
                       <button
                         type="button"
@@ -5388,7 +5664,7 @@ const HomePage: React.FC = () => {
                         data-testid="platform-mode-local"
                         className={`px-2.5 py-1 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                       >
-                        本地模型
+                        {uiLanguage === 'en' ? 'Local model' : '本地模型'}
                       </button>
                     </div>
                     <select
@@ -5407,7 +5683,7 @@ const HomePage: React.FC = () => {
                       value={apiKeyModel}
                       onChange={(event) => setApiKeyModel(event.target.value)}
                       data-testid="platform-api-key-model"
-                      placeholder={platformKeys[0]?.model || '模型名'}
+                      placeholder={platformKeys[0]?.model || (uiLanguage === 'en' ? 'Model name' : '模型名')}
                       className="h-8 w-full min-w-[12rem] max-w-[22rem] flex-1 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text md:w-56 md:flex-none"
                     />
                     <input
@@ -5907,6 +6183,34 @@ const HomePage: React.FC = () => {
                     ) : null}
                   </section>
                 ) : null}
+                {platformEnabled ? (
+                  <FreeApiTrialPanelV93
+                    language={uiLanguage}
+                    signedIn={Boolean(platformSession)}
+                    plan={platformAccount?.user.plan || platformSession?.user.plan || 'free'}
+                    weeklyLimit={platformAiQuickQuota
+                      ? platformAiQuickQuota.weeklyLimit
+                      : baseQuota?.weeklyLimit ?? 5}
+                    remaining={platformAiQuickQuota
+                      ? platformAiQuickQuota.remaining
+                      : baseQuota?.remaining ?? 5}
+                    busy={isAnalyzing}
+                    status={basicRetentionStatus}
+                    error={basicRetentionError}
+                    onAction={() => void handlePlatformApiTrial()}
+                  />
+                ) : null}
+                {platformEnabled && freeTrialTaskId && freeTrialTaskStatus ? (
+                  <FreeApiTrialTaskStatusV95
+                    language={uiLanguage}
+                    taskId={freeTrialTaskId}
+                    status={freeTrialTaskStatus}
+                    progress={freeTrialTaskProgress}
+                  />
+                ) : null}
+                {basicQueryChange ? (
+                  <QueryChangeSummaryV93 summary={basicQueryChange} language={uiLanguage} />
+                ) : null}
                 {basicSnapshotViewMode === 'quick' && basicDecisionJourneyV91 ? (
                   <DecisionJourneyV91
                     model={basicDecisionJourneyV91}
@@ -6209,7 +6513,8 @@ const HomePage: React.FC = () => {
                                   <div
                                     className={`rounded-t-sm ${bar.isLatest ? 'bg-primary' : 'bg-primary/45'}`}
                                     style={{ height: `${bar.height}%` }}
-                                    title={`${bar.label}: ${formatBasicCompactNumber(bar.value)}`}
+                                    role="img"
+                                    aria-label={`${bar.label}: ${formatBasicCompactNumber(bar.value)}`}
                                   />
                                 </div>
                               ))
@@ -6479,8 +6784,8 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0 rounded-md border border-primary/30 bg-background/35 p-2.5">
                         <div className="text-xs font-semibold text-primary">{basicTodayBriefCard.freeLabel}</div>
                         <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
-                          {basicTodayBriefCard.freeItems.map((item) => (
-                            <span key={item} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                          {basicTodayBriefCard.freeItems.map((item, index) => (
+                            <span key={`${index}-${item}`} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
                               {item}
                             </span>
                           ))}
@@ -6489,8 +6794,8 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0 rounded-md border border-primary/35 bg-primary/10 p-2.5">
                         <div className="text-xs font-semibold text-primary">{basicTodayBriefCard.premiumLabel}</div>
                         <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
-                          {basicTodayBriefCard.premiumItems.map((item) => (
-                            <span key={item} className="max-w-full rounded-md border border-primary/35 bg-background/35 px-1.5 py-0.5 text-primary">
+                          {basicTodayBriefCard.premiumItems.map((item, index) => (
+                            <span key={`${index}-${item}`} className="max-w-full rounded-md border border-primary/35 bg-background/35 px-1.5 py-0.5 text-primary">
                               {item}
                             </span>
                           ))}
@@ -6774,8 +7079,8 @@ const HomePage: React.FC = () => {
                             <span className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
                               {basicProDecisionCard.premiumLabel}
                             </span>
-                            {basicProDecisionCard.upgradeItems.map((item) => (
-                              <span key={item} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                            {basicProDecisionCard.upgradeItems.map((item, index) => (
+                              <span key={`${index}-${item}`} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
                                 {item}
                               </span>
                             ))}
@@ -7084,8 +7389,8 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0 rounded-lg border border-primary/35 bg-background/35 p-3">
                         <div className="text-sm font-semibold text-primary">{basicEventRadar.upgradeTitle}</div>
                         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                          {basicEventRadar.upgradeItems.map((item) => (
-                            <div key={item} className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-xs font-medium text-primary">
+                          {basicEventRadar.upgradeItems.map((item, index) => (
+                            <div key={`${index}-${item}`} className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-xs font-medium text-primary">
                               {item}
                             </div>
                           ))}
@@ -7135,8 +7440,8 @@ const HomePage: React.FC = () => {
                         <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
                           <div className="text-xs font-medium text-primary">{basicBrokerCockpit.proofLabel}</div>
                           <div className="mt-2 grid gap-1.5">
-                            {basicBrokerCockpit.nextActions.map((item) => (
-                              <div key={item} className="flex min-w-0 items-start gap-2 text-xs leading-relaxed text-secondary-text">
+                            {basicBrokerCockpit.nextActions.map((item, index) => (
+                              <div key={`${index}-${item}`} className="flex min-w-0 items-start gap-2 text-xs leading-relaxed text-secondary-text">
                                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
                                 <span>{item}</span>
                               </div>
@@ -7146,8 +7451,8 @@ const HomePage: React.FC = () => {
                         <div className="rounded-lg border border-subtle/80 bg-background/35 p-3">
                           <div className="text-xs font-medium text-primary">{basicBrokerCockpit.riskLabel}</div>
                           <div className="mt-2 flex min-w-0 flex-wrap gap-1.5 text-[11px] text-secondary-text">
-                            {basicBrokerCockpit.riskItems.slice(0, 4).map((item) => (
-                              <span key={item} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
+                            {basicBrokerCockpit.riskItems.slice(0, 4).map((item, index) => (
+                              <span key={`${index}-${item}`} className="max-w-full rounded-md border border-subtle/70 px-1.5 py-0.5">
                                 {item}
                               </span>
                             ))}
@@ -7156,8 +7461,8 @@ const HomePage: React.FC = () => {
                         <div className="rounded-lg border border-primary/30 bg-surface/40 p-3">
                           <div className="text-xs font-medium text-primary">{basicBrokerCockpit.upgradeLabel}</div>
                           <div className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
-                            {basicBrokerCockpit.upgradeItems.map((item) => (
-                              <div key={item} className="rounded-md border border-subtle/70 bg-background/30 px-2 py-1.5 text-xs text-secondary-text">
+                            {basicBrokerCockpit.upgradeItems.map((item, index) => (
+                              <div key={`${index}-${item}`} className="rounded-md border border-subtle/70 bg-background/30 px-2 py-1.5 text-xs text-secondary-text">
                                 {item}
                               </div>
                             ))}
@@ -8385,8 +8690,8 @@ const HomePage: React.FC = () => {
                               ) : null}
                               {kronosForecast.warnings.length ? (
                                 <div className="space-y-1 text-xs text-secondary-text">
-                                  {kronosForecast.warnings.slice(0, 3).map((warning) => (
-                                    <div key={warning} className="rounded-md border border-subtle/70 px-2 py-1">
+                                  {kronosForecast.warnings.slice(0, 3).map((warning, index) => (
+                                    <div key={`${index}-${warning}`} className="rounded-md border border-subtle/70 px-2 py-1">
                                       {localizeGeneratedText(warning, uiLanguage)}
                                     </div>
                                   ))}
@@ -8696,7 +9001,6 @@ const HomePage: React.FC = () => {
                               <div
                                 key={`${item.symbol}-${item.label}`}
                                 className="min-w-0 rounded-lg border border-subtle/80 bg-background/45 px-2.5 py-2 text-[11px] text-secondary-text"
-                                title={localizeGeneratedText(item.reason, uiLanguage)}
                               >
                                 <div className="flex min-w-0 items-start justify-between gap-2">
                                   <div className="min-w-0">
@@ -9197,6 +9501,16 @@ const HomePage: React.FC = () => {
               </div>
             ) : !marketReviewReport && !basicSnapshot && selectedReport ? (
               <div className={isHistoryTrendOpen ? 'max-w-6xl space-y-4 pb-8' : 'max-w-4xl space-y-4 pb-8'}>
+                {freeTrialAutoOpenedRecordId === selectedReport.meta.id
+                  && (platformAccount?.user.plan || platformSession?.user.plan || 'free').toLowerCase() === 'free' ? (
+                    <FreeApiTrialConversionV96
+                      language={uiLanguage}
+                      onExplorePremium={() => {
+                        trackRetentionEvent('premium_options_viewed', 'account');
+                        navigate('/account');
+                      }}
+                    />
+                  ) : null}
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {!isMarketReviewHistoryReport ? (
                     <>

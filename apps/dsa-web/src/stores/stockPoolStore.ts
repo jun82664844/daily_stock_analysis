@@ -3,7 +3,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
-import type { AnalysisDepth, AnalysisReport, ApiKeyMode, HistoryFilters, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
+import type { AnalysisDepth, AnalysisReport, AnalyzeAsyncResponse, ApiKeyMode, HistoryFilters, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
@@ -32,6 +32,11 @@ type SubmitAnalysisOptions = {
   reportLanguage?: ReportLanguage;
   analysisDepth?: AnalysisDepth;
   apiKeyMode?: ApiKeyMode;
+};
+
+export type SubmitAnalysisResult = {
+  accepted: boolean;
+  taskId?: string;
 };
 
 let reportRequestSeq = 0;
@@ -106,7 +111,7 @@ export interface StockPoolState {
   toggleMarketReviewHistorySelection: (recordId: number) => void;
   toggleSelectAllVisibleMarketReviewHistory: () => void;
   deleteSelectedMarketReviewHistory: () => Promise<void>;
-  submitAnalysis: (options?: SubmitAnalysisOptions) => Promise<void>;
+  submitAnalysis: (options?: SubmitAnalysisOptions) => Promise<SubmitAnalysisResult | boolean>;
   setNotify: (notify: boolean) => void;
   setApiKeyMode: (mode: ApiKeyMode) => void;
   syncTaskCreated: (task: TaskInfo) => void;
@@ -292,6 +297,13 @@ function isUnauthenticatedError(error: unknown): boolean {
 
 function isSameStockCode(left?: string, right?: string): boolean {
   return normalizeStockCode(left || '') === normalizeStockCode(right || '');
+}
+
+function acceptedTaskId(response: AnalyzeAsyncResponse): string | undefined {
+  if ('taskId' in response) {
+    return response.taskId;
+  }
+  return response.accepted[0]?.taskId;
 }
 
 function resetStockHistoryState(set: (partial: Partial<StockPoolState>) => void) {
@@ -834,12 +846,12 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
     if (!stockCodeInput) {
       set({ inputError: '请输入股票代码', duplicateError: null });
-      return;
+      return false;
     }
 
     if (selectionSource !== 'autocomplete' && isObviouslyInvalidStockQuery(stockCodeInput)) {
       set({ inputError: '请输入有效的股票代码或股票名称', duplicateError: null });
-      return;
+      return false;
     }
 
     let normalizedStockCode = stockCodeInput;
@@ -847,7 +859,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       const { valid, message, normalized } = validateStockCode(stockCodeInput);
       if (!valid) {
         set({ inputError: message, duplicateError: null });
-        return;
+        return false;
       }
       normalizedStockCode = normalized;
     }
@@ -861,7 +873,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
     const requestId = ++analyzeRequestSeq;
     try {
-      await analysisApi.analyzeAsync({
+      const response = await analysisApi.analyzeAsync({
         stockCode: normalizedStockCode,
         reportType,
         analysisDepth,
@@ -876,26 +888,62 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       });
 
       if (requestId !== analyzeRequestSeq) {
-        return;
+        return false;
       }
+
+      const createdAt = new Date().toISOString();
+      const acceptedTasks: TaskInfo[] = 'taskId' in response
+        ? [{
+            taskId: response.taskId,
+            traceId: response.traceId,
+            stockCode: normalizedStockCode,
+            stockName,
+            status: response.status,
+            progress: 0,
+            message: response.message,
+            reportType,
+            createdAt,
+            originalQuery: originalQuery || stockCodeInput,
+            selectionSource,
+            analysisPhase: response.analysisPhase,
+            analysisDepth: response.analysisDepth || analysisDepth,
+          }]
+        : response.accepted.map((task) => ({
+            taskId: task.taskId,
+            traceId: task.traceId,
+            stockCode: task.stockCode,
+            stockName,
+            status: task.status,
+            progress: 0,
+            message: task.message,
+            reportType,
+            createdAt,
+            originalQuery: originalQuery || stockCodeInput,
+            selectionSource,
+            analysisPhase: task.analysisPhase,
+            analysisDepth: task.analysisDepth || analysisDepth,
+          }));
+      acceptedTasks.forEach((task) => get().syncTaskCreated(task));
 
       set({
         query: '',
         selectionSource: 'manual',
       });
+      return { accepted: true, taskId: acceptedTaskId(response) };
     } catch (error) {
       if (requestId !== analyzeRequestSeq) {
-        return;
+        return false;
       }
 
       if (error instanceof DuplicateTaskError) {
         set({
           duplicateError: `股票 ${error.stockCode} 正在分析中，请等待完成`,
         });
-        return;
+        return false;
       }
 
       set({ error: getParsedApiError(error) });
+      return false;
     } finally {
       if (requestId === analyzeRequestSeq) {
         set({ isAnalyzing: false });

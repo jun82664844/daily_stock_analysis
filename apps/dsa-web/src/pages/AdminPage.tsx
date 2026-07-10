@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, CreditCard, Gauge, RefreshCw, RotateCcw, Server, ShieldAlert, ShieldCheck, Users, Zap } from 'lucide-react';
-import { platformApi, type PlatformAuditEvent, type PlatformBillingEvent, type PlatformLocalStatusResponse, type PlatformOpsHealthResponse, type PlatformProductionReadinessResponse, type PlatformUsageBucket, type PlatformUser } from '../api/platform';
+import { platformApi, type PlatformAuditEvent, type PlatformBillingEvent, type PlatformLocalStatusResponse, type PlatformOpsHealthResponse, type PlatformProductionReadinessResponse, type PlatformRetentionFunnelResponse, type PlatformUsageBucket, type PlatformUser } from '../api/platform';
 import { stocksApi, type BasicPrewarmResponse, type MarketSourceHealthResponse, type MarketSourceRecoveryResponse } from '../api/stocks';
 import type { ParsedApiError } from '../api/error';
 import { ApiErrorAlert, AppPage, Card, EmptyState, PageHeader, StatCard } from '../components/common';
+import { RetentionFunnelPanelV97 } from '../components/admin/RetentionFunnelPanelV97';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { cn } from '../utils/cn';
@@ -141,6 +142,7 @@ const AdminPage: React.FC = () => {
   const [localStatus, setLocalStatus] = useState<PlatformLocalStatusResponse | null>(null);
   const [productionReadiness, setProductionReadiness] = useState<PlatformProductionReadinessResponse | null>(null);
   const [opsHealth, setOpsHealth] = useState<PlatformOpsHealthResponse | null>(null);
+  const [retentionFunnel, setRetentionFunnel] = useState<PlatformRetentionFunnelResponse | null>(null);
   const [marketSourceHealth, setMarketSourceHealth] = useState<MarketSourceHealthResponse | null>(null);
   const [prewarmResult, setPrewarmResult] = useState<BasicPrewarmResponse | null>(null);
   const [recoveryResult, setRecoveryResult] = useState<MarketSourceRecoveryResponse | null>(null);
@@ -158,13 +160,14 @@ const AdminPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [usersResponse, usageResponse, billingResponse, localStatusResponse, productionReadinessResponse, opsHealthResponse, marketSourceResponse] = await Promise.all([
+      const [usersResponse, usageResponse, billingResponse, localStatusResponse, productionReadinessResponse, opsHealthResponse, retentionFunnelResponse, marketSourceResponse] = await Promise.all([
         platformApi.adminUsers(),
         platformApi.adminUsage(),
         platformApi.adminBillingEvents(),
         platformApi.adminLocalStatus(),
         platformApi.adminProductionReadiness(),
         platformApi.adminOpsHealth(),
+        platformApi.adminRetentionFunnel(),
         stocksApi.marketSourceHealth(),
       ]);
       if (requestSeq !== requestSeqRef.current) {
@@ -177,6 +180,7 @@ const AdminPage: React.FC = () => {
       setLocalStatus(localStatusResponse);
       setProductionReadiness(productionReadinessResponse);
       setOpsHealth(opsHealthResponse);
+      setRetentionFunnel(retentionFunnelResponse);
       setMarketSourceHealth(marketSourceResponse);
     } catch (err) {
       if (requestSeq !== requestSeqRef.current) {
@@ -291,6 +295,12 @@ const AdminPage: React.FC = () => {
           <StatCard label="Billing events" value={formatNumber(billingEvents.length, language)} hint="Local sandbox event ledger only" icon={<CreditCard className="h-5 w-5" />} tone="warning" />
         </div>
 
+        {loading && !retentionFunnel ? (
+          <div className="h-40 animate-pulse border-y border-subtle bg-hover/35" />
+        ) : retentionFunnel ? (
+          <RetentionFunnelPanelV97 language={language} summary={retentionFunnel} />
+        ) : null}
+
         <Card title="Local functional status" subtitle="Local 8018 readiness, cost controls, and safety boundaries" className="rounded-lg">
           {loading && !localStatus ? (
             <div className="h-28 animate-pulse rounded-lg bg-hover/70" />
@@ -400,7 +410,7 @@ const AdminPage: React.FC = () => {
                         ? 'border-emerald-500/25 text-emerald-500'
                         : 'border-amber-500/25 text-amber-500',
                     )}
-                    title={check.title}
+                    aria-label={check.title}
                   >
                     {check.category}
                   </span>
@@ -481,7 +491,7 @@ const AdminPage: React.FC = () => {
                         ? 'border-emerald-500/25 text-emerald-500'
                         : 'border-amber-500/25 text-amber-500',
                     )}
-                    title={check.title}
+                    aria-label={check.title}
                   >
                     {check.category}
                   </span>

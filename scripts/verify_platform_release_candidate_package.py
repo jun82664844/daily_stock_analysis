@@ -458,7 +458,7 @@ def classify_dirty_path(path: str) -> str | None:
         return "build-and-ignore-impact"
     if normalized == "requirements.txt":
         return "manual-confirmation"
-    if normalized.startswith("docs/superpowers/"):
+    if normalized.startswith("docs/superpowers/") or normalized == "docs/CHANGELOG.md":
         return "docs-and-config"
     if normalized in {"apps/dsa-web/playwright.config.ts"} or normalized.startswith("apps/dsa-web/e2e/"):
         return "tests-and-verifiers"
@@ -471,7 +471,7 @@ def classify_dirty_path(path: str) -> str | None:
         return "tests-and-verifiers"
     if normalized == "apps/dsa-web/index.html" or normalized.startswith("apps/dsa-web/src/"):
         return "frontend-platform-experience"
-    if normalized.startswith("api/") or normalized.startswith("src/"):
+    if normalized.startswith("api/") or normalized.startswith("src/") or normalized.startswith("data_provider/"):
         return "backend-platform-foundation"
     return None
 

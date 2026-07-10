@@ -45,6 +45,13 @@ logger = logging.getLogger(__name__)
 _PYTDX_CONNECTION_COOLDOWN_SECONDS = 15.0
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _parse_hosts_from_env() -> Optional[List[Tuple[str, int]]]:
     """
     从环境变量构建通达信服务器列表。
@@ -142,9 +149,12 @@ class PytdxFetcher(BaseFetcher):
         """
         if hosts is not None:
             self._hosts = hosts
+            self._explicit_hosts_configured = bool(hosts)
         else:
             env_hosts = _parse_hosts_from_env()
             self._hosts = env_hosts if env_hosts else self.DEFAULT_HOSTS
+            self._explicit_hosts_configured = bool(env_hosts)
+        self._auto_discovery_enabled = _env_flag("PYTDX_AUTO_DISCOVERY_ENABLED", False)
         self._api = None
         self._connected = False
         self._current_host_idx = 0
@@ -166,7 +176,14 @@ class PytdxFetcher(BaseFetcher):
         )
 
     def is_available_for_request(self, capability: str = "") -> bool:
-        return not self._is_in_connection_cooldown()
+        if self._is_in_connection_cooldown():
+            return False
+        if not self._explicit_hosts_configured and not self._auto_discovery_enabled:
+            logger.debug(
+                "Pytdx skipped: no explicit server configuration and auto discovery is disabled"
+            )
+            return False
+        return True
     
     def _get_pytdx(self):
         """

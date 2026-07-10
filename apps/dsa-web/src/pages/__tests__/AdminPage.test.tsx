@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import AdminPage from '../AdminPage';
 
-const { adminUsers, adminUsage, adminBillingEvents, adminLocalStatus, adminProductionReadiness, adminOpsHealth } = vi.hoisted(() => ({
+const { adminUsers, adminUsage, adminBillingEvents, adminLocalStatus, adminProductionReadiness, adminOpsHealth, adminRetentionFunnel } = vi.hoisted(() => ({
   adminUsers: vi.fn(),
   adminUsage: vi.fn(),
   adminBillingEvents: vi.fn(),
   adminLocalStatus: vi.fn(),
   adminProductionReadiness: vi.fn(),
   adminOpsHealth: vi.fn(),
+  adminRetentionFunnel: vi.fn(),
 }));
 
 const { marketSourceHealth, prewarm, recoverMarketSources } = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ vi.mock('../../api/platform', () => ({
     adminLocalStatus,
     adminProductionReadiness,
     adminOpsHealth,
+    adminRetentionFunnel,
   },
 }));
 
@@ -215,6 +217,20 @@ beforeEach(() => {
       },
     ],
   });
+  adminRetentionFunnel.mockResolvedValue({
+    mode: 'local_only',
+    windowDays: 30,
+    generatedAt: '2026-07-10T10:00:00Z',
+    totalSessions: 3,
+    aiUsed: false,
+    stages: [
+      { event: 'free_query_completed', uniqueSessions: 3, reachedFromStart: 3, droppedFromPrevious: 0, conversionFromPreviousPct: 100, conversionFromStartPct: 100 },
+      { event: 'registration_completed', uniqueSessions: 2, reachedFromStart: 2, droppedFromPrevious: 1, conversionFromPreviousPct: 66.7, conversionFromStartPct: 66.7 },
+      { event: 'api_trial_submitted', uniqueSessions: 2, reachedFromStart: 2, droppedFromPrevious: 0, conversionFromPreviousPct: 100, conversionFromStartPct: 66.7 },
+      { event: 'trial_report_opened', uniqueSessions: 1, reachedFromStart: 1, droppedFromPrevious: 1, conversionFromPreviousPct: 50, conversionFromStartPct: 33.3 },
+      { event: 'premium_options_viewed', uniqueSessions: 1, reachedFromStart: 1, droppedFromPrevious: 0, conversionFromPreviousPct: 100, conversionFromStartPct: 33.3 },
+    ],
+  });
   marketSourceHealth.mockResolvedValue({
     mode: 'local_only',
     aiUsed: false,
@@ -314,6 +330,8 @@ describe('AdminPage', () => {
     expect(screen.getAllByText('data_sources').length).toBeGreaterThan(0);
     expect(screen.getByText('No real payment provider is enabled; paid public launch remains blocked.')).toBeInTheDocument();
     expect(screen.getByText('Market source health')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Free conversion funnel' })).toBeInTheDocument();
+    expect(screen.getByTestId('retention-stage-premium_options_viewed')).toHaveTextContent('Premium viewed');
     expect(screen.getAllByText('hk_market_data').length).toBeGreaterThan(0);
     expect(screen.getByText('hk_realtime')).toBeInTheDocument();
     expect(screen.getByText('cooling_down')).toBeInTheDocument();
@@ -333,6 +351,7 @@ describe('AdminPage', () => {
       expect(adminLocalStatus).toHaveBeenCalledTimes(2);
       expect(adminProductionReadiness).toHaveBeenCalledTimes(2);
       expect(adminOpsHealth).toHaveBeenCalledTimes(2);
+      expect(adminRetentionFunnel).toHaveBeenCalledTimes(2);
       expect(marketSourceHealth).toHaveBeenCalledTimes(2);
     });
   });

@@ -4,6 +4,16 @@ Date: 2026-07-02
 
 Scope: manifest for reviewing and later splitting the local V1/V2 platform release-candidate package. This file is a review aid only. It does not approve public launch, real payment, production deployment, or production secret use.
 
+V94 local addendum: the current release-candidate package also includes the bounded A-share history route and its regression evidence:
+
+- `data_provider/base.py`
+- `data_provider/efinance_fetcher.py`
+- `data_provider/pytdx_fetcher.py`
+- `src/services/stock_service.py`
+- `tests/test_efinance_history_timeout.py`
+- `tests/test_platform_history_resilience_v94.py`
+- `docs/superpowers/plans/2026-07-10-dsa-v94-a-share-history-resilience.md`
+
 No-go: real payment disabled, no production API keys, no public deployment, no HTTPS/domain/WAF claims, no legal/privacy finalization, and no investment advice. 不构成投资建议. Do not commit real API Key.
 
 ## Summary
@@ -1562,3 +1572,125 @@ Acceptance gates:
 Rollback:
 
 - Reverting this slice removes V73 cockpit rendering, V73 verifier, and V73 docs. V72 peer quotes and earlier free query modules remain available if those slices are kept.
+
+## V93 Free Retention And API Trial Manifest Addendum
+
+Status: local-only free retention and bounded platform-API trial. No public launch approval.
+
+New/updated files:
+
+- `api/v1/endpoints/analysis.py`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/stocks.py`
+- `src/platform_accounts.py`
+- `src/services/stock_service.py`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/stores/stockPoolStore.ts`
+- `apps/dsa-web/src/components/retention/FreeApiTrialPanelV93.tsx`
+- `apps/dsa-web/src/components/retention/QueryChangeSummaryV93.tsx`
+- `apps/dsa-web/src/components/retention/queryChangeTracker.ts`
+- `apps/dsa-web/src/components/retention/__tests__/FreeApiTrialPanelV93.test.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/queryChangeTracker.test.ts`
+- `tests/test_platform_free_retention_v93.py`
+- `tests/test_auth_api.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-10-dsa-v93-free-retention-and-api-trial.md`
+- `scripts/verify_platform_release_candidate_package.py`
+
+Acceptance boundary:
+
+- Free guests retain no-AI lookup. Signed-in free users get a weekly platform-API trial bucket; premium users may use platform API, BYOK, or local model lanes.
+- Async platform analysis reserves quota before queue admission and releases duplicate or failed reservations.
+- No real payment, production deployment, production secrets, or investment advice is introduced.
+
+## V95 Free API Trial Result Loop Manifest Addendum
+
+Status: local-only bounded trial UX. No public launch approval.
+
+New/updated files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/stores/stockPoolStore.ts`
+- `apps/dsa-web/src/stores/__tests__/stockPoolStore.test.ts`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `apps/dsa-web/src/components/retention/FreeApiTrialTaskStatusV95.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/FreeApiTrialTaskStatusV95.test.tsx`
+- `tests/test_platform_free_retention_v93.py`
+- `tests/test_auth_api.py`
+- `docs/superpowers/plans/2026-07-10-dsa-v95-free-api-trial-result-loop.md`
+
+Acceptance boundary:
+
+- A free signed-in user receives only the existing bounded weekly platform-API trial.
+- The accepted task id is rendered with localized progress and terminal outcome.
+- Accepted tasks are inserted into activeTasks before SSE terminal updates, preventing fast-completion races.
+- Registration/browser mocks follow password confirmation and local verification-code behavior.
+- A successful task relies on the existing history refresh path; failed/cancelled work is visible as failed.
+- No real payment, production secret, unlimited quota, or investment advice is introduced.
+
+## V96 Free Trial Report Conversion Manifest Addendum
+
+Status: local-only post-trial conversion UX. No public launch or payment approval.
+
+New/updated files:
+
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `apps/dsa-web/src/components/retention/FreeApiTrialConversionV96.tsx`
+- `apps/dsa-web/src/components/retention/freeApiTrialReport.ts`
+- `apps/dsa-web/src/components/retention/__tests__/FreeApiTrialConversionV96.test.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/freeApiTrialReport.test.ts`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-10-dsa-v96-free-trial-report-conversion.md`
+
+Acceptance boundary:
+
+- A completed bounded trial auto-opens only its newly created same-symbol history report.
+- Report matching excludes pre-submit history ids and records older than the trial start window.
+- The localized conversion band keeps report content visible and navigates to the existing account surface.
+- Platform API, user API, and local-model options are described honestly; real payment stays disabled.
+- No production key, unlimited quota, public deployment, user-data deletion, or investment advice is introduced.
+
+## V97 Free Retention Funnel Manifest Addendum
+
+Status: local-only anonymous aggregate funnel. No production analytics or launch approval.
+
+New/updated files:
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/platform.py`
+- `src/platform_retention_funnel.py`
+- `tests/test_platform_retention_funnel_v97.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/utils/retentionFunnel.ts`
+- `apps/dsa-web/src/utils/__tests__/retentionFunnel.test.ts`
+- `apps/dsa-web/src/components/admin/RetentionFunnelPanelV97.tsx`
+- `apps/dsa-web/src/components/admin/__tests__/RetentionFunnelPanelV97.test.tsx`
+- `apps/dsa-web/src/components/history/StockBarItem.tsx`
+- `apps/dsa-web/src/components/i18n/UiLanguageToggle.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/Shell.test.tsx`
+- `apps/dsa-web/src/components/report/__tests__/ReportMarkdownDrawer.test.tsx`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AdminPage.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/e2e/platform-user-e2e.spec.ts`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-10-dsa-v97-free-retention-funnel.md`
+
+Acceptance boundary:
+
+- Only five fixed conversion events and five fixed sources are accepted; extra metadata is rejected.
+- Raw browser session ids, emails, stock symbols, report content, keys, tokens, and payment data are absent from retention storage and responses.
+- Duplicate same-day events do not inflate the ledger, and aggregate stage math is covered by deterministic tests.
+- Only admins can read the bounded funnel; ordinary users receive `403`.
+- HomePage event sends remain best-effort and preserve the complete free query and trial experience.
+- No production analytics vendor, real payment, production secret, public deployment, user-data deletion, or investment advice is introduced.

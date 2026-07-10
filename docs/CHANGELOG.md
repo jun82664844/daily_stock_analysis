@@ -9,11 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [fix] Bound the local A-share history provider route, skip unconfigured Pytdx discovery, and expose honest history timeout/source diagnostics.
+- [feat] Close the V95 free platform-API trial loop: accepted submissions retain a task id, the HomePage shows progress, and completion/failure is localized and honest.
+- [fix] Register accepted analysis tasks locally before SSE updates, refresh the platform browser E2E for the verified registration flow, and isolate platform-auth environment state across backend tests.
+- [feat] Automatically open a completed free platform-API trial report and show a localized premium-options entry without enabling real payment.
+- [feat] Add a privacy-bounded local V97 funnel for free query, registration, API trial, report opening, and premium-options viewing.
+
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
 - [修复] 修复日股/韩股历史列表重建市场阶段摘要时将 non_trading 等结果阶段误传为 analysis_phase 导致列表查询失败的问题。
 - [改进] Web 历史报告详情不再内嵌展示 AI 建议卡片，结构化决策信号集中在 AI 建议页查询，并保留按来源报告 ID 筛选或 URL 参数精确定位入口。
+- [新功能] 免费用户保留免登录无 AI 查询，并新增登录后每周 5 次平台 API 快速试用、同标的查询变化对比和自选股今日复盘；高级版继续支持平台 API、用户自有 API 和本地模型。
+- [修复] 免费 API 试用异步入队改为先锁定额度再提交任务，并补齐重复任务回收、企业无限额度显示、游客 K 线历史、历史来源标记和浏览器存储失败提示。
 
 ## [3.23.0] - 2026-06-20
 

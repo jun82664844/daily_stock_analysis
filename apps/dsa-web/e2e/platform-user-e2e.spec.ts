@@ -51,6 +51,7 @@ type MockUser = {
 type MockBackend = {
   getUserByEmail: (email: string) => MockUser | undefined;
   getCurrentUser: () => MockUser | null;
+  getRetentionEvents: () => Array<{ event: string; source: string }>;
 };
 
 const quotaBuckets: QuotaBucket[] = [
@@ -255,6 +256,8 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
   let nextApiKeyId = 1;
   let nextHistoryId = 100;
   let pendingStreamResolvers: Array<(task: Record<string, unknown>) => void> = [];
+  let pendingStreamTask: Record<string, unknown> | null = null;
+  const retentionEvents: Array<{ event: string; source: string }> = [];
 
   const getCurrentUser = () => {
     if (currentUserId === null) {
@@ -266,6 +269,10 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
   const completePendingStreams = (task: Record<string, unknown>) => {
     const resolvers = pendingStreamResolvers;
     pendingStreamResolvers = [];
+    if (resolvers.length === 0) {
+      pendingStreamTask = task;
+      return;
+    }
     resolvers.forEach((resolve) => resolve(task));
   };
 
@@ -281,9 +288,10 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
     const currentUser = getCurrentUser();
 
     if (path === '/api/v1/analysis/tasks/stream') {
-      const task = await new Promise<Record<string, unknown>>((resolve) => {
+      const task = pendingStreamTask || await new Promise<Record<string, unknown>>((resolve) => {
         pendingStreamResolvers.push(resolve);
       });
+      pendingStreamTask = null;
       return route.fulfill({
         status: 200,
         headers: {
@@ -314,6 +322,16 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
     if (path === '/api/v1/platform/status') {
       return json(route, { platform_auth_enabled: true });
     }
+    if (path === '/api/v1/platform/retention/events' && method === 'POST') {
+      const body = await readJson(route);
+      retentionEvents.push({ event: String(body.event || ''), source: String(body.source || '') });
+      return json(route, {
+        event: String(body.event || ''),
+        accepted: true,
+        duplicate: false,
+        ai_used: false,
+      });
+    }
     if (path === '/api/v1/system/config/setup/status') {
       return json(route, { is_complete: true, checks: [] });
     }
@@ -328,6 +346,16 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
         return json(route, { error: 'unauthorized', message: 'Login required' }, 401);
       }
       return json(route, authPayload(currentUser));
+    }
+    if (path === '/api/v1/platform/register/verification-code' && method === 'POST') {
+      const body = await readJson(route);
+      return json(route, {
+        email: String(body.email || ''),
+        sent: true,
+        expires_in_seconds: 300,
+        dev_code: '123456',
+        message: 'Local verification code generated.',
+      });
     }
     if (path === '/api/v1/platform/register' && method === 'POST') {
       const body = await readJson(route);
@@ -646,6 +674,7 @@ async function installMockBackend(page: Page): Promise<MockBackend> {
   return {
     getUserByEmail: (email: string) => users.get(email.toLowerCase()),
     getCurrentUser,
+    getRetentionEvents: () => [...retentionEvents],
   };
 }
 
@@ -664,6 +693,8 @@ test.describe('platform user local E2E', () => {
     await page.getByTestId('platform-auth-register-tab').click();
     await page.getByTestId('platform-auth-email').fill(userAEmail);
     await page.getByTestId('platform-auth-password').fill(password);
+    await page.getByTestId('platform-auth-confirm-password').fill(password);
+    await page.getByTestId('platform-auth-send-code').click();
     await page.getByTestId('platform-auth-submit').click();
 
     await expect(page.getByTestId('platform-query-status')).toContainText(`Signed in ${userAEmail}`);
@@ -702,7 +733,7 @@ test.describe('platform user local E2E', () => {
       await expect(page.getByTestId('basic-query-snapshot')).toBeVisible();
       const guardrails = page.getByTestId('basic-query-user-guardrails');
       await expect(guardrails).toContainText('Current quick snapshot');
-      await expect(guardrails).toContainText('No AI used');
+      await expect(guardrails).toContainText('No AI');
       await expect(guardrails).toContainText(laneText);
       await expect(guardrails).toContainText('Historical reports stay separate');
       await expect(guardrails).toContainText('Cache local_json');
@@ -717,9 +748,9 @@ test.describe('platform user local E2E', () => {
     await page.getByTestId('platform-mode-user').click();
     await stockInput.fill('');
     await stockInput.pressSequentially('600519');
-    await page.locator('header').getByRole('button', { name: 'Quick AI' }).click();
+    await page.locator('header').getByRole('button', { name: 'Deep analysis' }).click();
     await expect(page.getByTestId('home-stock-bar-scroll')).toContainText('Kweichow Moutai', { timeout: 15_000 });
-    expect(backend.getUserByEmail(userAEmail)?.usage.ai_quick_user_key).toBe(1);
+    expect(backend.getUserByEmail(userAEmail)?.usage.ai_deep_user_key).toBe(1);
 
     await page.getByRole('link', { name: 'Account' }).click();
     await page.getByRole('button', { name: 'Start sandbox upgrade' }).click();
@@ -734,6 +765,8 @@ test.describe('platform user local E2E', () => {
     await page.getByTestId('platform-auth-register-tab').click();
     await page.getByTestId('platform-auth-email').fill(userBEmail);
     await page.getByTestId('platform-auth-password').fill(password);
+    await page.getByTestId('platform-auth-confirm-password').fill(password);
+    await page.getByTestId('platform-auth-send-code').click();
     await page.getByTestId('platform-auth-submit').click();
     await expect(page.getByTestId('platform-query-status')).toContainText(`Signed in ${userBEmail}`);
     await expect(page.getByRole('link', { name: 'Admin' })).toHaveCount(0);
@@ -759,6 +792,43 @@ test.describe('platform user local E2E', () => {
     await expect(page.getByTestId('home-stock-bar-scroll')).toContainText('Kweichow Moutai');
   });
 
+  test('shows the free platform API trial result loop', async ({ page }) => {
+    const backend = await installMockBackend(page);
+    const email = `e2e+api-trial-${Date.now()}@example.test`;
+    const password = 'password123';
+
+    await page.goto('/');
+    await expect(page.getByTestId('guest-query-entry')).toBeVisible({ timeout: 15_000 });
+    const stockInput = page.getByPlaceholder(/Enter a stock code/);
+    await stockInput.fill('AAPL');
+    await page.getByRole('button', { name: 'Query' }).click();
+    await expect(page.getByTestId('basic-query-snapshot')).toContainText('Apple');
+    await expect(page.getByTestId('free-platform-api-trial-action')).toContainText('Sign in for 5 weekly API trials');
+
+    await page.getByTestId('free-platform-api-trial-action').click();
+    await page.getByTestId('platform-auth-email').fill(email);
+    await page.getByTestId('platform-auth-password').fill(password);
+    await page.getByTestId('platform-auth-confirm-password').fill(password);
+    await page.getByTestId('platform-auth-send-code').click();
+    await page.getByTestId('platform-auth-submit').click();
+    await expect(page.getByTestId('free-platform-api-trial-action')).toContainText('Use platform API trial');
+
+    await page.getByTestId('free-platform-api-trial-action').click();
+    await expect(page.getByTestId('free-api-trial-conversion-v96')).toContainText('Free trial report opened', { timeout: 15_000 });
+    await expect(page.getByText('Mock AI quick analysis. Informational only; not investment advice.')).toBeVisible();
+    expect(backend.getUserByEmail(email)?.usage.ai_quick).toBe(1);
+    expect(backend.getUserByEmail(email)?.histories).toHaveLength(1);
+    await page.getByTestId('free-api-trial-upgrade').click();
+    await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+    await expect.poll(() => backend.getRetentionEvents()).toEqual([
+      { event: 'free_query_completed', source: 'home' },
+      { event: 'registration_completed', source: 'registration' },
+      { event: 'api_trial_submitted', source: 'trial' },
+      { event: 'trial_report_opened', source: 'report' },
+      { event: 'premium_options_viewed', source: 'account' },
+    ]);
+  });
+
   test('retains a guest AAPL snapshot after register and reloads saved history after login', async ({ page }) => {
     const backend = await installMockBackend(page);
     const timestamp = Date.now();
@@ -770,12 +840,13 @@ test.describe('platform user local E2E', () => {
 
     await page.getByTestId('guest-example-AAPL').click();
     await expect(page.getByTestId('basic-query-snapshot')).toContainText('Apple');
-    await expect(page.getByTestId('guest-conversion-guide')).toContainText('Login is optional');
 
-    await page.getByTestId('guest-guide-register').click();
-    await page.getByTestId('guest-auth-email').fill(email);
-    await page.getByTestId('guest-auth-password').fill(password);
-    await page.getByTestId('guest-auth-submit').click();
+    await page.getByTestId('platform-auth-register-tab').click();
+    await page.getByTestId('platform-auth-email').fill(email);
+    await page.getByTestId('platform-auth-password').fill(password);
+    await page.getByTestId('platform-auth-confirm-password').fill(password);
+    await page.getByTestId('platform-auth-send-code').click();
+    await page.getByTestId('platform-auth-submit').click();
 
     await expect(page.getByTestId('basic-query-snapshot')).toContainText('Apple');
     await expect(page.getByTestId('basic-query-retention-mode-guide')).toContainText('Free no-AI');

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -137,4 +137,29 @@ class PlatformSnapshotHistorySaveResponse(BaseModel):
     stock_name: Optional[str] = None
     report_type: str = "basic_snapshot"
     saved_to_history: bool = True
+    ai_used: bool = False
+
+
+PlatformRetentionEventName = Literal[
+    "free_query_completed",
+    "registration_completed",
+    "api_trial_submitted",
+    "trial_report_opened",
+    "premium_options_viewed",
+]
+PlatformRetentionEventSource = Literal["home", "registration", "trial", "report", "account"]
+
+
+class PlatformRetentionEventRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    event: PlatformRetentionEventName
+    session_id: str = Field(..., alias="sessionId", min_length=12, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    source: PlatformRetentionEventSource
+
+
+class PlatformRetentionEventResponse(BaseModel):
+    event: PlatformRetentionEventName
+    accepted: bool
+    duplicate: bool
     ai_used: bool = False

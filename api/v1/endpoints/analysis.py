@@ -415,6 +415,32 @@ def _reserve_platform_analysis_quota(
     return None
 
 
+def _release_platform_analysis_quota(
+    http_request: Optional[Request],
+    quantity: int,
+    *,
+    request: AnalyzeRequest,
+    reference_id: str,
+) -> None:
+    user_id = _get_platform_user_id(http_request)
+    if user_id is None or quantity <= 0:
+        return
+    try:
+        PlatformAccountService().release_feature_quota(
+            user_id=user_id,
+            feature=_analysis_feature_for_request(request),
+            api_key_mode=_api_key_mode_for_request(request),
+            quantity=quantity,
+            reference_id=reference_id,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to release platform quota reservation: user_id=%s reference_id=%s",
+            user_id,
+            reference_id,
+        )
+
+
 # ============================================================
 # POST /analyze - 触发股票分析
 # ============================================================
@@ -581,15 +607,36 @@ def _handle_async_analysis_batch(
     if skills is not None:
         submit_kwargs["skills"] = skills
 
-    accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
+    reservation_reference = f"analysis:{uuid.uuid4().hex}"
+    reserved_quantity = len(stock_codes)
     quota_error = _reserve_platform_analysis_quota(
         http_request,
-        len(accepted_tasks),
+        reserved_quantity,
         request=request,
-        reference_id=",".join(task.stock_code for task in accepted_tasks) if accepted_tasks else None,
+        reference_id=reservation_reference,
     )
     if quota_error is not None:
         return quota_error
+
+    try:
+        accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
+    except Exception:
+        _release_platform_analysis_quota(
+            http_request,
+            reserved_quantity,
+            request=request,
+            reference_id=reservation_reference,
+        )
+        raise
+
+    rejected_quantity = max(0, reserved_quantity - len(accepted_tasks))
+    if rejected_quantity:
+        _release_platform_analysis_quota(
+            http_request,
+            rejected_quantity,
+            request=request,
+            reference_id=reservation_reference,
+        )
 
     accepted = [
         BatchTaskAcceptedItem(

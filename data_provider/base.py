@@ -438,7 +438,7 @@ class BaseFetcher(ABC):
 
     def get_daily_data(
         self,
-        stock_code: str, 
+        stock_code: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         days: int = 30
@@ -724,11 +724,47 @@ class DataFetcherManager:
                 self._fetcher_call_locks[fetcher_id] = lock
             return lock
 
-    def _call_fetcher_method(self, fetcher: BaseFetcher, method_name: str, *args, **kwargs):
-        """Serialize shared fetcher state access through manager-owned per-instance locks."""
+    def _call_fetcher_method(
+        self,
+        fetcher: BaseFetcher,
+        method_name: str,
+        *args,
+        timeout_seconds: Optional[float] = None,
+        **kwargs,
+    ):
+        """Serialize fetcher access and optionally bound a slow provider call."""
         method = getattr(fetcher, method_name)
-        with self._get_fetcher_call_lock(fetcher):
-            return method(*args, **kwargs)
+
+        def invoke():
+            with self._get_fetcher_call_lock(fetcher):
+                return method(*args, **kwargs)
+
+        if timeout_seconds is None:
+            return invoke()
+
+        timeout = max(0.001, float(timeout_seconds))
+        result: Dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                result["value"] = invoke()
+            except Exception as exc:
+                result["error"] = exc
+
+        worker = Thread(
+            target=run,
+            name=f"dsa-{fetcher.name}-{method_name}",
+            daemon=True,
+        )
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            raise DataFetchError(
+                f"[{fetcher.name}] {method_name} timed out after {timeout:g}s"
+            )
+        if "error" in result:
+            raise result["error"]
+        return result.get("value")
 
     @classmethod
     def _filter_daily_fetchers_for_market(
@@ -1205,7 +1241,8 @@ class DataFetcherManager:
         stock_code: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        days: int = 30
+        days: int = 30,
+        timeout_seconds: Optional[float] = None,
     ) -> Tuple[pd.DataFrame, str]:
         """
         获取日线数据（自动切换数据源）
@@ -1237,6 +1274,17 @@ class DataFetcherManager:
         fetchers = self._get_fetchers_snapshot()
         errors = []
         request_start = time.time()
+        deadline = None
+        if timeout_seconds is not None:
+            deadline = time.monotonic() + max(0.001, float(timeout_seconds))
+
+        def remaining_timeout() -> Optional[float]:
+            if deadline is None:
+                return None
+            return max(0.001, deadline - time.monotonic())
+
+        def deadline_expired() -> bool:
+            return deadline is not None and time.monotonic() >= deadline
 
         # 快速路径：美股使用专用数据源路由；港股先过滤不支持港股日线的数据源
         #   - 配置长桥凭据后: Longbridge 为首选, YFinance/AkShare 兜底
@@ -1282,6 +1330,9 @@ class DataFetcherManager:
                 for attempt, fetcher in enumerate(fetchers, start=1):
                     if fetcher.name != src_name:
                         continue
+                    if deadline_expired():
+                        errors.append("[route] (timeout) daily history deadline exceeded")
+                        break
                     if not self._is_daily_source_available(fetcher, market):
                         errors.append(self._daily_source_unavailable_error(fetcher))
                         break
@@ -1304,6 +1355,7 @@ class DataFetcherManager:
                             start_date=start_date,
                             end_date=end_date,
                             days=days,
+                            timeout_seconds=remaining_timeout(),
                         )
                         if df is not None and not df.empty:
                             duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1364,6 +1416,9 @@ class DataFetcherManager:
             raise DataFetchError(error_summary)
 
         for attempt, fetcher in enumerate(fetchers, start=1):
+            if deadline_expired():
+                errors.append("[route] (timeout) daily history deadline exceeded")
+                break
             if not self._is_daily_source_available(fetcher, market):
                 errors.append(self._daily_source_unavailable_error(fetcher))
                 continue
@@ -1382,7 +1437,8 @@ class DataFetcherManager:
                     stock_code=stock_code,
                     start_date=start_date,
                     end_date=end_date,
-                    days=days
+                    days=days,
+                    timeout_seconds=remaining_timeout(),
                 )
                 
                 if df is not None and not df.empty:

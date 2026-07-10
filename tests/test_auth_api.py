@@ -38,6 +38,8 @@ class AuthApiTestCase(unittest.TestCase):
     """Integration tests for /api/v1/auth/* and API protection."""
 
     def setUp(self) -> None:
+        self._environment_before = os.environ.copy()
+        os.environ.pop("PLATFORM_USER_AUTH_ENABLED", None)
         _reset_auth_globals()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.temp_dir.name)
@@ -62,6 +64,10 @@ class AuthApiTestCase(unittest.TestCase):
         os.environ.pop("ENV_FILE", None)
         os.environ.pop("DATABASE_PATH", None)
         self.temp_dir.cleanup()
+        for key in list(os.environ):
+            if key not in self._environment_before:
+                os.environ.pop(key, None)
+        os.environ.update(self._environment_before)
 
     def _read_auth_enabled_from_env(self) -> bool:
         values = dotenv_values(self.env_path)
@@ -226,6 +232,30 @@ class AuthApiTestCase(unittest.TestCase):
             response = asyncio.run(middleware.dispatch(request, AsyncMock(return_value=Response(status_code=200))))
 
         self.assertEqual(response.status_code, 401)
+
+    def test_public_stock_history_is_reachable_without_platform_session(self) -> None:
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/stocks/AAPL/history",
+            "headers": [],
+            "query_string": b"days=30",
+            "scheme": "http",
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 80),
+            "root_path": "",
+        }
+        request = Request(scope)
+        middleware = AuthMiddleware(app=MagicMock())
+        next_response = Response(status_code=200)
+        call_next = AsyncMock(return_value=next_response)
+
+        with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+             patch("api.middlewares.auth.is_platform_user_auth_enabled", return_value=True):
+            response = asyncio.run(middleware.dispatch(request, call_next))
+
+        self.assertEqual(response.status_code, 200)
+        call_next.assert_awaited_once()
 
     def test_logout_requires_session_when_auth_enabled(self) -> None:
         scope = {
