@@ -3048,7 +3048,29 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    const brokerDecisionDesk = screen.getByTestId('basic-query-broker-decision-desk-v89');
+    expect(
+      screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(brokerDecisionDesk)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(brokerDecisionDesk).toHaveTextContent('经纪人决策台');
+    expect(brokerDecisionDesk).toHaveTextContent('先给结论');
+    expect(brokerDecisionDesk).toHaveTextContent('机会窗口');
+    expect(brokerDecisionDesk).toHaveTextContent('风险边界');
+    expect(brokerDecisionDesk).toHaveTextContent('证据确认');
+    expect(brokerDecisionDesk).toHaveTextContent('高级版补强');
+    expect(brokerDecisionDesk).toHaveTextContent('免费版看到同样结构');
+    expect(brokerDecisionDesk).toHaveTextContent('未用 AI，不扣额度');
+    expect(brokerDecisionDesk).toHaveTextContent('仅作信息分析，不构成投资建议');
+    fireEvent.click(within(brokerDecisionDesk).getByRole('button', { name: '看证据' }));
+    fireEvent.click(within(brokerDecisionDesk).getByRole('button', { name: '看风险' }));
+    fireEvent.click(within(brokerDecisionDesk).getByRole('button', { name: '看升级差异' }));
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     const nextActions = screen.getByTestId('basic-query-next-actions-v85');
+    expect(
+      brokerDecisionDesk.compareDocumentPosition(nextActions)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(nextActions).toHaveTextContent('下一步工作流');
     expect(nextActions).toHaveTextContent('刷新行情');
     expect(nextActions).toHaveTextContent('看资讯');

@@ -2231,6 +2231,68 @@ const HomePage: React.FC = () => {
         : ['先看价格是否守住 MA20', '再和 QQQ / 行业参照比较', '需要来源链接时再开深度模式'],
     };
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicBrokerDecisionDesk = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport || !basicBrokerCockpit) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const currentPrice = toFiniteBasicNumber(basicSnapshot.quote.currentPrice);
+    const changePercent = toFiniteBasicNumber(basicSnapshot.quote.changePercent);
+    const support = localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage);
+    const resistance = localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage);
+    const firstEvidence = basicBrokerCockpit.evidenceItems[0];
+    const secondEvidence = basicBrokerCockpit.evidenceItems[1];
+    const firstRisk = basicBrokerCockpit.riskItems[0]
+      || (isEnglish ? 'Keep this as an information-only checklist.' : '先把这次结果作为信息分析清单。');
+    return {
+      title: isEnglish ? 'Broker decision desk' : '经纪人决策台',
+      subtitle: isEnglish
+        ? 'A broker-style first screen: conclusion, opportunity, risk, evidence, and the premium data gap.'
+        : '像经纪人一样先看结论、机会、风险、证据和高级版补强点。',
+      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      disclaimer: isEnglish ? 'Information analysis only, not investment advice.' : '仅作信息分析，不构成投资建议',
+      freeLabel: isEnglish ? 'Free shows the same structure' : '免费版看到同样结构',
+      premiumLabel: isEnglish ? 'Premium strengthens sources' : '高级版补强',
+      actionLabels: {
+        evidence: isEnglish ? 'See evidence' : '看证据',
+        risk: isEnglish ? 'See risk' : '看风险',
+        upgrade: isEnglish ? 'See upgrade gap' : '看升级差异',
+      },
+      cards: [
+        {
+          key: 'verdict',
+          label: isEnglish ? 'Conclusion first' : '先给结论',
+          headline: basicBrokerCockpit.verdict,
+          detail: isEnglish
+            ? `Research score ${basicBrokerCockpit.score}; price ${formatBasicNumber(currentPrice)} (${formatSignedBasicPercent(changePercent)}).`
+            : `研究分 ${basicBrokerCockpit.score}；最新价 ${formatBasicNumber(currentPrice)}（${formatSignedBasicPercent(changePercent)}）。`,
+        },
+        {
+          key: 'opportunity',
+          label: isEnglish ? 'Opportunity window' : '机会窗口',
+          headline: isEnglish
+            ? `Support ${support}; resistance ${resistance}`
+            : `支撑 ${support}；压力 ${resistance}`,
+          detail: secondEvidence?.detail || basicBrokerCockpit.nextActions[0],
+        },
+        {
+          key: 'risk',
+          label: isEnglish ? 'Risk boundary' : '风险边界',
+          headline: firstRisk,
+          detail: isEnglish
+            ? 'Read risk before chasing the move; stale or incomplete data should be refreshed first.'
+            : '追涨跌前先看风险；行情过期或数据不完整时，先刷新再解读。',
+        },
+        {
+          key: 'evidence',
+          label: isEnglish ? 'Evidence confirmation' : '证据确认',
+          headline: firstEvidence?.value || basicBrokerCockpit.proofLabel,
+          detail: firstEvidence?.detail || basicBrokerCockpit.nextActions.join('；'),
+        },
+      ],
+      upgradeItems: basicBrokerCockpit.upgradeItems.slice(0, 4),
+    };
+  }, [basicBrokerCockpit, basicFreeReport, basicSnapshot, uiLanguage]);
   const basicProDecisionCard = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport || !basicBrokerCockpit) {
       return null;
@@ -5857,6 +5919,102 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                  </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' && basicBrokerDecisionDesk ? (
+                  <section
+                    data-testid="basic-query-broker-decision-desk-v89"
+                    className="mb-4 rounded-lg border border-primary/50 bg-gradient-to-br from-primary/16 via-surface/75 to-background/45 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 font-semibold text-primary">
+                            {basicBrokerDecisionDesk.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
+                            {basicBrokerDecisionDesk.boundary}
+                          </span>
+                          <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
+                            {basicBrokerDecisionDesk.freeLabel}
+                          </span>
+                          <span className="rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-warning">
+                            {basicBrokerDecisionDesk.premiumLabel}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 text-xl font-semibold leading-snug text-foreground">
+                          {basicBrokerDecisionDesk.subtitle}
+                        </h3>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                          {basicBrokerDecisionDesk.disclaimer}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-visual-analyst-page-v87')}
+                        >
+                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                          {basicBrokerDecisionDesk.actionLabels.evidence}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-free-analyst-workbench-v86')}
+                        >
+                          <Search className="h-4 w-4" aria-hidden="true" />
+                          {basicBrokerDecisionDesk.actionLabels.risk}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-commercial-journey')}
+                        >
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          {basicBrokerDecisionDesk.actionLabels.upgrade}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-4">
+                      {basicBrokerDecisionDesk.cards.map((card) => (
+                        <div
+                          key={card.key}
+                          className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-3"
+                        >
+                          <div className="text-xs font-semibold text-primary">{card.label}</div>
+                          <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                            {card.headline}
+                          </div>
+                          <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-secondary-text">
+                            {card.detail}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md border border-primary/30 bg-primary/8 p-3">
+                      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-primary">{basicBrokerDecisionDesk.premiumLabel}</div>
+                          <p className="mt-1 text-xs leading-relaxed text-secondary-text">
+                            {basicBrokerDecisionDesk.freeLabel}；{basicBrokerDecisionDesk.premiumLabel}。
+                          </p>
+                        </div>
+                        <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] text-primary">
+                          {basicBrokerDecisionDesk.upgradeItems.map((item) => (
+                            <span
+                              key={item}
+                              className="max-w-full rounded-md border border-primary/35 bg-background/35 px-2 py-1"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicNextActionsWorkflow ? (
