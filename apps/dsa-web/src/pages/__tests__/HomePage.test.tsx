@@ -3048,7 +3048,29 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    const firstScreenFocus = screen.getByTestId('basic-query-first-screen-focus-v90');
+    expect(
+      screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(firstScreenFocus)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(firstScreenFocus).toHaveTextContent('首屏聚焦');
+    expect(firstScreenFocus).toHaveTextContent('第一屏先看四件事');
+    expect(firstScreenFocus).toHaveTextContent('结论');
+    expect(firstScreenFocus).toHaveTextContent('证据');
+    expect(firstScreenFocus).toHaveTextContent('风险');
+    expect(firstScreenFocus).toHaveTextContent('升级差异');
+    expect(firstScreenFocus).toHaveTextContent('下方模块降为证据库');
+    expect(firstScreenFocus).toHaveTextContent('免费版不锁内容');
+    expect(firstScreenFocus).toHaveTextContent('未用 AI，不扣额度');
+    fireEvent.click(within(firstScreenFocus).getByRole('button', { name: '看决策台' }));
+    fireEvent.click(within(firstScreenFocus).getByRole('button', { name: '看证据库' }));
+    fireEvent.click(within(firstScreenFocus).getByRole('button', { name: '看升级差异' }));
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     const brokerDecisionDesk = screen.getByTestId('basic-query-broker-decision-desk-v89');
+    expect(
+      firstScreenFocus.compareDocumentPosition(brokerDecisionDesk)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(brokerDecisionDesk)
       & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -3094,6 +3116,7 @@ describe('HomePage', () => {
     expect(freeAnalystWorkbench).toHaveTextContent('免费版已经开放');
     expect(freeAnalystWorkbench).toHaveTextContent('高级版增强');
     expect(freeAnalystWorkbench).toHaveTextContent('未用 AI，不扣额度');
+    expect(freeAnalystWorkbench).toHaveAttribute('data-density', 'secondary');
     fireEvent.click(within(freeAnalystWorkbench).getByRole('button', { name: '看资讯' }));
     fireEvent.click(within(freeAnalystWorkbench).getByRole('button', { name: '看K线' }));
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
@@ -3107,6 +3130,7 @@ describe('HomePage', () => {
     expect(visualAnalystPage).toHaveTextContent('免费版可见');
     expect(visualAnalystPage).toHaveTextContent('高级版增强');
     expect(visualAnalystPage).toHaveTextContent('未用 AI，不扣额度');
+    expect(visualAnalystPage).toHaveAttribute('data-density', 'secondary');
     fireEvent.click(within(visualAnalystPage).getByRole('button', { name: '看资讯' }));
     fireEvent.click(within(visualAnalystPage).getByRole('button', { name: '看K线' }));
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
@@ -3119,6 +3143,7 @@ describe('HomePage', () => {
     expect(readingRoadmap).toHaveTextContent('免费版可完整阅读');
     expect(readingRoadmap).toHaveTextContent('高级版补数据源');
     expect(readingRoadmap).toHaveTextContent('未用 AI，不扣额度');
+    expect(readingRoadmap).toHaveAttribute('data-density', 'secondary');
     const scrollIntoViewSpy = vi.fn();
     HTMLElement.prototype.scrollIntoView = scrollIntoViewSpy;
     fireEvent.click(within(readingRoadmap).getByRole('button', { name: '看资讯' }));

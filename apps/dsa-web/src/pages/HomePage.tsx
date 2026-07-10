@@ -2293,6 +2293,55 @@ const HomePage: React.FC = () => {
       upgradeItems: basicBrokerCockpit.upgradeItems.slice(0, 4),
     };
   }, [basicBrokerCockpit, basicFreeReport, basicSnapshot, uiLanguage]);
+  const basicFirstScreenFocus = useMemo(() => {
+    if (!basicSnapshot || !basicFreeReport) {
+      return null;
+    }
+    const isEnglish = uiLanguage === 'en';
+    const firstRisk = basicFreeReport.productBrief.risks[0]
+      || basicFreeReport.productBrief.midStatus
+      || basicFreeReport.productBrief.shortStatus;
+    return {
+      title: isEnglish ? 'First-screen focus' : '首屏聚焦',
+      subtitle: isEnglish
+        ? 'Read four things first; use lower modules as the evidence library.'
+        : '第一屏先看四件事；下方模块降为证据库。',
+      boundary: isEnglish ? 'No AI, no quota' : '未用 AI，不扣额度',
+      freeLabel: isEnglish ? 'Free does not lock content' : '免费版不锁内容',
+      secondaryLabel: isEnglish ? 'Lower modules become evidence library' : '下方模块降为证据库',
+      actionLabels: {
+        desk: isEnglish ? 'Decision desk' : '看决策台',
+        evidence: isEnglish ? 'Evidence library' : '看证据库',
+        upgrade: isEnglish ? 'Upgrade gap' : '看升级差异',
+      },
+      points: [
+        {
+          key: 'conclusion',
+          label: isEnglish ? 'Conclusion' : '结论',
+          detail: localizeGeneratedText(basicFreeReport.productBrief.conclusion, uiLanguage),
+        },
+        {
+          key: 'evidence',
+          label: isEnglish ? 'Evidence' : '证据',
+          detail: isEnglish
+            ? `Support ${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}; resistance ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}.`
+            : `支撑 ${localizeGeneratedText(basicFreeReport.productBrief.supportLevels, uiLanguage)}；压力 ${localizeGeneratedText(basicFreeReport.productBrief.pressureLevels, uiLanguage)}。`,
+        },
+        {
+          key: 'risk',
+          label: isEnglish ? 'Risk' : '风险',
+          detail: localizeGeneratedText(firstRisk, uiLanguage),
+        },
+        {
+          key: 'upgrade',
+          label: isEnglish ? 'Upgrade gap' : '升级差异',
+          detail: isEnglish
+            ? 'Premium improves source freshness, links, and model depth; free keeps the same reading structure.'
+            : '高级版增强数据新鲜度、来源链接和模型深度；免费版保留同样阅读结构。',
+        },
+      ],
+    };
+  }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const basicProDecisionCard = useMemo(() => {
     if (!basicSnapshot || !basicFreeReport || !basicBrokerCockpit) {
       return null;
@@ -5921,6 +5970,76 @@ const HomePage: React.FC = () => {
                     ) : null}
                   </section>
                 ) : null}
+                {basicSnapshotViewMode === 'quick' && basicFirstScreenFocus ? (
+                  <section
+                    data-testid="basic-query-first-screen-focus-v90"
+                    className="mb-4 rounded-lg border border-primary/45 bg-gradient-to-r from-primary/14 via-surface/75 to-background/45 p-3 shadow-soft-card"
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded-md border border-primary/45 bg-primary/12 px-2 py-1 font-semibold text-primary">
+                            {basicFirstScreenFocus.title}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
+                            {basicFirstScreenFocus.boundary}
+                          </span>
+                          <span className="rounded-md border border-primary/35 bg-background/35 px-2 py-1 text-primary">
+                            {basicFirstScreenFocus.freeLabel}
+                          </span>
+                          <span className="rounded-md border border-subtle/75 bg-background/35 px-2 py-1 text-secondary-text">
+                            {basicFirstScreenFocus.secondaryLabel}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 text-lg font-semibold leading-snug text-foreground">
+                          {basicFirstScreenFocus.subtitle}
+                        </h3>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-broker-decision-desk-v89')}
+                        >
+                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                          {basicFirstScreenFocus.actionLabels.desk}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-visual-analyst-page-v87')}
+                        >
+                          <Search className="h-4 w-4" aria-hidden="true" />
+                          {basicFirstScreenFocus.actionLabels.evidence}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleBasicFeatureJump('basic-query-commercial-journey')}
+                        >
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          {basicFirstScreenFocus.actionLabels.upgrade}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-4">
+                      {basicFirstScreenFocus.points.map((point) => (
+                        <div
+                          key={point.key}
+                          className="min-w-0 rounded-md border border-subtle/80 bg-background/35 p-3"
+                        >
+                          <div className="text-xs font-semibold text-primary">{point.label}</div>
+                          <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-secondary-text">
+                            {point.detail}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
                 {basicSnapshotViewMode === 'quick' && basicBrokerDecisionDesk ? (
                   <section
                     data-testid="basic-query-broker-decision-desk-v89"
@@ -6107,6 +6226,7 @@ const HomePage: React.FC = () => {
                 {basicSnapshotViewMode === 'quick' && basicFreeAnalystWorkbench ? (
                   <section
                     data-testid="basic-query-free-analyst-workbench-v86"
+                    data-density="secondary"
                     className="mb-4 rounded-lg border border-primary/45 bg-gradient-to-br from-primary/14 via-surface/75 to-background/40 p-3 shadow-soft-card"
                   >
                     <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -6199,6 +6319,7 @@ const HomePage: React.FC = () => {
                 {basicSnapshotViewMode === 'quick' && basicVisualAnalystPage ? (
                   <section
                     data-testid="basic-query-visual-analyst-page-v87"
+                    data-density="secondary"
                     className="mb-4 rounded-lg border border-primary/50 bg-gradient-to-br from-background/75 via-primary/10 to-surface/70 p-3 shadow-soft-card"
                   >
                     <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -6394,6 +6515,7 @@ const HomePage: React.FC = () => {
                 {basicSnapshotViewMode === 'quick' && basicReadingRoadmap ? (
                   <section
                     data-testid="basic-query-reading-roadmap-v88"
+                    data-density="secondary"
                     className="mb-4 rounded-lg border border-primary/45 bg-surface/70 p-3 shadow-soft-card"
                   >
                     <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
