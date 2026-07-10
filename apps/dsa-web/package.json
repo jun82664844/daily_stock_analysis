@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:smoke": "playwright test",
+    "verify:bundle:v92": "node ./scripts/verify-homepage-bundle-v92.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -14,6 +14,7 @@ from src.config import Config
 from src.platform_accounts import PlatformAccountService
 from src.services.basic_query_service import BasicQueryService
 from src.services.market_data_cache import MarketDataCache
+from src.services.market_source_health import MarketSourceHealthRegistry
 from src.storage import DatabaseManager
 
 
@@ -199,6 +200,7 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
 
     def test_stale_and_missing_quotes_return_degradation_warnings(self) -> None:
         stock_service = MagicMock()
+        stock_service.get_realtime_quote.return_value = None
         stock_service.get_history_data.return_value = {
             "stock_code": "AAPL",
             "stock_name": "Apple Inc.",
@@ -207,7 +209,11 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
         stale_cache = MarketDataCache(default_ttl_seconds=0)
         stale_cache.set("quote:AAPL", _quote("AAPL", source="cache"), source="cache")
         time.sleep(0.01)
-        stale_service = BasicQueryService(stock_service=stock_service, cache=stale_cache)
+        stale_service = BasicQueryService(
+            stock_service=stock_service,
+            cache=stale_cache,
+            source_health=MarketSourceHealthRegistry(),
+        )
 
         stale = stale_service.get_snapshot("AAPL")
 
@@ -226,6 +232,7 @@ class PlatformQueryQualityV4TestCase(unittest.TestCase):
         missing = BasicQueryService(
             stock_service=missing_quote_service,
             cache=MarketDataCache(default_ttl_seconds=60),
+            source_health=MarketSourceHealthRegistry(),
         ).get_snapshot("AAPL")
 
         self.assertEqual(missing["quote"]["freshness"], "unavailable")

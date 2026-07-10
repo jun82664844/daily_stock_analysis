@@ -59,8 +59,9 @@ class PlatformLocalQuerySpeedV7TestCase(unittest.TestCase):
             cache=MarketDataCache(default_ttl_seconds=60),
         )
 
-        first = service.get_snapshot("AAPL")
-        second = service.get_snapshot("AAPL")
+        with patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]):
+            first = service.get_snapshot("AAPL")
+            second = service.get_snapshot("AAPL")
 
         first_diag = first["diagnostics"]
         self.assertFalse(first["ai_used"])

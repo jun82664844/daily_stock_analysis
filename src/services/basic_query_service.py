@@ -27,6 +27,7 @@ _BASIC_QUERY_FETCH_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 _DEFAULT_FETCH_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_FETCH_TIMEOUT_SEC", "4"))
 _DEFAULT_PROFILE_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_PROFILE_TIMEOUT_SEC", "2"))
 _DEFAULT_REFERENCE_QUOTE_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_REFERENCE_QUOTE_TIMEOUT_SEC", "1.2"))
+_DEFAULT_STALE_REVALIDATION_TIMEOUT_SECONDS = float(os.getenv("BASIC_QUERY_STALE_REVALIDATION_TIMEOUT_SEC", "0.8"))
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,7 @@ class BasicQueryService:
         fetch_timeout_seconds: Optional[float] = None,
         profile_timeout_seconds: Optional[float] = None,
         reference_quote_timeout_seconds: Optional[float] = None,
+        stale_revalidation_timeout_seconds: Optional[float] = None,
         source_health: Optional[MarketSourceHealthRegistry] = None,
         a_share_enrichment_service: Optional[Any] = None,
     ):
@@ -83,11 +85,19 @@ class BasicQueryService:
             if reference_quote_timeout_seconds is None
             else max(0.001, float(reference_quote_timeout_seconds))
         )
+        self.stale_revalidation_timeout_seconds = (
+            _DEFAULT_STALE_REVALIDATION_TIMEOUT_SECONDS
+            if stale_revalidation_timeout_seconds is None
+            else max(0.001, float(stale_revalidation_timeout_seconds))
+        )
 
     def get_snapshot(self, stock_code: str, *, force_refresh: bool = False) -> Dict[str, Any]:
         started = time.perf_counter()
         route = self._resolve_route(stock_code)
         code = route.normalized_code
+        cached_history_available = bool(
+            not force_refresh and self.cache.get(f"history:{code}:daily:30") is not None
+        )
         (
             quote,
             quote_freshness,
@@ -99,7 +109,12 @@ class BasicQueryService:
             quote_error,
             quote_health,
             quote_cache_origin,
-        ) = self._get_quote(code, route=route, force_refresh=force_refresh)
+        ) = self._get_quote(
+            code,
+            route=route,
+            force_refresh=force_refresh,
+            cached_history_available=cached_history_available,
+        )
         (
             history,
             history_freshness,
@@ -284,19 +299,31 @@ class BasicQueryService:
         *,
         route: MarketRoute,
         force_refresh: bool = False,
+        cached_history_available: bool = False,
     ) -> tuple[Optional[Dict[str, Any]], str, str, int, str, bool, str, Optional[str], Dict[str, Any], str]:
         started = time.perf_counter()
         cache_key = f"quote:{code}"
         hit = None if force_refresh else self.cache.get(cache_key)
-        if hit is not None:
+        if hit is not None and hit.freshness != "stale":
             source = self._payload_source(hit.value, hit.source or route.quote_sources[0])
             fallback = self._cache_fallback(hit)
             return hit.value, hit.freshness, "hit", self._elapsed_ms(started), source, False, fallback, None, self.source_health.snapshot(source), hit.origin
+        stale_hit = hit if hit is not None and hit.freshness == "stale" else None
         source_id = route.quote_sources[0]
         health = self.source_health.snapshot(source_id)
         if health.get("status") == "cooling_down":
+            if stale_hit is not None:
+                source = self._payload_source(stale_hit.value, stale_hit.source or source_id)
+                return stale_hit.value, "stale", "stale_fallback", self._elapsed_ms(started), source, False, self._cache_fallback(stale_hit), "cooling_down", health, stale_hit.origin
             return None, "unavailable", "unavailable", self._elapsed_ms(started), source_id, False, "none", "cooling_down", health, "none"
-        quote, error = self._call_with_timeout(lambda: self.stock_service.get_realtime_quote(code))
+        quote, error = self._call_with_timeout(
+            lambda: self.stock_service.get_realtime_quote(code),
+            timeout_seconds=(
+                min(self.fetch_timeout_seconds, self.stale_revalidation_timeout_seconds)
+                if stale_hit is not None or cached_history_available
+                else None
+            ),
+        )
         elapsed_ms = self._elapsed_ms(started)
         if quote:
             quote = dict(quote)
@@ -307,9 +334,14 @@ class BasicQueryService:
             self.source_health.record_timeout(source_id, elapsed_ms=elapsed_ms)
         elif error == "error":
             self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+        elif stale_hit is not None:
+            error = "unavailable"
         health = self.source_health.snapshot(source_id)
+        if not quote and stale_hit is not None:
+            source = self._payload_source(stale_hit.value, stale_hit.source or source_id)
+            return stale_hit.value, "stale", "stale_fallback", elapsed_ms, source, error == "timeout", self._cache_fallback(stale_hit), error, health, stale_hit.origin
         source = self._payload_source(quote, source_id)
-        cache_state = "refresh" if force_refresh and quote else ("miss" if error is None else "unavailable")
+        cache_state = "refresh" if force_refresh and quote else ("revalidated" if stale_hit is not None and quote else ("miss" if error is None else "unavailable"))
         fallback = "live" if quote else "none"
         return quote, "fresh" if quote else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
 
@@ -323,15 +355,26 @@ class BasicQueryService:
         started = time.perf_counter()
         cache_key = f"history:{code}:daily:30"
         hit = None if force_refresh else self.cache.get(cache_key)
-        if hit is not None:
+        if hit is not None and hit.freshness != "stale":
             source = self._payload_source(hit.value, hit.source or route.history_sources[0])
             fallback = self._cache_fallback(hit)
             return hit.value, hit.freshness, "hit", self._elapsed_ms(started), source, False, fallback, None, self.source_health.snapshot(source), hit.origin
+        stale_hit = hit if hit is not None and hit.freshness == "stale" else None
         source_id = route.history_sources[0]
         health = self.source_health.snapshot(source_id)
         if health.get("status") == "cooling_down":
+            if stale_hit is not None:
+                source = self._payload_source(stale_hit.value, stale_hit.source or source_id)
+                return stale_hit.value, "stale", "stale_fallback", self._elapsed_ms(started), source, False, self._cache_fallback(stale_hit), "cooling_down", health, stale_hit.origin
             return None, "unavailable", "unavailable", self._elapsed_ms(started), source_id, False, "none", "cooling_down", health, "none"
-        history, error = self._call_with_timeout(lambda: self.stock_service.get_history_data(code, period="daily", days=30))
+        history, error = self._call_with_timeout(
+            lambda: self.stock_service.get_history_data(code, period="daily", days=30),
+            timeout_seconds=(
+                min(self.fetch_timeout_seconds, self.stale_revalidation_timeout_seconds)
+                if stale_hit is not None
+                else None
+            ),
+        )
         elapsed_ms = self._elapsed_ms(started)
         if history:
             history = dict(history)
@@ -342,9 +385,14 @@ class BasicQueryService:
             self.source_health.record_timeout(source_id, elapsed_ms=elapsed_ms)
         elif error == "error":
             self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+        elif stale_hit is not None:
+            error = "unavailable"
         health = self.source_health.snapshot(source_id)
+        if not history and stale_hit is not None:
+            source = self._payload_source(stale_hit.value, stale_hit.source or source_id)
+            return stale_hit.value, "stale", "stale_fallback", elapsed_ms, source, error == "timeout", self._cache_fallback(stale_hit), error, health, stale_hit.origin
         source = self._payload_source(history, source_id)
-        cache_state = "refresh" if force_refresh and history else ("miss" if error is None else "unavailable")
+        cache_state = "refresh" if force_refresh and history else ("revalidated" if stale_hit is not None and history else ("miss" if error is None else "unavailable"))
         fallback = "live" if history else "none"
         return history, "fresh" if history else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
 
@@ -360,20 +408,28 @@ class BasicQueryService:
         source_id = route.profile_sources[0] if route.profile_sources else self._profile_source_for_route(route)
         cache_key = f"profile:{code}"
         hit = None if force_refresh else self.cache.get(cache_key)
-        if hit is not None:
+        if hit is not None and hit.freshness != "stale":
             source = self._payload_source(hit.value, hit.source or source_id)
             fallback = self._cache_fallback(hit)
             return hit.value, hit.freshness, "hit", self._elapsed_ms(started), source, False, fallback, None, self.source_health.snapshot(source), hit.origin
+        stale_hit = hit if hit is not None and hit.freshness == "stale" else None
 
         health = self.source_health.snapshot(source_id)
         if health.get("status") == "cooling_down":
+            if stale_hit is not None:
+                source = self._payload_source(stale_hit.value, stale_hit.source or source_id)
+                return stale_hit.value, "stale", "stale_fallback", self._elapsed_ms(started), source, False, self._cache_fallback(stale_hit), "cooling_down", health, stale_hit.origin
             profile = self._profile_from_quote(code, quote, source=source_id)
             freshness = "fresh" if profile else "unavailable"
             return profile, freshness, "unavailable", self._elapsed_ms(started), source_id, False, "quote", "cooling_down", health, "none"
 
         profile, error = self._call_with_timeout(
             lambda: self._fetch_profile_from_stock_service(code, route=route),
-            timeout_seconds=self.profile_timeout_seconds,
+            timeout_seconds=(
+                min(self.profile_timeout_seconds, self.stale_revalidation_timeout_seconds)
+                if stale_hit is not None
+                else self.profile_timeout_seconds
+            ),
         )
         if not isinstance(profile, dict):
             profile = None
@@ -387,9 +443,14 @@ class BasicQueryService:
             self.source_health.record_timeout(source_id, elapsed_ms=elapsed_ms)
         elif error == "error":
             self.source_health.record_error(source_id, elapsed_ms=elapsed_ms)
+        elif stale_hit is not None:
+            error = "unavailable"
         health = self.source_health.snapshot(source_id)
+        if not profile and stale_hit is not None:
+            source = self._payload_source(stale_hit.value, stale_hit.source or source_id)
+            return stale_hit.value, "stale", "stale_fallback", elapsed_ms, source, error == "timeout", self._cache_fallback(stale_hit), error, health, stale_hit.origin
         source = self._payload_source(profile, source_id)
-        cache_state = "refresh" if force_refresh and profile else ("miss" if error is None else "unavailable")
+        cache_state = "refresh" if force_refresh and profile else ("revalidated" if stale_hit is not None and profile else ("miss" if error is None else "unavailable"))
         fallback = "live" if profile else "none"
         return profile, "fresh" if profile else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
 
@@ -497,6 +558,8 @@ class BasicQueryService:
         elapsed_ms = self._elapsed_ms(started)
         slow_threshold_ms = 3000
         timed_out = quote_timeout or history_timeout or profile_timeout
+        cache_states = (quote_cache, history_cache, profile_cache)
+        stale_revalidation = any(state in {"revalidated", "stale_fallback"} for state in cache_states)
         return {
             "elapsed_ms": elapsed_ms,
             "quote_elapsed_ms": quote_elapsed_ms,
@@ -545,11 +608,12 @@ class BasicQueryService:
                 "storage": getattr(self.cache, "storage_label", "memory"),
             },
             "refresh": {
-                "mode": "force_refresh" if force_refresh else "cache_first",
-                "requested": bool(force_refresh),
-                "quote": bool(force_refresh),
-                "history": bool(force_refresh),
-                "profile": bool(force_refresh),
+                "mode": "force_refresh" if force_refresh else ("stale_while_revalidate" if stale_revalidation else "cache_first"),
+                "requested": bool(force_refresh or stale_revalidation),
+                "quote": bool(force_refresh or quote_cache in {"revalidated", "stale_fallback"}),
+                "history": bool(force_refresh or history_cache in {"revalidated", "stale_fallback"}),
+                "profile": bool(force_refresh or profile_cache in {"revalidated", "stale_fallback"}),
+                "stale_timeout_seconds": self.stale_revalidation_timeout_seconds,
             },
             "route_lane": route.data_source_lane,
             "performance": {

@@ -4,7 +4,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.services.basic_query_service import BasicQueryService
 from src.services.market_source_health import MarketSourceHealthRegistry
@@ -78,6 +78,8 @@ class PlatformLocalPersistentMarketCacheV10TestCase(unittest.TestCase):
             health = MarketSourceHealthRegistry(failure_threshold=2, cooling_seconds=60)
             health.record_timeout("hk_realtime", elapsed_ms=4000)
             health.record_timeout("hk_realtime", elapsed_ms=4000)
+            health.record_timeout("hk_history", elapsed_ms=4000)
+            health.record_timeout("hk_history", elapsed_ms=4000)
             cache = PersistentMarketDataCache(path=cache_path, default_ttl_seconds=0)
             service = BasicQueryService(
                 stock_service=stock_service,
@@ -86,11 +88,13 @@ class PlatformLocalPersistentMarketCacheV10TestCase(unittest.TestCase):
                 fetch_timeout_seconds=0.01,
             )
 
-            snapshot = service.get_snapshot("HK00700")
+            with patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]):
+                snapshot = service.get_snapshot("HK00700")
 
         self.assertFalse(snapshot["ai_used"])
         self.assertEqual(snapshot["quote"]["freshness"], "stale")
-        self.assertEqual(snapshot["diagnostics"]["cache"]["quote"], "hit")
+        self.assertEqual(snapshot["diagnostics"]["cache"]["quote"], "stale_fallback")
+        self.assertEqual(snapshot["diagnostics"]["cache"]["history"], "stale_fallback")
         self.assertEqual(snapshot["diagnostics"]["fallback"]["quote"], "stale_disk_cache")
         self.assertEqual(snapshot["diagnostics"]["fallback"]["history"], "stale_disk_cache")
         self.assertEqual(snapshot["diagnostics"]["persistent_cache"]["quote"], "disk")

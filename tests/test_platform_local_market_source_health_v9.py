@@ -106,11 +106,13 @@ class PlatformLocalMarketSourceHealthV9TestCase(unittest.TestCase):
             source_health=health,
         )
 
-        service.get_snapshot("AAPL")
-        service.get_snapshot("AAPL")
+        with patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]):
+            service.get_snapshot("AAPL")
+            service.get_snapshot("AAPL")
         self.assertEqual(stock_service.get_realtime_quote.call_count, 2)
 
-        snapshot = service.get_snapshot("AAPL")
+        with patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]):
+            snapshot = service.get_snapshot("AAPL")
 
         self.assertEqual(stock_service.get_realtime_quote.call_count, 2)
         self.assertFalse(snapshot["ai_used"])

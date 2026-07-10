@@ -12,6 +12,7 @@ from api.app import create_app
 from src.config import Config
 from src.services.basic_query_service import BasicQueryService
 from src.services.market_data_cache import MarketDataCache
+from src.services.market_source_health import MarketSourceHealthRegistry
 from src.storage import DatabaseManager
 from scripts.verify_platform_local_market_refresh_v22 import (
     evaluate_market_refresh_summary,
@@ -61,7 +62,11 @@ class PlatformLocalMarketRefreshV22TestCase(unittest.TestCase):
             "data": _history_rows(),
         }
 
-        snapshot = BasicQueryService(stock_service=stock_service, cache=cache).get_snapshot(
+        snapshot = BasicQueryService(
+            stock_service=stock_service,
+            cache=cache,
+            source_health=MarketSourceHealthRegistry(),
+        ).get_snapshot(
             "AAPL",
             force_refresh=True,
         )
@@ -73,7 +78,10 @@ class PlatformLocalMarketRefreshV22TestCase(unittest.TestCase):
         self.assertEqual(snapshot["diagnostics"]["refresh"]["mode"], "force_refresh")
         self.assertEqual(snapshot["diagnostics"]["refresh"]["requested"], True)
         self.assertFalse(snapshot["ai_used"])
-        stock_service.get_realtime_quote.assert_called_once_with("AAPL")
+        self.assertEqual(
+            [call.args for call in stock_service.get_realtime_quote.call_args_list].count(("AAPL",)),
+            1,
+        )
         stock_service.get_history_data.assert_called_once_with("AAPL", period="daily", days=30)
 
 
@@ -101,10 +109,16 @@ class PlatformLocalMarketRefreshEndpointV22TestCase(unittest.TestCase):
             MarketDataCache(default_ttl_seconds=60),
         )
         self.cache_patch.start()
+        self.health_patch = patch(
+            "src.services.basic_query_service.default_market_source_health",
+            MarketSourceHealthRegistry(),
+        )
+        self.health_patch.start()
         self.client = TestClient(create_app(static_dir=self.static_dir))
 
     def tearDown(self) -> None:
         self.client.close()
+        self.health_patch.stop()
         self.cache_patch.stop()
         self.env_patch.stop()
         DatabaseManager.reset_instance()
@@ -118,10 +132,18 @@ class PlatformLocalMarketRefreshEndpointV22TestCase(unittest.TestCase):
         )
         self.assertEqual(register.status_code, 200)
         stock_service = MagicMock()
-        stock_service.get_realtime_quote.side_effect = [
-            _quote("AAPL", price=100.0, source="first_live"),
-            _quote("AAPL", price=210.0, source="refresh_live"),
-        ]
+        aapl_quote_calls = 0
+
+        def quote_for_code(code: str) -> dict:
+            nonlocal aapl_quote_calls
+            if code == "AAPL":
+                aapl_quote_calls += 1
+                if aapl_quote_calls == 1:
+                    return _quote(code, price=100.0, source="first_live")
+                return _quote(code, price=210.0, source="refresh_live")
+            return _quote(code, price=150.0, source="reference_live")
+
+        stock_service.get_realtime_quote.side_effect = quote_for_code
         stock_service.get_history_data.side_effect = [
             {"stock_code": "AAPL", "stock_name": "AAPL", "source": "first_history", "data": _history_rows()},
             {"stock_code": "AAPL", "stock_name": "AAPL", "source": "refresh_history", "data": _history_rows()},
@@ -145,6 +167,13 @@ class PlatformLocalMarketRefreshEndpointV22TestCase(unittest.TestCase):
 
 
 class PlatformLocalMarketRefreshVerifierV22TestCase(unittest.TestCase):
+    def test_current_source_shape_passes_v22_static_check(self) -> None:
+        from scripts.verify_platform_local_market_refresh_v22 import _run_source_shape_check
+
+        result = _run_source_shape_check(Path(__file__).resolve().parents[1])
+
+        self.assertEqual(result.status, "passed", result.error)
+
     def test_evaluate_market_refresh_summary_accepts_complete_shape(self) -> None:
         summary = {
             "service": {

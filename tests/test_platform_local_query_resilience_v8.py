@@ -6,7 +6,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.services.basic_query_service import BasicQueryService
 from src.services.market_data_cache import MarketDataCache
@@ -66,7 +66,8 @@ class PlatformLocalQueryResilienceV8TestCase(unittest.TestCase):
         )
 
         started = time.perf_counter()
-        snapshot = service.get_snapshot("600519")
+        with patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]):
+            snapshot = service.get_snapshot("600519")
         elapsed = time.perf_counter() - started
 
         self.assertLess(elapsed, 0.18)
@@ -86,32 +87,33 @@ class PlatformLocalQueryResilienceV8TestCase(unittest.TestCase):
         self.assertEqual(diagnostics["fallback"]["history"], "live")
         self.assertEqual(diagnostics["performance"]["status"], "slow")
 
-    def test_stale_cache_short_circuits_slow_sources_and_marks_fallback(self) -> None:
+    def test_stale_cache_revalidates_once_and_marks_fallback_when_sources_error(self) -> None:
         cache = MarketDataCache(default_ttl_seconds=0)
         cache.set("quote:HK00700", _quote("HK00700", source="stale_quote"), source="stale_quote")
         cache.set("history:HK00700:daily:30", _history("HK00700", source="stale_history"), source="stale_history")
         time.sleep(0.01)
         stock_service = MagicMock()
-        stock_service.get_realtime_quote.side_effect = AssertionError("stale quote cache should short-circuit live fetch")
-        stock_service.get_history_data.side_effect = AssertionError("stale history cache should short-circuit live fetch")
+        stock_service.get_realtime_quote.side_effect = RuntimeError("live quote failed")
+        stock_service.get_history_data.side_effect = RuntimeError("live history failed")
         service = BasicQueryService(
             stock_service=stock_service,
             cache=cache,
             fetch_timeout_seconds=0.01,
         )
 
-        snapshot = service.get_snapshot("HK00700")
+        with patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]):
+            snapshot = service.get_snapshot("HK00700")
 
         self.assertEqual(snapshot["market"], "hk")
         self.assertEqual(snapshot["quote"]["freshness"], "stale")
-        self.assertEqual(snapshot["diagnostics"]["cache"]["quote"], "hit")
-        self.assertEqual(snapshot["diagnostics"]["cache"]["history"], "hit")
+        self.assertEqual(snapshot["diagnostics"]["cache"]["quote"], "stale_fallback")
+        self.assertEqual(snapshot["diagnostics"]["cache"]["history"], "stale_fallback")
         self.assertEqual(snapshot["diagnostics"]["fallback"]["quote"], "stale_cache")
         self.assertEqual(snapshot["diagnostics"]["fallback"]["history"], "stale_cache")
         self.assertEqual(snapshot["diagnostics"]["timeouts"]["quote"], False)
         self.assertTrue(any(warning["code"] == "stale_quote" for warning in snapshot["warnings"]))
-        stock_service.get_realtime_quote.assert_not_called()
-        stock_service.get_history_data.assert_not_called()
+        stock_service.get_realtime_quote.assert_called_once_with("HK00700")
+        stock_service.get_history_data.assert_called_once_with("HK00700", period="daily", days=30)
 
     def test_history_timeout_returns_quote_with_missing_history_warning(self) -> None:
         stock_service = MagicMock()

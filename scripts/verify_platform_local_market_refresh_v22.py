@@ -222,7 +222,7 @@ def _run_source_shape_check(root: Path) -> LocalMarketRefreshV22Result:
         "service": {
             "accepts_force_refresh": "force_refresh: bool = False" in basic_query,
             "bypasses_cache": "None if force_refresh else self.cache.get" in basic_query,
-            "refresh_mode": "force_refresh" if '"force_refresh" if force_refresh else "cache_first"' in basic_query else "missing",
+            "refresh_mode": "force_refresh" if '"mode": "force_refresh" if force_refresh' in basic_query else "missing",
             "ai_used": False if '"ai_used": False' in basic_query else None,
         },
         "endpoint": {
@@ -230,7 +230,11 @@ def _run_source_shape_check(root: Path) -> LocalMarketRefreshV22Result:
             "passes_force_refresh": "force_refresh=refresh" in stocks_endpoint,
         },
         "frontend": {
-            "api_uses_refresh_query": "?refresh=true" in stocks_api,
+            "api_uses_refresh_query": (
+                "?refresh=true" in stocks_api
+                or "params.set('refresh', 'true')" in stocks_api
+                or 'params.set("refresh", "true")' in stocks_api
+            ),
             "refresh_button_visible": "basic-query-refresh-market" in home_page,
             "refresh_diagnostics_visible": "diagnostics.refresh" in home_page and "Refresh:" in home_page,
             "ai_submission_guard": "analysisApi.analyzeAsync).not.toHaveBeenCalled" in _read_text(root, "apps/dsa-web/src/pages/__tests__/HomePage.test.tsx"),

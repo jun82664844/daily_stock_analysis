@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, ArchiveRestore, BarChart3, Check, Download, Eye, Flag, KeyRound, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -14,12 +14,7 @@ import { DecisionJourneyV91 } from '../components/analysis/DecisionJourneyV91';
 import { buildDecisionJourneyModel } from '../components/analysis/decisionJourneyModel';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
-import { HistoryList, StockHistoryTrendDrawer, StockBar } from '../components/history';
-import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
-import { MarketReviewReportView } from '../components/report/MarketReviewReportView';
-import { ReportSummary } from '../components/report/ReportSummary';
-import { RunFlowPanel } from '../components/run-flow';
-import { TaskPanel } from '../components/tasks';
+import { HistoryList, StockBar } from '../components/history';
 import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -29,6 +24,27 @@ import type { AnalysisDepth, AnalysisReport, ApiKeyMode, HistoryFilters, History
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { downloadTextFile } from '../utils/downloadText';
+
+const LazyTaskPanel = lazy(() => import('../components/tasks/TaskPanel')
+  .then((module) => ({ default: module.TaskPanel })));
+const LazyMarketReviewReportView = lazy(() => import('../components/report/MarketReviewReportView')
+  .then((module) => ({ default: module.MarketReviewReportView })));
+const LazyStockHistoryTrendDrawer = lazy(() => import('../components/history/StockHistoryTrendDrawer')
+  .then((module) => ({ default: module.StockHistoryTrendDrawer })));
+const LazyReportSummary = lazy(() => import('../components/report/ReportSummary')
+  .then((module) => ({ default: module.ReportSummary })));
+const LazyReportMarkdownDrawer = lazy(() => import('../components/report/ReportMarkdownDrawer')
+  .then((module) => ({ default: module.ReportMarkdownDrawer })));
+const LazyRunFlowPanel = lazy(() => import('../components/run-flow/RunFlowPanel')
+  .then((module) => ({ default: module.RunFlowPanel })));
+
+const LazyFeatureFallback: React.FC<{ className?: string }> = ({ className = 'min-h-24' }) => (
+  <div
+    data-testid="lazy-feature-loading"
+    className={`${className} w-full animate-pulse rounded-lg border border-white/10 bg-white/[0.02]`}
+    aria-hidden="true"
+  />
+);
 
 const formatBasicNumber = (value: unknown): string => (
   typeof value === 'number' && Number.isFinite(value)
@@ -4947,7 +4963,11 @@ const HomePage: React.FC = () => {
   const sidebarContent = useMemo(
     () => (
       <div className="flex min-h-0 h-full flex-col gap-3 overflow-hidden">
-        <TaskPanel tasks={activeTasks} onOpenRunFlow={openTaskRunFlow} />
+        {activeTasks.length > 0 ? (
+          <Suspense fallback={<LazyFeatureFallback className="min-h-28" />}>
+            <LazyTaskPanel tasks={activeTasks} onOpenRunFlow={openTaskRunFlow} />
+          </Suspense>
+        ) : null}
         <HistoryList
           title={uiLanguage === 'en' ? 'History Center' : '历史报告中心'}
           items={historyCenterItems}
@@ -5671,12 +5691,14 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {marketReviewReport ? (
-              <MarketReviewReportView
-                content={marketReviewReport}
-                payload={marketReviewPayload}
-                reportLanguage={liveMarketReviewLanguage}
-                className="mb-3"
-              />
+              <Suspense fallback={<LazyFeatureFallback className="mb-3 min-h-64" />}>
+                <LazyMarketReviewReportView
+                  content={marketReviewReport}
+                  payload={marketReviewPayload}
+                  reportLanguage={liveMarketReviewLanguage}
+                  className="mb-3"
+                />
+              </Suspense>
             ) : null}
 
             {error ? (
@@ -9474,35 +9496,39 @@ const HomePage: React.FC = () => {
                   ) : null}
                 </div>
                 {isHistoryTrendOpen ? (
-                  <StockHistoryTrendDrawer
-                    key={`stock-history-${selectedReport.meta.id}`}
-                    report={selectedReport}
-                    items={stockHistoryItems}
-                    total={stockHistoryTotal}
-                    hasMore={stockHistoryHasMore}
-                    isLoading={isLoadingStockHistory}
-                    isLoadingMore={isLoadingMoreStockHistory}
-                    error={stockHistoryError}
-                    filters={stockHistoryFilters}
-                    onClose={closeHistoryTrend}
-                    onRangeChange={(range) => void setStockHistoryRange(range)}
-                    onLoadMore={() => void loadMoreStockHistory()}
-                    onSelectRecord={(recordId) => void selectHistoryItem(recordId)}
-                    onRetry={() => void openHistoryTrend()}
-                  />
+                  <Suspense fallback={<LazyFeatureFallback className="min-h-[32rem]" />}>
+                    <LazyStockHistoryTrendDrawer
+                      key={`stock-history-${selectedReport.meta.id}`}
+                      report={selectedReport}
+                      items={stockHistoryItems}
+                      total={stockHistoryTotal}
+                      hasMore={stockHistoryHasMore}
+                      isLoading={isLoadingStockHistory}
+                      isLoadingMore={isLoadingMoreStockHistory}
+                      error={stockHistoryError}
+                      filters={stockHistoryFilters}
+                      onClose={closeHistoryTrend}
+                      onRangeChange={(range) => void setStockHistoryRange(range)}
+                      onLoadMore={() => void loadMoreStockHistory()}
+                      onSelectRecord={(recordId) => void selectHistoryItem(recordId)}
+                      onRetry={() => void openHistoryTrend()}
+                    />
+                  </Suspense>
                 ) : (
-                  <ReportSummary
-                    data={selectedReport}
-                    isHistory
-                    sectionIdPrefix={historyReportSectionPrefix}
-                    onOpenRunFlow={openHistoryRunFlow}
-                    watchlist={{
-                      isInWatchlist: watchlistState.isInWatchlist,
-                      onToggle: watchlistState.toggleWatchlist,
-                      isActioning: watchlistState.isActioning,
-                      actionMessage: watchlistState.actionMessage,
-                    }}
-                  />
+                  <Suspense fallback={<LazyFeatureFallback className="min-h-[32rem]" />}>
+                    <LazyReportSummary
+                      data={selectedReport}
+                      isHistory
+                      sectionIdPrefix={historyReportSectionPrefix}
+                      onOpenRunFlow={openHistoryRunFlow}
+                      watchlist={{
+                        isInWatchlist: watchlistState.isInWatchlist,
+                        onToggle: watchlistState.toggleWatchlist,
+                        isActioning: watchlistState.isActioning,
+                        actionMessage: watchlistState.actionMessage,
+                      }}
+                    />
+                  </Suspense>
                 )}
               </div>
             ) : !marketReviewReport && !basicSnapshot ? (
@@ -9524,14 +9550,26 @@ const HomePage: React.FC = () => {
       </div>
 
       {markdownDrawerOpen && selectedReport?.meta.id ? (
-        <ReportMarkdownDrawer
-          key={selectedReport.meta.id}
-          recordId={selectedReport.meta.id}
-          stockName={selectedReport.meta.stockName || ''}
-          stockCode={selectedReport.meta.stockCode}
-          reportLanguage={reportLanguage}
-          onClose={closeMarkdownDrawer}
-        />
+        <Suspense fallback={(
+          <Drawer
+            isOpen
+            onClose={closeMarkdownDrawer}
+            width="max-w-3xl"
+            zIndex={100}
+            backdropClassName="bg-background/56 backdrop-blur-[2px]"
+          >
+            <LazyFeatureFallback className="min-h-[28rem]" />
+          </Drawer>
+        )}>
+          <LazyReportMarkdownDrawer
+            key={selectedReport.meta.id}
+            recordId={selectedReport.meta.id}
+            stockName={selectedReport.meta.stockName || ''}
+            stockCode={selectedReport.meta.stockCode}
+            reportLanguage={reportLanguage}
+            onClose={closeMarkdownDrawer}
+          />
+        </Suspense>
       ) : null}
 
       {runFlowDrawer.open ? (
@@ -9542,11 +9580,13 @@ const HomePage: React.FC = () => {
           width="max-w-[96vw]"
           zIndex={80}
         >
-          <RunFlowPanel
-            key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}
-            source={runFlowDrawer.source}
-            title={runFlowDrawer.title}
-          />
+          <Suspense fallback={<LazyFeatureFallback className="min-h-[28rem]" />}>
+            <LazyRunFlowPanel
+              key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}
+              source={runFlowDrawer.source}
+              title={runFlowDrawer.title}
+            />
+          </Suspense>
         </Drawer>
       ) : null}
 
