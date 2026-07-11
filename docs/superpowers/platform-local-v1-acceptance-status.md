@@ -514,3 +514,18 @@ git diff --check
 - Focused V103 verification covers the new backend contract plus existing V99/V100 isolation, alert, and history behavior, and covers API mapping, Chinese/English rendering, HomePage integration, and symbol navigation in the frontend.
 - The verifier prints `DSA_PLATFORM_FREE_DAILY_RESEARCH_COCKPIT_V103_OK` only after required files, source contract, Git visibility, backend tests, and frontend tests pass.
 - V103 remains local-only, no-AI by default, non-destructive, and informational analysis only. It is not production launch approval, real payment, production key handling, market-data licensing approval, or investment advice.
+## 2026-07-11 V104 Market Data Screening And Condition Alerts Acceptance
+
+- AlphaSift candidates now include a deterministic `screening_brief` with matched condition codes, observed metrics, source freshness, data completeness, information flags, observation codes, condition-exit codes, and explicit AI-use provenance.
+- The screening result surface uses neutral data cards. Provider narratives, raw recommendation fields, target prices, return forecasts, and buy/sell instructions are not rendered in the V104 card contract.
+- Users can compare up to five results. Logged-in users can add a result to their private watchlist and save an existing V100 condition-alert rule; guests receive a login-required state without losing the public screening page.
+- Anonymous users can call the information-only AlphaSift status, strategy, hotspot, task submission, and task status paths. AlphaSift install remains protected. Public screening passes `use_llm=false` so it cannot consume a model API by default.
+- The sidebar keeps `Market screening` / `市场筛选` visible even when the local AlphaSift engine is disabled, so the page can explain availability and degraded state instead of disappearing.
+- Chinese and English V104 data cards, comparison labels, alert labels, route labels, and information-boundary copy are covered by focused tests.
+- `scripts/verify_platform_market_screening_alerts_v104.py` prints `DSA_PLATFORM_MARKET_SCREENING_ALERTS_V104_OK` only after required-file, source-contract, information-boundary, Git-visibility, backend, and frontend checks pass.
+- V104 remains local-only. It does not enable real payment, production keys, public deployment, or production market-data licensing, and it is not investment advice.
+- Anonymous local users can run the public market-data screen without a platform login or an AI API key; the default path explicitly uses `use_llm=false`.
+- The live task reports staged full-market snapshot/filter/coverage progress instead of remaining at a static 20 percent state, and completed results identify AI as unused rather than incorrectly reporting an LLM degradation.
+- Built-in strategy names and descriptions are presented as neutral data filters in Chinese and English; entry-opportunity and trading-signal wording is not rendered in the V104 strategy cards.
+- The complete primary screening surface now follows the selected locale, including themes, filter settings, progress, result metadata, comparison, alerts, and boundary copy; a focused page test protects the English mode from mixed Chinese UI labels.
+- The unreachable legacy result table containing operation-signal and LLM-judgment fields was removed from `StockScreeningPage.tsx`; V104 has a single neutral result renderer.

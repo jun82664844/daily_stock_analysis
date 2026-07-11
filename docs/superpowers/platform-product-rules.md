@@ -250,3 +250,16 @@
 - Opening a symbol from the cockpit is a no-AI navigation action and does not consume quota. A platform API trial is charged only after the user explicitly chooses the existing real-time enhancement action on the stock page.
 - The cockpit remains private to the authenticated platform user and reuses the existing V99/V100 user-isolation, current-plan limits, CSRF, rate-limit, persisted-review, and alert-rule boundaries.
 - V103 is local-only and does not enable public search, real payment, production keys, deployment, or market-data licensing. All content remains informational analysis only, not investment advice.
+## V104 Market Data Screening And Alert Boundary
+
+- Public market screening is an information-and-data feature. It does not require login and defaults to deterministic `use_llm=false` execution.
+- A completed no-AI screen must be labeled as AI unused, not as an LLM failure or degradation.
+- Built-in strategy presentation uses neutral filter names and factual metric descriptions; it must not present entry opportunities, trading signals, target prices, or return forecasts.
+
+- The screening page provides market information, observed metrics, source freshness, data coverage, comparison, watchlist actions, and user-defined condition alerts only.
+- Anonymous users may read screening status/strategies/hotspots and run the no-AI screening task. AlphaSift install and configuration writes remain authenticated administrative actions.
+- DSA must not present buy/sell/hold instructions, target prices, return forecasts, guaranteed outcomes, or model output as an investment recommendation.
+- Alerts report observed data events against thresholds chosen by the user. They are notifications, not trading instructions.
+- Free and paid users see the same information architecture. Paid capability may improve source/API availability or user-supplied API access, but must not change the information-only boundary.
+- The current deterministic screening universe is A-share (`cn`). Other markets must not be claimed until their screening data contract is implemented and verified.
+- Every screening surface must keep a visible reminder that the product provides information and data only and does not provide investment advice.

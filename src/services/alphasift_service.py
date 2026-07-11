@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_models
+from src.services.market_screening_brief import build_market_screening_brief
 
 logger = logging.getLogger(__name__)
 
@@ -1065,7 +1066,7 @@ class AlphaSiftService:
         _write_alphasift_hotspot_detail_cache(provider=provider_name, topic=topic_text, payload=cleaned)
         return cleaned
 
-    def screen(self, *, strategy: str, market: str, max_results: int) -> Dict[str, Any]:
+    def screen(self, *, strategy: str, market: str, max_results: int, use_llm: bool = False) -> Dict[str, Any]:
         _ensure_alphasift_enabled(self.config)
         _ensure_alphasift_available_for_use()
         _ensure_supported_market(market)
@@ -1074,7 +1075,14 @@ class AlphaSiftService:
         adapter = _get_dsa_adapter()
         screen = _get_adapter_callable(adapter, "screen", "screen() 不可调用。")
         try:
-            raw = _call_alphasift_screen(screen, strategy, market, max_results, self.config)
+            raw = _call_alphasift_screen(
+                screen,
+                strategy,
+                market,
+                max_results,
+                self.config,
+                use_llm=use_llm,
+            )
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
@@ -1101,6 +1109,8 @@ class AlphaSiftService:
         candidates = _normalize_candidates(raw_data)
         selected = candidates[:max_results]
         selected, dsa_enrichment = _enrich_candidates_with_dsa(selected)
+        for candidate in selected:
+            candidate["screening_brief"] = build_market_screening_brief(candidate)
         return {
             "enabled": True,
             "candidates": selected,
@@ -1725,7 +1735,15 @@ def _ensure_supported_strategy(strategy: str) -> None:
     # 策略由适配层进行最终校验，因此在列表外仍保持透传。
 
 
-def _call_alphasift_screen(screen: Any, strategy: str, market: str, max_results: int, config: Config) -> Any:
+def _call_alphasift_screen(
+    screen: Any,
+    strategy: str,
+    market: str,
+    max_results: int,
+    config: Config,
+    *,
+    use_llm: bool = False,
+) -> Any:
     signature = inspect.signature(screen)
     params = signature.parameters
     supports_var_kwargs = any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in params.values())
@@ -1750,7 +1768,7 @@ def _call_alphasift_screen(screen: Any, strategy: str, market: str, max_results:
         kwargs["max_results"] = max_results
 
     if supports_use_llm:
-        kwargs["use_llm"] = True
+        kwargs["use_llm"] = bool(use_llm)
     if supports_context:
         kwargs["context"] = _build_alphasift_context(config, max_results=max_results)
 

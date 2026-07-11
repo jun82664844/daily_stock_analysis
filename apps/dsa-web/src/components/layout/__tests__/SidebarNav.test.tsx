@@ -53,7 +53,7 @@ describe('SidebarNav', () => {
     authState.loggedIn = false;
   });
 
-  it('hides the screening navigation item while AlphaSift is disabled', () => {
+  it('keeps market screening navigation visible while AlphaSift is disabled', async () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false });
 
     render(
@@ -62,7 +62,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '选股' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '市场筛选' })).toHaveAttribute('href', '/screening');
   });
 
   it('shows the screening navigation item when AlphaSift is enabled', async () => {
@@ -74,7 +74,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(await screen.findByRole('link', { name: '市场筛选' })).toHaveAttribute('href', '/screening');
   });
 
   it('places screening directly after chat when AlphaSift is enabled', async () => {
@@ -86,12 +86,12 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByRole('link', { name: '选股' });
+    await screen.findByRole('link', { name: '市场筛选' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/screening', '/portfolio', '/decision-signals']);
   });
 
-  it('refreshes the screening navigation item after any config save event', async () => {
+  it('does not hide market screening navigation after a config save event', async () => {
     mockGetAlphaSiftStatus
       .mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false })
       .mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: false });
@@ -102,11 +102,10 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '选股' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '市场筛选' })).toHaveAttribute('href', '/screening');
     window.dispatchEvent(new Event('dsa-system-config-changed'));
 
-    expect(await screen.findByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
-    await waitFor(() => expect(mockGetAlphaSiftStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(screen.getByRole('link', { name: '市场筛选' })).toHaveAttribute('href', '/screening');
   });
 
   it('shows the shared completion badge only when chat completion is pending', () => {

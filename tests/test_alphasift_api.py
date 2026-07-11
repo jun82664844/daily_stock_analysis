@@ -1574,7 +1574,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             task_id="screen-task-1",
             trace_id="screen-task-1",
             status=QueueTaskStatus.PENDING,
-            message="AlphaSift 选股任务已提交",
+            message="AlphaSift 数据筛选任务已提交",
         )
 
         with (
@@ -1603,7 +1603,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         fake_queue.update_task_progress.assert_any_call(
             "screen-task-1",
             20,
-            "正在执行 AlphaSift 选股，外部数据源较慢时会持续后台运行",
+            "正在采集并筛选全市场数据，首次运行或外部数据源较慢时会持续后台处理",
         )
 
     def test_screen_task_status_returns_alphasift_result(self) -> None:
@@ -1827,6 +1827,15 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
                             "price": 1688.0,
                             "industry": "Baijiu",
                             "factor_scores": {"value": 88.0},
+                            "dsa_context": {
+                                "quote": {
+                                    "price": 1688.0,
+                                    "source": "test_quote",
+                                    "freshness": "fresh",
+                                    "updated_at": "2026-07-11T09:30:00+08:00",
+                                },
+                                "warnings": [],
+                            },
                         }
                     ],
                 }
@@ -1840,7 +1849,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             "dual_low",
             market="cn",
             max_results=5,
-            use_llm=True,
+            use_llm=False,
             context=ANY,
         )
         self.assertEqual(fake_module.screen.call_args.kwargs["context"]["llm"]["model"], "")
@@ -1862,6 +1871,41 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["candidates"][0]["risk_level"], "medium")
         self.assertEqual(payload["candidates"][0]["price"], 1688.0)
         self.assertEqual(payload["candidates"][0]["industry"], "Baijiu")
+        brief = payload["candidates"][0]["screening_brief"]
+        self.assertTrue(brief["ai_used"])
+        self.assertEqual(brief["data_freshness"], "fresh")
+        self.assertEqual(brief["source_status"], "available")
+        self.assertIn("factor:value", brief["matched_condition_codes"])
+        self.assertNotIn("recommendation", brief)
+
+    def test_screen_adds_neutral_brief_without_llm_fields(self) -> None:
+        config = self._config(enabled=True)
+        fake_module = _make_adapter_module(
+            screen=MagicMock(
+                return_value={
+                    "candidates": [
+                        {
+                            "code": "600519",
+                            "screen_score": 76.0,
+                            "factor_scores": {"quality": 82.0},
+                            "dsa_context": {
+                                "quote": {"price": 1688.0, "freshness": "cached"},
+                                "warnings": [],
+                            },
+                        }
+                    ]
+                }
+            )
+        )
+
+        with patch("src.services.alphasift_service._import_alphasift", return_value=fake_module):
+            payload = self._screen(config, market="cn", strategy="dual_low", max_results=5)
+
+        brief = payload["candidates"][0]["screening_brief"]
+        self.assertFalse(brief["ai_used"])
+        self.assertEqual(brief["data_freshness"], "cached")
+        self.assertIn("screen_score", brief["matched_condition_codes"])
+        self.assertNotIn("action", brief)
 
     def test_screen_prefers_dsa_daily_history_for_alphasift_enrichment(self) -> None:
         config = self._config(enabled=True)
@@ -2874,7 +2918,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertNotIn("context", second_kwargs)
         self.assertEqual(second_kwargs["market"], "cn")
         self.assertEqual(second_kwargs["max_results"], 5)
-        self.assertEqual(second_kwargs["use_llm"], True)
+        self.assertEqual(second_kwargs["use_llm"], False)
         self.assertEqual(payload["candidate_count"], 0)
 
     def test_screen_does_not_install_when_enabled_but_adapter_missing(self) -> None:
@@ -2937,7 +2981,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             "custom_alpha",
             market="cn",
             max_results=5,
-            use_llm=True,
+            use_llm=False,
             context=ANY,
         )
         self.assertEqual(payload["candidates"], [])

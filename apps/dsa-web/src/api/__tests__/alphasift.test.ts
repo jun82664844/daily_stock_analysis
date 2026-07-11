@@ -241,6 +241,41 @@ describe('alphasiftApi', () => {
     );
   });
 
+  it('maps the neutral screening brief to camel case', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        enabled: true,
+        candidate_count: 1,
+        candidates: [
+          {
+            rank: 1,
+            code: '600519',
+            name: '贵州茅台',
+            raw: {},
+            screening_brief: {
+              matched_condition_codes: ['factor:quality'],
+              observed_metrics: [{ code: 'factor:quality', value: 88, source: 'alphasift', as_of: null }],
+              information_flags: ['data_partial'],
+              observation_codes: ['refresh_data'],
+              condition_exit_codes: ['factor_condition_changed'],
+              data_freshness: 'cached',
+              data_completeness: 75,
+              source_status: 'partial',
+              ai_used: false,
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await alphasiftApi.screen({ market: 'cn', strategy: 'dual_low', maxResults: 3 });
+
+    expect(result.candidates[0].screeningBrief?.matchedConditionCodes).toEqual(['factor:quality']);
+    expect(result.candidates[0].screeningBrief?.dataFreshness).toBe('cached');
+    expect(result.candidates[0].screeningBrief?.dataCompleteness).toBe(75);
+    expect(result.candidates[0].screeningBrief?.aiUsed).toBe(false);
+  });
+
   it('starts an async screening task', async () => {
     post.mockResolvedValueOnce({
       data: {

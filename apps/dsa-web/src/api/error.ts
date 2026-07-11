@@ -395,8 +395,8 @@ export function parseApiError(error: unknown): ParsedApiError {
 
   if (errorCode === 'alphasift_screen_task_not_found') {
     return createParsedApiError({
-      title: '选股任务不可恢复',
-      message: '服务端没有找到这次选股任务，可能后端已重启或任务记录已清理，请重新运行选股。',
+      title: '筛选任务不可恢复',
+      message: '服务端没有找到这次筛选任务，可能后端已重启或任务记录已清理，请重新运行筛选。',
       rawMessage,
       status,
       category: 'http_error',
@@ -405,7 +405,7 @@ export function parseApiError(error: unknown): ParsedApiError {
 
   if (errorCode === 'alphasift_screen_failed') {
     return createParsedApiError({
-      title: 'AlphaSift 选股失败',
+      title: 'AlphaSift 数据筛选失败',
       message: 'AlphaSift 运行时访问外部行情、快照或模型服务失败，请稍后重试，或检查网络与代理设置。',
       rawMessage,
       status,

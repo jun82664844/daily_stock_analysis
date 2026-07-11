@@ -1615,3 +1615,51 @@ Review focus:
 - No public search, real payment, production key, deployment, user-data deletion, fabricated freshness, or investment advice is introduced.
 - Review private-response generation and `userId` checks together; either check alone is insufficient during logout or account switching.
 - Review current-plan limits at both listing and execution, same-user local write serialization, source URL deduplication, finite numeric validation, CSRF, and delete-rate limiting.
+## V104 Market Data Screening And Condition Alerts Addendum
+
+### backend-platform-foundation
+
+- `api/v1/endpoints/alphasift.py`
+- `api/middlewares/auth.py`
+- `src/services/market_screening_brief.py`
+- `src/services/alphasift_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/alphasift.ts`
+- `apps/dsa-web/src/api/error.ts`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/pages/StockScreeningPage.tsx`
+- `apps/dsa-web/src/components/screening/screeningModelV104.ts`
+- `apps/dsa-web/src/components/screening/MarketScreeningCardV104.tsx`
+- `apps/dsa-web/src/components/screening/ScreeningCompareTrayV104.tsx`
+- `apps/dsa-web/src/components/screening/ScreeningReminderPanelV104.tsx`
+
+### tests-and-verifiers
+
+- `tests/test_market_screening_brief.py`
+- `tests/test_auth_api.py`
+- `tests/test_alphasift_api.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_market_screening_alerts_v104_verifier.py`
+- `scripts/verify_platform_market_screening_alerts_v104.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `apps/dsa-web/src/api/__tests__/alphasift.test.ts`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/StockScreeningPage.test.tsx`
+- `apps/dsa-web/src/components/screening/__tests__/screeningModelV104.test.ts`
+- `apps/dsa-web/src/components/screening/__tests__/MarketScreeningCardV104.test.tsx`
+- `apps/dsa-web/src/components/screening/__tests__/ScreeningCompareTrayV104.test.tsx`
+- `apps/dsa-web/src/components/screening/__tests__/ScreeningReminderPanelV104.test.tsx`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v104-explainable-stock-discovery.md`
+
+Boundary: local-only, no real payment, no production keys, no production deployment, no investment advice. No `git add`, commit, or push is part of this slice.

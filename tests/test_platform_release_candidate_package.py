@@ -60,6 +60,17 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("docs/superpowers/plans/2026-07-11-dsa-v103-free-daily-research-cockpit.md", REQUIRED_FILES)
         self.assertIn("scripts/verify_platform_free_daily_research_cockpit_v103.py", VERIFIER_FILES)
 
+    def test_v104_market_screening_verifier_is_part_of_release_package_contract(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_market_screening_alerts_v104.py", REQUIRED_FILES)
+        self.assertIn("tests/test_platform_market_screening_alerts_v104_verifier.py", REQUIRED_FILES)
+        self.assertIn("tests/test_market_screening_brief.py", REQUIRED_FILES)
+        self.assertIn("src/services/market_screening_brief.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/screening/MarketScreeningCardV104.tsx", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-11-dsa-v104-explainable-stock-discovery.md", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_market_screening_alerts_v104.py", VERIFIER_FILES)
+
     def _write_file(self, root: Path, rel_path: str, content: str = "ok\n") -> None:
         path = root / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -418,6 +429,13 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
                 "daily research cockpit\ndata confidence\nAPI trial\n"
                 "DSA_PLATFORM_FREE_DAILY_RESEARCH_COCKPIT_V103_OK\n"
             ),
+            "docs/superpowers/plans/2026-07-11-dsa-v104-explainable-stock-discovery.md": (
+                "No-go\nlocal-only\nnot real payment\nnot investment advice\n"
+                "Do not commit real API Key\nNo AI calls by default\nNo public search\n"
+                "DSA V104 market data screening and condition alerts\n"
+                "information and data only\nuser-defined alerts\n"
+                "DSA_PLATFORM_MARKET_SCREENING_ALERTS_V104_OK\n"
+            ),
             "docs/superpowers/platform-review-slices.md": (
                 "backend-platform-foundation\n"
                 "tests-and-verifiers\n"
@@ -494,6 +512,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "scripts/verify_platform_free_broker_conversion_v73.py",
             "scripts/verify_platform_a_share_free_query_speed_v102.py",
             "scripts/verify_platform_free_daily_research_cockpit_v103.py",
+            "scripts/verify_platform_market_screening_alerts_v104.py",
             "scripts/run_platform_backup_restore_dry_run.py",
             "scripts/cleanup_platform_e2e_data.py",
             "src/platform_watchlist.py",
@@ -570,6 +589,17 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             "tests/test_platform_free_daily_research_cockpit_v103_verifier.py",
             "apps/dsa-web/src/components/radar/DailyResearchCockpitV103.tsx",
             "apps/dsa-web/src/components/radar/__tests__/DailyResearchCockpitV103.test.tsx",
+            "src/services/market_screening_brief.py",
+            "tests/test_market_screening_brief.py",
+            "tests/test_platform_market_screening_alerts_v104_verifier.py",
+            "apps/dsa-web/src/components/screening/screeningModelV104.ts",
+            "apps/dsa-web/src/components/screening/MarketScreeningCardV104.tsx",
+            "apps/dsa-web/src/components/screening/ScreeningCompareTrayV104.tsx",
+            "apps/dsa-web/src/components/screening/ScreeningReminderPanelV104.tsx",
+            "apps/dsa-web/src/components/screening/__tests__/screeningModelV104.test.ts",
+            "apps/dsa-web/src/components/screening/__tests__/MarketScreeningCardV104.test.tsx",
+            "apps/dsa-web/src/components/screening/__tests__/ScreeningCompareTrayV104.test.tsx",
+            "apps/dsa-web/src/components/screening/__tests__/ScreeningReminderPanelV104.test.tsx",
             "apps/dsa-web/playwright.config.ts",
             "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
         ):

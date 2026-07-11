@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import threading
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -65,7 +66,7 @@ def _screening_task_not_found(task_id: str) -> HTTPException:
     return api_error(
         404,
         "alphasift_screen_task_not_found",
-        f"选股任务 {task_id} 不存在或已过期",
+        f"筛选任务 {task_id} 不存在或已过期",
     )
 
 
@@ -133,16 +134,35 @@ def alphasift_start_screen_task(
     task_queue = get_task_queue()
 
     def run_screen() -> Dict[str, Any]:
+        heartbeat_stop = threading.Event()
+
+        def report_progress() -> None:
+            stages = (
+                (30, "正在读取全市场数据快照"),
+                (45, "正在按指标条件过滤数据"),
+                (60, "正在核对候选数据完整度"),
+                (75, "正在整理行情与来源状态"),
+            )
+            for progress, message in stages:
+                if heartbeat_stop.wait(6):
+                    return
+                task_queue.update_task_progress(task_id, progress, message)
+
         task_queue.update_task_progress(
             task_id,
             20,
-            "正在执行 AlphaSift 选股，外部数据源较慢时会持续后台运行",
+            "正在采集并筛选全市场数据，首次运行或外部数据源较慢时会持续后台处理",
         )
-        result = _service(config).screen(
-            strategy=request.strategy,
-            market=request.market,
-            max_results=request.max_results,
-        )
+        heartbeat = threading.Thread(target=report_progress, daemon=True, name=f"alphasift-progress-{task_id[:8]}")
+        heartbeat.start()
+        try:
+            result = _service(config).screen(
+                strategy=request.strategy,
+                market=request.market,
+                max_results=request.max_results,
+            )
+        finally:
+            heartbeat_stop.set()
         task_queue.update_task_progress(
             task_id,
             90,
@@ -155,7 +175,7 @@ def alphasift_start_screen_task(
         stock_code="alphasift_screen",
         stock_name=f"{request.strategy} / {request.market}",
         report_type="alphasift_screen",
-        message="AlphaSift 选股任务已提交",
+        message="AlphaSift 数据筛选任务已提交",
         task_id=task_id,
         trace_id=task_id,
     )
@@ -163,7 +183,7 @@ def alphasift_start_screen_task(
         task_id=task.task_id,
         trace_id=task.trace_id or task.task_id,
         status=task.status.value if isinstance(task.status, QueueTaskStatus) else str(task.status),
-        message=task.message or "AlphaSift 选股任务已提交",
+        message=task.message or "AlphaSift 数据筛选任务已提交",
         strategy=request.strategy,
         market=request.market,
         max_results=request.max_results,

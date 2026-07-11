@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
-import { ALPHASIFT_CONFIG_CHANGED_EVENT, SYSTEM_CONFIG_CHANGED_EVENT, alphasiftApi } from '../../api/alphasift';
 import { PLATFORM_SESSION_CHANGED_EVENT, platformApi } from '../../api/platform';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
@@ -47,35 +46,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const { t } = useUiLanguage();
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showAlphaSiftNav, setShowAlphaSiftNav] = useState(false);
   const [platformRole, setPlatformRole] = useState<string | null>('loading');
-
-  useEffect(() => {
-    let active = true;
-
-    const refreshAlphaSiftStatus = async () => {
-      try {
-        const status = await alphasiftApi.getStatus();
-        if (active) {
-          setShowAlphaSiftNav(status.enabled);
-        }
-      } catch {
-        if (active) {
-          setShowAlphaSiftNav(false);
-        }
-      }
-    };
-
-    void refreshAlphaSiftStatus();
-    window.addEventListener(ALPHASIFT_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-    window.addEventListener(SYSTEM_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-
-    return () => {
-      active = false;
-      window.removeEventListener(ALPHASIFT_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-      window.removeEventListener(SYSTEM_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -103,8 +74,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   }, []);
 
   const showAdminOnlyNav = platformRole === 'admin' || (loggedIn && platformRole !== 'user');
-  const navItems = (showAlphaSiftNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening'))
-    .filter((item) => !['admin', 'settings'].includes(item.key) || showAdminOnlyNav);
+  const navItems = NAV_ITEMS.filter((item) => !['admin', 'settings'].includes(item.key) || showAdminOnlyNav);
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
     'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-2xl border border-transparent text-sm leading-none text-secondary-text transition-all',

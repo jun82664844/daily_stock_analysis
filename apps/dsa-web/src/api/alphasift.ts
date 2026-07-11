@@ -23,6 +23,25 @@ export type AlphaSiftInstallResponse = {
   installSpecIsDefault: boolean;
 };
 
+export type MarketScreeningObservedMetricV104 = {
+  code: string;
+  value: number;
+  source: string;
+  asOf?: string | null;
+};
+
+export type MarketScreeningBriefV104 = {
+  matchedConditionCodes: string[];
+  observedMetrics: MarketScreeningObservedMetricV104[];
+  informationFlags: string[];
+  observationCodes: string[];
+  conditionExitCodes: string[];
+  dataFreshness: 'fresh' | 'cached' | 'stale' | 'unavailable' | string;
+  dataCompleteness: number;
+  sourceStatus: 'available' | 'partial' | 'unavailable' | string;
+  aiUsed: boolean;
+};
+
 export type AlphaSiftCandidate = {
   rank: number;
   code: string;
@@ -71,6 +90,7 @@ export type AlphaSiftCandidate = {
     publishedDate?: string | null;
   }>;
   dsaAnalysisSummary?: string;
+  screeningBrief?: MarketScreeningBriefV104;
   raw: Record<string, unknown>;
 };
 

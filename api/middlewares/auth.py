@@ -71,6 +71,26 @@ def _public_no_ai_query_path(request: Request) -> bool:
     )
 
 
+def _public_market_screening_path(request: Request) -> bool:
+    """Expose information-only screening while keeping install/config writes protected."""
+    method = request.method.upper()
+    path = request.url.path.rstrip("/")
+    if method == "GET":
+        return (
+            path in {
+                "/api/v1/alphasift/status",
+                "/api/v1/alphasift/strategies",
+                "/api/v1/alphasift/hotspots",
+            }
+            or path.startswith("/api/v1/alphasift/hotspots/")
+            or path.startswith("/api/v1/alphasift/screen/tasks/")
+        )
+    return method == "POST" and path in {
+        "/api/v1/alphasift/screen",
+        "/api/v1/alphasift/screen/tasks",
+    }
+
+
 def _csrf_failure_response(request: Request) -> JSONResponse | None:
     if not csrf_enabled() or request.method.upper() not in UNSAFE_METHODS:
         return None
@@ -102,7 +122,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api/v1/"):
             return await call_next(request)
 
-        if _public_no_ai_query_path(request):
+        if _public_no_ai_query_path(request) or _public_market_screening_path(request):
             return await call_next(request)
 
         admin_cookie_val = request.cookies.get(COOKIE_NAME)
