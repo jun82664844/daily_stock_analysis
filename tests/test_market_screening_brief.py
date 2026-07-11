@@ -34,7 +34,8 @@ class MarketScreeningBriefTestCase(unittest.TestCase):
         self.assertIn("factor:quality", brief["matched_condition_codes"])
         self.assertIn("screen_score", brief["matched_condition_codes"])
         self.assertIn("valuation_data_high", brief["information_flags"])
-        self.assertEqual(brief["observed_metrics"][0]["source"], "alphasift")
+        self.assertIn("alphasift", {item["source"] for item in brief["observed_metrics"]})
+        self.assertIn("market_snapshot", {item["source"] for item in brief["observed_metrics"]})
         self.assertNotIn("recommendation", brief)
         self.assertNotIn("action", brief)
         self.assertNotIn("target_price", brief)
@@ -107,6 +108,33 @@ class MarketScreeningBriefTestCase(unittest.TestCase):
         self.assertNotIn("change_pct", codes)
         self.assertNotIn("factor:bad", codes)
         self.assertEqual(brief["information_flags"].count("data_partial"), 1)
+
+    def test_exposes_factual_valuation_liquidity_and_size_metrics(self) -> None:
+        brief = build_market_screening_brief(
+            {
+                "code": "600519",
+                "price": 1480.0,
+                "change_pct": 1.25,
+                "amount": 3_260_000_000,
+                "raw": {
+                    "pe_ratio": 24.5,
+                    "pb_ratio": 8.2,
+                    "turnover_rate": 1.3,
+                    "total_mv": 1_860_000_000_000,
+                },
+                "factor_scores": {"value": 72.0},
+                "dsa_context": {},
+            }
+        )
+
+        metrics = {item["code"]: item["value"] for item in brief["observed_metrics"]}
+        self.assertEqual(metrics["price"], 1480.0)
+        self.assertEqual(metrics["pe_ratio"], 24.5)
+        self.assertEqual(metrics["pb_ratio"], 8.2)
+        self.assertEqual(metrics["turnover_rate"], 1.3)
+        self.assertEqual(metrics["amount"], 3_260_000_000)
+        self.assertEqual(metrics["total_mv"], 1_860_000_000_000)
+        self.assertNotIn("target_price", metrics)
 
 
 if __name__ == "__main__":

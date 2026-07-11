@@ -263,3 +263,14 @@
 - Free and paid users see the same information architecture. Paid capability may improve source/API availability or user-supplied API access, but must not change the information-only boundary.
 - The current deterministic screening universe is A-share (`cn`). Other markets must not be claimed until their screening data contract is implemented and verified.
 - Every screening surface must keep a visible reminder that the product provides information and data only and does not provide investment advice.
+
+## V105 Fast Useful Market Screening
+
+- Anonymous and free users use a recent full-market snapshot by default, without AI or an API key.
+- A forced source refresh is explicit and slower; cache provenance, snapshot time, age, and elapsed time remain visible.
+- Result cards may show price, change, PE, PB, turnover, trading value, market cap, and neutral factor labels when present.
+- Sorting and secondary filtering run locally and do not consume AI or platform quota.
+- The recent-snapshot fast path does not block on per-symbol network enrichment; detailed company data loads only after the user opens a symbol.
+- No-AI screening does not run AlphaSift pre-rank candidate-context providers; those providers are reserved for an explicitly selected AI/deep path.
+- A cache inside the selected V105 TTL is labeled as cached data, not as unavailable or a stale-source failure.
+- Every V105 surface remains information-and-data only and must not produce buy/sell/hold instructions, target prices, or expected returns.

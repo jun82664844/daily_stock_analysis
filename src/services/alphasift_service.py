@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_models
 from src.services.market_screening_brief import build_market_screening_brief
+from src.services.alphasift_screen_cache import inspect_snapshot_cache
 
 logger = logging.getLogger(__name__)
 
@@ -1066,7 +1067,15 @@ class AlphaSiftService:
         _write_alphasift_hotspot_detail_cache(provider=provider_name, topic=topic_text, payload=cleaned)
         return cleaned
 
-    def screen(self, *, strategy: str, market: str, max_results: int, use_llm: bool = False) -> Dict[str, Any]:
+    def screen(
+        self,
+        *,
+        strategy: str,
+        market: str,
+        max_results: int,
+        use_llm: bool = False,
+        force_refresh: bool = False,
+    ) -> Dict[str, Any]:
         _ensure_alphasift_enabled(self.config)
         _ensure_alphasift_available_for_use()
         _ensure_supported_market(market)
@@ -1074,15 +1083,34 @@ class AlphaSiftService:
 
         adapter = _get_dsa_adapter()
         screen = _get_adapter_callable(adapter, "screen", "screen() 不可调用。")
+        started_at = time.monotonic()
+        cache_path = _resolve_alphasift_data_dir() / "snapshot.last_good.json"
+        snapshot_cache = inspect_snapshot_cache(cache_path, force_refresh=force_refresh)
         try:
-            raw = _call_alphasift_screen(
-                screen,
-                strategy,
-                market,
-                max_results,
-                self.config,
-                use_llm=use_llm,
-            )
+            try:
+                raw = _call_alphasift_screen(
+                    screen,
+                    strategy,
+                    market,
+                    max_results,
+                    self.config,
+                    use_llm=use_llm,
+                    prefer_snapshot_cache=bool(snapshot_cache.get("use_cache")),
+                )
+            except Exception:
+                if not snapshot_cache.get("use_cache"):
+                    raise
+                snapshot_cache["use_cache"] = False
+                snapshot_cache["reason"] = "cache_rejected"
+                raw = _call_alphasift_screen(
+                    screen,
+                    strategy,
+                    market,
+                    max_results,
+                    self.config,
+                    use_llm=use_llm,
+                    prefer_snapshot_cache=False,
+                )
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
@@ -1108,8 +1136,29 @@ class AlphaSiftService:
 
         candidates = _normalize_candidates(raw_data)
         selected = candidates[:max_results]
-        selected, dsa_enrichment = _enrich_candidates_with_dsa(selected)
+        if snapshot_cache.get("use_cache") and not force_refresh:
+            dsa_enrichment = {
+                "enabled": False,
+                "mode": "snapshot_fast_path",
+                "max_candidates": DSA_ENRICHMENT_MAX_CANDIDATES,
+                "requested_count": 0,
+                "enriched_count": 0,
+                "warnings": [],
+            }
+        else:
+            selected, dsa_enrichment = _enrich_candidates_with_dsa(selected)
         for candidate in selected:
+            if snapshot_cache.get("use_cache"):
+                context = candidate.get("dsa_context") if isinstance(candidate.get("dsa_context"), dict) else {}
+                context = dict(context)
+                context.setdefault("freshness", "cached")
+                context.setdefault("source", snapshot_cache.get("source") or "market_snapshot_cache")
+                context.setdefault("updated_at", snapshot_cache.get("cached_at"))
+                candidate["dsa_context"] = context
+            if not _env_text(candidate.get("industry")):
+                context = candidate.get("dsa_context") if isinstance(candidate.get("dsa_context"), dict) else {}
+                fundamentals = context.get("fundamentals") if isinstance(context.get("fundamentals"), dict) else {}
+                candidate["industry"] = _env_text(fundamentals.get("industry") or fundamentals.get("sector"))
             candidate["screening_brief"] = build_market_screening_brief(candidate)
         return {
             "enabled": True,
@@ -1127,7 +1176,7 @@ class AlphaSiftService:
             "llm_portfolio_risk": raw_data.get("llm_portfolio_risk") or "",
             "llm_coverage": raw_data.get("llm_coverage"),
             "llm_parse_errors": raw_data.get("llm_parse_errors") or [],
-            "warnings": raw_data.get("warnings") or [],
+            "warnings": _screening_warnings(raw_data.get("warnings"), snapshot_cache),
             "source_errors": raw_data.get("source_errors") or [],
             "dsa_enrichment": dsa_enrichment,
             "deep_analysis_requested": raw_data.get("deep_analysis_requested"),
@@ -1137,7 +1186,25 @@ class AlphaSiftService:
             "risk_enabled": raw_data.get("risk_enabled"),
             "portfolio_diversity_enabled": raw_data.get("portfolio_diversity_enabled"),
             "portfolio_concentration_notes": raw_data.get("portfolio_concentration_notes") or [],
+            "snapshot_cache_used": bool(snapshot_cache.get("use_cache")),
+            "snapshot_cached_at": snapshot_cache.get("cached_at"),
+            "snapshot_age_seconds": snapshot_cache.get("age_seconds"),
+            "snapshot_cache_ttl_seconds": snapshot_cache.get("max_age_seconds"),
+            "snapshot_refresh_forced": bool(force_refresh),
+            "screen_elapsed_ms": round((time.monotonic() - started_at) * 1000),
         }
+
+
+def _screening_warnings(value: Any, snapshot_cache: Dict[str, Any]) -> List[str]:
+    warnings = _list_text_values(value)
+    if not snapshot_cache.get("use_cache"):
+        return warnings
+    warnings = [
+        warning
+        for warning in warnings
+        if not ("last_good_cache" in warning.lower() and "stale" in warning.lower())
+    ]
+    return warnings
 
 
 def _normalize_alphasift_hotspot_detail(detail: Any, *, provider: str, requested_topic: str) -> Dict[str, Any]:
@@ -1743,6 +1810,7 @@ def _call_alphasift_screen(
     config: Config,
     *,
     use_llm: bool = False,
+    prefer_snapshot_cache: bool = False,
 ) -> Any:
     signature = inspect.signature(screen)
     params = signature.parameters
@@ -1770,10 +1838,18 @@ def _call_alphasift_screen(
     if supports_use_llm:
         kwargs["use_llm"] = bool(use_llm)
     if supports_context:
-        kwargs["context"] = _build_alphasift_context(config, max_results=max_results)
+        kwargs["context"] = _build_alphasift_context(
+            config,
+            max_results=max_results,
+            include_candidate_context=bool(use_llm),
+        )
 
     with (
-        _alphasift_runtime_env(config, max_results=max_results),
+        _alphasift_runtime_env(
+            config,
+            max_results=max_results,
+            prefer_snapshot_cache=prefer_snapshot_cache,
+        ),
         _alphasift_dsa_daily_history_provider(),
         _alphasift_litellm_headers(config),
     ):
@@ -1799,8 +1875,17 @@ def _call_alphasift_screen(
 
 
 @contextmanager
-def _alphasift_runtime_env(config: Config, *, max_results: Optional[int] = None) -> Iterator[None]:
-    updates = _build_alphasift_runtime_env(config, max_results=max_results)
+def _alphasift_runtime_env(
+    config: Config,
+    *,
+    max_results: Optional[int] = None,
+    prefer_snapshot_cache: bool = False,
+) -> Iterator[None]:
+    updates = _build_alphasift_runtime_env(
+        config,
+        max_results=max_results,
+        prefer_snapshot_cache=prefer_snapshot_cache,
+    )
     if not updates:
         yield
         return
@@ -1869,7 +1954,12 @@ def _resolve_alphasift_snapshot_source_priority(config: Config) -> str:
     return DSA_ALPHASIFT_SNAPSHOT_SOURCE_PRIORITY
 
 
-def _build_alphasift_runtime_env(config: Config, *, max_results: Optional[int] = None) -> Dict[str, str]:
+def _build_alphasift_runtime_env(
+    config: Config,
+    *,
+    max_results: Optional[int] = None,
+    prefer_snapshot_cache: bool = False,
+) -> Dict[str, str]:
     # Bridge runtime only: only inject resolved DSA values for this request/process scope.
     # User .env/config is never rewritten here; unset channels/models are not silently migrated.
     # 与 LiteLLM provider/model、openai-compatible `api_base` 与 headers 注入语义保持一致，
@@ -1940,6 +2030,8 @@ def _build_alphasift_runtime_env(config: Config, *, max_results: Optional[int] =
     put_default("LLM_CANDIDATE_MULTIPLIER", str(DSA_ALPHASIFT_LLM_CANDIDATE_MULTIPLIER))
     put_default("LLM_MAX_CANDIDATES", str(_resolve_dsa_llm_max_candidates(max_results)))
     put_default("SNAPSHOT_SOURCE_PRIORITY", _resolve_alphasift_snapshot_source_priority(config))
+    if prefer_snapshot_cache:
+        env["SNAPSHOT_SOURCE_PRIORITY"] = ""
     alphasift_data_dir = _resolve_alphasift_data_dir()
     put_default("ALPHASIFT_DATA_DIR", str(alphasift_data_dir))
     put_default("ALPHASIFT_FALLBACK_SNAPSHOT_PATH", str(alphasift_data_dir / "snapshot.last_good.json"))
@@ -2818,11 +2910,37 @@ class DsaEastMoneyHotspotProvider:
         return records
 
 
-def _build_alphasift_context(config: Config, *, max_results: Optional[int] = None) -> Dict[str, Any]:
+def _build_alphasift_context(
+    config: Config,
+    *,
+    max_results: Optional[int] = None,
+    include_candidate_context: bool = True,
+) -> Dict[str, Any]:
     # context.llm.model/fallback/model_list 与 LiteLLM 路由语义保持一致，
     # 参见 https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
     channels = _normalize_dsa_llm_channels(config)
     litellm_model, fallback_models = _resolve_alphasift_llm_models(config)
+    dsa_context: Dict[str, Any] = {
+        "contract_version": "1",
+        "mode": "snapshot_only" if not include_candidate_context else "pre_rank_light",
+        "max_candidates": DSA_PRE_RANK_CONTEXT_MAX_CANDIDATES if include_candidate_context else 0,
+        "include_news": False,
+        "news_max_results": 0,
+        "capabilities": ["daily_history"],
+        "get_daily_history": get_dsa_daily_history,
+    }
+    if include_candidate_context:
+        dsa_context.update({
+            "capabilities": [
+                "candidate_context",
+                "daily_history",
+                "realtime_quote",
+                "fundamental_context",
+            ],
+            "get_candidate_context": get_dsa_candidate_context,
+            "get_realtime_quote": get_dsa_realtime_quote,
+            "get_fundamental_context": get_dsa_fundamental_context,
+        })
     return {
         "llm": {
             "model": litellm_model,
@@ -2835,23 +2953,7 @@ def _build_alphasift_context(config: Config, *, max_results: Optional[int] = Non
             "candidate_multiplier": DSA_ALPHASIFT_LLM_CANDIDATE_MULTIPLIER,
             "max_candidates": _resolve_dsa_llm_max_candidates(max_results),
         },
-        "dsa": {
-            "contract_version": "1",
-            "mode": "pre_rank_light",
-            "max_candidates": DSA_PRE_RANK_CONTEXT_MAX_CANDIDATES,
-            "include_news": False,
-            "news_max_results": 0,
-            "capabilities": [
-                "candidate_context",
-                "daily_history",
-                "realtime_quote",
-                "fundamental_context",
-            ],
-            "get_candidate_context": get_dsa_candidate_context,
-            "get_daily_history": get_dsa_daily_history,
-            "get_realtime_quote": get_dsa_realtime_quote,
-            "get_fundamental_context": get_dsa_fundamental_context,
-        },
+        "dsa": dsa_context,
     }
 
 @contextmanager

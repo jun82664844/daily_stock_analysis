@@ -1911,3 +1911,32 @@ Validated review inventory for this local-only slice:
 Acceptance marker: `DSA_PLATFORM_MARKET_SCREENING_ALERTS_V104_OK`.
 
 The release boundary remains No-go for real payment, production API keys, production deployment, domain/HTTPS/WAF, and market-data licensing approval. DSA provides information and data only; it does not provide investment advice.
+
+## V105 Fast Useful Market Screening Package
+
+- `src/services/alphasift_screen_cache.py`
+- `src/services/alphasift_service.py`
+- `src/services/market_screening_brief.py`
+- `api/v1/endpoints/alphasift.py`
+- `apps/dsa-web/src/api/alphasift.ts`
+- `apps/dsa-web/src/api/__tests__/alphasift.test.ts`
+- `apps/dsa-web/src/components/screening/screeningModelV104.ts`
+- `apps/dsa-web/src/components/screening/MarketScreeningCardV104.tsx`
+- `apps/dsa-web/src/components/screening/__tests__/screeningModelV104.test.ts`
+- `apps/dsa-web/src/pages/StockScreeningPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/StockScreeningPage.test.tsx`
+- `tests/test_alphasift_screen_cache_v105.py`
+- `tests/test_market_screening_brief.py`
+- `tests/test_alphasift_api.py`
+- `tests/test_platform_fast_useful_screening_v105_verifier.py`
+- `scripts/verify_platform_fast_useful_screening_v105.py`
+- `docs/superpowers/plans/2026-07-11-dsa-v105-fast-useful-market-screening.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Acceptance marker: `DSA_PLATFORM_FAST_USEFUL_SCREENING_V105_OK`.

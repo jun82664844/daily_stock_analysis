@@ -87,6 +87,7 @@ def build_market_screening_brief(candidate: Dict[str, Any]) -> Dict[str, Any]:
     context = candidate.get("dsa_context") if isinstance(candidate.get("dsa_context"), dict) else {}
     quote = context.get("quote") if isinstance(context.get("quote"), dict) else {}
     factors = candidate.get("factor_scores") if isinstance(candidate.get("factor_scores"), dict) else {}
+    raw = candidate.get("raw") if isinstance(candidate.get("raw"), dict) else {}
     numeric_factors = sorted(
         (
             (str(key), number)
@@ -117,9 +118,23 @@ def build_market_screening_brief(candidate: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
 
+    snapshot_as_of = _first_text((raw.get("updated_at"), raw.get("timestamp"), raw.get("ticktime"), as_of))
     observed_metrics: List[Dict[str, Any]] = []
     matched_condition_codes: List[str] = []
-    for code in ("screen_score", "score", "change_pct"):
+    market_metrics = (
+        ("price", candidate.get("price") if candidate.get("price") is not None else raw.get("price")),
+        ("change_pct", candidate.get("change_pct") if candidate.get("change_pct") is not None else raw.get("change_pct")),
+        ("pe_ratio", raw.get("pe_ratio")),
+        ("pb_ratio", raw.get("pb_ratio")),
+        ("turnover_rate", raw.get("turnover_rate")),
+        ("amount", candidate.get("amount") if candidate.get("amount") is not None else raw.get("amount")),
+        ("total_mv", raw.get("total_mv")),
+    )
+    for code, raw_value in market_metrics:
+        value = _number(raw_value)
+        if value is not None:
+            observed_metrics.append(_metric(code, value, source="market_snapshot", as_of=snapshot_as_of))
+    for code in ("screen_score", "score"):
         value = _number(candidate.get(code))
         if value is None:
             continue
@@ -130,7 +145,7 @@ def build_market_screening_brief(candidate: Dict[str, Any]) -> Dict[str, Any]:
         code = f"factor:{key}"
         observed_metrics.append(_metric(code, value, source="alphasift"))
         matched_condition_codes.append(code)
-    if quote_price is not None:
+    if quote_price is not None and not any(item["code"] == "price" for item in observed_metrics):
         observed_metrics.append(_metric("quote_price", quote_price, source=source or "dsa_quote", as_of=as_of))
 
     completeness = 0
@@ -146,6 +161,8 @@ def build_market_screening_brief(candidate: Dict[str, Any]) -> Dict[str, Any]:
         completeness += 15
     if source:
         completeness += 10
+    if any(item["code"] in {"pe_ratio", "pb_ratio", "turnover_rate", "amount", "total_mv"} for item in observed_metrics):
+        completeness += 15
 
     has_factors = bool(numeric_factors)
     has_quote = quote_price is not None

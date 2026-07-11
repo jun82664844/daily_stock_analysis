@@ -529,3 +529,15 @@ git diff --check
 - Built-in strategy names and descriptions are presented as neutral data filters in Chinese and English; entry-opportunity and trading-signal wording is not rendered in the V104 strategy cards.
 - The complete primary screening surface now follows the selected locale, including themes, filter settings, progress, result metadata, comparison, alerts, and boundary copy; a focused page test protects the English mode from mixed Chinese UI labels.
 - The unreachable legacy result table containing operation-signal and LLM-judgment fields was removed from `StockScreeningPage.tsx`; V104 has a single neutral result renderer.
+
+## 2026-07-11 V105 Fast Useful Market Screening Acceptance
+
+- Recent full-market snapshots are preferred for repeat anonymous/free screening; trading-session TTL is short and off-hours TTL is longer.
+- Users can explicitly force a slower source refresh.
+- Responses expose cache use, cached timestamp, age, TTL, forced-refresh state, and elapsed milliseconds.
+- Cards expose factual valuation, liquidity, trading-value, and market-cap fields when available.
+- Results support local sorting and secondary filters without another request or AI usage.
+- The recent-snapshot fast path skips blocking per-symbol enrichment; opening a result remains the explicit path for detailed company data.
+- Live acceptance on `http://127.0.0.1:8018/screening` reduced a cached repeat request from about 28.6 seconds before the fast-path correction to 55 milliseconds at the API client and 47 milliseconds in the service; the browser displayed the same cached run as 0.1 seconds.
+- Anonymous Chinese and English browser acceptance passed with localized sorting/filter controls, cache provenance, visible no-AI status, information-only copy, and no browser console errors.
+- `scripts/verify_platform_fast_useful_screening_v105.py` prints `DSA_PLATFORM_FAST_USEFUL_SCREENING_V105_OK` only after static, backend, and frontend checks pass.

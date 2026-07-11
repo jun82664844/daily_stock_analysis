@@ -792,6 +792,7 @@ describe('StockScreeningPage', () => {
       market: 'cn',
       strategy: 'shrink_pullback',
       maxResults: 3,
+      forceRefresh: false,
     });
   });
 
@@ -1184,6 +1185,49 @@ describe('StockScreeningPage', () => {
         selectionSource: 'market_screening',
       },
     });
+  });
+
+  it('supports V105 cache provenance, force refresh and secondary filters', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: true, installSpecIsDefault: true });
+    const brief = (pe: number) => ({
+      matchedConditionCodes: ['factor:value'],
+      observedMetrics: [
+        { code: 'price', value: 10, source: 'market_snapshot' },
+        { code: 'pe_ratio', value: pe, source: 'market_snapshot' },
+      ],
+      informationFlags: [],
+      observationCodes: ['monitor_factor_values'],
+      conditionExitCodes: ['factor_condition_changed'],
+      dataFreshness: 'cached',
+      dataCompleteness: 90,
+      sourceStatus: 'available',
+      aiUsed: false,
+    });
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [
+        { rank: 1, code: '600001', name: '高估值样例', changePct: -1, screeningBrief: brief(30), raw: {} },
+        { rank: 2, code: '600002', name: '低估值样例', changePct: 2, screeningBrief: brief(10), raw: {} },
+      ],
+      candidateCount: 2,
+      snapshotCacheUsed: true,
+      snapshotCachedAt: '2026-07-11T10:00:00Z',
+      screenElapsedMs: 850,
+      llmRanked: false,
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('筛选已开启')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('强制刷新源数据（速度较慢）'));
+    fireEvent.click(screen.getByRole('button', { name: /运行筛选/ }));
+    await waitFor(() => expect(startScreenTask).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: true })));
+    expect(await screen.findByText(/快照：近期缓存/)).toBeInTheDocument();
+    expect(screen.getByText(/0.8s/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('最高正市盈率'), { target: { value: '15' } });
+    expect(screen.queryByTestId('market-screening-card-600001')).not.toBeInTheDocument();
+    expect(screen.getByTestId('market-screening-card-600002')).toBeInTheDocument();
+    expect(screen.getByText('1 / 2 条结果')).toBeInTheDocument();
   });
 
   it('renders the primary market-screening surface fully in English mode', async () => {

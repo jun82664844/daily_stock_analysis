@@ -1663,3 +1663,43 @@ Review focus:
 - `docs/superpowers/plans/2026-07-11-dsa-v104-explainable-stock-discovery.md`
 
 Boundary: local-only, no real payment, no production keys, no production deployment, no investment advice. No `git add`, commit, or push is part of this slice.
+
+## V105 Fast Useful Market Screening
+
+### backend-platform-foundation
+
+- `src/services/alphasift_screen_cache.py`
+- `src/services/alphasift_service.py`
+- `src/services/market_screening_brief.py`
+- `api/v1/endpoints/alphasift.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/alphasift.ts`
+- `apps/dsa-web/src/components/screening/screeningModelV104.ts`
+- `apps/dsa-web/src/components/screening/MarketScreeningCardV104.tsx`
+- `apps/dsa-web/src/pages/StockScreeningPage.tsx`
+
+### tests-and-verifiers
+
+- `tests/test_alphasift_screen_cache_v105.py`
+- `tests/test_market_screening_brief.py`
+- `tests/test_alphasift_api.py`
+- `tests/test_platform_fast_useful_screening_v105_verifier.py`
+- `apps/dsa-web/src/api/__tests__/alphasift.test.ts`
+- `apps/dsa-web/src/components/screening/__tests__/screeningModelV104.test.ts`
+- `apps/dsa-web/src/pages/__tests__/StockScreeningPage.test.tsx`
+- `scripts/verify_platform_fast_useful_screening_v105.py`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/superpowers/plans/2026-07-11-dsa-v105-fast-useful-market-screening.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Boundary: local-only, no AI by default, no real payment, no production deployment, and no investment advice.

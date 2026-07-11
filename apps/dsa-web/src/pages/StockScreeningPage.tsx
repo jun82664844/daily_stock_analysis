@@ -48,7 +48,9 @@ import ScreeningReminderPanelV104, {
 } from '../components/screening/ScreeningReminderPanelV104';
 import {
   MAX_SCREENING_COMPARE,
+  filterAndSortScreeningCandidates,
   strategyPresentation,
+  type ScreeningSortV105,
   toggleComparedCodes,
 } from '../components/screening/screeningModelV104';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -428,6 +430,11 @@ const StockScreeningPage: React.FC = () => {
   const [reminderCode, setReminderCode] = useState<string | null>(null);
   const [reminderState, setReminderState] = useState<ScreeningReminderState>('idle');
   const [screeningActionMessage, setScreeningActionMessage] = useState('');
+  const [resultSort, setResultSort] = useState<ScreeningSortV105>('rank');
+  const [minChangePct, setMinChangePct] = useState('');
+  const [maxPe, setMaxPe] = useState('');
+  const [currentDataOnly, setCurrentDataOnly] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(false);
   const [loading, setLoading] = useState(Boolean(restoredTask?.taskId));
   const [enabling, setEnabling] = useState(false);
   const [loadingStrategies, setLoadingStrategies] = useState(false);
@@ -483,6 +490,12 @@ const StockScreeningPage: React.FC = () => {
             ? 'Reading the full-market snapshot'
             : 'Submitting the market-data screen'
     : taskMessage;
+  const visibleCandidates = useMemo(() => filterAndSortScreeningCandidates(candidates, {
+    sort: resultSort,
+    minChangePct: minChangePct === '' ? null : Number(minChangePct),
+    maxPe: maxPe === '' ? null : Number(maxPe),
+    currentDataOnly,
+  }), [candidates, currentDataOnly, maxPe, minChangePct, resultSort]);
 
   useEffect(() => {
     setScreeningActionMessage('');
@@ -878,7 +891,7 @@ const StockScreeningPage: React.FC = () => {
     setTaskProgress(0);
     setTaskMessage(language === 'en' ? 'Submitting the market-data screen...' : '正在提交筛选任务...');
     try {
-      const task = await alphasiftApi.startScreen({ market, strategy, maxResults });
+      const task = await alphasiftApi.startScreen({ market, strategy, maxResults, forceRefresh });
       persistScreenTask({
         taskId: task.taskId,
         market,
@@ -1270,8 +1283,38 @@ const StockScreeningPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-secondary-text">
             <Search className="h-4 w-4 text-cyan" />
-            {language === 'en' ? `${candidates.length} results` : `${candidates.length} 条结果`}
+            {language === 'en'
+              ? `${visibleCandidates.length} / ${candidates.length} results`
+              : `${visibleCandidates.length} / ${candidates.length} 条结果`}
           </div>
+        </div>
+
+        <div className="mb-4 grid gap-3 border-y border-border py-4 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_auto_auto] xl:items-end">
+          <label className="space-y-2 text-xs font-medium text-secondary-text">
+            {language === 'en' ? 'Sort results' : '结果排序'}
+            <select className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground" value={resultSort} onChange={(event) => setResultSort(event.target.value as ScreeningSortV105)}>
+              <option value="rank">{language === 'en' ? 'Filter rank' : '筛选排序'}</option>
+              <option value="change_desc">{language === 'en' ? 'Price change: high to low' : '涨跌幅：高到低'}</option>
+              <option value="pe_asc">{language === 'en' ? 'P/E: low to high' : '市盈率：低到高'}</option>
+              <option value="turnover_desc">{language === 'en' ? 'Turnover: high to low' : '换手率：高到低'}</option>
+              <option value="market_cap_desc">{language === 'en' ? 'Market cap: high to low' : '总市值：高到低'}</option>
+            </select>
+          </label>
+          <label className="space-y-2 text-xs font-medium text-secondary-text">
+            {language === 'en' ? 'Minimum change %' : '最低涨跌幅 %'}
+            <input className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground" type="number" value={minChangePct} onChange={(event) => setMinChangePct(event.target.value)} />
+          </label>
+          <label className="space-y-2 text-xs font-medium text-secondary-text">
+            {language === 'en' ? 'Maximum positive P/E' : '最高正市盈率'}
+            <input className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground" type="number" min="0" value={maxPe} onChange={(event) => setMaxPe(event.target.value)} />
+          </label>
+          <label className="inline-flex min-h-10 items-center gap-2 text-sm text-foreground">
+            <input type="checkbox" checked={currentDataOnly} onChange={(event) => setCurrentDataOnly(event.target.checked)} />
+            {language === 'en' ? 'Current data only' : '仅看当前数据'}
+          </label>
+          <button className="min-h-10 rounded-lg border border-border px-3 text-sm text-secondary-text" type="button" onClick={() => { setResultSort('rank'); setMinChangePct(''); setMaxPe(''); setCurrentDataOnly(false); }}>
+            {language === 'en' ? 'Reset' : '重置'}
+          </button>
         </div>
 
         {screeningActionMessage ? (
@@ -1305,16 +1348,18 @@ const StockScreeningPage: React.FC = () => {
           </div>
         ) : null}
 
-        {candidates.length === 0 ? (
+        {visibleCandidates.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-surface/70 px-5 py-10 text-center">
             <p className="text-sm font-medium text-foreground">{language === 'en' ? 'No results yet' : '暂无结果'}</p>
             <p className="mt-2 text-sm text-secondary-text">
-              {language === 'en' ? 'Run a data screen to generate a factual candidate list.' : '运行数据筛选后生成事实型候选列表。'}
+              {candidates.length > 0
+                ? language === 'en' ? 'No records match the secondary filters.' : '没有记录满足当前二次筛选条件。'
+                : language === 'en' ? 'Run a data screen to generate a factual candidate list.' : '运行数据筛选后生成事实型候选列表。'}
             </p>
           </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
-            {candidates.map((candidate) => (
+            {visibleCandidates.map((candidate) => (
               <MarketScreeningCardV104
                 key={`${candidate.rank}-${candidate.code}`}
                 candidate={candidate}
@@ -1390,6 +1435,10 @@ const StockScreeningPage: React.FC = () => {
             {language === 'en' ? 'Run screen' : '运行筛选'}
           </Button>
         </div>
+        <label className="mt-3 inline-flex items-center gap-2 text-sm text-secondary-text">
+          <input type="checkbox" checked={forceRefresh} disabled={loading} onChange={(event) => setForceRefresh(event.target.checked)} />
+          {language === 'en' ? 'Force refresh source data (slower)' : '强制刷新源数据（速度较慢）'}
+        </label>
       </section>
 
       <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
@@ -1428,6 +1477,13 @@ const StockScreeningPage: React.FC = () => {
             <span>
               {language === 'en' ? 'DSA data enrichment: ' : 'DSA数据补充：'}{screenMeta?.dsaEnrichment?.enrichedCount ?? '-'} / {screenMeta?.dsaEnrichment?.requestedCount ?? '-'}
             </span>
+            {screenMeta ? <span>
+              {screenMeta.snapshotCacheUsed
+                ? language === 'en' ? 'Snapshot: recent cache' : '快照：近期缓存'
+                : language === 'en' ? 'Snapshot: source refresh' : '快照：数据源刷新'}
+              {screenMeta.screenElapsedMs != null ? ` · ${(screenMeta.screenElapsedMs / 1000).toFixed(1)}s` : ''}
+            </span> : null}
+            {screenMeta?.snapshotCachedAt ? <span>{language === 'en' ? 'Snapshot time: ' : '快照时间：'}{screenMeta.snapshotCachedAt}</span> : null}
           </div>
         </div>
       </section>

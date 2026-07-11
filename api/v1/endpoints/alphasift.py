@@ -24,6 +24,7 @@ class AlphaSiftScreenRequest(BaseModel):
     market: str = Field("cn", min_length=1, max_length=16)
     strategy: str = Field("dual_low", min_length=1, max_length=64)
     max_results: int = Field(20, ge=1, le=100)
+    force_refresh: bool = False
 
 
 class AlphaSiftStrategyResponse(BaseModel):
@@ -160,6 +161,7 @@ def alphasift_start_screen_task(
                 strategy=request.strategy,
                 market=request.market,
                 max_results=request.max_results,
+                force_refresh=request.force_refresh,
             )
         finally:
             heartbeat_stop.set()
@@ -218,4 +220,5 @@ def alphasift_screen(
         strategy=request.strategy,
         market=request.market,
         max_results=request.max_results,
+        force_refresh=request.force_refresh,
     )

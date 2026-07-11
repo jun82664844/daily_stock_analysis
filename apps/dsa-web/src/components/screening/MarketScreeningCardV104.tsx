@@ -6,6 +6,7 @@ import {
   dataCompletenessLabel,
   dataFreshnessLabel,
   informationFlagLabel,
+  formatScreeningMetric,
   metricLabel,
   observationLabel,
   type ScreeningLanguage,
@@ -25,9 +26,6 @@ type Props = {
   onOpenReminder: (code: string) => void;
 };
 
-const formatValue = (value: number) =>
-  new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(value);
-
 export default function MarketScreeningCardV104({
   candidate,
   language,
@@ -41,7 +39,7 @@ export default function MarketScreeningCardV104({
 }: Props) {
   const en = language === 'en';
   const brief = candidate.screeningBrief;
-  const metrics = brief?.observedMetrics.slice(0, 3) ?? [];
+  const metrics = brief?.observedMetrics.slice(0, 6) ?? [];
   const watchlistLabel = {
     idle: en ? 'Add to watchlist' : '加入自选',
     saving: en ? 'Saving' : '保存中',
@@ -75,7 +73,7 @@ export default function MarketScreeningCardV104({
           metrics.map((metric) => (
             <div key={metric.code} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2">
               <span className="block truncate text-xs text-secondary-text">{metricLabel(metric.code, language)}</span>
-              <strong className="mt-1 block text-sm text-foreground">{formatValue(metric.value)}</strong>
+              <strong className="mt-1 block text-sm text-foreground">{formatScreeningMetric(metric.code, metric.value, language)}</strong>
               <span className="mt-1 block truncate text-[11px] text-secondary-text">{metric.source || '-'}</span>
             </div>
           ))

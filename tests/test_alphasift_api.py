@@ -68,7 +68,14 @@ def _missing_alphasift_module_diagnostics() -> Dict[str, str]:
 class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
     def setUp(self) -> None:
         Config.reset_instance()
-        self.env_patch = patch.dict(os.environ, {"ALPHASIFT_DATA_DIR": ""}, clear=False)
+        self.env_patch = patch.dict(
+            os.environ,
+            {
+                "ALPHASIFT_DATA_DIR": "",
+                "DSA_ALPHASIFT_SCREEN_CACHE_TTL_SECONDS": "0",
+            },
+            clear=False,
+        )
         self.env_patch.start()
 
     def tearDown(self) -> None:
@@ -1587,7 +1594,12 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             ) as screen_mock,
         ):
             payload = alphasift_endpoint.alphasift_start_screen_task(
-                alphasift_endpoint.AlphaSiftScreenRequest(market="cn", strategy="dual_low", max_results=3),
+                alphasift_endpoint.AlphaSiftScreenRequest(
+                    market="cn",
+                    strategy="dual_low",
+                    max_results=3,
+                    force_refresh=True,
+                ),
                 http_request=self._request(),
                 config=config,
             )
@@ -1598,7 +1610,12 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload.max_results, 3)
         fake_queue.submit_background_task.assert_called_once()
         self.assertEqual(fake_queue.submit_background_task.call_args.kwargs["report_type"], "alphasift_screen")
-        screen_mock.assert_called_once_with(strategy="dual_low", market="cn", max_results=3)
+        screen_mock.assert_called_once_with(
+            strategy="dual_low",
+            market="cn",
+            max_results=3,
+            force_refresh=True,
+        )
         self.assertEqual(result["candidate_count"], 0)
         fake_queue.update_task_progress.assert_any_call(
             "screen-task-1",
@@ -1906,6 +1923,59 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(brief["data_freshness"], "cached")
         self.assertIn("screen_score", brief["matched_condition_codes"])
         self.assertNotIn("action", brief)
+
+    def test_screen_uses_recent_snapshot_cache_and_returns_timing_metadata(self) -> None:
+        config = self._config(enabled=True)
+        captured: Dict[str, Any] = {}
+
+        def screen_impl(_strategy: str, **kwargs: Any) -> Dict[str, Any]:
+            captured["snapshot_priority"] = os.environ.get("SNAPSHOT_SOURCE_PRIORITY")
+            return {
+                "snapshot_count": 5524,
+                "snapshot_source": "last_good_cache",
+                "warnings": ["Snapshot source fallback: last_good_cache stale_age_hours=0.1"],
+                "candidates": [{
+                    "code": "600519",
+                    "price": 1480.0,
+                    "factor_scores": {"value": 70.0},
+                    "raw": {"pe_ratio": 24.5},
+                }],
+            }
+
+        fake_module = _make_adapter_module(screen=MagicMock(side_effect=screen_impl))
+        cache_decision = {
+            "available": True,
+            "use_cache": True,
+            "reason": "hit",
+            "cached_at": "2026-07-11T10:00:00Z",
+            "age_seconds": 120,
+            "max_age_seconds": 300,
+            "source": "sina",
+            "row_count": 5524,
+            "force_refresh": False,
+        }
+        with (
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            patch("src.services.alphasift_service.inspect_snapshot_cache", return_value=cache_decision),
+            patch("src.services.alphasift_service._enrich_candidates_with_dsa") as enrich_mock,
+        ):
+            payload = self._screen(
+                config,
+                market="cn",
+                strategy="dual_low",
+                max_results=5,
+                mock_enrichment=False,
+            )
+
+        self.assertEqual(captured["snapshot_priority"], "")
+        self.assertTrue(payload["snapshot_cache_used"])
+        self.assertEqual(payload["snapshot_cached_at"], "2026-07-11T10:00:00Z")
+        self.assertEqual(payload["snapshot_age_seconds"], 120)
+        self.assertGreaterEqual(payload["screen_elapsed_ms"], 0)
+        self.assertEqual(payload["dsa_enrichment"]["mode"], "snapshot_fast_path")
+        self.assertEqual(payload["candidates"][0]["screening_brief"]["data_freshness"], "cached")
+        self.assertEqual(payload["warnings"], [])
+        enrich_mock.assert_not_called()
 
     def test_screen_prefers_dsa_daily_history_for_alphasift_enrichment(self) -> None:
         config = self._config(enabled=True)
@@ -2300,9 +2370,9 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(context["llm"]["channels"][0]["api_keys"], ["dsa-gemini-key"])
         self.assertEqual(context["llm"]["channels"][0]["extra_headers"], {"x-tenant": "dsa"})
         self.assertEqual(context["llm"]["model_list"][0]["litellm_params"]["extra_headers"], {"x-tenant": "dsa"})
-        self.assertIn("get_candidate_context", context["dsa"])
-        self.assertEqual(context["dsa"]["mode"], "pre_rank_light")
-        self.assertEqual(context["dsa"]["max_candidates"], 3)
+        self.assertNotIn("get_candidate_context", context["dsa"])
+        self.assertEqual(context["dsa"]["mode"], "snapshot_only")
+        self.assertEqual(context["dsa"]["max_candidates"], 0)
         self.assertFalse(context["dsa"]["include_news"])
         self.assertNotIn("search_stock_news", context["dsa"])
         self.assertEqual(payload["candidate_count"], 0)

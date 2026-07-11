@@ -236,7 +236,7 @@ describe('alphasiftApi', () => {
 
     expect(post).toHaveBeenCalledWith(
       '/api/v1/alphasift/screen',
-      { market: 'cn', strategy: 'dual_low', max_results: 3 },
+      { market: 'cn', strategy: 'dual_low', max_results: 3, force_refresh: false },
       { timeout: 180000 }
     );
   });
@@ -293,7 +293,7 @@ describe('alphasiftApi', () => {
 
     expect(post).toHaveBeenCalledWith(
       '/api/v1/alphasift/screen/tasks',
-      { market: 'cn', strategy: 'dual_low', max_results: 3 }
+      { market: 'cn', strategy: 'dual_low', max_results: 3, force_refresh: false }
     );
     expect(result.taskId).toBe('screen-task-1');
     expect(result.maxResults).toBe(3);

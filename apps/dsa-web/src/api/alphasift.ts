@@ -233,6 +233,12 @@ export type AlphaSiftScreenResponse = {
   riskEnabled?: boolean | null;
   portfolioDiversityEnabled?: boolean | null;
   portfolioConcentrationNotes?: string[];
+  snapshotCacheUsed?: boolean;
+  snapshotCachedAt?: string | null;
+  snapshotAgeSeconds?: number | null;
+  snapshotCacheTtlSeconds?: number | null;
+  snapshotRefreshForced?: boolean;
+  screenElapsedMs?: number | null;
 };
 
 export type AlphaSiftScreenAccepted = {
@@ -281,20 +287,22 @@ export const alphasiftApi = {
     return toCamelCase<AlphaSiftStatus>(response.data);
   },
 
-  async screen(payload: { market: string; strategy: string; maxResults: number }): Promise<AlphaSiftScreenResponse> {
+  async screen(payload: { market: string; strategy: string; maxResults: number; forceRefresh?: boolean }): Promise<AlphaSiftScreenResponse> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/alphasift/screen', {
       market: payload.market,
       strategy: payload.strategy,
       max_results: payload.maxResults,
+      force_refresh: payload.forceRefresh ?? false,
     }, { timeout: ALPHASIFT_SCREEN_TIMEOUT_MS });
     return toCamelCase<AlphaSiftScreenResponse>(response.data);
   },
 
-  async startScreen(payload: { market: string; strategy: string; maxResults: number }): Promise<AlphaSiftScreenAccepted> {
+  async startScreen(payload: { market: string; strategy: string; maxResults: number; forceRefresh?: boolean }): Promise<AlphaSiftScreenAccepted> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/alphasift/screen/tasks', {
       market: payload.market,
       strategy: payload.strategy,
       max_results: payload.maxResults,
+      force_refresh: payload.forceRefresh ?? false,
     });
     return toCamelCase<AlphaSiftScreenAccepted>(response.data);
   },

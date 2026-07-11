@@ -1,4 +1,13 @@
+import type { AlphaSiftCandidate } from '../../api/alphasift';
+
 export type ScreeningLanguage = 'zh' | 'en';
+export type ScreeningSortV105 = 'rank' | 'change_desc' | 'pe_asc' | 'turnover_desc' | 'market_cap_desc';
+export type ScreeningFilterV105 = {
+  sort: ScreeningSortV105;
+  minChangePct?: number | null;
+  maxPe?: number | null;
+  currentDataOnly?: boolean;
+};
 
 export const MAX_SCREENING_COMPARE = 5;
 
@@ -110,6 +119,14 @@ export function metricLabel(code: string, language: ScreeningLanguage): string {
     score: ['指标汇总值', 'Metric aggregate'],
     change_pct: ['涨跌幅', 'Price change'],
     quote_price: ['最新价格', 'Latest price'],
+    price: ['最新价格', 'Latest price'],
+    pe_ratio: ['市盈率', 'P/E ratio'],
+    pb_ratio: ['市净率', 'P/B ratio'],
+    turnover_rate: ['换手率', 'Turnover rate'],
+    amount: ['成交额', 'Trading value'],
+    total_mv: ['总市值', 'Market cap'],
+    size: ['规模因子', 'Size factor'],
+    liquidity: ['流动性因子', 'Liquidity factor'],
     quality: ['质量因子', 'Quality factor'],
     value: ['估值因子', 'Valuation factor'],
     growth: ['成长因子', 'Growth factor'],
@@ -117,6 +134,45 @@ export function metricLabel(code: string, language: ScreeningLanguage): string {
   };
   const pair = labels[key] ?? [key, key];
   return language === 'en' ? pair[1] : pair[0];
+}
+
+export function screeningMetricValue(candidate: AlphaSiftCandidate, code: string): number | null {
+  const value = candidate.screeningBrief?.observedMetrics.find((item) => item.code === code)?.value;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+export function formatScreeningMetric(code: string, value: number, language: ScreeningLanguage): string {
+  if (code === 'change_pct' || code === 'turnover_rate') return `${value.toFixed(2)}%`;
+  if (code === 'amount' || code === 'total_mv') {
+    const units = language === 'en'
+      ? [[1e12, 'T'], [1e9, 'B'], [1e6, 'M']]
+      : [[1e8, '亿'], [1e4, '万']];
+    const unit = units.find(([threshold]) => value >= Number(threshold));
+    if (unit) return `${(value / Number(unit[0])).toFixed(2)}${unit[1]}`;
+  }
+  return new Intl.NumberFormat(language === 'en' ? 'en-US' : 'zh-CN', { maximumFractionDigits: 4 }).format(value);
+}
+
+export function filterAndSortScreeningCandidates(
+  candidates: AlphaSiftCandidate[],
+  options: ScreeningFilterV105,
+): AlphaSiftCandidate[] {
+  const filtered = candidates.filter((candidate) => {
+    if (options.minChangePct != null && (candidate.changePct == null || candidate.changePct < options.minChangePct)) return false;
+    const pe = screeningMetricValue(candidate, 'pe_ratio');
+    if (options.maxPe != null && (pe == null || pe <= 0 || pe > options.maxPe)) return false;
+    if (options.currentDataOnly && !['fresh', 'cached'].includes(candidate.screeningBrief?.dataFreshness || '')) return false;
+    return true;
+  });
+  const numberOr = (value: number | null | undefined, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return [...filtered].sort((left, right) => {
+    if (options.sort === 'change_desc') return numberOr(right.changePct, -Infinity) - numberOr(left.changePct, -Infinity);
+    if (options.sort === 'pe_asc') return numberOr(screeningMetricValue(left, 'pe_ratio'), Infinity) - numberOr(screeningMetricValue(right, 'pe_ratio'), Infinity);
+    if (options.sort === 'turnover_desc') return numberOr(screeningMetricValue(right, 'turnover_rate'), -Infinity) - numberOr(screeningMetricValue(left, 'turnover_rate'), -Infinity);
+    if (options.sort === 'market_cap_desc') return numberOr(screeningMetricValue(right, 'total_mv'), -Infinity) - numberOr(screeningMetricValue(left, 'total_mv'), -Infinity);
+    return numberOr(left.rank, Infinity) - numberOr(right.rank, Infinity);
+  });
 }
 
 export function informationFlagLabel(code: string, language: ScreeningLanguage): string {
