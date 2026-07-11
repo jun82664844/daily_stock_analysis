@@ -18,6 +18,7 @@ import { FreeApiTrialTaskStatusV95 } from '../components/retention/FreeApiTrialT
 import { QueryChangeSummaryV93 } from '../components/retention/QueryChangeSummaryV93';
 import { WatchlistEventRadarV99 } from '../components/radar/WatchlistEventRadarV99';
 import { WatchlistAlertLoopV100 } from '../components/radar/WatchlistAlertLoopV100';
+import { DailyResearchCockpitV103 } from '../components/radar/DailyResearchCockpitV103';
 import { findNewTrialHistoryItem } from '../components/retention/freeApiTrialReport';
 import { buildQueryObservation, compareQueryObservations, readPriorQueryObservation, storeQueryObservation, type QueryChangeSummary, type QueryObservation } from '../components/retention/queryChangeTracker';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -5672,6 +5673,13 @@ const HomePage: React.FC = () => {
                     ) : null}
                     {platformWatchlistRadar ? (
                       <>
+                        <DailyResearchCockpitV103
+                          language={uiLanguage}
+                          radar={platformWatchlistRadar}
+                          trialRemaining={platformAiQuickQuota?.remaining ?? baseQuota?.remaining ?? 0}
+                          trialLimit={platformAiQuickQuota?.weeklyLimit ?? baseQuota?.weeklyLimit ?? 0}
+                          onSelectSymbol={(stockCode) => void handleBasicQuery(stockCode)}
+                        />
                         {platformRadarHistory && platformAlertRules ? (
                           <WatchlistAlertLoopV100
                             language={uiLanguage}

@@ -51,11 +51,13 @@ class PlatformWatchlistRadarService:
             item_events.extend(source_events)
             suggestions = self._suggested_alerts(row)
             item_events.sort(key=self._event_sort_key)
+            research_brief = self._research_brief(row, item_events)
             row.update(
                 {
                     "events": item_events,
                     "suggested_alerts": suggestions,
                     "source_status": source_status,
+                    "research_brief": research_brief,
                     "ai_used": bool(row.get("ai_used")),
                 }
             )
@@ -89,12 +91,149 @@ class PlatformWatchlistRadarService:
                 "risk_count": risk_count,
                 "source_event_count": source_event_count,
             },
+            "daily_digest": self._daily_digest(items),
             "items": items,
             "events": events,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "ai_used": bool(refreshed.get("ai_used")),
             "analysis_boundary": "information_only_not_investment_advice",
         }
+
+    def _research_brief(self, row: Dict[str, Any], events: List[Dict[str, Any]]) -> Dict[str, Any]:
+        current_price = self._number(row.get("current_price"))
+        ma5 = self._number(row.get("ma5"))
+        ma20 = self._number(row.get("ma20"))
+        change = self._number(row.get("change_percent"))
+        volume_change = self._number(row.get("volume_change_percent"))
+        signal_score = self._number(row.get("signal_score"))
+        freshness = str(row.get("freshness") or "unavailable").lower()
+        warning_codes = [str(value) for value in row.get("warning_codes") or []]
+        status = str(row.get("status") or "degraded").lower()
+
+        low_confidence = status != "ok" or freshness in {"stale", "unavailable"} or bool(warning_codes)
+        complete_core = current_price is not None and ma20 is not None and signal_score is not None
+        if low_confidence:
+            data_confidence = "low"
+        elif freshness == "fresh" and complete_core:
+            data_confidence = "high"
+        else:
+            data_confidence = "medium"
+
+        risk_structure = (
+            change is not None and change <= -2
+        ) or (
+            current_price is not None
+            and ma20 is not None
+            and current_price < ma20
+            and (signal_score is None or signal_score < 55)
+        )
+        strong_structure = (
+            data_confidence == "high"
+            and signal_score is not None
+            and signal_score >= 65
+            and current_price is not None
+            and ma20 is not None
+            and current_price >= ma20
+            and volume_change is not None
+            and volume_change >= 20
+            and (change is None or change >= 0)
+        )
+        if low_confidence or risk_structure:
+            state = "risk_review"
+        elif strong_structure:
+            state = "strong_confirmation"
+        else:
+            state = "wait_for_confirmation"
+
+        evidence_codes: List[str] = []
+        if current_price is not None and ma20 is not None:
+            evidence_codes.append("price_above_ma20" if current_price >= ma20 else "price_below_ma20")
+        if volume_change is not None:
+            if volume_change >= 20:
+                evidence_codes.append("volume_expanded")
+            elif volume_change <= -20:
+                evidence_codes.append("volume_contracted")
+        if change is not None:
+            if change >= 2:
+                evidence_codes.append("positive_price_move")
+            elif change <= -2:
+                evidence_codes.append("negative_price_move")
+        evidence_codes.append("stale_data" if low_confidence else "usable_data")
+        if any(event.get("type") == "source_update" for event in events):
+            evidence_codes.append("traceable_source_update")
+
+        if low_confidence:
+            next_watch = self._research_condition("refresh_data")
+            invalidation = self._research_condition("fresh_data_restored")
+        elif current_price is not None and ma20 is not None and current_price < ma20:
+            next_watch = self._research_condition("reclaim_ma20", value=ma20)
+            invalidation = self._research_condition("move_below_ma5", value=ma5)
+        else:
+            next_watch = self._research_condition("hold_above_ma20", value=ma20)
+            invalidation = self._research_condition("lose_ma20", value=ma20)
+
+        base_score = signal_score if signal_score is not None else 50.0
+        movement_score = min(abs(change or 0.0) * 2.0, 15.0)
+        volume_score = min(abs(volume_change or 0.0) * 0.1, 10.0)
+        state_bonus = 10.0 if state in {"strong_confirmation", "risk_review"} else 0.0
+        priority_score = int(round(max(0.0, min(100.0, base_score + movement_score + volume_score + state_bonus))))
+        return {
+            "state": state,
+            "priority_score": priority_score,
+            "data_confidence": data_confidence,
+            "evidence_codes": evidence_codes,
+            "next_watch": next_watch,
+            "invalidation": invalidation,
+            "ai_used": False,
+        }
+
+    def _daily_digest(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        groups = {
+            "strong_confirmation": [],
+            "risk_review": [],
+            "wait_for_confirmation": [],
+        }
+        data_health = {"fresh": 0, "cached": 0, "stale": 0, "unavailable": 0}
+        for item in items:
+            brief = item.get("research_brief") or {}
+            state = str(brief.get("state") or "wait_for_confirmation")
+            summary = {
+                "stock_code": item.get("stock_code"),
+                "stock_name": item.get("stock_name"),
+                "market": item.get("market"),
+                "state": state,
+                "priority_score": int(brief.get("priority_score") or 0),
+                "change_percent": self._number(item.get("change_percent")),
+                "signal_score": item.get("signal_score"),
+                "data_confidence": brief.get("data_confidence"),
+            }
+            groups.setdefault(state, []).append(summary)
+
+            freshness = str(item.get("freshness") or "unavailable").lower()
+            status = str(item.get("status") or "degraded").lower()
+            if freshness == "fresh" and status == "ok":
+                data_health["fresh"] += 1
+            elif freshness in {"cached", "cache"} and status == "ok":
+                data_health["cached"] += 1
+            elif freshness == "stale" or item.get("warning_codes"):
+                data_health["stale"] += 1
+            else:
+                data_health["unavailable"] += 1
+
+        for values in groups.values():
+            values.sort(key=lambda value: (-int(value.get("priority_score") or 0), str(value.get("stock_code") or "")))
+        return {
+            "strong_confirmation": groups["strong_confirmation"][:3],
+            "risk_review": groups["risk_review"][:3],
+            "wait_for_confirmation": groups["wait_for_confirmation"][:3],
+            "data_health": data_health,
+            "upgrade_boundary": "same_research_flow_better_sources_and_automation",
+            "ai_used": False,
+        }
+
+    @staticmethod
+    def _research_condition(condition_type: str, *, value: Optional[float] = None) -> Dict[str, Any]:
+        return {"type": condition_type, "value": value}
 
     def _market_events(self, row: Dict[str, Any]) -> List[Dict[str, Any]]:
         stock_code = str(row.get("stock_code") or "")

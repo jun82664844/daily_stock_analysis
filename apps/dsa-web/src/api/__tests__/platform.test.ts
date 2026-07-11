@@ -225,6 +225,23 @@ describe('platformApi', () => {
           risk_count: 0,
           source_event_count: 0,
         },
+        daily_digest: {
+          strong_confirmation: [{
+            stock_code: 'AAPL',
+            stock_name: 'Apple Inc.',
+            market: 'us',
+            state: 'strong_confirmation',
+            priority_score: 92,
+            change_percent: 3.2,
+            signal_score: 75,
+            data_confidence: 'high',
+          }],
+          risk_review: [],
+          wait_for_confirmation: [],
+          data_health: { fresh: 1, cached: 0, stale: 0, unavailable: 0 },
+          upgrade_boundary: 'same_research_flow_better_sources_and_automation',
+          ai_used: false,
+        },
         items: [{
           stock_code: 'AAPL',
           stock_name: 'Apple Inc.',
@@ -241,6 +258,15 @@ describe('platformApi', () => {
           ai_used: false,
           status: 'ok',
           source_status: 'no_traceable_source',
+          research_brief: {
+            state: 'strong_confirmation',
+            priority_score: 92,
+            data_confidence: 'high',
+            evidence_codes: ['price_above_ma20', 'volume_expanded', 'usable_data'],
+            next_watch: { type: 'hold_above_ma20', value: 205 },
+            invalidation: { type: 'lose_ma20', value: 205 },
+            ai_used: false,
+          },
           events: [{
             stock_code: 'AAPL',
             type: 'price_move',
@@ -266,6 +292,10 @@ describe('platformApi', () => {
     expect(result.summary.strongest?.stockCode).toBe('AAPL');
     expect(result.items[0].volumeChangePercent).toBe(20);
     expect(result.items[0].suggestedAlerts[0].referenceValue).toBe(205);
+    expect(result.dailyDigest.strongConfirmation[0].priorityScore).toBe(92);
+    expect(result.dailyDigest.dataHealth.fresh).toBe(1);
+    expect(result.items[0].researchBrief.nextWatch.type).toBe('hold_above_ma20');
+    expect(result.items[0].researchBrief.evidenceCodes).toContain('volume_expanded');
     expect(result.aiUsed).toBe(false);
   });
 

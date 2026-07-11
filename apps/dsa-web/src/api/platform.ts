@@ -341,16 +341,57 @@ export interface PlatformWatchlistRadarAlertSuggestion {
   aiUsed: boolean;
 }
 
+export interface PlatformWatchlistResearchCondition {
+  type: string;
+  value?: number | null;
+}
+
+export interface PlatformWatchlistResearchBrief {
+  state: string;
+  priorityScore: number;
+  dataConfidence: string;
+  evidenceCodes: string[];
+  nextWatch: PlatformWatchlistResearchCondition;
+  invalidation: PlatformWatchlistResearchCondition;
+  aiUsed: boolean;
+}
+
 export interface PlatformWatchlistRadarItem extends PlatformWatchlistRefreshItem {
   events: PlatformWatchlistRadarEvent[];
   suggestedAlerts: PlatformWatchlistRadarAlertSuggestion[];
   sourceStatus: string;
+  researchBrief: PlatformWatchlistResearchBrief;
 }
 
 export interface PlatformWatchlistRadarSummaryItem {
   stockCode: string;
   stockName?: string | null;
   changePercent?: number | null;
+}
+
+export interface PlatformWatchlistDailyDigestItem {
+  stockCode: string;
+  stockName?: string | null;
+  market: string;
+  state: string;
+  priorityScore: number;
+  changePercent?: number | null;
+  signalScore?: number | null;
+  dataConfidence: string;
+}
+
+export interface PlatformWatchlistDailyDigest {
+  strongConfirmation: PlatformWatchlistDailyDigestItem[];
+  riskReview: PlatformWatchlistDailyDigestItem[];
+  waitForConfirmation: PlatformWatchlistDailyDigestItem[];
+  dataHealth: {
+    fresh: number;
+    cached: number;
+    stale: number;
+    unavailable: number;
+  };
+  upgradeBoundary: string;
+  aiUsed: boolean;
 }
 
 export interface PlatformWatchlistRadarResponse {
@@ -368,6 +409,7 @@ export interface PlatformWatchlistRadarResponse {
     riskCount: number;
     sourceEventCount: number;
   };
+  dailyDigest: PlatformWatchlistDailyDigest;
   items: PlatformWatchlistRadarItem[];
   events: PlatformWatchlistRadarEvent[];
   generatedAt: string;

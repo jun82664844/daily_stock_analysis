@@ -1567,5 +1567,51 @@ Review focus:
 - A cooling reference-quote source is skipped without removing the visible comparison row.
 - Only the built-in adapter shares cache across request-scoped instances; injected/custom adapters retain isolated state.
 - No AI quota, public search, real payment, production key, deployment, user-data deletion, or fabricated freshness is introduced.
+
+## V103 Free Daily Research Cockpit Addendum
+
+Scope: local-only free-user daily retention and watchlist research prioritization.
+
+Backend platform foundation:
+
+- `src/platform_watchlist_radar.py`
+- `api/v1/schemas/platform.py`
+
+Frontend platform experience:
+
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/components/radar/DailyResearchCockpitV103.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Tests and verifiers:
+
+- `tests/test_platform_daily_research_cockpit_v103.py`
+- `tests/test_platform_watchlist_alert_loop_v100.py`
+- `tests/test_platform_free_daily_research_cockpit_v103_verifier.py`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/radar/__tests__/DailyResearchCockpitV103.test.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistEventRadarV99.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_daily_research_cockpit_v103.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Docs and config:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v103-free-daily-research-cockpit.md`
+
+Review focus:
+
+- Stale or degraded rows cannot enter the strong-confirmation group.
+- Daily groups remain deterministic, top-three bounded, no-AI, and user-scoped.
+- Symbol drill-down does not consume quota; only the existing explicit platform API trial action can do so.
+- Chinese and English copy expose the same research, confidence, quota, and safety boundaries.
+- No public search, real payment, production key, deployment, user-data deletion, fabricated freshness, or investment advice is introduced.
 - Review private-response generation and `userId` checks together; either check alone is insufficient during logout or account switching.
 - Review current-plan limits at both listing and execution, same-user local write serialization, source URL deduplication, finite numeric validation, CSRF, and delete-rate limiting.

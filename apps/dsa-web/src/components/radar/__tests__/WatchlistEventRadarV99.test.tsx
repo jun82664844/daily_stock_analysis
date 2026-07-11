@@ -17,6 +17,23 @@ const radar = {
     riskCount: 2,
     sourceEventCount: 1,
   },
+  dailyDigest: {
+    strongConfirmation: [{
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      market: 'us',
+      state: 'strong_confirmation',
+      priorityScore: 96,
+      changePercent: 5.2,
+      signalScore: 78,
+      dataConfidence: 'high',
+    }],
+    riskReview: [],
+    waitForConfirmation: [],
+    dataHealth: { fresh: 1, cached: 0, stale: 0, unavailable: 0 },
+    upgradeBoundary: 'same_research_flow_better_sources_and_automation',
+    aiUsed: false,
+  },
   items: [
     {
       stockCode: 'AAPL',
@@ -39,6 +56,15 @@ const radar = {
       aiUsed: false,
       status: 'ok',
       sourceStatus: 'available',
+      researchBrief: {
+        state: 'strong_confirmation',
+        priorityScore: 96,
+        dataConfidence: 'high',
+        evidenceCodes: ['price_above_ma20', 'volume_expanded', 'usable_data'],
+        nextWatch: { type: 'hold_above_ma20', value: 200 },
+        invalidation: { type: 'lose_ma20', value: 200 },
+        aiUsed: false,
+      },
       events: [
         {
           stockCode: 'AAPL',

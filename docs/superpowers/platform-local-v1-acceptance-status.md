@@ -501,3 +501,16 @@ git diff --check
 - Slow or unavailable public sources remain channel-level degradation. Quote/history evidence and completed channels are not discarded, and cached timeout results are not labeled fresh.
 - The verifier prints `DSA_PLATFORM_A_SHARE_FREE_QUERY_SPEED_V102_OK` only after required-file, source-contract, git-visibility, and focused regression checks pass.
 - V102 remains local-only. It does not approve real payment, production deployment, production keys, market-data licensing, or investment advice.
+
+## 2026-07-11 V103 Free Daily Research Cockpit Acceptance
+
+- The existing authenticated V99/V100 watchlist review now adds a deterministic daily research digest without adding another live-data or AI request.
+- Each visible symbol is classified into strong confirmation, risk review, or wait for confirmation and includes structured evidence, next-watch, invalidation, priority, and data-confidence fields.
+- Low-confidence, stale, warning-bearing, or unavailable data is forced into risk review and cannot be presented as strong confirmation.
+- HomePage renders a bilingual three-group cockpit before the detailed event radar, with fresh/cached/stale/unavailable counts and a symbol drill-down that does not automatically spend API quota.
+- Live browser acceptance on 8018 processed four private watchlist symbols in about 2.146 seconds for the first Chinese review and about 0.291 seconds for the cached English review. AAPL drill-down completed in about 0.289 seconds while the platform API trial remained `5/5`.
+- Chinese and English both rendered all three group headings, confidence labels, data-health counts, quota boundary, and safety copy. Browser error logs and load/service/run-failure banners were all zero.
+- The cockpit displays the current weekly platform API trial balance and keeps the existing explicit trial action on the stock page as the only consumption point.
+- Focused V103 verification covers the new backend contract plus existing V99/V100 isolation, alert, and history behavior, and covers API mapping, Chinese/English rendering, HomePage integration, and symbol navigation in the frontend.
+- The verifier prints `DSA_PLATFORM_FREE_DAILY_RESEARCH_COCKPIT_V103_OK` only after required files, source contract, Git visibility, backend tests, and frontend tests pass.
+- V103 remains local-only, no-AI by default, non-destructive, and informational analysis only. It is not production launch approval, real payment, production key handling, market-data licensing approval, or investment advice.

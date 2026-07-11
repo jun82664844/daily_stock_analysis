@@ -239,3 +239,14 @@
 - Cached timeout placeholders remain visibly degraded through diagnostics and channel status. They must never be presented as fresh source data.
 - Optional peer/reference quote requests must honor the existing source-health cooldown. A cooling source returns an unavailable reference row immediately instead of adding another timeout to the main free snapshot.
 - V102 does not invoke AI, public search, real payment, or production credentials. Public market data may still be delayed or incomplete, and all output remains informational analysis only, not investment advice.
+
+## Free Daily Research Cockpit V103
+
+- A signed-in free user can run the existing private watchlist review and receive the same daily research workflow shown to paid plans. Free and paid plans differ in capacity, data sources, refresh automation, and model depth rather than hiding the core research structure.
+- Each processed symbol receives a deterministic research brief with one of three states: `strong_confirmation`, `risk_review`, or `wait_for_confirmation`.
+- The brief exposes structured evidence codes, a next-watch condition, an invalidation condition, priority score, and data-confidence level. It does not generate trading instructions or claim model inference.
+- Stale, unavailable, warning-bearing, or otherwise degraded data must be low-confidence and must never enter `strong_confirmation`, regardless of price move or signal score.
+- The daily digest shows no more than three symbols per group and separately counts fresh, cached, stale, and unavailable data so users can distinguish research priority from source quality.
+- Opening a symbol from the cockpit is a no-AI navigation action and does not consume quota. A platform API trial is charged only after the user explicitly chooses the existing real-time enhancement action on the stock page.
+- The cockpit remains private to the authenticated platform user and reuses the existing V99/V100 user-isolation, current-plan limits, CSRF, rate-limit, persisted-review, and alert-rule boundaries.
+- V103 is local-only and does not enable public search, real payment, production keys, deployment, or market-data licensing. All content remains informational analysis only, not investment advice.

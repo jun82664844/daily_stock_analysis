@@ -158,10 +158,26 @@ class PlatformWatchlistRadarAlertSuggestion(BaseModel):
     ai_used: bool = False
 
 
+class PlatformWatchlistResearchCondition(BaseModel):
+    type: str
+    value: Optional[float] = None
+
+
+class PlatformWatchlistResearchBrief(BaseModel):
+    state: str
+    priority_score: int = 0
+    data_confidence: str
+    evidence_codes: List[str] = Field(default_factory=list)
+    next_watch: PlatformWatchlistResearchCondition
+    invalidation: PlatformWatchlistResearchCondition
+    ai_used: bool = False
+
+
 class PlatformWatchlistRadarItem(PlatformWatchlistRefreshItem):
     events: List[PlatformWatchlistRadarEvent] = Field(default_factory=list)
     suggested_alerts: List[PlatformWatchlistRadarAlertSuggestion] = Field(default_factory=list)
     source_status: str
+    research_brief: PlatformWatchlistResearchBrief
 
 
 class PlatformWatchlistRadarSummaryItem(BaseModel):
@@ -178,6 +194,33 @@ class PlatformWatchlistRadarSummary(BaseModel):
     source_event_count: int = 0
 
 
+class PlatformWatchlistDailyDigestItem(BaseModel):
+    stock_code: str
+    stock_name: Optional[str] = None
+    market: str
+    state: str
+    priority_score: int = 0
+    change_percent: Optional[float] = None
+    signal_score: Optional[int] = None
+    data_confidence: str
+
+
+class PlatformWatchlistDailyDataHealth(BaseModel):
+    fresh: int = 0
+    cached: int = 0
+    stale: int = 0
+    unavailable: int = 0
+
+
+class PlatformWatchlistDailyDigest(BaseModel):
+    strong_confirmation: List[PlatformWatchlistDailyDigestItem] = Field(default_factory=list)
+    risk_review: List[PlatformWatchlistDailyDigestItem] = Field(default_factory=list)
+    wait_for_confirmation: List[PlatformWatchlistDailyDigestItem] = Field(default_factory=list)
+    data_health: PlatformWatchlistDailyDataHealth
+    upgrade_boundary: str
+    ai_used: bool = False
+
+
 class PlatformWatchlistRadarResponse(BaseModel):
     user_id: int
     plan: str
@@ -187,6 +230,7 @@ class PlatformWatchlistRadarResponse(BaseModel):
     hidden_count: int
     degraded: int
     summary: PlatformWatchlistRadarSummary
+    daily_digest: PlatformWatchlistDailyDigest
     items: List[PlatformWatchlistRadarItem] = Field(default_factory=list)
     events: List[PlatformWatchlistRadarEvent] = Field(default_factory=list)
     generated_at: str

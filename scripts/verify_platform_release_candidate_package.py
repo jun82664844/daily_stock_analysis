@@ -78,6 +78,7 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-08-dsa-v72-free-peer-quotes.md",
     "docs/superpowers/plans/2026-07-08-dsa-v73-free-broker-conversion.md",
     "docs/superpowers/plans/2026-07-11-dsa-v102-a-share-free-query-speed.md",
+    "docs/superpowers/plans/2026-07-11-dsa-v103-free-daily-research-cockpit.md",
     REVIEW_SLICES_DOC,
     RELEASE_MANIFEST_DOC,
     "scripts/verify_local_v1_operability.py",
@@ -139,6 +140,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_free_peer_quotes_v72.py",
     "scripts/verify_platform_free_broker_conversion_v73.py",
     "scripts/verify_platform_a_share_free_query_speed_v102.py",
+    "scripts/verify_platform_free_daily_research_cockpit_v103.py",
     "scripts/run_platform_backup_restore_dry_run.py",
     "scripts/cleanup_platform_e2e_data.py",
     "src/services/a_share_enrichment_service.py",
@@ -211,6 +213,10 @@ REQUIRED_FILES = (
     "tests/test_platform_free_peer_quotes_v72.py",
     "tests/test_platform_free_broker_conversion_v73.py",
     "tests/test_platform_a_share_free_query_speed_v102_verifier.py",
+    "tests/test_platform_daily_research_cockpit_v103.py",
+    "tests/test_platform_free_daily_research_cockpit_v103_verifier.py",
+    "apps/dsa-web/src/components/radar/DailyResearchCockpitV103.tsx",
+    "apps/dsa-web/src/components/radar/__tests__/DailyResearchCockpitV103.test.tsx",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -275,6 +281,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_peer_quotes_v72.py",
     "scripts/verify_platform_free_broker_conversion_v73.py",
     "scripts/verify_platform_a_share_free_query_speed_v102.py",
+    "scripts/verify_platform_free_daily_research_cockpit_v103.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

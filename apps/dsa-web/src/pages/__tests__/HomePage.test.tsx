@@ -122,6 +122,15 @@ const makeRadarItem = (overrides: Partial<PlatformWatchlistRadarItem>): Platform
   aiUsed: false,
   status: 'ok',
   sourceStatus: 'no_traceable_source',
+  researchBrief: {
+    state: 'wait_for_confirmation',
+    priorityScore: 60,
+    dataConfidence: 'high',
+    evidenceCodes: ['usable_data'],
+    nextWatch: { type: 'hold_above_ma20', value: 205 },
+    invalidation: { type: 'lose_ma20', value: 205 },
+    aiUsed: false,
+  },
   events: [],
   suggestedAlerts: [],
   ...overrides,
@@ -136,6 +145,16 @@ const makeRadarResponse = (
     .filter((item) => typeof item.changePercent === 'number')
     .slice()
     .sort((left, right) => (right.changePercent ?? 0) - (left.changePercent ?? 0));
+  const digestItem = (item: PlatformWatchlistRadarItem) => ({
+    stockCode: item.stockCode,
+    stockName: item.stockName,
+    market: item.market,
+    state: item.researchBrief.state,
+    priorityScore: item.researchBrief.priorityScore,
+    changePercent: item.changePercent,
+    signalScore: item.signalScore,
+    dataConfidence: item.researchBrief.dataConfidence,
+  });
   return {
     userId,
     plan: 'free',
@@ -150,6 +169,19 @@ const makeRadarResponse = (
       eventCount: items.reduce((total, item) => total + item.events.length, 0),
       riskCount: degraded,
       sourceEventCount: items.reduce((total, item) => total + item.events.filter((event) => event.type === 'source_update').length, 0),
+    },
+    dailyDigest: {
+      strongConfirmation: items.filter((item) => item.researchBrief.state === 'strong_confirmation').map(digestItem).slice(0, 3),
+      riskReview: items.filter((item) => item.researchBrief.state === 'risk_review').map(digestItem).slice(0, 3),
+      waitForConfirmation: items.filter((item) => item.researchBrief.state === 'wait_for_confirmation').map(digestItem).slice(0, 3),
+      dataHealth: {
+        fresh: items.filter((item) => item.freshness === 'fresh' && item.status === 'ok').length,
+        cached: items.filter((item) => item.freshness === 'cached' && item.status === 'ok').length,
+        stale: items.filter((item) => item.freshness === 'stale' || item.warningCodes.length > 0).length,
+        unavailable: items.filter((item) => item.freshness === 'unavailable').length,
+      },
+      upgradeBoundary: 'same_research_flow_better_sources_and_automation',
+      aiUsed: false,
     },
     items,
     events: items.flatMap((item) => item.events),
@@ -5276,6 +5308,11 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
 
     const radarPanel = await screen.findByTestId('watchlist-event-radar-v99');
+    const cockpit = await screen.findByTestId('daily-research-cockpit-v103');
+    expect(cockpit).toHaveTextContent('Daily research cockpit');
+    expect(cockpit).toHaveTextContent('Wait for confirmation');
+    expect(cockpit).toHaveTextContent('Platform API trial 5/5 remaining');
+    expect(cockpit).toHaveTextContent('does not consume quota automatically');
     expect(radarPanel).toHaveTextContent('Today’s watchlist event radar');
     expect(radarPanel).toHaveTextContent(/Strongest\s*BTC-USD \+2\.5%/);
     expect(radarPanel).toHaveTextContent(/Weakest\s*AAPL -0\.42%/);

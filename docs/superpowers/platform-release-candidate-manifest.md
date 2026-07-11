@@ -1832,3 +1832,40 @@ Acceptance boundary:
 - Cooling peer/reference quote sources are skipped immediately and remain visible as unavailable rows rather than delaying the full snapshot.
 - Process-local cache reuse applies only to the built-in adapter and does not cross source modes.
 - The change remains no-AI, no-public-search, local-only, and non-destructive. It does not enable real payment, production credentials, deployment, market-data licensing approval, or investment advice.
+
+## V103 Free Daily Research Cockpit Manifest Addendum
+
+Status: local-only free-user retention and watchlist research workflow. No production launch approval.
+
+New/updated files:
+
+- `.gitignore`
+- `src/platform_watchlist_radar.py`
+- `api/v1/schemas/platform.py`
+- `tests/test_platform_daily_research_cockpit_v103.py`
+- `tests/test_platform_watchlist_alert_loop_v100.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/radar/DailyResearchCockpitV103.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/DailyResearchCockpitV103.test.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistEventRadarV99.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_daily_research_cockpit_v103.py`
+- `tests/test_platform_free_daily_research_cockpit_v103_verifier.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v103-free-daily-research-cockpit.md`
+
+Acceptance boundary:
+
+- The current user's watchlist receives deterministic strong-confirmation, risk-review, and wait-for-confirmation groups with structured evidence and data confidence.
+- Stale, unavailable, warning-bearing, or degraded data is always low-confidence and cannot be promoted to strong confirmation.
+- Free and paid plans share the research workflow; paid value remains better source quality, capacity, automation, and model depth.
+- Symbol drill-down remains no-AI and does not consume platform trial quota automatically.
+- The change is local-only, private, no-public-search, non-destructive, and not investment advice. It does not enable real payment, production credentials, deployment, or market-data licensing approval.
