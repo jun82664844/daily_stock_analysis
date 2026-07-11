@@ -1496,5 +1496,40 @@ Review focus:
 - HomePage rejects stale-generation private writes and cross-user responses, including watchlist and API-key completion paths.
 - Free and paid users share the visible loop; only rule and processing capacity differ.
 - No AI quota, public search, real payment, production key, deployment, or user-data deletion is introduced.
+
+## V101 Free Historical Trend Research Addendum
+
+Scope: guest-visible, no-AI historical price evidence for free quick analysis.
+
+Frontend and API client:
+
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/components/research/FreeKlineResearchV101.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Tests and verifier:
+
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/components/research/__tests__/FreeKlineResearchV101.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_platform_free_kline_research_v101_verifier.py`
+- `scripts/verify_platform_free_kline_research_v101.py`
+
+Docs and config:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v101-free-kline-research.md`
+
+Review focus:
+
+- Guest quick analysis gets evidence depth without login or AI quota.
+- Actual history and deterministic moving averages remain visibly separate from forecast/model copy.
+- Public source failures degrade without raw errors or secret disclosure.
+- Mobile layout and range controls remain stable and do not widen the page.
 - Review private-response generation and `userId` checks together; either check alone is insufficient during logout or account switching.
 - Review current-plan limits at both listing and execution, same-user local write serialization, source URL deduplication, finite numeric validation, CSRF, and delete-rate limiting.

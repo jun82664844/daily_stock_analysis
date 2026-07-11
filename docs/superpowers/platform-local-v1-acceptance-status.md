@@ -479,3 +479,13 @@ git diff --check
 - Failed logout confirmation is contained locally: private UI state and busy flags are cleared, the raw error is not exposed, and the active interface language receives a refresh/session warning.
 - The verifier prints `DSA_PLATFORM_WATCHLIST_ALERT_LOOP_V100_OK` only after its required local checks pass.
 - V100 remains local-only. It is not public launch approval, real payment, production deployment, production key handling, market-data licensing approval, or investment advice.
+
+## 2026-07-11 V101 Free Historical Trend Research Acceptance
+
+- Guest quick analysis now lazy-loads a free historical trend panel backed by the existing public daily-history endpoint; lookup mode remains lightweight and does not load the panel.
+- Users can switch among 30, 90, 180, and 365-day ranges and inspect actual close, MA5, MA20, volume, range return, high/low, maximum drawdown, source, and deterministic next-check conditions.
+- The panel does not require login, call AI, consume platform/BYOK/local-model quota, or enable public search.
+- Chinese and English loading, usable-data, empty-data, and failure states are covered; raw provider errors are not rendered.
+- Existing quick-snapshot close points render immediately while full OHLCV history loads; if the secondary history source fails, the close-only chart remains visible with a degradation label.
+- The verifier prints `DSA_PLATFORM_FREE_KLINE_RESEARCH_V101_OK` only after API, component, HomePage integration, and production-build checks pass.
+- V101 remains local-only and uses public/local market data that may be delayed or incomplete. It is not production market-data licensing approval or investment advice.

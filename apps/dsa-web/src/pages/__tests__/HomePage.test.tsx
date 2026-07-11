@@ -69,6 +69,7 @@ vi.mock('../../api/stocks', () => ({
     parseImport: vi.fn(),
     prewarm: vi.fn(),
     kronosForecast: vi.fn(),
+    history: vi.fn(),
     snapshot: vi.fn(),
   },
 }));
@@ -404,6 +405,22 @@ describe('HomePage', () => {
       aiUsed: false,
     });
     vi.mocked(analysisApi.getTaskFlow).mockResolvedValue(runFlowSnapshot);
+    vi.mocked(stocksApi.history).mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      period: 'daily',
+      source: 'yahoo_chart_history',
+      data: Array.from({ length: 30 }, (_, index) => ({
+        date: `2026-06-${String(index + 1).padStart(2, '0')}`,
+        open: 100 + index,
+        high: 103 + index,
+        low: 98 + index,
+        close: 101 + index,
+        volume: 1_000_000 + index * 20_000,
+        amount: null,
+        changePercent: index === 0 ? 0 : 0.8,
+      })),
+    });
     vi.mocked(stocksApi.prewarm).mockResolvedValue({
       requested: 4,
       warmed: 0,
@@ -2967,6 +2984,8 @@ describe('HomePage', () => {
     expect(await screen.findByTestId('basic-query-primary-summary')).toHaveTextContent('贵州茅台');
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
     expect(screen.getByTestId('basic-query-mode-banner')).toHaveTextContent('未用 AI');
+    expect(await screen.findByTestId('free-kline-research-v101')).toHaveTextContent('免费历史走势研究台');
+    expect(stocksApi.history).toHaveBeenCalledWith('600519', 90);
     expect(screen.queryByText('Login required')).not.toBeInTheDocument();
   });
 

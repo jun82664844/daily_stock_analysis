@@ -1772,3 +1772,33 @@ Acceptance boundary:
 - Current-plan caps, source URL deduplication, soft-delete history integrity, finite numeric validation, CSRF, and delete-rate limiting are covered by deterministic regression tests.
 - Same-user radar runs, rule saves, and rule disables are serialized inside the local process; bounded A-share/HK symbol variants preserve persisted-source matching. Multi-worker database coordination remains a production boundary.
 - Logout failure is handled without an unhandled rejection: local private state and busy flags are cleared and a localized session-verification warning is shown.
+
+## V101 Free Historical Trend Research Manifest Addendum
+
+Status: local-only guest-visible historical evidence panel. No production launch approval.
+
+New/updated files:
+
+- `.gitignore`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/components/research/FreeKlineResearchV101.tsx`
+- `apps/dsa-web/src/components/research/__tests__/FreeKlineResearchV101.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_free_kline_research_v101.py`
+- `tests/test_platform_free_kline_research_v101_verifier.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v101-free-kline-research.md`
+
+Acceptance boundary:
+
+- Free quick analysis renders actual historical price, moving-average, volume, range, drawdown, source, and next-check evidence without requiring login.
+- Range switching is bounded to 30/90/180/365 days and remains no-AI/no-public-search.
+- Actual history is not described as model prediction; Kronos forecast remains a separate experimental section.
+- Public source failures remain visible and sanitized. No raw provider error, real API key, payment, deployment, or market-data licensing approval is introduced.
+- Snapshot close history provides an immediate, explicitly close-only fallback while the full range loads; background failure must not blank an already useful chart.

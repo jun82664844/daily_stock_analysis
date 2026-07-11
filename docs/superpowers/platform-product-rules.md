@@ -218,3 +218,13 @@
 - V100 local writes serialize same-user radar runs, rule saves, and rule disables inside the single local application process; multi-worker production coordination remains outside the local-only scope.
 - Persisted symbol-scoped sources are checked through bounded A-share and HK code variants such as `600519.SH`, `SH600519`, `HK00700`, and `00700.HK` before the name fallback is used.
 - V100 remains local-only, no-AI by default, informational analysis only, and not investment advice. It does not approve real payment, production keys, deployment, or market-data licensing.
+
+## Free Historical Trend Research V101
+
+- Guest and signed-in users may open the same free historical trend research panel from quick analysis without consuming AI quota.
+- The panel reads the existing public daily-history endpoint and supports bounded 30, 90, 180, and 365-day ranges. Range changes must not submit AI analysis or public search.
+- Visible evidence includes actual close history, MA5, MA20, volume, range return, high/low, maximum drawdown, source label, and deterministic next-check conditions.
+- The panel must distinguish actual historical data from Kronos/local-rule forecast scenarios. It must not call moving-average rules a model prediction.
+- Empty, incomplete, or failed public history sources degrade visibly without exposing raw provider exceptions, credentials, headers, or internal stack traces.
+- When the quick snapshot already contains a bounded close-price trend, the panel renders that evidence immediately while the full selected range refreshes. A failed full-history refresh must keep the snapshot evidence visible and label it as close-only degraded data.
+- Chinese and English copy must remain complete, the mobile panel must not introduce horizontal overflow, and all output remains informational analysis only, not investment advice.

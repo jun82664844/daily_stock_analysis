@@ -13,6 +13,25 @@ export type ExtractFromImageResponse = {
   rawText?: string;
 };
 
+export type StockHistoryPoint = {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number | null;
+  amount?: number | null;
+  changePercent?: number | null;
+};
+
+export type StockHistoryResponse = {
+  stockCode: string;
+  stockName?: string | null;
+  period: string;
+  source?: string | null;
+  data: StockHistoryPoint[];
+};
+
 export type BasicStockSnapshot = {
   stockCode: string;
   stockName?: string | null;
@@ -422,6 +441,14 @@ export type MarketSourceRecoveryResponse = {
 };
 
 export const stocksApi = {
+  async history(code: string, days = 90): Promise<StockHistoryResponse> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/stocks/${encodeURIComponent(code)}/history`,
+      { params: { period: 'daily', days } },
+    );
+    return toCamelCase<StockHistoryResponse>(response.data);
+  },
+
   async snapshot(code: string, options?: BasicSnapshotOptions): Promise<BasicStockSnapshot> {
     const params = new URLSearchParams();
     if (options?.refresh) params.set('refresh', 'true');

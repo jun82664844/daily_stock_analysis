@@ -46,6 +46,8 @@ const LazyReportMarkdownDrawer = lazy(() => import('../components/report/ReportM
   .then((module) => ({ default: module.ReportMarkdownDrawer })));
 const LazyRunFlowPanel = lazy(() => import('../components/run-flow/RunFlowPanel')
   .then((module) => ({ default: module.RunFlowPanel })));
+const LazyFreeKlineResearchV101 = lazy(() => import('../components/research/FreeKlineResearchV101')
+  .then((module) => ({ default: module.FreeKlineResearchV101 })));
 
 const LazyFeatureFallback: React.FC<{ className?: string }> = ({ className = 'min-h-24' }) => (
   <div
@@ -8527,6 +8529,16 @@ const HomePage: React.FC = () => {
                           </span>
                         </div>
                       </div>
+                    ) : null}
+                    {basicSnapshotViewMode === 'quick' ? (
+                      <Suspense fallback={<LazyFeatureFallback className="mb-3 min-h-[22rem]" />}>
+                        <LazyFreeKlineResearchV101
+                          stockCode={basicSnapshot.stockCode}
+                          stockName={basicSnapshot.stockName}
+                          language={uiLanguage}
+                          initialTrend={basicSnapshot.trend}
+                        />
+                      </Suspense>
                     ) : null}
                     {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.klineForecast ? (
                       <div

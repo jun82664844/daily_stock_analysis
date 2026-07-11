@@ -138,6 +138,36 @@ describe('stocksApi', () => {
     expect(result.aiUsed).toBe(false);
   });
 
+  it('loads public historical K-line data for the free research chart', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: 'AAPL',
+        stock_name: 'Apple Inc.',
+        period: 'daily',
+        source: 'yahoo_chart_history',
+        data: [{
+          date: '2026-07-10',
+          open: 200,
+          high: 205,
+          low: 198,
+          close: 204,
+          volume: 123456,
+          amount: 25000000,
+          change_percent: 2,
+        }],
+      },
+    });
+
+    const result = await stocksApi.history('AAPL', 90);
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/AAPL/history', {
+      params: { period: 'daily', days: 90 },
+    });
+    expect(result.stockCode).toBe('AAPL');
+    expect(result.source).toBe('yahoo_chart_history');
+    expect(result.data[0]).toMatchObject({ close: 204, changePercent: 2 });
+  });
+
   it('loads A-share enrichment channels as camelCase snapshot data', async () => {
     get.mockResolvedValueOnce({
       data: {

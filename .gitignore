@@ -136,6 +136,7 @@ verify_*.py
 !scripts/verify_platform_free_broker_conversion_v73.py
 !scripts/verify_platform_watchlist_event_radar_v99.py
 !scripts/verify_platform_watchlist_alert_loop_v100.py
+!scripts/verify_platform_free_kline_research_v101.py
 
 # ignore Claude workspace artifacts, but keep shared repo skills versioned
 .claude/*
