@@ -489,3 +489,15 @@ git diff --check
 - Existing quick-snapshot close points render immediately while full OHLCV history loads; if the secondary history source fails, the close-only chart remains visible with a degradation label.
 - The verifier prints `DSA_PLATFORM_FREE_KLINE_RESEARCH_V101_OK` only after API, component, HomePage integration, and production-build checks pass.
 - V101 remains local-only and uses public/local market data that may be delayed or incomplete. It is not production market-data licensing approval or investment advice.
+
+## 2026-07-11 V102 A-share Free Query Speed Acceptance
+
+- The five optional A-share enrichment channels now run concurrently instead of serially; the default total enrichment wait is bounded to 1.5 seconds.
+- Deterministic tests prove parallel completion, total-budget degradation, immediate timeout-cache reuse, cross-request default-adapter cache reuse, stable channel order, and no-AI/no-public-search boundaries.
+- A real local service-layer probe for 600519 measured about 1.5 seconds for the first enrichment and about 0.001 seconds for the immediate repeated enrichment with five cache hits.
+- After restarting 8018 with the final code, a direct HTTP cold request measured 4.405 seconds while public quote/history sources were probed; the immediate repeat measured 0.807 seconds after source-health cooldown and cache reuse. The response kept stale quote/history warnings visible.
+- Fresh browser acceptance on `/?dsa_v102_cold_acceptance=1` measured 1.604 seconds for the free 600519 quote view and 0.281 seconds to expand the complete free research board. The page visibly retained A-share enrichment, the historical K-line research board, no-AI status, and the untouched `5/5` platform-API trial quota, with no load/service/run-failure banner.
+- Optional A-share peer/reference quotes now honor source-health cooldown, so an already cooling market source no longer adds another bounded timeout to repeated free snapshots.
+- Slow or unavailable public sources remain channel-level degradation. Quote/history evidence and completed channels are not discarded, and cached timeout results are not labeled fresh.
+- The verifier prints `DSA_PLATFORM_A_SHARE_FREE_QUERY_SPEED_V102_OK` only after required-file, source-contract, git-visibility, and focused regression checks pass.
+- V102 remains local-only. It does not approve real payment, production deployment, production keys, market-data licensing, or investment advice.

@@ -1,10 +1,116 @@
 # -*- coding: utf-8 -*-
 import sys
+import time
 import unittest
 from unittest.mock import patch
 
 
 class AShareEnrichmentServiceTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        AShareEnrichmentService.clear_shared_state_for_tests()
+
+    def test_a_stock_data_channels_run_concurrently_within_one_budget(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        calls: list[str] = []
+
+        def slow_http_get(url: str, *, params=None, headers=None, timeout=None):
+            calls.append(url)
+            time.sleep(0.15)
+            return {"checked": True, "items": [{"title": url}]}
+
+        service = AShareEnrichmentService(
+            http_get=slow_http_get,
+            source_mode="a_stock_data",
+            timeout_seconds=0.5,
+            total_timeout_seconds=1.0,
+            min_interval_seconds=0,
+        )
+
+        started = time.perf_counter()
+        payload = service.get_enrichment("600519")
+        elapsed = time.perf_counter() - started
+
+        self.assertLess(elapsed, 0.45)
+        self.assertEqual(len(calls), 5)
+        self.assertEqual(payload["diagnostics"]["execution"]["mode"], "parallel")
+        self.assertEqual(payload["diagnostics"]["execution"]["timed_out_channels"], [])
+
+    def test_a_stock_data_total_budget_degrades_only_unfinished_channels(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        now = [1000.0]
+
+        def budget_http_get(url: str, *, params=None, headers=None, timeout=None):
+            if url.endswith("/research"):
+                time.sleep(0.6)
+            else:
+                time.sleep(0.01)
+            return {"checked": True, "items": [{"title": url}]}
+
+        service = AShareEnrichmentService(
+            http_get=budget_http_get,
+            source_mode="a_stock_data",
+            timeout_seconds=1.0,
+            total_timeout_seconds=0.08,
+            min_interval_seconds=0,
+            time_provider=lambda: now[0],
+        )
+
+        started = time.perf_counter()
+        payload = service.get_enrichment("600519")
+        elapsed = time.perf_counter() - started
+
+        self.assertLess(elapsed, 0.3)
+        self.assertEqual(payload["status"], "degraded")
+        self.assertEqual(payload["diagnostics"]["execution"]["timed_out_channels"], ["research"])
+        self.assertEqual(payload["diagnostics"]["errors"]["research"], "total_timeout")
+        by_category = {item["category"]: item for item in payload["channels"]}
+        self.assertEqual(by_category["research"]["status"], "degraded")
+        self.assertEqual(by_category["announcements"]["status"], "available")
+
+        repeat_started = time.perf_counter()
+        repeat = service.get_enrichment("600519")
+        repeat_elapsed = time.perf_counter() - repeat_started
+        self.assertLess(repeat_elapsed, 0.05)
+        self.assertGreaterEqual(repeat["diagnostics"]["cache"]["hits"], 1)
+        self.assertEqual(repeat["status"], "degraded")
+        self.assertEqual(repeat["diagnostics"]["errors"]["research"], "cached_total_timeout")
+
+        now[0] = 1016.0
+        expired = service.get_enrichment("600519")
+        self.assertEqual(expired["diagnostics"]["execution"]["timed_out_channels"], ["research"])
+        self.assertGreaterEqual(expired["diagnostics"]["cache"]["misses"], 1)
+
+    def test_default_adapter_cache_is_reused_across_request_scoped_instances(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        calls: list[str] = []
+
+        def fake_default_http_get(self, url: str, *, params=None, headers=None, timeout=None):
+            calls.append(url)
+            return {"checked": True, "items": [{"title": url}]}
+
+        with patch.object(AShareEnrichmentService, "_default_http_get", fake_default_http_get):
+            first = AShareEnrichmentService(
+                source_mode="a_stock_data",
+                http_enabled=True,
+                cache_ttl_seconds=300,
+                min_interval_seconds=0,
+            ).get_enrichment("600999")
+            second = AShareEnrichmentService(
+                source_mode="a_stock_data",
+                http_enabled=True,
+                cache_ttl_seconds=300,
+                min_interval_seconds=0,
+            ).get_enrichment("600999")
+
+        self.assertEqual(first["diagnostics"]["cache"]["hits"], 0)
+        self.assertEqual(second["diagnostics"]["cache"]["hits"], 5)
+        self.assertEqual(len(calls), 5)
+
     def test_builds_useful_quick_reference_when_external_lanes_are_disabled(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService
 
@@ -173,6 +279,7 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
 
         self.assertEqual(poc.timeout_seconds, 1.2)
         self.assertEqual(real.timeout_seconds, 2.5)
+        self.assertEqual(real.total_timeout_seconds, 1.5)
 
     def test_a_stock_data_source_mode_reuses_stale_cache_during_rate_limit(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService

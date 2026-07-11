@@ -228,3 +228,14 @@
 - Empty, incomplete, or failed public history sources degrade visibly without exposing raw provider exceptions, credentials, headers, or internal stack traces.
 - When the quick snapshot already contains a bounded close-price trend, the panel renders that evidence immediately while the full selected range refreshes. A failed full-history refresh must keep the snapshot evidence visible and label it as close-only degraded data.
 - Chinese and English copy must remain complete, the mobile panel must not introduce horizontal overflow, and all output remains informational analysis only, not investment advice.
+
+## A-share Free Query Speed V102
+
+- Free A-share quick analysis keeps the same quote, technical, announcement, fund-flow, sector, research, dragon-tiger, K-line, and risk structure. Performance work must not remove those visible lanes.
+- Announcement, fund-flow, sector, research, and dragon-tiger enrichment requests are independent and run concurrently under one default 1.5-second total budget.
+- A channel that exceeds the total budget degrades independently. The quote, history, technical evidence, and already completed channels must remain available without waiting for every upstream source.
+- A timeout placeholder is cacheable as an explicit degraded result so an immediate repeated query does not wait on the same slow source. A later successful background completion may replace that placeholder.
+- The built-in adapter reuses a process-local TTL cache across request-scoped service instances. Custom or injected adapters remain instance-local by default, preventing unrelated provider state from mixing.
+- Cached timeout placeholders remain visibly degraded through diagnostics and channel status. They must never be presented as fresh source data.
+- Optional peer/reference quote requests must honor the existing source-health cooldown. A cooling source returns an unavailable reference row immediately instead of adding another timeout to the main free snapshot.
+- V102 does not invoke AI, public search, real payment, or production credentials. Public market data may still be delayed or incomplete, and all output remains informational analysis only, not investment advice.

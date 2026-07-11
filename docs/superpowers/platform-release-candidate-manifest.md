@@ -1069,7 +1069,9 @@ New/updated files:
 - `.gitignore`
 - `api/v1/schemas/basic_query.py`
 - `src/services/a_share_enrichment_service.py`
+- `src/services/basic_query_service.py`
 - `tests/test_a_share_enrichment_service.py`
+- `tests/test_platform_market_data_freshness_v92.py`
 - `scripts/verify_platform_a_stock_data_v60.py`
 - `tests/test_platform_a_stock_data_v60.py`
 - `scripts/verify_platform_release_candidate_package.py`
@@ -1802,3 +1804,31 @@ Acceptance boundary:
 - Actual history is not described as model prediction; Kronos forecast remains a separate experimental section.
 - Public source failures remain visible and sanitized. No raw provider error, real API key, payment, deployment, or market-data licensing approval is introduced.
 - Snapshot close history provides an immediate, explicitly close-only fallback while the full range loads; background failure must not blank an already useful chart.
+
+## V102 A-share Free Query Speed Manifest Addendum
+
+Status: local-only A-share public-data performance and degradation hardening. No production launch approval.
+
+New/updated files:
+
+- `.gitignore`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `scripts/verify_platform_a_share_free_query_speed_v102.py`
+- `tests/test_platform_a_share_free_query_speed_v102_verifier.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v102-a-share-free-query-speed.md`
+
+Acceptance boundary:
+
+- The A-share enrichment wait is bounded to 1.5 seconds and independent channels run concurrently while preserving stable response order.
+- Slow channels degrade independently and create explicit short-lived cached timeout evidence; completed background work may replace the placeholder.
+- Cooling peer/reference quote sources are skipped immediately and remain visible as unavailable rows rather than delaying the full snapshot.
+- Process-local cache reuse applies only to the built-in adapter and does not cross source modes.
+- The change remains no-AI, no-public-search, local-only, and non-destructive. It does not enable real payment, production credentials, deployment, market-data licensing approval, or investment advice.

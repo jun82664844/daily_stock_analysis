@@ -1886,6 +1886,13 @@ class BasicQueryService:
                     status="available",
                 )
                 continue
+            source_id = target_route.quote_sources[0]
+            if self.source_health.should_skip(source_id):
+                results[symbol] = self._unavailable_reference_quote_payload(
+                    source=source_id,
+                    error="cooling_down",
+                )
+                continue
             started = time.perf_counter()
             future = _BASIC_QUERY_FETCH_EXECUTOR.submit(self._fetch_reference_quote, target_route.normalized_code)
             pending[future] = (symbol, target_route, started)

@@ -7,8 +7,10 @@ search, no hard dependency on third-party unofficial endpoints.
 
 from __future__ import annotations
 
+import concurrent.futures
 import os
 import re
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,6 +18,14 @@ from typing import Any, Callable, Optional
 
 
 HttpGet = Callable[..., dict[str, Any]]
+
+
+_A_SHARE_ENRICHMENT_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=max(5, int(os.getenv("A_STOCK_DATA_FETCH_MAX_WORKERS", "10")))
+)
+_A_SHARE_ENRICHMENT_SHARED_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
+_A_SHARE_ENRICHMENT_SHARED_LAST_REQUEST_AT: dict[tuple[str, str, str], float] = {}
+_A_SHARE_ENRICHMENT_SHARED_LOCK = threading.RLock()
 
 
 class AShareEnrichmentService:
@@ -32,14 +42,23 @@ class AShareEnrichmentService:
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DSA-local-a-stock-data/1.0"
     _CNINFO_ORGID_MAP: dict[str, str] = {}
 
+    @classmethod
+    def clear_shared_state_for_tests(cls) -> None:
+        """Reset process-local adapter state between isolated tests."""
+        with _A_SHARE_ENRICHMENT_SHARED_LOCK:
+            _A_SHARE_ENRICHMENT_SHARED_CACHE.clear()
+            _A_SHARE_ENRICHMENT_SHARED_LAST_REQUEST_AT.clear()
+
     def __init__(
         self,
         *,
         http_get: Optional[HttpGet] = None,
         timeout_seconds: Optional[float] = None,
+        total_timeout_seconds: Optional[float] = None,
         http_enabled: Optional[bool] = None,
         source_mode: Optional[str] = None,
         cache_ttl_seconds: Optional[float] = None,
+        timeout_cache_ttl_seconds: Optional[float] = None,
         min_interval_seconds: Optional[float] = None,
         skill_root: Optional[str] = None,
         skill_revision: Optional[str] = None,
@@ -51,12 +70,29 @@ class AShareEnrichmentService:
             0.1,
             float(timeout_seconds or os.getenv("A_STOCK_DATA_POC_TIMEOUT_SEC", default_timeout)),
         )
+        default_total_timeout = "1.5"
+        self.total_timeout_seconds = max(
+            0.1,
+            float(
+                total_timeout_seconds
+                if total_timeout_seconds is not None
+                else os.getenv("A_STOCK_DATA_TOTAL_TIMEOUT_SEC", default_total_timeout)
+            ),
+        )
         self.cache_ttl_seconds = max(
             0.0,
             float(
                 cache_ttl_seconds
                 if cache_ttl_seconds is not None
                 else os.getenv("A_STOCK_DATA_CACHE_TTL_SEC", "600")
+            ),
+        )
+        self.timeout_cache_ttl_seconds = max(
+            0.0,
+            float(
+                timeout_cache_ttl_seconds
+                if timeout_cache_ttl_seconds is not None
+                else os.getenv("A_STOCK_DATA_TIMEOUT_CACHE_TTL_SEC", "15")
             ),
         )
         self.min_interval_seconds = max(
@@ -73,8 +109,6 @@ class AShareEnrichmentService:
         )
         self.skill_revision = skill_revision or os.getenv("A_STOCK_DATA_SKILL_REVISION") or self._detect_skill_revision()
         self._time_provider = time_provider or time.monotonic
-        self._cache: dict[tuple[str, str], dict[str, Any]] = {}
-        self._last_request_at: dict[tuple[str, str], float] = {}
         enabled = http_enabled
         if enabled is None:
             enabled = (
@@ -86,6 +120,15 @@ class AShareEnrichmentService:
             self.http_get = None
         else:
             self.http_get = http_get if http_get is not None else (self._default_http_get if enabled else None)
+        use_shared_default_cache = http_get is None and enabled and self.source_mode != "off"
+        if use_shared_default_cache:
+            self._cache = _A_SHARE_ENRICHMENT_SHARED_CACHE
+            self._last_request_at = _A_SHARE_ENRICHMENT_SHARED_LAST_REQUEST_AT
+            self._state_lock = _A_SHARE_ENRICHMENT_SHARED_LOCK
+        else:
+            self._cache: dict[tuple[str, str, str], dict[str, Any]] = {}
+            self._last_request_at: dict[tuple[str, str, str], float] = {}
+            self._state_lock = threading.RLock()
 
     def get_enrichment(
         self,
@@ -101,8 +144,7 @@ class AShareEnrichmentService:
         errors: dict[str, str] = {}
         diagnostics: dict[str, Any] = self._new_diagnostics(errors)
 
-        for channel in self.CHANNELS:
-            fetched[channel] = self._fetch_channel(channel, code=code, errors=errors, diagnostics=diagnostics)
+        fetched.update(self._fetch_channels(code=code, errors=errors, diagnostics=diagnostics))
 
         has_external_data = any(self._has_external_payload(fetched.get(channel)) for channel in self.CHANNELS)
         if not has_external_data:
@@ -171,6 +213,102 @@ class AShareEnrichmentService:
             "boundary": "Information analysis only; not investment advice.",
         }
 
+    def _fetch_channels(
+        self,
+        *,
+        code: str,
+        errors: dict[str, str],
+        diagnostics: dict[str, Any],
+    ) -> dict[str, dict[str, Any] | None]:
+        started = time.perf_counter()
+        if self.http_get is None:
+            diagnostics["execution"]["elapsed_ms"] = 0
+            return {channel: None for channel in self.CHANNELS}
+
+        futures = {
+            channel: _A_SHARE_ENRICHMENT_EXECUTOR.submit(self._fetch_channel_isolated, channel, code)
+            for channel in self.CHANNELS
+        }
+        done, pending = concurrent.futures.wait(
+            futures.values(),
+            timeout=self.total_timeout_seconds,
+        )
+        fetched: dict[str, dict[str, Any] | None] = {}
+        completed_channels: list[str] = []
+        timed_out_channels: list[str] = []
+        for channel in self.CHANNELS:
+            future = futures[channel]
+            if future in pending:
+                future.cancel()
+                fetched[channel] = None
+                errors[channel] = "total_timeout"
+                timed_out_channels.append(channel)
+                diagnostics["cache"]["misses"] += 1
+                self._cache_total_timeout(channel=channel, code=code)
+                continue
+            try:
+                payload, channel_error, channel_diagnostics = future.result()
+            except Exception as exc:
+                payload = None
+                channel_error = type(exc).__name__
+                channel_diagnostics = self._new_diagnostics({})
+            fetched[channel] = payload
+            completed_channels.append(channel)
+            if channel_error:
+                errors[channel] = channel_error
+            self._merge_channel_diagnostics(diagnostics, channel_diagnostics)
+
+        diagnostics["execution"].update(
+            {
+                "elapsed_ms": max(0, int(round((time.perf_counter() - started) * 1000))),
+                "completed_channels": completed_channels,
+                "timed_out_channels": timed_out_channels,
+            }
+        )
+        return fetched
+
+    def _cache_total_timeout(self, *, channel: str, code: str) -> None:
+        cache_key = (self.source_mode, channel, code)
+        placeholder = {
+            "checked": True,
+            "items": [],
+            "error": "total_timeout",
+        }
+        with self._state_lock:
+            cached = self._cache.get(cache_key)
+            if not self._cache_is_fresh(cached, self._time_provider()):
+                self._cache[cache_key] = {
+                    "payload": placeholder,
+                    "fetched_at": self._time_provider(),
+                    "ttl_seconds": self.timeout_cache_ttl_seconds,
+                }
+
+    def _fetch_channel_isolated(
+        self,
+        channel: str,
+        code: str,
+    ) -> tuple[dict[str, Any] | None, str | None, dict[str, Any]]:
+        channel_errors: dict[str, str] = {}
+        channel_diagnostics = self._new_diagnostics(channel_errors)
+        payload = self._fetch_channel(
+            channel,
+            code=code,
+            errors=channel_errors,
+            diagnostics=channel_diagnostics,
+        )
+        return payload, channel_errors.get(channel), channel_diagnostics
+
+    def _merge_channel_diagnostics(
+        self,
+        target: dict[str, Any],
+        channel_diagnostics: dict[str, Any],
+    ) -> None:
+        target_cache = target["cache"]
+        channel_cache = channel_diagnostics.get("cache") or {}
+        for key in ("hits", "stale_hits", "misses"):
+            target_cache[key] += int(channel_cache.get(key) or 0)
+        target["rate_limited_channels"].extend(channel_diagnostics.get("rate_limited_channels") or [])
+
     def _fetch_channel(
         self,
         channel: str,
@@ -182,25 +320,29 @@ class AShareEnrichmentService:
         if self.http_get is None:
             return None
         now = self._time_provider()
-        cache_key = (channel, code)
-        cached = self._cache.get(cache_key)
-        if self._cache_is_fresh(cached, now):
-            diagnostics["cache"]["hits"] += 1
-            return cached["payload"]
-        last_request_at = self._last_request_at.get(cache_key)
-        if (
-            self.min_interval_seconds > 0
-            and last_request_at is not None
-            and now - last_request_at < self.min_interval_seconds
-        ):
-            diagnostics["rate_limited_channels"].append(channel)
-            if cached is not None:
-                diagnostics["cache"]["stale_hits"] += 1
-                return cached["payload"]
-            errors[channel] = "rate_limited"
-            return None
-        diagnostics["cache"]["misses"] += 1
-        self._last_request_at[cache_key] = now
+        cache_key = (self.source_mode, channel, code)
+        with self._state_lock:
+            cached = self._cache.get(cache_key)
+            if self._cache_is_fresh(cached, now):
+                diagnostics["cache"]["hits"] += 1
+                payload = cached["payload"]
+                if isinstance(payload, dict) and payload.get("error") == "total_timeout":
+                    errors[channel] = "cached_total_timeout"
+                return payload
+            last_request_at = self._last_request_at.get(cache_key)
+            if (
+                self.min_interval_seconds > 0
+                and last_request_at is not None
+                and now - last_request_at < self.min_interval_seconds
+            ):
+                diagnostics["rate_limited_channels"].append(channel)
+                if cached is not None:
+                    diagnostics["cache"]["stale_hits"] += 1
+                    return cached["payload"]
+                errors[channel] = "rate_limited"
+                return None
+            diagnostics["cache"]["misses"] += 1
+            self._last_request_at[cache_key] = now
         try:
             url = self._channel_url(channel)
             result = self.http_get(
@@ -212,7 +354,8 @@ class AShareEnrichmentService:
             if not isinstance(result, dict):
                 return None
             if self._has_external_payload(result):
-                self._cache[cache_key] = {"payload": result, "fetched_at": now}
+                with self._state_lock:
+                    self._cache[cache_key] = {"payload": result, "fetched_at": self._time_provider()}
             return result
         except Exception as exc:
             errors[channel] = type(exc).__name__
@@ -230,6 +373,13 @@ class AShareEnrichmentService:
             "cache": {"hits": 0, "stale_hits": 0, "misses": 0},
             "rate_limited_channels": [],
             "errors": errors,
+            "execution": {
+                "mode": "disabled" if self.http_get is None else "parallel",
+                "budget_seconds": self.total_timeout_seconds,
+                "elapsed_ms": 0,
+                "completed_channels": [],
+                "timed_out_channels": [],
+            },
         }
 
     def _cache_is_fresh(self, cached: dict[str, Any] | None, now: float) -> bool:
@@ -238,7 +388,10 @@ class AShareEnrichmentService:
         fetched_at = self._float_or_none(cached.get("fetched_at"))
         if fetched_at is None:
             return False
-        return now - fetched_at <= self.cache_ttl_seconds
+        ttl_seconds = self._float_or_none(cached.get("ttl_seconds"))
+        if ttl_seconds is None:
+            ttl_seconds = self.cache_ttl_seconds
+        return now - fetched_at <= max(0.0, ttl_seconds)
 
     def _skill_metadata(self) -> dict[str, Any]:
         root = Path(self.skill_root)

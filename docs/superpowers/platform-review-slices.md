@@ -1531,5 +1531,41 @@ Review focus:
 - Actual history and deterministic moving averages remain visibly separate from forecast/model copy.
 - Public source failures degrade without raw errors or secret disclosure.
 - Mobile layout and range controls remain stable and do not widen the page.
+
+## V102 A-share Free Query Speed Addendum
+
+Scope: local-only A-share free-query latency and source-resilience hardening.
+
+Backend platform foundation:
+
+- `src/services/a_share_enrichment_service.py`
+- `src/services/basic_query_service.py`
+
+Tests and verifiers:
+
+- `tests/test_a_share_enrichment_service.py`
+- `tests/test_platform_market_data_freshness_v92.py`
+- `tests/test_platform_a_share_free_query_speed_v102_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `scripts/verify_platform_a_share_free_query_speed_v102.py`
+- `scripts/verify_platform_release_candidate_package.py`
+
+Docs and config:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v102-a-share-free-query-speed.md`
+
+Review focus:
+
+- Five independent public-data channels execute in stable output order under one bounded parallel budget.
+- Budget expiration returns promptly and remains explicitly degraded, including on a cached repeat response.
+- A cooling reference-quote source is skipped without removing the visible comparison row.
+- Only the built-in adapter shares cache across request-scoped instances; injected/custom adapters retain isolated state.
+- No AI quota, public search, real payment, production key, deployment, user-data deletion, or fabricated freshness is introduced.
 - Review private-response generation and `userId` checks together; either check alone is insufficient during logout or account switching.
 - Review current-plan limits at both listing and execution, same-user local write serialization, source URL deduplication, finite numeric validation, CSRF, and delete-rate limiting.

@@ -89,6 +89,22 @@ class PlatformMarketDataFreshnessV92TestCase(unittest.TestCase):
         self.assertEqual(result[6], "cache")
         stock_service.get_realtime_quote.assert_not_called()
 
+    def test_reference_quote_skips_a_source_that_is_already_cooling_down(self) -> None:
+        health = MarketSourceHealthRegistry(failure_threshold=1, cooling_seconds=60)
+        health.record_timeout("a_share_realtime", elapsed_ms=600)
+        service = BasicQueryService(
+            stock_service=MagicMock(),
+            cache=MarketDataCache(default_ttl_seconds=60),
+            source_health=health,
+        )
+
+        with patch.object(service, "_fetch_reference_quote") as fetch_reference:
+            payloads = service._reference_quote_payloads_for_targets([{"symbol": "000300.SH"}])
+
+        fetch_reference.assert_not_called()
+        self.assertEqual(payloads["000300.SH"]["status"], "unavailable")
+        self.assertEqual(payloads["000300.SH"]["error"], "cooling_down")
+
     def test_stale_quote_history_and_profile_are_revalidated_by_live_sources(self) -> None:
         cache = MarketDataCache(default_ttl_seconds=0)
         cache.set("quote:AAPL", _quote(100.0, source="cached_quote"), source="cached_quote")
