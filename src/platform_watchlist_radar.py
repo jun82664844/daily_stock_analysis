@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
+from data_provider.base import is_bse_code
 from src.platform_watchlist import PlatformWatchlistService
 from src.services.intelligence_service import IntelligenceService
 
@@ -155,21 +156,47 @@ class PlatformWatchlistRadarService:
 
     def _source_events(self, row: Dict[str, Any]) -> tuple[List[Dict[str, Any]], str]:
         stock_code = str(row.get("stock_code") or "")
-        try:
-            payload = self.intelligence_service.list_items(
-                scope_type="stock",
-                scope_value=stock_code,
-                published_days=7,
-                page=1,
-                page_size=5,
-            )
-        except Exception:
-            return [], "source_unavailable"
+        stock_name = str(row.get("stock_name") or "").strip()
+        market = str(row.get("market") or "").strip()
+        raw_items: List[Dict[str, Any]] = []
+        source_failed = False
+        for scope_value in self._symbol_scope_values(stock_code, market):
+            try:
+                payload = self.intelligence_service.list_items(
+                    scope_type="symbol",
+                    scope_value=scope_value,
+                    published_days=7,
+                    page=1,
+                    page_size=5,
+                )
+            except Exception:
+                source_failed = True
+            else:
+                raw_items.extend(item for item in payload.get("items") or [] if isinstance(item, dict))
+
+        if stock_name and stock_name.upper() != stock_code.upper():
+            try:
+                payload = self.intelligence_service.list_items(
+                    market=market or None,
+                    query=stock_name,
+                    published_days=7,
+                    page=1,
+                    page_size=5,
+                )
+            except Exception:
+                source_failed = True
+            else:
+                raw_items.extend(item for item in payload.get("items") or [] if isinstance(item, dict))
 
         events: List[Dict[str, Any]] = []
-        for item in payload.get("items") or []:
-            if not isinstance(item, dict) or not self._is_traceable_source(item):
+        seen_urls: set[str] = set()
+        for item in raw_items:
+            if not self._is_traceable_source(item):
                 continue
+            source_url = str(item.get("url") or "").strip()
+            if source_url in seen_urls:
+                continue
+            seen_urls.add(source_url)
             source_name = str(item.get("source_name") or item.get("source") or "").strip()
             events.append(
                 self._event(
@@ -180,11 +207,60 @@ class PlatformWatchlistRadarService:
                     title=str(item.get("title") or "").strip(),
                     summary=str(item.get("summary") or "").strip() or None,
                     source_name=source_name,
-                    source_url=str(item.get("url") or "").strip(),
+                    source_url=source_url,
                     occurred_at=item.get("published_at") or item.get("fetched_at"),
                 )
             )
-        return events, "available" if events else "no_traceable_source"
+        if events:
+            return events, "available"
+        return [], "source_unavailable" if source_failed else "no_traceable_source"
+
+    @staticmethod
+    def _symbol_scope_values(stock_code: str, market: str) -> List[str]:
+        raw = str(stock_code or "").strip()
+        normalized_market = str(market or "").strip().lower()
+        values: List[str] = []
+        seen: set[str] = set()
+
+        def add(value: str) -> None:
+            text = str(value or "").strip()
+            if text and text not in seen:
+                seen.add(text)
+                values.append(text)
+
+        def add_cases(value: str) -> None:
+            add(value)
+            add(value.upper())
+            add(value.lower())
+
+        add_cases(raw)
+        upper = raw.upper()
+        if normalized_market == "hk" or upper.startswith("HK") or upper.endswith(".HK"):
+            digits = upper.removeprefix("HK").removesuffix(".HK")
+            if digits.isdigit():
+                padded = digits.zfill(5)
+                trimmed = padded.lstrip("0") or "0"
+                for value in (padded, trimmed, f"HK{padded}", f"HK{trimmed}", f"{padded}.HK", f"{trimmed}.HK"):
+                    add_cases(value)
+            return values
+
+        if normalized_market == "cn":
+            digits = upper
+            for prefix in ("SH", "SS", "SZ", "BJ"):
+                digits = digits.removeprefix(prefix).removeprefix(".")
+            for suffix in (".SH", ".SS", ".SZ", ".BJ"):
+                digits = digits.removesuffix(suffix)
+            if digits.isdigit() and len(digits) == 6:
+                if is_bse_code(digits):
+                    exchange = "BJ"
+                else:
+                    exchange = "SH" if digits.startswith(("5", "6", "9")) else "SZ"
+                for value in (digits, f"{exchange}{digits}", f"{exchange}.{digits}", f"{digits}.{exchange}"):
+                    add_cases(value)
+                if exchange == "SH":
+                    add_cases(f"SS.{digits}")
+                    add_cases(f"{digits}.SS")
+        return values
 
     def _suggested_alerts(self, row: Dict[str, Any]) -> List[Dict[str, Any]]:
         stock_code = str(row.get("stock_code") or "")

@@ -1729,3 +1729,46 @@ Acceptance boundary:
 - Only persisted items with traceable HTTP(S) sources can become source events; failures degrade without provider error disclosure.
 - Suggested alerts are not persisted into the global alert table until platform-user ownership exists.
 - No real payment, production key, production deployment, data-license approval, user-data deletion, or investment advice is introduced.
+
+## V100 Private Watchlist Alert Loop Manifest Addendum
+
+Status: local-only private alert and saved daily-review workflow. No production launch approval.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/platform.py`
+- `src/platform_watchlist_automation.py`
+- `src/platform_watchlist_radar.py`
+- `src/storage.py`
+- `tests/test_platform_watchlist_alert_loop_v100.py`
+- `tests/test_platform_watchlist_alert_loop_v100_verifier.py`
+- `tests/test_platform_security_boundaries.py`
+- `tests/test_platform_watchlist_event_radar_v99.py`
+- `scripts/verify_platform_watchlist_alert_loop_v100.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/radar/WatchlistAlertLoopV100.tsx`
+- `apps/dsa-web/src/components/radar/WatchlistEventRadarV99.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistAlertLoopV100.test.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistEventRadarV99.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v100-watchlist-alert-loop.md`
+
+Acceptance boundary:
+
+- Radar runs, alert rules, and trigger events are scoped to the signed-in user and use deliberately cropped no-secret payloads.
+- Free and paid plans share the complete experience; enabled alert limits are 3 and 50, and radar processing limits remain 10 and 50.
+- MA20 alerts require a previous saved baseline and a true side crossing; traceable source alerts require a persisted HTTP(S) link.
+- The workflow remains no-AI by default and does not enable public search, feed ingestion, real payment, production keys, deployment, or investment advice.
+- Session-generation plus `userId` guards prevent stale or cross-user private responses from reaching HomePage state.
+- Current-plan caps, source URL deduplication, soft-delete history integrity, finite numeric validation, CSRF, and delete-rate limiting are covered by deterministic regression tests.
+- Same-user radar runs, rule saves, and rule disables are serialized inside the local process; bounded A-share/HK symbol variants preserve persisted-source matching. Multi-worker database coordination remains a production boundary.
+- Logout failure is handled without an unhandled rejection: local private state and busy flags are cleared and a localized session-verification warning is shown.

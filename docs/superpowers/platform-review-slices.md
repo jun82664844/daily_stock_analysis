@@ -1446,3 +1446,55 @@ Review focus:
 - Source events require a traceable persisted URL and do not promote placeholder text into news.
 - Free/paid differences affect processing capacity only; both plans retain the same information architecture.
 - No AI quota, public search, live feed ingestion, real payment, production key, or user-data deletion is introduced.
+
+## V100 Private Watchlist Alert Loop Addendum
+
+Scope: local-only, user-owned private alerts and persisted daily review history.
+
+Backend platform foundation:
+
+- `src/platform_watchlist_automation.py`
+- `src/platform_watchlist_radar.py`
+- `src/storage.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/platform.py`
+
+Frontend platform experience:
+
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/components/radar/WatchlistAlertLoopV100.tsx`
+- `apps/dsa-web/src/components/radar/WatchlistEventRadarV99.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Tests and verifiers:
+
+- `tests/test_platform_watchlist_alert_loop_v100.py`
+- `tests/test_platform_watchlist_alert_loop_v100_verifier.py`
+- `tests/test_platform_security_boundaries.py`
+- `tests/test_platform_watchlist_event_radar_v99.py`
+- `scripts/verify_platform_watchlist_alert_loop_v100.py`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistAlertLoopV100.test.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistEventRadarV99.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Docs and config:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v100-watchlist-alert-loop.md`
+
+Review focus:
+
+- Every stored rule, alert event, and radar run is owned by the current platform user.
+- First-run MA20 state is a baseline only; crossing requires a previous saved run and a real side change.
+- Same-user run/save/disable writes are serialized locally, and A-share/HK persisted source-code variants are matched deterministically.
+- HomePage rejects stale-generation private writes and cross-user responses, including watchlist and API-key completion paths.
+- Free and paid users share the visible loop; only rule and processing capacity differ.
+- No AI quota, public search, real payment, production key, deployment, or user-data deletion is introduced.
+- Review private-response generation and `userId` checks together; either check alone is insufficient during logout or account switching.
+- Review current-plan limits at both listing and execution, same-user local write serialization, source URL deduplication, finite numeric validation, CSRF, and delete-rate limiting.

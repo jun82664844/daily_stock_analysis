@@ -96,6 +96,11 @@ vi.mock('../../api/platform', () => ({
     removeWatchlistItem: vi.fn(),
     refreshWatchlist: vi.fn(),
     watchlistRadar: vi.fn(),
+    runWatchlistRadar: vi.fn(),
+    watchlistRadarHistory: vi.fn(),
+    watchlistAlertRules: vi.fn(),
+    saveWatchlistAlertRule: vi.fn(),
+    deleteWatchlistAlertRule: vi.fn(),
     saveSnapshotToHistory: vi.fn(),
   },
 }));
@@ -317,6 +322,39 @@ describe('HomePage', () => {
       aiUsed: false,
     });
     vi.mocked(platformApi.watchlistRadar).mockResolvedValue(makeRadarResponse(0, []));
+    vi.mocked(platformApi.runWatchlistRadar).mockResolvedValue({
+      ...makeRadarResponse(0, []),
+      runId: 1,
+      triggeredAlerts: [],
+    });
+    vi.mocked(platformApi.watchlistRadarHistory).mockResolvedValue({ userId: 0, total: 0, items: [], aiUsed: false });
+    vi.mocked(platformApi.watchlistAlertRules).mockResolvedValue({
+      userId: 0,
+      plan: 'free',
+      limit: 3,
+      total: 0,
+      remaining: 3,
+      items: [],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.saveWatchlistAlertRule).mockResolvedValue({
+      userId: 0,
+      plan: 'free',
+      limit: 3,
+      total: 0,
+      remaining: 3,
+      items: [],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.deleteWatchlistAlertRule).mockResolvedValue({
+      userId: 0,
+      plan: 'free',
+      limit: 3,
+      total: 0,
+      remaining: 3,
+      items: [],
+      aiUsed: false,
+    });
     vi.mocked(platformApi.saveSnapshotToHistory).mockResolvedValue({
       recordId: 0,
       stockCode: 'AAPL',
@@ -431,6 +469,152 @@ describe('HomePage', () => {
       nextStepKey: null,
       checks: [],
     });
+  });
+
+  it('does not restore a stale private account load after logout', async () => {
+    let resolveAccount: ((value: Awaited<ReturnType<typeof platformApi.account>>) => void) | undefined;
+    const pendingAccount = new Promise<Awaited<ReturnType<typeof platformApi.account>>>((resolve) => {
+      resolveAccount = resolve;
+    });
+    const session = {
+      user: { id: 71, email: 'race-a@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 71, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-07-06' },
+    };
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(session);
+    vi.mocked(platformApi.account).mockReturnValue(pendingAccount);
+    vi.mocked(platformApi.watchlist).mockResolvedValue({
+      userId: 71,
+      total: 1,
+      items: [{ id: 1, stockCode: 'AAPL', market: 'us' }],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.watchlistRadarHistory).mockResolvedValue({
+      userId: 71,
+      total: 1,
+      items: [{ id: 1, plan: 'free', processed: 1, eventCount: 0, riskCount: 0, sourceEventCount: 0, triggeredCount: 0 }],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.watchlistAlertRules).mockResolvedValue({
+      userId: 71,
+      plan: 'free',
+      limit: 3,
+      total: 1,
+      remaining: 2,
+      items: [{ id: 9, stockCode: 'AAPL', ruleType: 'price_move', threshold: 3, enabled: true }],
+      aiUsed: false,
+    });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    expect(await screen.findByTestId('platform-signed-in-panel')).toHaveTextContent('race-a@example.com');
+    fireEvent.click(screen.getByTestId('platform-logout-button'));
+    await waitFor(() => expect(screen.queryByTestId('platform-signed-in-panel')).not.toBeInTheDocument());
+
+    resolveAccount?.({
+      user: session.user,
+      quota: session.quota,
+      quotaBuckets: [],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+
+    expect(screen.queryByText('race-a@example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('AAPL 涨跌达到 3%')).not.toBeInTheDocument();
+  });
+
+  it('clears private state and reports a localized error when logout confirmation fails', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    const session = {
+      user: { id: 72, email: 'logout-failure@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 72, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-07-06' },
+    };
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(session);
+    vi.mocked(platformApi.account).mockResolvedValue({
+      user: session.user,
+      quota: session.quota,
+      quotaBuckets: [],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    vi.mocked(platformApi.watchlist).mockResolvedValue({ userId: 72, total: 0, items: [], aiUsed: false });
+    vi.mocked(platformApi.watchlistRadarHistory).mockResolvedValue({ userId: 72, total: 0, items: [], aiUsed: false });
+    vi.mocked(platformApi.watchlistAlertRules).mockResolvedValue({
+      userId: 72,
+      plan: 'free',
+      limit: 3,
+      total: 0,
+      remaining: 3,
+      items: [],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.logout).mockRejectedValue(new Error('local logout unavailable'));
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    expect(await screen.findByTestId('platform-signed-in-panel')).toHaveTextContent('logout-failure@example.com');
+    fireEvent.click(screen.getByTestId('platform-logout-button'));
+
+    await waitFor(() => expect(screen.queryByTestId('platform-signed-in-panel')).not.toBeInTheDocument());
+    expect(screen.getByTestId('platform-auth-error')).toHaveTextContent('本地退出确认失败，请刷新页面检查登录状态');
+  });
+
+  it('rejects private watchlist payloads owned by a different session user', async () => {
+    const session = {
+      user: { id: 81, email: 'owner-a@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 81, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-07-06' },
+    };
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(session);
+    vi.mocked(platformApi.account).mockResolvedValue({
+      user: session.user,
+      quota: session.quota,
+      quotaBuckets: [],
+      apiKeys: [],
+      recommendedQueryMode: 'platform',
+    });
+    vi.mocked(platformApi.watchlist).mockResolvedValue({
+      userId: 82,
+      total: 1,
+      items: [{ id: 1, stockCode: 'MSFT', market: 'us' }],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.watchlistRadarHistory).mockResolvedValue({ userId: 82, total: 0, items: [], aiUsed: false });
+    vi.mocked(platformApi.watchlistAlertRules).mockResolvedValue({
+      userId: 82,
+      plan: 'free',
+      limit: 3,
+      total: 0,
+      remaining: 3,
+      items: [],
+      aiUsed: false,
+    });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    expect(await screen.findByTestId('platform-signed-in-panel')).toHaveTextContent('owner-a@example.com');
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    expect(screen.getByTestId('platform-watchlist-panel')).not.toHaveTextContent('MSFT');
   });
 
   it('shows a guest-first query entry before login', async () => {
@@ -4622,12 +4806,16 @@ describe('HomePage', () => {
         { stockCode: 'BTC-USD', stockName: 'Bitcoin', market: 'crypto', routeLane: 'crypto_market_data', freshness: 'fresh', degradationStatus: 'ok', warningCodes: [], aiUsed: false, status: 'ok' },
       ],
     });
-    vi.mocked(platformApi.watchlistRadar).mockResolvedValue(makeRadarResponse(15, [
-      makeRadarItem({ stockCode: '600519', stockName: 'Kweichow Moutai', market: 'cn', routeLane: 'a_share_market_data', currentPrice: 1512.34, changePercent: 1.23 }),
-      makeRadarItem({ stockCode: 'AAPL', stockName: 'Apple Inc.', market: 'us', routeLane: 'us_market_data', currentPrice: 211.88, changePercent: -0.42 }),
-      makeRadarItem({ stockCode: 'HK00700', stockName: 'Tencent Holdings', market: 'hk', routeLane: 'hk_market_data', currentPrice: 390.2, changePercent: 0.8, degradationStatus: 'degraded', warningCodes: ['missing_history'], status: 'degraded', sourceStatus: 'source_unavailable' }),
-      makeRadarItem({ stockCode: 'BTC-USD', stockName: 'Bitcoin', market: 'crypto', routeLane: 'crypto_market_data', currentPrice: 61888.12, changePercent: 2.5 }),
-    ], 1));
+    vi.mocked(platformApi.runWatchlistRadar).mockResolvedValue({
+      ...makeRadarResponse(15, [
+        makeRadarItem({ stockCode: '600519', stockName: 'Kweichow Moutai', market: 'cn', routeLane: 'a_share_market_data', currentPrice: 1512.34, changePercent: 1.23 }),
+        makeRadarItem({ stockCode: 'AAPL', stockName: 'Apple Inc.', market: 'us', routeLane: 'us_market_data', currentPrice: 211.88, changePercent: -0.42 }),
+        makeRadarItem({ stockCode: 'HK00700', stockName: 'Tencent Holdings', market: 'hk', routeLane: 'hk_market_data', currentPrice: 390.2, changePercent: 0.8, degradationStatus: 'degraded', warningCodes: ['missing_history'], status: 'degraded', sourceStatus: 'source_unavailable' }),
+        makeRadarItem({ stockCode: 'BTC-USD', stockName: 'Bitcoin', market: 'crypto', routeLane: 'crypto_market_data', currentPrice: 61888.12, changePercent: 2.5 }),
+      ], 1),
+      runId: 99,
+      triggeredAlerts: [],
+    });
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -4821,7 +5009,7 @@ describe('HomePage', () => {
     expect(panel).not.toHaveTextContent('No-AI quick');
   });
 
-  it('renders the V99 watchlist event radar and runs a no-AI quick query from a row', async () => {
+  it('renders the V100 saved review loop, saves an alert, and runs a no-AI query from a row', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
     vi.mocked(platformApi.current).mockResolvedValue({
@@ -4933,7 +5121,8 @@ describe('HomePage', () => {
         },
       ],
     });
-    vi.mocked(platformApi.watchlistRadar).mockResolvedValue(makeRadarResponse(18, [
+    const radarRun = {
+      ...makeRadarResponse(18, [
       makeRadarItem({ stockCode: '600519', stockName: 'Kweichow Moutai', market: 'cn', routeLane: 'a_share_market_data', currentPrice: 1512.34, changePercent: 1.23, ma20: 1490 }),
       makeRadarItem({ stockCode: 'AAPL', stockName: 'Apple Inc.', market: 'us', routeLane: 'us_market_data', currentPrice: 211.88, changePercent: -0.42, ma20: 205 }),
       makeRadarItem({
@@ -4960,7 +5149,53 @@ describe('HomePage', () => {
         changePercent: 2.5,
         events: [{ stockCode: 'BTC-USD', type: 'price_move', severity: 'warning', direction: 'up', value: 2.5, warningCodes: [], aiUsed: false }],
       }),
-    ], 1));
+      ], 1),
+      runId: 100,
+      triggeredAlerts: [],
+    };
+    vi.mocked(platformApi.runWatchlistRadar).mockResolvedValue(radarRun);
+    vi.mocked(platformApi.watchlistRadarHistory).mockResolvedValue({
+      userId: 18,
+      total: 1,
+      aiUsed: false,
+      items: [{
+        id: 100,
+        plan: 'free',
+        processed: 4,
+        eventCount: 2,
+        riskCount: 1,
+        sourceEventCount: 0,
+        triggeredCount: 0,
+        strongest: { stockCode: 'BTC-USD', changePercent: 2.5 },
+        weakest: { stockCode: 'AAPL', changePercent: -0.42 },
+        createdAt: '2026-07-11T09:30:00Z',
+      }],
+    });
+    vi.mocked(platformApi.watchlistAlertRules).mockResolvedValue({
+      userId: 18,
+      plan: 'free',
+      limit: 3,
+      total: 0,
+      remaining: 3,
+      items: [],
+      aiUsed: false,
+    });
+    vi.mocked(platformApi.saveWatchlistAlertRule).mockResolvedValue({
+      userId: 18,
+      plan: 'free',
+      limit: 3,
+      total: 1,
+      remaining: 2,
+      aiUsed: false,
+      items: [{
+        id: 31,
+        stockCode: 'HK00700',
+        ruleType: 'ma20_cross',
+        threshold: null,
+        referenceValue: 376,
+        enabled: true,
+      }],
+    });
     vi.mocked(stocksApi.snapshot).mockResolvedValue({
       stockCode: 'HK00700',
       stockName: 'Tencent Holdings',
@@ -5034,6 +5269,21 @@ describe('HomePage', () => {
     expect(radarPanel).toHaveTextContent('Market data needs a freshness check');
     expect(radarPanel).toHaveTextContent('Apple Inc.');
     expect(radarPanel).toHaveTextContent('AAPL');
+
+    const alertLoop = await screen.findByTestId('watchlist-alert-loop-v100');
+    expect(alertLoop).toHaveTextContent('Continuous tracking and daily reviews');
+    expect(alertLoop).toHaveTextContent('Recent reviews 1');
+    fireEvent.click(screen.getByTestId('watchlist-alert-save-HK00700-ma20_cross'));
+    await waitFor(() => {
+      expect(platformApi.saveWatchlistAlertRule).toHaveBeenCalledWith({
+        stockCode: 'HK00700',
+        ruleType: 'ma20_cross',
+        threshold: null,
+        referenceValue: 376,
+        enabled: true,
+      });
+    });
+    expect(await screen.findByTestId('watchlist-alert-save-HK00700-ma20_cross')).toHaveTextContent('Saved');
 
     fireEvent.click(screen.getByTestId('watchlist-radar-symbol-HK00700'));
 

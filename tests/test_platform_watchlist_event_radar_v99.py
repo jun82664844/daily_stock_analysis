@@ -186,6 +186,115 @@ class PlatformWatchlistEventRadarV99TestCase(unittest.TestCase):
         self.assertIn("source_unavailable", result["items"][0]["source_status"])
         self.assertNotIn("sk-secret", str(result))
 
+    def test_market_intelligence_name_match_is_used_when_stock_scope_is_empty(self) -> None:
+        from src.platform_watchlist_radar import PlatformWatchlistRadarService
+
+        class NameMatchIntelligence:
+            def list_items(self, **filters: object) -> dict:
+                if filters.get("scope_type") == "symbol":
+                    return {"items": [], "total": 0}
+                if filters.get("query") == "AAPL name" and filters.get("market") == "us":
+                    return {
+                        "items": [{
+                            "title": "Apple official market update",
+                            "summary": "Traceable stored item",
+                            "url": "https://example.com/apple/update",
+                            "source_name": "Official feed",
+                            "published_at": "2026-07-11T09:00:00Z",
+                        }],
+                        "total": 1,
+                    }
+                return {"items": [], "total": 0}
+
+        result = PlatformWatchlistRadarService(
+            watchlist_service=_WatchlistStub([_row("AAPL", change_percent=1.0)]),
+            intelligence_service=NameMatchIntelligence(),
+        ).build(user_id=12, plan="free")
+
+        self.assertEqual(result["summary"]["source_event_count"], 1)
+        self.assertEqual(result["items"][0]["source_status"], "available")
+
+    def test_symbol_scoped_intelligence_is_used_before_name_fallback(self) -> None:
+        from src.platform_watchlist_radar import PlatformWatchlistRadarService
+
+        class SymbolScopeIntelligence:
+            def list_items(self, **filters: object) -> dict:
+                if filters.get("scope_type") == "symbol" and filters.get("scope_value") == "AAPL":
+                    return {
+                        "items": [{
+                            "title": "Apple symbol-scoped filing",
+                            "url": "https://example.com/apple/symbol-filing",
+                            "source_name": "Official feed",
+                            "published_at": "2026-07-11T09:00:00Z",
+                        }],
+                        "total": 1,
+                    }
+                return {"items": [], "total": 0}
+
+        result = PlatformWatchlistRadarService(
+            watchlist_service=_WatchlistStub([_row("AAPL", change_percent=1.0)]),
+            intelligence_service=SymbolScopeIntelligence(),
+        ).build(user_id=12, plan="free")
+
+        self.assertEqual(result["summary"]["source_event_count"], 1)
+        self.assertEqual(result["items"][0]["events"][-1]["title"], "Apple symbol-scoped filing")
+
+    def test_hong_kong_symbol_scope_checks_persisted_suffix_variant(self) -> None:
+        from src.platform_watchlist_radar import PlatformWatchlistRadarService
+
+        class HongKongVariantIntelligence:
+            def list_items(self, **filters: object) -> dict:
+                if filters.get("scope_type") == "symbol" and filters.get("scope_value") == "00700.HK":
+                    return {
+                        "items": [{
+                            "title": "Tencent traceable update",
+                            "url": "https://example.com/tencent/update",
+                            "source_name": "HKEX feed",
+                            "published_at": "2026-07-11T09:00:00Z",
+                        }],
+                        "total": 1,
+                    }
+                return {"items": [], "total": 0}
+
+        row = _row("HK00700", change_percent=1.0)
+        row["stock_name"] = "Tencent Holdings"
+        row["market"] = "hk"
+        result = PlatformWatchlistRadarService(
+            watchlist_service=_WatchlistStub([row]),
+            intelligence_service=HongKongVariantIntelligence(),
+        ).build(user_id=12, plan="free")
+
+        self.assertEqual(result["summary"]["source_event_count"], 1)
+        self.assertEqual(result["items"][0]["source_status"], "available")
+
+    def test_beijing_symbol_scope_checks_persisted_exchange_variant(self) -> None:
+        from src.platform_watchlist_radar import PlatformWatchlistRadarService
+
+        class BeijingVariantIntelligence:
+            def list_items(self, **filters: object) -> dict:
+                if filters.get("scope_type") == "symbol" and filters.get("scope_value") == "430047.BJ":
+                    return {
+                        "items": [{
+                            "title": "BSE traceable update",
+                            "url": "https://example.com/bse/update",
+                            "source_name": "BSE feed",
+                            "published_at": "2026-07-11T09:00:00Z",
+                        }],
+                        "total": 1,
+                    }
+                return {"items": [], "total": 0}
+
+        row = _row("430047", change_percent=1.0)
+        row["stock_name"] = "BSE Sample"
+        row["market"] = "cn"
+        result = PlatformWatchlistRadarService(
+            watchlist_service=_WatchlistStub([row]),
+            intelligence_service=BeijingVariantIntelligence(),
+        ).build(user_id=12, plan="free")
+
+        self.assertEqual(result["summary"]["source_event_count"], 1)
+        self.assertEqual(result["items"][0]["source_status"], "available")
+
 
 class PlatformWatchlistEventRadarV99ApiTestCase(unittest.TestCase):
     def setUp(self) -> None:

@@ -248,6 +248,70 @@ class PlatformWatchlistItem(Base):
     )
 
 
+class PlatformWatchlistRadarRun(Base):
+    """Saved no-AI radar run owned by one platform user."""
+
+    __tablename__ = 'platform_watchlist_radar_runs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    plan = Column(String(32), nullable=False, default='free', index=True)
+    processed = Column(Integer, nullable=False, default=0)
+    event_count = Column(Integer, nullable=False, default=0)
+    risk_count = Column(Integer, nullable=False, default=0)
+    source_event_count = Column(Integer, nullable=False, default=0)
+    triggered_count = Column(Integer, nullable=False, default=0)
+    payload_json = Column(Text, nullable=False, default='{}')
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+
+    __table_args__ = (
+        Index('ix_platform_radar_run_user_time', 'user_id', 'created_at'),
+    )
+
+
+class PlatformWatchlistAlertRule(Base):
+    """Private watchlist alert rule for one platform user and symbol."""
+
+    __tablename__ = 'platform_watchlist_alert_rules'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    stock_code = Column(String(32), nullable=False, index=True)
+    rule_type = Column(String(32), nullable=False, index=True)
+    threshold = Column(Float)
+    reference_value = Column(Float)
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'stock_code', 'rule_type', name='uix_platform_watchlist_alert_rule'),
+        Index('ix_platform_watchlist_alert_user_time', 'user_id', 'updated_at'),
+    )
+
+
+class PlatformWatchlistAlertEvent(Base):
+    """Triggered private alert tied to one saved radar run."""
+
+    __tablename__ = 'platform_watchlist_alert_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    rule_id = Column(Integer, ForeignKey('platform_watchlist_alert_rules.id'), nullable=False, index=True)
+    radar_run_id = Column(Integer, ForeignKey('platform_watchlist_radar_runs.id'), nullable=False, index=True)
+    stock_code = Column(String(32), nullable=False, index=True)
+    rule_type = Column(String(32), nullable=False, index=True)
+    direction = Column(String(24))
+    value = Column(Float)
+    threshold = Column(Float)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+
+    __table_args__ = (
+        UniqueConstraint('rule_id', 'radar_run_id', name='uix_platform_watchlist_alert_event_run'),
+        Index('ix_platform_watchlist_alert_event_user_time', 'user_id', 'created_at'),
+    )
+
+
 class StockDaily(Base):
     """
     股票日线数据模型

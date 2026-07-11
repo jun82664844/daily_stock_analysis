@@ -37,7 +37,11 @@ from api.v1.schemas.platform import (
     PlatformStatusResponse,
     PlatformUserResponse,
     PlatformWatchlistRefreshResponse,
+    PlatformWatchlistAlertRuleUpsertRequest,
+    PlatformWatchlistAlertRulesResponse,
+    PlatformWatchlistRadarHistoryResponse,
     PlatformWatchlistRadarResponse,
+    PlatformWatchlistRadarRunResponse,
     PlatformWatchlistResponse,
     PlatformWatchlistUpsertRequest,
 )
@@ -60,6 +64,7 @@ from src.platform_audit import PlatformAuditLogger, redact_metadata
 from src.platform_rate_limit import check_platform_rate_limit
 from src.platform_retention_funnel import PlatformRetentionFunnelService
 from src.platform_watchlist import PlatformWatchlistService
+from src.platform_watchlist_automation import AlertRuleLimitExceeded, PlatformWatchlistAutomationService
 from src.platform_watchlist_radar import PlatformWatchlistRadarService
 from src.storage import DatabaseManager
 from src.services.local_functional_status import build_local_functional_status
@@ -441,6 +446,91 @@ async def platform_watchlist_radar(request: Request):
         user_id=int(identity.user_id),
         plan=identity.plan,
     )
+
+
+@router.post("/watchlist/radar/run", response_model=PlatformWatchlistRadarRunResponse)
+async def platform_watchlist_radar_run(request: Request):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "watchlist_radar", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+    result = PlatformWatchlistAutomationService().run_and_save(
+        user_id=int(identity.user_id),
+        plan=identity.plan,
+    )
+    _audit(
+        user_id=int(identity.user_id),
+        action="watchlist_radar_run_saved",
+        metadata={
+            "run_id": result.get("run_id"),
+            "processed": result.get("processed"),
+            "triggered_count": len(result.get("triggered_alerts") or []),
+        },
+    )
+    return result
+
+
+@router.get("/watchlist/radar/history", response_model=PlatformWatchlistRadarHistoryResponse)
+async def platform_watchlist_radar_history(request: Request, limit: int = Query(default=7, ge=1, le=30)):
+    identity = _require_identity(request)
+    return PlatformWatchlistAutomationService().list_history(int(identity.user_id), limit=limit)
+
+
+@router.get("/watchlist/alert-rules", response_model=PlatformWatchlistAlertRulesResponse)
+async def platform_watchlist_alert_rules(request: Request):
+    identity = _require_identity(request)
+    return PlatformWatchlistAutomationService().list_rules(int(identity.user_id), plan=identity.plan)
+
+
+@router.post("/watchlist/alert-rules", response_model=PlatformWatchlistAlertRulesResponse)
+async def platform_watchlist_alert_rule_save(request: Request, body: PlatformWatchlistAlertRuleUpsertRequest):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "watchlist_alert_rules", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+    try:
+        result = PlatformWatchlistAutomationService().save_rule(
+            user_id=int(identity.user_id),
+            plan=identity.plan,
+            stock_code=body.stock_code,
+            rule_type=body.rule_type,
+            threshold=body.threshold,
+            reference_value=body.reference_value,
+            enabled=body.enabled,
+        )
+    except AlertRuleLimitExceeded:
+        return JSONResponse(
+            status_code=409,
+            content={"error": "alert_rule_limit_exceeded", "message": "Alert rule limit reached for the current plan."},
+        )
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": "invalid_alert_rule", "message": str(exc)})
+    _audit(
+        user_id=int(identity.user_id),
+        action="watchlist_alert_rule_saved",
+        metadata={"stock_code": body.stock_code, "rule_type": body.rule_type, "enabled": body.enabled},
+    )
+    return result
+
+
+@router.delete("/watchlist/alert-rules/{rule_id}", response_model=PlatformWatchlistAlertRulesResponse)
+async def platform_watchlist_alert_rule_delete(request: Request, rule_id: int):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "watchlist_alert_rules", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+    service = PlatformWatchlistAutomationService()
+    if not service.delete_rule(user_id=int(identity.user_id), rule_id=rule_id):
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+    _audit(
+        user_id=int(identity.user_id),
+        action="watchlist_alert_rule_deleted",
+        metadata={"rule_id": int(rule_id)},
+    )
+    return service.list_rules(int(identity.user_id), plan=identity.plan)
 
 
 @router.post("/history/snapshot", response_model=PlatformSnapshotHistorySaveResponse)

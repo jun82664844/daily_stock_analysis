@@ -96,6 +96,24 @@ class PlatformSecurityBoundariesTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_watchlist_automation_writes_reject_missing_csrf_when_enabled(self):
+        client = self._client({"PLATFORM_CSRF_ENABLED": "true"})
+        client.post(
+            "/api/v1/platform/register",
+            json={"email": "watchlist-csrf@example.com", "password": "password123"},
+        )
+
+        responses = [
+            client.post("/api/v1/platform/watchlist/radar/run"),
+            client.post(
+                "/api/v1/platform/watchlist/alert-rules",
+                json={"stockCode": "AAPL", "ruleType": "price_move", "threshold": 2.0},
+            ),
+            client.delete("/api/v1/platform/watchlist/alert-rules/1"),
+        ]
+
+        self.assertEqual([response.status_code for response in responses], [403, 403, 403])
+
     def test_cookie_write_endpoint_accepts_matching_csrf_header_when_csrf_enabled(self):
         client = self._client({"PLATFORM_CSRF_ENABLED": "true"})
         client.post(

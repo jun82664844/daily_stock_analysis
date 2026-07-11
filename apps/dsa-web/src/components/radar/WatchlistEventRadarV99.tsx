@@ -2,9 +2,11 @@ import type React from 'react';
 import {
   Activity,
   BellRing,
+  Check,
   Database,
   ExternalLink,
   Newspaper,
+  Plus,
   Radar,
   Search,
   TrendingDown,
@@ -21,6 +23,9 @@ type Props = {
   language: string;
   radar: PlatformWatchlistRadarResponse;
   onSelectSymbol: (stockCode: string) => void;
+  onSaveAlert?: (alert: PlatformWatchlistRadarAlertSuggestion) => void;
+  savedRuleKeys?: Set<string>;
+  alertBusy?: boolean;
 };
 
 const numberText = (value: number | null | undefined, maximumFractionDigits = 2): string => (
@@ -87,7 +92,14 @@ const severityClasses = (severity: string): string => {
   return 'border-primary/35 bg-primary/5 text-primary';
 };
 
-export const WatchlistEventRadarV99: React.FC<Props> = ({ language, radar, onSelectSymbol }) => {
+export const WatchlistEventRadarV99: React.FC<Props> = ({
+  language,
+  radar,
+  onSelectSymbol,
+  onSaveAlert,
+  savedRuleKeys = new Set(),
+  alertBusy = false,
+}) => {
   const en = language === 'en';
 
   if (radar.items.length === 0) {
@@ -230,11 +242,29 @@ export const WatchlistEventRadarV99: React.FC<Props> = ({ language, radar, onSel
               <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5 border-t border-subtle pt-3 text-[11px] text-secondary-text">
                 <BellRing className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                 <span className="font-medium text-foreground">{en ? 'Suggested alerts' : '建议提醒'}</span>
-                {item.suggestedAlerts.slice(0, 3).map((alert) => (
-                  <span key={`${item.stockCode}-${alert.type}`} className="rounded-md border border-subtle px-2 py-1">
-                    {alertText(alert, en)}
-                  </span>
-                ))}
+                {item.suggestedAlerts.slice(0, 3).map((alert) => {
+                  const ruleKey = `${item.stockCode}:${alert.type}`;
+                  const saved = savedRuleKeys.has(ruleKey);
+                  return onSaveAlert ? (
+                    <button
+                      key={ruleKey}
+                      type="button"
+                      data-testid={`watchlist-alert-save-${item.stockCode}-${alert.type}`}
+                      disabled={alertBusy || saved}
+                      onClick={() => onSaveAlert(alert)}
+                      className="inline-flex min-h-8 items-center gap-1 rounded-md border border-subtle px-2 py-1 text-left hover:border-primary/45 hover:text-foreground disabled:cursor-default disabled:opacity-70"
+                    >
+                      {saved
+                        ? <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+                        : <Plus className="h-3.5 w-3.5 text-primary" aria-hidden="true" />}
+                      <span>{saved ? (en ? 'Saved' : '已保存') : alertText(alert, en)}</span>
+                    </button>
+                  ) : (
+                    <span key={ruleKey} className="rounded-md border border-subtle px-2 py-1">
+                      {alertText(alert, en)}
+                    </span>
+                  );
+                })}
               </div>
             </article>
           );

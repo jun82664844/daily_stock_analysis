@@ -135,6 +135,36 @@ describe('WatchlistEventRadarV99', () => {
     expect(onSelectSymbol).toHaveBeenCalledWith('AAPL');
   });
 
+  it('saves a suggested alert and shows its saved state', () => {
+    const onSaveAlert = vi.fn();
+    const { rerender } = render(
+      <WatchlistEventRadarV99
+        language="zh"
+        radar={radar}
+        onSelectSymbol={() => undefined}
+        onSaveAlert={onSaveAlert}
+        savedRuleKeys={new Set()}
+        alertBusy={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('watchlist-alert-save-AAPL-price_move'));
+    expect(onSaveAlert).toHaveBeenCalledWith(radar.items[0].suggestedAlerts[0]);
+
+    rerender(
+      <WatchlistEventRadarV99
+        language="zh"
+        radar={radar}
+        onSelectSymbol={() => undefined}
+        onSaveAlert={onSaveAlert}
+        savedRuleKeys={new Set(['AAPL:price_move'])}
+        alertBusy={false}
+      />,
+    );
+    expect(screen.getByTestId('watchlist-alert-save-AAPL-price_move')).toHaveTextContent('已保存');
+    expect(screen.getByTestId('watchlist-alert-save-AAPL-price_move')).toBeDisabled();
+  });
+
   it('shows a useful empty state', () => {
     render(
       <WatchlistEventRadarV99

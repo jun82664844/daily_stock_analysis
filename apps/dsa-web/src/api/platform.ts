@@ -375,6 +375,63 @@ export interface PlatformWatchlistRadarResponse {
   analysisBoundary: string;
 }
 
+export interface PlatformWatchlistAlertRule {
+  id: number;
+  stockCode: string;
+  ruleType: string;
+  threshold?: number | null;
+  referenceValue?: number | null;
+  enabled: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface PlatformWatchlistAlertRulesResponse {
+  userId: number;
+  plan: PlatformPlan | string;
+  limit: number;
+  total: number;
+  remaining: number;
+  items: PlatformWatchlistAlertRule[];
+  aiUsed: boolean;
+}
+
+export interface PlatformWatchlistTriggeredAlert {
+  ruleId: number;
+  stockCode: string;
+  ruleType: string;
+  direction?: string | null;
+  value?: number | null;
+  threshold?: number | null;
+  referenceValue?: number | null;
+  aiUsed: boolean;
+}
+
+export interface PlatformWatchlistRadarRunResponse extends PlatformWatchlistRadarResponse {
+  runId: number;
+  triggeredAlerts: PlatformWatchlistTriggeredAlert[];
+}
+
+export interface PlatformWatchlistRadarHistoryItem {
+  id: number;
+  plan: PlatformPlan | string;
+  processed: number;
+  eventCount: number;
+  riskCount: number;
+  sourceEventCount: number;
+  triggeredCount: number;
+  strongest?: PlatformWatchlistRadarSummaryItem | null;
+  weakest?: PlatformWatchlistRadarSummaryItem | null;
+  createdAt?: string | null;
+}
+
+export interface PlatformWatchlistRadarHistoryResponse {
+  userId: number;
+  items: PlatformWatchlistRadarHistoryItem[];
+  total: number;
+  aiUsed: boolean;
+}
+
 export interface PlatformSnapshotHistorySaveResponse {
   recordId: number;
   stockCode: string;
@@ -484,6 +541,39 @@ export const platformApi = {
   watchlistRadar: async (): Promise<PlatformWatchlistRadarResponse> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/watchlist/radar');
     return toCamelCase<PlatformWatchlistRadarResponse>(response.data);
+  },
+
+  runWatchlistRadar: async (): Promise<PlatformWatchlistRadarRunResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/watchlist/radar/run');
+    return toCamelCase<PlatformWatchlistRadarRunResponse>(response.data);
+  },
+
+  watchlistRadarHistory: async (limit = 7): Promise<PlatformWatchlistRadarHistoryResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/watchlist/radar/history', {
+      params: { limit },
+    });
+    return toCamelCase<PlatformWatchlistRadarHistoryResponse>(response.data);
+  },
+
+  watchlistAlertRules: async (): Promise<PlatformWatchlistAlertRulesResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/watchlist/alert-rules');
+    return toCamelCase<PlatformWatchlistAlertRulesResponse>(response.data);
+  },
+
+  saveWatchlistAlertRule: async (data: {
+    stockCode: string;
+    ruleType: string;
+    threshold?: number | null;
+    referenceValue?: number | null;
+    enabled?: boolean;
+  }): Promise<PlatformWatchlistAlertRulesResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/watchlist/alert-rules', data);
+    return toCamelCase<PlatformWatchlistAlertRulesResponse>(response.data);
+  },
+
+  deleteWatchlistAlertRule: async (ruleId: number): Promise<PlatformWatchlistAlertRulesResponse> => {
+    const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/platform/watchlist/alert-rules/${ruleId}`);
+    return toCamelCase<PlatformWatchlistAlertRulesResponse>(response.data);
   },
 
   saveSnapshotToHistory: async (snapshot: unknown): Promise<PlatformSnapshotHistorySaveResponse> => {

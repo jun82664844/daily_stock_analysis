@@ -465,3 +465,17 @@ git diff --check
 - Backend V17/V18/V99 compatibility tests and V99 endpoint isolation tests pass. Frontend API, component, HomePage, lint, build, verifier, and browser evidence are required before final acceptance.
 - The verifier prints `DSA_PLATFORM_WATCHLIST_EVENT_RADAR_V99_OK` only after required local checks pass.
 - V99 remains local-only. It is not public launch approval, real payment, production deployment, production key handling, or investment advice.
+
+## 2026-07-11 V100 Private Watchlist Alert Loop Acceptance
+
+- Signed-in users can run and save a private daily watchlist review, read their recent review timeline, and manage only their own alert rules.
+- Free users receive 3 enabled private alert slots and paid plans receive 50, while both plans keep the same visible workflow and information structure.
+- Price movement, volume movement, source update, data quality, and true MA20 side-crossing rules are supported. The first saved run establishes a baseline and does not fake a crossing.
+- Source alerts require a traceable persisted HTTP(S) link. Public search, live feed ingestion, and AI quota use remain disabled in this loop.
+- Backend ownership, limit, baseline, trigger, and endpoint tests pass; frontend Chinese/English, save/delete, timeline, full regression, lint, and build checks pass.
+- Private browser state accepts a response only when the session generation still matches and, where the response carries ownership, its `userId` also matches; logout or user switching invalidates in-flight account, API-key, watchlist, history, rule, and radar responses.
+- Current-plan caps are reapplied on list and execution, source URLs are compared with the prior run, rule deletion is soft-disable, non-finite values are rejected, and all V100 writes retain CSRF plus write-rate-limit coverage.
+- Same-user radar runs, rule saves, and rule disables are serialized in the local process, and bounded A-share/HK symbol variants are covered when matching already persisted traceable sources.
+- Failed logout confirmation is contained locally: private UI state and busy flags are cleared, the raw error is not exposed, and the active interface language receives a refresh/session warning.
+- The verifier prints `DSA_PLATFORM_WATCHLIST_ALERT_LOOP_V100_OK` only after its required local checks pass.
+- V100 remains local-only. It is not public launch approval, real payment, production deployment, production key handling, market-data licensing approval, or investment advice.

@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [feat] Automatically open a completed free platform-API trial report and show a localized premium-options entry without enabling real payment.
 - [feat] Add a privacy-bounded local V97 funnel for free query, registration, API trial, report opening, and premium-options viewing.
 - [新功能] 新增 V99 用户自选股事件雷达，以无 AI 方式汇总价格、MA20、量能、数据质量和可追溯来源事件，并为免费版与高级版提供相同的信息结构。
+- [新功能] 新增 V100 用户私有提醒与每日复盘历史：支持保存价格、MA20、量能、来源更新和数据质量提醒，首次运行建立比较基线，后续复盘展示真实触发记录。
+- [修复] 加固 V100 私有状态：阻断旧会话和跨用户响应回填，套餐降级后重新限制规则，来源链接仅首次触发，并补齐软停用、有限数值、CSRF 与删除限流边界。
+- [修复] 完成 V100 收口：私有写请求的忙碌/错误状态受会话代次保护，登出失败也会清理本地私有状态并给出本地化提示，A 股资讯匹配补齐北交所代码变体。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->

@@ -269,6 +269,45 @@ describe('platformApi', () => {
     expect(result.aiUsed).toBe(false);
   });
 
+  it('runs and manages the private V100 watchlist alert loop', async () => {
+    post
+      .mockResolvedValueOnce({ data: { user_id: 15, run_id: 9, visible_limit: 10, total_watchlist: 0, processed: 0, hidden_count: 0, degraded: 0, summary: { event_count: 0, risk_count: 0, source_event_count: 0 }, items: [], events: [], triggered_alerts: [], generated_at: '2026-07-11T09:30:00Z', ai_used: false, analysis_boundary: 'information_only_not_investment_advice' } })
+      .mockResolvedValueOnce({ data: { user_id: 15, plan: 'free', limit: 3, total: 1, remaining: 2, items: [{ id: 31, stock_code: 'AAPL', rule_type: 'ma20_cross', reference_value: 205, enabled: true }], ai_used: false } });
+    get
+      .mockResolvedValueOnce({ data: { user_id: 15, total: 1, items: [{ id: 9, plan: 'free', processed: 4, event_count: 2, risk_count: 1, source_event_count: 0, triggered_count: 0, created_at: '2026-07-11T09:30:00Z' }], ai_used: false } })
+      .mockResolvedValueOnce({ data: { user_id: 15, plan: 'free', limit: 3, total: 0, remaining: 3, items: [], ai_used: false } });
+    del.mockResolvedValueOnce({ data: { user_id: 15, plan: 'free', limit: 3, total: 0, remaining: 3, items: [], ai_used: false } });
+
+    const run = await platformApi.runWatchlistRadar();
+    const history = await platformApi.watchlistRadarHistory(5);
+    const emptyRules = await platformApi.watchlistAlertRules();
+    const savedRules = await platformApi.saveWatchlistAlertRule({
+      stockCode: 'AAPL',
+      ruleType: 'ma20_cross',
+      threshold: null,
+      referenceValue: 205,
+      enabled: true,
+    });
+    const deletedRules = await platformApi.deleteWatchlistAlertRule(31);
+
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/platform/watchlist/radar/run');
+    expect(get).toHaveBeenNthCalledWith(1, '/api/v1/platform/watchlist/radar/history', { params: { limit: 5 } });
+    expect(get).toHaveBeenNthCalledWith(2, '/api/v1/platform/watchlist/alert-rules');
+    expect(post).toHaveBeenNthCalledWith(2, '/api/v1/platform/watchlist/alert-rules', {
+      stockCode: 'AAPL',
+      ruleType: 'ma20_cross',
+      threshold: null,
+      referenceValue: 205,
+      enabled: true,
+    });
+    expect(del).toHaveBeenCalledWith('/api/v1/platform/watchlist/alert-rules/31');
+    expect(run.runId).toBe(9);
+    expect(history.items[0].triggeredCount).toBe(0);
+    expect(emptyRules.remaining).toBe(3);
+    expect(savedRules.items[0].ruleType).toBe('ma20_cross');
+    expect(deletedRules.total).toBe(0);
+  });
+
   it('creates a local sandbox checkout session', async () => {
     post.mockResolvedValueOnce({
       data: {

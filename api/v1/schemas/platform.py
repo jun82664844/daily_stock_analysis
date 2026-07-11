@@ -194,6 +194,73 @@ class PlatformWatchlistRadarResponse(BaseModel):
     analysis_boundary: str
 
 
+class PlatformWatchlistAlertRuleUpsertRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    stock_code: str = Field(..., alias="stockCode", min_length=1, max_length=64)
+    rule_type: str = Field(..., alias="ruleType", min_length=3, max_length=32)
+    threshold: Optional[float] = Field(default=None, allow_inf_nan=False)
+    reference_value: Optional[float] = Field(default=None, alias="referenceValue", allow_inf_nan=False)
+    enabled: bool = True
+
+
+class PlatformWatchlistAlertRuleItem(BaseModel):
+    id: int
+    stock_code: str
+    rule_type: str
+    threshold: Optional[float] = None
+    reference_value: Optional[float] = None
+    enabled: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class PlatformWatchlistAlertRulesResponse(BaseModel):
+    user_id: int
+    plan: str
+    limit: int
+    total: int
+    remaining: int
+    items: List[PlatformWatchlistAlertRuleItem] = Field(default_factory=list)
+    ai_used: bool = False
+
+
+class PlatformWatchlistTriggeredAlert(BaseModel):
+    rule_id: int
+    stock_code: str
+    rule_type: str
+    direction: Optional[str] = None
+    value: Optional[float] = None
+    threshold: Optional[float] = None
+    reference_value: Optional[float] = None
+    ai_used: bool = False
+
+
+class PlatformWatchlistRadarRunResponse(PlatformWatchlistRadarResponse):
+    run_id: int
+    triggered_alerts: List[PlatformWatchlistTriggeredAlert] = Field(default_factory=list)
+
+
+class PlatformWatchlistRadarHistoryItem(BaseModel):
+    id: int
+    plan: str
+    processed: int
+    event_count: int
+    risk_count: int
+    source_event_count: int
+    triggered_count: int
+    strongest: Optional[PlatformWatchlistRadarSummaryItem] = None
+    weakest: Optional[PlatformWatchlistRadarSummaryItem] = None
+    created_at: Optional[str] = None
+
+
+class PlatformWatchlistRadarHistoryResponse(BaseModel):
+    user_id: int
+    items: List[PlatformWatchlistRadarHistoryItem] = Field(default_factory=list)
+    total: int
+    ai_used: bool = False
+
+
 class PlatformSnapshotHistorySaveRequest(BaseModel):
     snapshot: Dict[str, Any] = Field(default_factory=dict)
     note: Optional[str] = Field(default=None, max_length=512)

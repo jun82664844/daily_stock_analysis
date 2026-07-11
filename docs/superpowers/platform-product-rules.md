@@ -202,3 +202,19 @@
 - Free and paid plans use the same visible radar structure. Free processes up to 10 watchlist symbols per review; pro, premium, and enterprise process up to 50. Symbols beyond the current review limit remain stored and are not deleted.
 - Suggested alerts are informational observation conditions only. V99 does not write them into the existing global alert table because that table does not yet provide platform-user ownership.
 - V99 remains local-only. It does not approve production market-data licensing, real payment, production deployment, or investment advice.
+
+## Private Watchlist Alert Loop V100
+
+- `POST /api/v1/platform/watchlist/radar/run` is an authenticated user-owned write. It stores a bounded no-AI radar snapshot and returns only the current user's triggered alerts.
+- `GET /api/v1/platform/watchlist/radar/history` and `/watchlist/alert-rules` are private to the current user. Cross-user rule deletion must return `404` and must not reveal whether another user's rule exists.
+- Free users may enable up to 3 private alert rules. Pro, premium, and enterprise users may enable up to 50. Both plans keep the same visible rule, trigger, and review-history structure.
+- Supported rules are `price_move`, `ma20_cross`, `volume_change`, `source_update`, and `data_quality`. Price and volume thresholds must be positive and bounded.
+- MA20 crossing is stateful: the first saved run establishes a comparison baseline and cannot claim a crossing. A later run triggers only when price truly changes sides relative to MA20.
+- Source-update alerts require an already persisted event with a valid HTTP(S) source URL. V100 does not enable public search or live intelligence-feed ingestion.
+- Persisted radar payloads are deliberately cropped and must not contain API keys, tokens, passwords, raw provider errors, or full private reports.
+- Deleting a rule hides and disables its internal row instead of hard-deleting it, so a concurrent radar run or saved review event never keeps a dangling rule reference. Re-saving the same user/symbol/type may safely re-enable that row.
+- The effective rule list and execution set are capped again on every request by the current plan, so a paid-to-free downgrade cannot keep executing more than 3 rules.
+- Source-update rules compare traceable URLs with the prior saved run and do not repeat the same stored source on every refresh.
+- V100 local writes serialize same-user radar runs, rule saves, and rule disables inside the single local application process; multi-worker production coordination remains outside the local-only scope.
+- Persisted symbol-scoped sources are checked through bounded A-share and HK code variants such as `600519.SH`, `SH600519`, `HK00700`, and `00700.HK` before the name fallback is used.
+- V100 remains local-only, no-AI by default, informational analysis only, and not investment advice. It does not approve real payment, production keys, deployment, or market-data licensing.

@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
-import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
+import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistAlertRulesResponse, type PlatformWatchlistRadarAlertSuggestion, type PlatformWatchlistRadarHistoryResponse, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse, type PlatformWatchlistTriggeredAlert } from '../api/platform';
 import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -17,6 +17,7 @@ import { FreeApiTrialConversionV96 } from '../components/retention/FreeApiTrialC
 import { FreeApiTrialTaskStatusV95 } from '../components/retention/FreeApiTrialTaskStatusV95';
 import { QueryChangeSummaryV93 } from '../components/retention/QueryChangeSummaryV93';
 import { WatchlistEventRadarV99 } from '../components/radar/WatchlistEventRadarV99';
+import { WatchlistAlertLoopV100 } from '../components/radar/WatchlistAlertLoopV100';
 import { findNewTrialHistoryItem } from '../components/retention/freeApiTrialReport';
 import { buildQueryObservation, compareQueryObservations, readPriorQueryObservation, storeQueryObservation, type QueryChangeSummary, type QueryObservation } from '../components/retention/queryChangeTracker';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -1247,6 +1248,7 @@ const HomePage: React.FC = () => {
   const freeTrialHistoryBaselineRef = useRef<Set<number>>(new Set());
   const freeTrialStartedAtRef = useRef(0);
   const retentionSessionIdRef = useRef<string | null>(null);
+  const platformSessionGenerationRef = useRef(0);
   const [deepAnalysisNotice, setDeepAnalysisNotice] = useState('');
   const [deepAnalysisInlineNotice, setDeepAnalysisInlineNotice] = useState('');
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
@@ -1260,6 +1262,10 @@ const HomePage: React.FC = () => {
   const [platformWatchlist, setPlatformWatchlist] = useState<PlatformWatchlistResponse | null>(null);
   const [platformWatchlistRefresh, setPlatformWatchlistRefresh] = useState<PlatformWatchlistRefreshResponse | null>(null);
   const [platformWatchlistRadar, setPlatformWatchlistRadar] = useState<PlatformWatchlistRadarResponse | null>(null);
+  const [platformRadarHistory, setPlatformRadarHistory] = useState<PlatformWatchlistRadarHistoryResponse | null>(null);
+  const [platformAlertRules, setPlatformAlertRules] = useState<PlatformWatchlistAlertRulesResponse | null>(null);
+  const [platformTriggeredAlerts, setPlatformTriggeredAlerts] = useState<PlatformWatchlistTriggeredAlert[]>([]);
+  const [platformAlertBusy, setPlatformAlertBusy] = useState(false);
   const [platformWatchlistBusy, setPlatformWatchlistBusy] = useState(false);
   const [platformWatchlistError, setPlatformWatchlistError] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -1387,17 +1393,44 @@ const HomePage: React.FC = () => {
     void stocksApi.prewarm(['600519', 'AAPL', 'HK00700', 'BTC-USD']).catch(() => undefined);
   }, []);
 
-  const loadPlatformWatchlist = useCallback(async () => {
+  const loadPlatformWatchlist = useCallback(async (generation: number, expectedUserId: number) => {
     try {
       const list = await platformApi.watchlist();
+      if (platformSessionGenerationRef.current !== generation || list.userId !== expectedUserId) return;
       setPlatformWatchlist(list);
       setPlatformWatchlistError('');
     } catch {
-      setPlatformWatchlist(null);
+      if (platformSessionGenerationRef.current === generation) setPlatformWatchlist(null);
     }
   }, []);
 
-  const loadPlatformAccount = useCallback(async (session: PlatformAuthPayload | null) => {
+  const loadPlatformWatchlistAutomation = useCallback(async (generation: number, expectedUserId: number) => {
+    try {
+      const [history, rules] = await Promise.all([
+        platformApi.watchlistRadarHistory(),
+        platformApi.watchlistAlertRules(),
+      ]);
+      if (
+        platformSessionGenerationRef.current !== generation
+        || history.userId !== expectedUserId
+        || rules.userId !== expectedUserId
+      ) return;
+      setPlatformRadarHistory(history);
+      setPlatformAlertRules(rules);
+    } catch {
+      if (platformSessionGenerationRef.current === generation) {
+        setPlatformRadarHistory(null);
+        setPlatformAlertRules(null);
+      }
+    }
+  }, []);
+
+  const loadPlatformAccount = useCallback(async (
+    session: PlatformAuthPayload | null,
+    existingGeneration?: number,
+  ) => {
+    const generation = existingGeneration ?? (platformSessionGenerationRef.current + 1);
+    platformSessionGenerationRef.current = generation;
     if (!session) {
       setPlatformSession(null);
       setPlatformAccount(null);
@@ -1405,27 +1438,44 @@ const HomePage: React.FC = () => {
       setPlatformWatchlist(null);
       setPlatformWatchlistRefresh(null);
       setPlatformWatchlistRadar(null);
+      setPlatformRadarHistory(null);
+      setPlatformAlertRules(null);
+      setPlatformTriggeredAlerts([]);
       setPlatformWatchlistError('');
       setApiKeyMode('platform');
       return;
     }
 
+    const expectedUserId = session.user.id;
     setPlatformSession(session);
     try {
       const account = await platformApi.account();
+      if (
+        platformSessionGenerationRef.current !== generation
+        || account.user.id !== expectedUserId
+      ) return;
       setPlatformAccount(account);
       setPlatformSession({ user: account.user, quota: account.quota });
       setPlatformKeys(account.apiKeys);
     } catch {
+      if (platformSessionGenerationRef.current !== generation) return;
       setPlatformAccount(null);
-      setPlatformKeys(await platformApi.listApiKeys());
+      const keys = await platformApi.listApiKeys();
+      if (platformSessionGenerationRef.current !== generation) return;
+      setPlatformKeys(keys);
     }
-    await loadPlatformWatchlist();
-  }, [loadPlatformWatchlist, setApiKeyMode]);
+    await Promise.all([
+      loadPlatformWatchlist(generation, expectedUserId),
+      loadPlatformWatchlistAutomation(generation, expectedUserId),
+    ]);
+  }, [loadPlatformWatchlist, loadPlatformWatchlistAutomation, setApiKeyMode]);
 
   const refreshPlatformSession = useCallback(async () => {
+    const generation = platformSessionGenerationRef.current + 1;
+    platformSessionGenerationRef.current = generation;
     const session = await platformApi.current();
-    await loadPlatformAccount(session);
+    if (platformSessionGenerationRef.current !== generation) return;
+    await loadPlatformAccount(session, generation);
   }, [loadPlatformAccount]);
 
   const trackRetentionEvent = useCallback((
@@ -1578,28 +1628,46 @@ const HomePage: React.FC = () => {
   }, []);
 
   const handlePlatformLogout = useCallback(async () => {
-    await platformApi.logout();
-    setPlatformSession(null);
-    setPlatformAccount(null);
-    setPlatformKeys([]);
-    setPlatformWatchlist(null);
-    setPlatformWatchlistRefresh(null);
-    setPlatformWatchlistRadar(null);
-    setPlatformWatchlistError('');
-    setApiKeyMode('platform');
-    setBasicSnapshot(null);
-    setBasicRetentionStatus('');
-    setBasicRetentionError('');
-    setAuthPassword('');
-    setAuthPasswordConfirm('');
-    setAuthVerificationCode('');
-    setAuthVerificationStatus('');
-    resetDashboardState();
-  }, [resetDashboardState, setApiKeyMode]);
+    platformSessionGenerationRef.current += 1;
+    setAuthError('');
+    try {
+      await platformApi.logout();
+    } catch {
+      setAuthError(uiLanguage === 'en'
+        ? 'Local logout confirmation failed. Refresh the page to verify your session.'
+        : '本地退出确认失败，请刷新页面检查登录状态');
+    } finally {
+      setPlatformSession(null);
+      setPlatformAccount(null);
+      setPlatformKeys([]);
+      setPlatformWatchlist(null);
+      setPlatformWatchlistRefresh(null);
+      setPlatformWatchlistRadar(null);
+      setPlatformRadarHistory(null);
+      setPlatformAlertRules(null);
+      setPlatformTriggeredAlerts([]);
+      setPlatformWatchlistBusy(false);
+      setPlatformAlertBusy(false);
+      setApiKeySaving(false);
+      setBasicRetentionBusy(false);
+      setPlatformWatchlistError('');
+      setApiKeyMode('platform');
+      setBasicSnapshot(null);
+      setBasicRetentionStatus('');
+      setBasicRetentionError('');
+      setAuthPassword('');
+      setAuthPasswordConfirm('');
+      setAuthVerificationCode('');
+      setAuthVerificationStatus('');
+      resetDashboardState();
+    }
+  }, [resetDashboardState, setApiKeyMode, uiLanguage]);
 
   const handleSaveApiKey = useCallback(async () => {
     const secret = apiKeyDraft.trim();
-    if (!secret) return;
+    if (!secret || !platformSession) return;
+    const generation = platformSessionGenerationRef.current;
+    const sessionAtStart = platformSession;
     setApiKeySaving(true);
     try {
       await platformApi.saveApiKey({
@@ -1607,15 +1675,13 @@ const HomePage: React.FC = () => {
         apiKey: secret,
         model: apiKeyModel.trim() || undefined,
       });
+      if (platformSessionGenerationRef.current !== generation) return;
       setApiKeyDraft('');
-      if (platformSession) {
-        await loadPlatformAccount(platformSession);
-      } else {
-        setPlatformKeys(await platformApi.listApiKeys());
-      }
+      await loadPlatformAccount(sessionAtStart, generation);
+      if (platformSessionGenerationRef.current !== generation) return;
       setApiKeyMode('user');
     } finally {
-      setApiKeySaving(false);
+      if (platformSessionGenerationRef.current === generation) setApiKeySaving(false);
     }
   }, [apiKeyDraft, apiKeyModel, apiKeyProvider, loadPlatformAccount, platformSession, setApiKeyMode]);
 
@@ -1631,21 +1697,26 @@ const HomePage: React.FC = () => {
       setBasicRetentionError(uiLanguage === 'en' ? 'Register or login to save this watchlist item.' : '注册或登录后可保存自选。');
       return;
     }
+    const generation = platformSessionGenerationRef.current;
+    const expectedUserId = platformSession.user.id;
     setPlatformWatchlistBusy(true);
     setPlatformWatchlistError('');
     setBasicRetentionError('');
     try {
       const list = await platformApi.addWatchlistItem(target);
+      if (platformSessionGenerationRef.current !== generation || list.userId !== expectedUserId) return;
       setPlatformWatchlist(list);
       setPlatformWatchlistRefresh(null);
       setPlatformWatchlistRadar(null);
+      setPlatformTriggeredAlerts([]);
       setBasicRetentionStatus(uiLanguage === 'en' ? 'Added to watchlist' : '已加入自选');
     } catch (err: unknown) {
+      if (platformSessionGenerationRef.current !== generation) return;
       const message = getParsedApiError(err).message || (uiLanguage === 'en' ? 'Watchlist update failed' : '自选更新失败');
       setPlatformWatchlistError(message);
       setBasicRetentionError(message);
     } finally {
-      setPlatformWatchlistBusy(false);
+      if (platformSessionGenerationRef.current === generation) setPlatformWatchlistBusy(false);
     }
   }, [basicSnapshot?.stockCode, platformSession, platformWatchlistBusy, query, uiLanguage]);
 
@@ -1659,32 +1730,39 @@ const HomePage: React.FC = () => {
       setBasicRetentionError(uiLanguage === 'en' ? 'Register or login to save this no-AI snapshot.' : '注册或登录后可保存这份未用 AI 快照。');
       return;
     }
+    const generation = platformSessionGenerationRef.current;
     setBasicRetentionBusy(true);
     setBasicRetentionStatus('');
     setBasicRetentionError('');
     try {
       await platformApi.saveSnapshotToHistory(basicSnapshot);
+      if (platformSessionGenerationRef.current !== generation) return;
       setBasicRetentionStatus(uiLanguage === 'en' ? 'Saved to history' : '已保存到历史');
       await Promise.all([
         refreshHistory(),
         loadStockBar(),
       ]);
     } catch (err: unknown) {
+      if (platformSessionGenerationRef.current !== generation) return;
       setBasicRetentionError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Snapshot save failed' : '快照保存失败'));
     } finally {
-      setBasicRetentionBusy(false);
+      if (platformSessionGenerationRef.current === generation) setBasicRetentionBusy(false);
     }
   }, [basicRetentionBusy, basicSnapshot, loadStockBar, platformSession, refreshHistory, uiLanguage]);
 
   const handleRefreshPlatformWatchlist = useCallback(async () => {
-    if (platformWatchlistBusy) {
+    if (platformWatchlistBusy || !platformSession) {
       return;
     }
+    const generation = platformSessionGenerationRef.current;
+    const expectedUserId = platformSession.user.id;
     setPlatformWatchlistBusy(true);
     setPlatformWatchlistError('');
     try {
-      const radar = await platformApi.watchlistRadar();
+      const radar = await platformApi.runWatchlistRadar();
+      if (platformSessionGenerationRef.current !== generation || radar.userId !== expectedUserId) return;
       setPlatformWatchlistRadar(radar);
+      setPlatformTriggeredAlerts(radar.triggeredAlerts);
       setPlatformWatchlistRefresh({
         userId: radar.userId,
         requested: radar.processed,
@@ -1693,12 +1771,66 @@ const HomePage: React.FC = () => {
         items: radar.items,
         aiUsed: radar.aiUsed,
       });
+      const [history, rules] = await Promise.all([
+        platformApi.watchlistRadarHistory(),
+        platformApi.watchlistAlertRules(),
+      ]);
+      if (
+        platformSessionGenerationRef.current !== generation
+        || history.userId !== expectedUserId
+        || rules.userId !== expectedUserId
+      ) return;
+      setPlatformRadarHistory(history);
+      setPlatformAlertRules(rules);
     } catch (err: unknown) {
+      if (platformSessionGenerationRef.current !== generation) return;
       setPlatformWatchlistError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Watchlist refresh failed' : '自选刷新失败'));
     } finally {
-      setPlatformWatchlistBusy(false);
+      if (platformSessionGenerationRef.current === generation) setPlatformWatchlistBusy(false);
     }
-  }, [platformWatchlistBusy, uiLanguage]);
+  }, [platformSession, platformWatchlistBusy, uiLanguage]);
+
+  const handleSaveWatchlistAlert = useCallback(async (alert: PlatformWatchlistRadarAlertSuggestion) => {
+    if (platformAlertBusy || !platformSession) return;
+    const generation = platformSessionGenerationRef.current;
+    const expectedUserId = platformSession.user.id;
+    setPlatformAlertBusy(true);
+    setPlatformWatchlistError('');
+    try {
+      const rules = await platformApi.saveWatchlistAlertRule({
+        stockCode: alert.stockCode,
+        ruleType: alert.type,
+        threshold: alert.threshold ?? null,
+        referenceValue: alert.referenceValue ?? null,
+        enabled: true,
+      });
+      if (platformSessionGenerationRef.current !== generation || rules.userId !== expectedUserId) return;
+      setPlatformAlertRules(rules);
+    } catch (err: unknown) {
+      if (platformSessionGenerationRef.current !== generation) return;
+      setPlatformWatchlistError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Alert save failed' : '提醒保存失败'));
+    } finally {
+      if (platformSessionGenerationRef.current === generation) setPlatformAlertBusy(false);
+    }
+  }, [platformAlertBusy, platformSession, uiLanguage]);
+
+  const handleDeleteWatchlistAlert = useCallback(async (ruleId: number) => {
+    if (platformAlertBusy || !platformSession) return;
+    const generation = platformSessionGenerationRef.current;
+    const expectedUserId = platformSession.user.id;
+    setPlatformAlertBusy(true);
+    setPlatformWatchlistError('');
+    try {
+      const rules = await platformApi.deleteWatchlistAlertRule(ruleId);
+      if (platformSessionGenerationRef.current !== generation || rules.userId !== expectedUserId) return;
+      setPlatformAlertRules(rules);
+    } catch (err: unknown) {
+      if (platformSessionGenerationRef.current !== generation) return;
+      setPlatformWatchlistError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Alert delete failed' : '提醒删除失败'));
+    } finally {
+      if (platformSessionGenerationRef.current === generation) setPlatformAlertBusy(false);
+    }
+  }, [platformAlertBusy, platformSession, uiLanguage]);
 
   useEffect(() => {
     let active = true;
@@ -5537,11 +5669,26 @@ const HomePage: React.FC = () => {
                       </div>
                     ) : null}
                     {platformWatchlistRadar ? (
-                      <WatchlistEventRadarV99
-                        language={uiLanguage}
-                        radar={platformWatchlistRadar}
-                        onSelectSymbol={(stockCode) => void handleBasicQuery(stockCode)}
-                      />
+                      <>
+                        {platformRadarHistory && platformAlertRules ? (
+                          <WatchlistAlertLoopV100
+                            language={uiLanguage}
+                            history={platformRadarHistory}
+                            rules={platformAlertRules}
+                            triggeredAlerts={platformTriggeredAlerts}
+                            busy={platformAlertBusy}
+                            onDeleteRule={(ruleId) => void handleDeleteWatchlistAlert(ruleId)}
+                          />
+                        ) : null}
+                        <WatchlistEventRadarV99
+                          language={uiLanguage}
+                          radar={platformWatchlistRadar}
+                          onSelectSymbol={(stockCode) => void handleBasicQuery(stockCode)}
+                          onSaveAlert={(alert) => void handleSaveWatchlistAlert(alert)}
+                          savedRuleKeys={new Set((platformAlertRules?.items ?? []).map((rule) => `${rule.stockCode}:${rule.ruleType}`))}
+                          alertBusy={platformAlertBusy}
+                        />
+                      </>
                     ) : null}
                     {platformWatchlistError ? (
                       <div className="text-xs text-danger" role="alert">{platformWatchlistError}</div>
