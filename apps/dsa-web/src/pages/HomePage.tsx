@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
-import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
+import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse } from '../api/platform';
 import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -16,6 +16,7 @@ import { FreeApiTrialPanelV93 } from '../components/retention/FreeApiTrialPanelV
 import { FreeApiTrialConversionV96 } from '../components/retention/FreeApiTrialConversionV96';
 import { FreeApiTrialTaskStatusV95 } from '../components/retention/FreeApiTrialTaskStatusV95';
 import { QueryChangeSummaryV93 } from '../components/retention/QueryChangeSummaryV93';
+import { WatchlistEventRadarV99 } from '../components/radar/WatchlistEventRadarV99';
 import { findNewTrialHistoryItem } from '../components/retention/freeApiTrialReport';
 import { buildQueryObservation, compareQueryObservations, readPriorQueryObservation, storeQueryObservation, type QueryChangeSummary, type QueryObservation } from '../components/retention/queryChangeTracker';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -1258,6 +1259,7 @@ const HomePage: React.FC = () => {
   const [platformKeys, setPlatformKeys] = useState<PlatformApiKeyItem[]>([]);
   const [platformWatchlist, setPlatformWatchlist] = useState<PlatformWatchlistResponse | null>(null);
   const [platformWatchlistRefresh, setPlatformWatchlistRefresh] = useState<PlatformWatchlistRefreshResponse | null>(null);
+  const [platformWatchlistRadar, setPlatformWatchlistRadar] = useState<PlatformWatchlistRadarResponse | null>(null);
   const [platformWatchlistBusy, setPlatformWatchlistBusy] = useState(false);
   const [platformWatchlistError, setPlatformWatchlistError] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -1402,6 +1404,7 @@ const HomePage: React.FC = () => {
       setPlatformKeys([]);
       setPlatformWatchlist(null);
       setPlatformWatchlistRefresh(null);
+      setPlatformWatchlistRadar(null);
       setPlatformWatchlistError('');
       setApiKeyMode('platform');
       return;
@@ -1581,6 +1584,7 @@ const HomePage: React.FC = () => {
     setPlatformKeys([]);
     setPlatformWatchlist(null);
     setPlatformWatchlistRefresh(null);
+    setPlatformWatchlistRadar(null);
     setPlatformWatchlistError('');
     setApiKeyMode('platform');
     setBasicSnapshot(null);
@@ -1634,6 +1638,7 @@ const HomePage: React.FC = () => {
       const list = await platformApi.addWatchlistItem(target);
       setPlatformWatchlist(list);
       setPlatformWatchlistRefresh(null);
+      setPlatformWatchlistRadar(null);
       setBasicRetentionStatus(uiLanguage === 'en' ? 'Added to watchlist' : '已加入自选');
     } catch (err: unknown) {
       const message = getParsedApiError(err).message || (uiLanguage === 'en' ? 'Watchlist update failed' : '自选更新失败');
@@ -1678,8 +1683,16 @@ const HomePage: React.FC = () => {
     setPlatformWatchlistBusy(true);
     setPlatformWatchlistError('');
     try {
-      const summary = await platformApi.refreshWatchlist();
-      setPlatformWatchlistRefresh(summary);
+      const radar = await platformApi.watchlistRadar();
+      setPlatformWatchlistRadar(radar);
+      setPlatformWatchlistRefresh({
+        userId: radar.userId,
+        requested: radar.processed,
+        refreshed: radar.processed,
+        degraded: radar.degraded,
+        items: radar.items,
+        aiUsed: radar.aiUsed,
+      });
     } catch (err: unknown) {
       setPlatformWatchlistError(getParsedApiError(err).message || (uiLanguage === 'en' ? 'Watchlist refresh failed' : '自选刷新失败'));
     } finally {
@@ -4050,31 +4063,7 @@ const HomePage: React.FC = () => {
   }, [basicFreeReport, basicSnapshot, uiLanguage]);
   const platformWatchlistItems = platformWatchlist?.items ?? [];
   const platformWatchlistPreview = platformWatchlistItems.slice(0, 6);
-  const platformWatchlistBoardItems = useMemo(
-    () => platformWatchlistRefresh?.items ?? [],
-    [platformWatchlistRefresh?.items],
-  );
   const platformWatchlistCount = platformWatchlist?.total ?? platformWatchlistItems.length;
-  const platformWatchlistDailyReview = useMemo(() => {
-    if (platformWatchlistBoardItems.length === 0) {
-      return null;
-    }
-    const ranked = platformWatchlistBoardItems
-      .filter((item) => typeof item.changePercent === 'number' && Number.isFinite(item.changePercent))
-      .slice()
-      .sort((left, right) => (right.changePercent ?? 0) - (left.changePercent ?? 0));
-    const flagged = platformWatchlistBoardItems.filter((item) => (
-      item.degradationStatus !== 'ok'
-      || item.freshness !== 'fresh'
-      || item.warningCodes.length > 0
-    )).length;
-    return {
-      strongest: ranked[0] ?? null,
-      weakest: ranked[ranked.length - 1] ?? null,
-      flagged,
-      total: platformWatchlistBoardItems.length,
-    };
-  }, [platformWatchlistBoardItems]);
   const workspaceHistoryCountText = uiLanguage === 'en'
     ? `${stockHistoryTotal ?? 0} reports`
     : `${stockHistoryTotal ?? 0} 份报告`;
@@ -4094,7 +4083,7 @@ const HomePage: React.FC = () => {
     && stockHistoryItems.length === 0
     && marketReviewHistoryItems.length === 0;
   const platformWatchlistLanes = Array.from(
-    new Set((platformWatchlistRefresh?.items ?? []).map((item) => item.routeLane).filter(Boolean)),
+    new Set((platformWatchlistRadar?.items ?? platformWatchlistRefresh?.items ?? []).map((item) => item.routeLane).filter(Boolean)),
   );
   const selectedAnalysisSkills = useMemo(
     () => (selectedStrategyId ? [selectedStrategyId] : undefined),
@@ -5547,87 +5536,12 @@ const HomePage: React.FC = () => {
                         ))}
                       </div>
                     ) : null}
-                    {platformWatchlistDailyReview ? (
-                      <div
-                        data-testid="platform-watchlist-daily-review"
-                        role="status"
-                        aria-live="polite"
-                        className="flex min-w-0 flex-wrap items-center gap-2 border-y border-subtle py-2 text-xs text-secondary-text"
-                      >
-                        <span className="font-semibold text-foreground">
-                          {uiLanguage === 'en' ? 'Today’s watchlist review' : '今日自选复盘'}
-                        </span>
-                        {platformWatchlistDailyReview.strongest ? (
-                          <span className="rounded-md border border-subtle px-2 py-1">
-                            {uiLanguage === 'en' ? 'Strongest' : '最强'} {platformWatchlistDailyReview.strongest.stockCode} {formatSignedBasicPercent(platformWatchlistDailyReview.strongest.changePercent)}
-                          </span>
-                        ) : null}
-                        {platformWatchlistDailyReview.weakest ? (
-                          <span className="rounded-md border border-subtle px-2 py-1">
-                            {uiLanguage === 'en' ? 'Weakest' : '最弱'} {platformWatchlistDailyReview.weakest.stockCode} {formatSignedBasicPercent(platformWatchlistDailyReview.weakest.changePercent)}
-                          </span>
-                        ) : null}
-                        <span className="rounded-md border border-subtle px-2 py-1">
-                          {uiLanguage === 'en'
-                            ? `Data flags ${platformWatchlistDailyReview.flagged}/${platformWatchlistDailyReview.total}`
-                            : `数据提醒 ${platformWatchlistDailyReview.flagged}/${platformWatchlistDailyReview.total}`}
-                        </span>
-                        <span className="rounded-md border border-subtle px-2 py-1">
-                          {uiLanguage === 'en' ? 'No AI; click a symbol to inspect' : '未用 AI；点击标的查看详情'}
-                        </span>
-                      </div>
-                    ) : null}
-                    {platformWatchlistBoardItems.length > 0 ? (
-                      <div
-                        data-testid="platform-watchlist-board"
-                        className="grid min-w-0 gap-2 text-xs text-secondary-text sm:grid-cols-2 xl:grid-cols-4"
-                      >
-                        {platformWatchlistBoardItems.map((item) => (
-                          <div
-                            key={`${item.stockCode}-${item.routeLane ?? item.market}`}
-                            className="min-w-0 rounded-lg border border-subtle bg-surface/70 p-2"
-                          >
-                            <div className="flex min-w-0 items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleBasicQuery(item.stockCode)}
-                                  data-testid={`platform-watchlist-board-query-${item.stockCode}`}
-                                  className="flex min-w-0 items-center gap-1 text-left font-medium text-foreground hover:text-primary"
-                                >
-                                  <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                  <span className="truncate">{item.stockCode}</span>
-                                </button>
-                                <div className="truncate text-[11px] text-secondary-text">
-                                  {item.stockName || item.market}
-                                </div>
-                              </div>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5 text-[11px] uppercase">
-                                {item.market}
-                              </span>
-                            </div>
-                            <div className="mt-2 grid grid-cols-2 gap-1 text-[11px]">
-                              <span className="rounded-md border border-subtle px-1.5 py-1">
-                                {uiLanguage === 'en' ? 'Price' : '价格'} {formatBasicNumber(item.currentPrice)}
-                              </span>
-                              <span className="rounded-md border border-subtle px-1.5 py-1">
-                                {uiLanguage === 'en' ? 'Chg' : '涨跌'} {formatBasicNumber(item.changePercent)}%
-                              </span>
-                            </div>
-                            <div className="mt-2 flex min-w-0 flex-wrap gap-1">
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{marketLaneLabel(item.routeLane || 'unknown_lane', uiLanguage)}</span>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{localizeRuntimeLabel(item.freshness, uiLanguage)}</span>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{localizeRuntimeLabel(item.degradationStatus, uiLanguage)}</span>
-                              <span className="rounded-md border border-subtle px-1.5 py-0.5">{item.aiUsed ? localizeRuntimeLabel('AI used', uiLanguage) : t('home.noAi')}</span>
-                              {item.warningCodes.map((warning) => (
-                                <span key={warning} className="rounded-md border border-warning/40 px-1.5 py-0.5 text-warning">
-                                  {warning}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    {platformWatchlistRadar ? (
+                      <WatchlistEventRadarV99
+                        language={uiLanguage}
+                        radar={platformWatchlistRadar}
+                        onSelectSymbol={(stockCode) => void handleBasicQuery(stockCode)}
+                      />
                     ) : null}
                     {platformWatchlistError ? (
                       <div className="text-xs text-danger" role="alert">{platformWatchlistError}</div>

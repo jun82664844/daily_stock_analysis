@@ -110,6 +110,14 @@ class PlatformWatchlistRefreshItem(BaseModel):
     route_lane: Optional[str] = None
     current_price: Optional[float] = None
     change_percent: Optional[float] = None
+    ma5: Optional[float] = None
+    ma20: Optional[float] = None
+    price_change_5d: Optional[float] = None
+    price_change_20d: Optional[float] = None
+    volume_change_percent: Optional[float] = None
+    volume_signal: Optional[str] = None
+    signal_score: Optional[int] = None
+    updated_at: Optional[str] = None
     freshness: str
     degradation_status: str
     warning_codes: List[str] = Field(default_factory=list)
@@ -124,6 +132,66 @@ class PlatformWatchlistRefreshResponse(BaseModel):
     degraded: int = 0
     items: List[PlatformWatchlistRefreshItem] = Field(default_factory=list)
     ai_used: bool = False
+
+
+class PlatformWatchlistRadarEvent(BaseModel):
+    stock_code: str
+    type: str
+    severity: str
+    direction: str
+    value: Optional[float] = None
+    reference_value: Optional[float] = None
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    source_name: Optional[str] = None
+    source_url: Optional[str] = None
+    occurred_at: Optional[str] = None
+    warning_codes: List[str] = Field(default_factory=list)
+    ai_used: bool = False
+
+
+class PlatformWatchlistRadarAlertSuggestion(BaseModel):
+    stock_code: str
+    type: str
+    threshold: Optional[float] = None
+    reference_value: Optional[float] = None
+    ai_used: bool = False
+
+
+class PlatformWatchlistRadarItem(PlatformWatchlistRefreshItem):
+    events: List[PlatformWatchlistRadarEvent] = Field(default_factory=list)
+    suggested_alerts: List[PlatformWatchlistRadarAlertSuggestion] = Field(default_factory=list)
+    source_status: str
+
+
+class PlatformWatchlistRadarSummaryItem(BaseModel):
+    stock_code: str
+    stock_name: Optional[str] = None
+    change_percent: Optional[float] = None
+
+
+class PlatformWatchlistRadarSummary(BaseModel):
+    strongest: Optional[PlatformWatchlistRadarSummaryItem] = None
+    weakest: Optional[PlatformWatchlistRadarSummaryItem] = None
+    event_count: int = 0
+    risk_count: int = 0
+    source_event_count: int = 0
+
+
+class PlatformWatchlistRadarResponse(BaseModel):
+    user_id: int
+    plan: str
+    visible_limit: int
+    total_watchlist: int
+    processed: int
+    hidden_count: int
+    degraded: int
+    summary: PlatformWatchlistRadarSummary
+    items: List[PlatformWatchlistRadarItem] = Field(default_factory=list)
+    events: List[PlatformWatchlistRadarEvent] = Field(default_factory=list)
+    generated_at: str
+    ai_used: bool = False
+    analysis_boundary: str
 
 
 class PlatformSnapshotHistorySaveRequest(BaseModel):

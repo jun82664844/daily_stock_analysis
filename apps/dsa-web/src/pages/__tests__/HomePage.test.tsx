@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
-import { platformApi } from '../../api/platform';
+import { platformApi, type PlatformWatchlistRadarItem, type PlatformWatchlistRadarResponse } from '../../api/platform';
 import { stocksApi } from '../../api/stocks';
 import type { BasicStockSnapshot } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -95,9 +95,63 @@ vi.mock('../../api/platform', () => ({
     addWatchlistItem: vi.fn(),
     removeWatchlistItem: vi.fn(),
     refreshWatchlist: vi.fn(),
+    watchlistRadar: vi.fn(),
     saveSnapshotToHistory: vi.fn(),
   },
 }));
+
+const makeRadarItem = (overrides: Partial<PlatformWatchlistRadarItem>): PlatformWatchlistRadarItem => ({
+  stockCode: 'AAPL',
+  stockName: 'Apple Inc.',
+  market: 'us',
+  routeLane: 'us_market_data',
+  currentPrice: 210,
+  changePercent: 0,
+  ma20: 205,
+  volumeChangePercent: 0,
+  signalScore: 60,
+  freshness: 'fresh',
+  degradationStatus: 'ok',
+  warningCodes: [],
+  aiUsed: false,
+  status: 'ok',
+  sourceStatus: 'no_traceable_source',
+  events: [],
+  suggestedAlerts: [],
+  ...overrides,
+});
+
+const makeRadarResponse = (
+  userId: number,
+  items: PlatformWatchlistRadarItem[],
+  degraded = 0,
+): PlatformWatchlistRadarResponse => {
+  const ranked = items
+    .filter((item) => typeof item.changePercent === 'number')
+    .slice()
+    .sort((left, right) => (right.changePercent ?? 0) - (left.changePercent ?? 0));
+  return {
+    userId,
+    plan: 'free',
+    visibleLimit: 10,
+    totalWatchlist: items.length,
+    processed: items.length,
+    hiddenCount: 0,
+    degraded,
+    summary: {
+      strongest: ranked[0] ? { stockCode: ranked[0].stockCode, stockName: ranked[0].stockName, changePercent: ranked[0].changePercent } : null,
+      weakest: ranked.at(-1) ? { stockCode: ranked.at(-1)!.stockCode, stockName: ranked.at(-1)!.stockName, changePercent: ranked.at(-1)!.changePercent } : null,
+      eventCount: items.reduce((total, item) => total + item.events.length, 0),
+      riskCount: degraded,
+      sourceEventCount: items.reduce((total, item) => total + item.events.filter((event) => event.type === 'source_update').length, 0),
+    },
+    items,
+    events: items.flatMap((item) => item.events),
+    generatedAt: '2026-07-11T09:30:00Z',
+    aiUsed: false,
+    analysisBoundary: 'information_only_not_investment_advice',
+  };
+};
 
 vi.mock('../../hooks/useTaskStream', () => ({
   useTaskStream: vi.fn(),
@@ -262,6 +316,7 @@ describe('HomePage', () => {
       items: [],
       aiUsed: false,
     });
+    vi.mocked(platformApi.watchlistRadar).mockResolvedValue(makeRadarResponse(0, []));
     vi.mocked(platformApi.saveSnapshotToHistory).mockResolvedValue({
       recordId: 0,
       stockCode: 'AAPL',
@@ -4567,6 +4622,12 @@ describe('HomePage', () => {
         { stockCode: 'BTC-USD', stockName: 'Bitcoin', market: 'crypto', routeLane: 'crypto_market_data', freshness: 'fresh', degradationStatus: 'ok', warningCodes: [], aiUsed: false, status: 'ok' },
       ],
     });
+    vi.mocked(platformApi.watchlistRadar).mockResolvedValue(makeRadarResponse(15, [
+      makeRadarItem({ stockCode: '600519', stockName: 'Kweichow Moutai', market: 'cn', routeLane: 'a_share_market_data', currentPrice: 1512.34, changePercent: 1.23 }),
+      makeRadarItem({ stockCode: 'AAPL', stockName: 'Apple Inc.', market: 'us', routeLane: 'us_market_data', currentPrice: 211.88, changePercent: -0.42 }),
+      makeRadarItem({ stockCode: 'HK00700', stockName: 'Tencent Holdings', market: 'hk', routeLane: 'hk_market_data', currentPrice: 390.2, changePercent: 0.8, degradationStatus: 'degraded', warningCodes: ['missing_history'], status: 'degraded', sourceStatus: 'source_unavailable' }),
+      makeRadarItem({ stockCode: 'BTC-USD', stockName: 'Bitcoin', market: 'crypto', routeLane: 'crypto_market_data', currentPrice: 61888.12, changePercent: 2.5 }),
+    ], 1));
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -4760,7 +4821,7 @@ describe('HomePage', () => {
     expect(panel).not.toHaveTextContent('No-AI quick');
   });
 
-  it('renders refreshed watchlist board rows and runs no-AI quick query from a row', async () => {
+  it('renders the V99 watchlist event radar and runs a no-AI quick query from a row', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
     vi.mocked(platformApi.current).mockResolvedValue({
@@ -4872,6 +4933,34 @@ describe('HomePage', () => {
         },
       ],
     });
+    vi.mocked(platformApi.watchlistRadar).mockResolvedValue(makeRadarResponse(18, [
+      makeRadarItem({ stockCode: '600519', stockName: 'Kweichow Moutai', market: 'cn', routeLane: 'a_share_market_data', currentPrice: 1512.34, changePercent: 1.23, ma20: 1490 }),
+      makeRadarItem({ stockCode: 'AAPL', stockName: 'Apple Inc.', market: 'us', routeLane: 'us_market_data', currentPrice: 211.88, changePercent: -0.42, ma20: 205 }),
+      makeRadarItem({
+        stockCode: 'HK00700',
+        stockName: 'Tencent Holdings',
+        market: 'hk',
+        routeLane: 'hk_market_data',
+        currentPrice: 390.2,
+        changePercent: 0.8,
+        ma20: 376,
+        degradationStatus: 'degraded',
+        warningCodes: ['missing_history'],
+        status: 'degraded',
+        sourceStatus: 'source_unavailable',
+        events: [{ stockCode: 'HK00700', type: 'data_quality', severity: 'warning', direction: 'degraded', warningCodes: ['missing_history'], aiUsed: false }],
+        suggestedAlerts: [{ stockCode: 'HK00700', type: 'ma20_cross', threshold: null, referenceValue: 376, aiUsed: false }],
+      }),
+      makeRadarItem({
+        stockCode: 'BTC-USD',
+        stockName: 'Bitcoin',
+        market: 'crypto',
+        routeLane: 'crypto_market_data',
+        currentPrice: 61888.12,
+        changePercent: 2.5,
+        events: [{ stockCode: 'BTC-USD', type: 'price_move', severity: 'warning', direction: 'up', value: 2.5, warningCodes: [], aiUsed: false }],
+      }),
+    ], 1));
     vi.mocked(stocksApi.snapshot).mockResolvedValue({
       stockCode: 'HK00700',
       stockName: 'Tencent Holdings',
@@ -4932,26 +5021,21 @@ describe('HomePage', () => {
     await screen.findByTestId('platform-watchlist-panel');
     fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
 
-    const board = await screen.findByTestId('platform-watchlist-board');
-    const dailyReview = await screen.findByTestId('platform-watchlist-daily-review');
-    expect(dailyReview).toHaveTextContent('Strongest BTC-USD +2.5%');
-    expect(dailyReview).toHaveTextContent('Weakest AAPL -0.42%');
-    expect(dailyReview).toHaveTextContent('Data flags 1/4');
-    expect(dailyReview).toHaveTextContent('No AI');
-    expect(board).toHaveTextContent('Tencent Holdings');
-    expect(board).toHaveTextContent('HK00700');
-    expect(board).toHaveTextContent('390.2');
-    expect(board).toHaveTextContent('0.8%');
-    expect(board).toHaveTextContent('HK market data');
-    expect(board).toHaveTextContent('degraded');
-    expect(board).toHaveTextContent('missing_history');
-    expect(board).toHaveTextContent('Apple Inc.');
-    expect(board).toHaveTextContent('AAPL');
-    expect(board).toHaveTextContent('US market data');
-    expect(board).toHaveTextContent('fresh');
-    expect(board).toHaveTextContent('No AI');
+    const radarPanel = await screen.findByTestId('watchlist-event-radar-v99');
+    expect(radarPanel).toHaveTextContent('Today’s watchlist event radar');
+    expect(radarPanel).toHaveTextContent(/Strongest\s*BTC-USD \+2\.5%/);
+    expect(radarPanel).toHaveTextContent(/Weakest\s*AAPL -0\.42%/);
+    expect(radarPanel).toHaveTextContent('Risk flags1');
+    expect(radarPanel).toHaveTextContent('No AI used');
+    expect(radarPanel).toHaveTextContent('Tencent Holdings');
+    expect(radarPanel).toHaveTextContent('HK00700');
+    expect(radarPanel).toHaveTextContent('390.2');
+    expect(radarPanel).toHaveTextContent('+0.8%');
+    expect(radarPanel).toHaveTextContent('Market data needs a freshness check');
+    expect(radarPanel).toHaveTextContent('Apple Inc.');
+    expect(radarPanel).toHaveTextContent('AAPL');
 
-    fireEvent.click(screen.getByTestId('platform-watchlist-board-query-HK00700'));
+    fireEvent.click(screen.getByTestId('watchlist-radar-symbol-HK00700'));
 
     await waitFor(() => {
       expect(stocksApi.snapshot).toHaveBeenCalledWith('HK00700');

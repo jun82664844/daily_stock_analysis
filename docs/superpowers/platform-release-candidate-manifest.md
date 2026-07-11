@@ -1694,3 +1694,38 @@ Acceptance boundary:
 - Only admins can read the bounded funnel; ordinary users receive `403`.
 - HomePage event sends remain best-effort and preserve the complete free query and trial experience.
 - No production analytics vendor, real payment, production secret, public deployment, user-data deletion, or investment advice is introduced.
+
+## V99 Watchlist Event Radar Manifest Addendum
+
+Status: local-only user retention and daily review workflow. No production launch approval.
+
+New/updated files:
+
+- `.gitignore`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/platform.py`
+- `src/platform_watchlist.py`
+- `src/platform_watchlist_radar.py`
+- `tests/test_platform_watchlist_event_radar_v99.py`
+- `tests/test_platform_watchlist_event_radar_v99_verifier.py`
+- `scripts/verify_platform_watchlist_event_radar_v99.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/radar/WatchlistEventRadarV99.tsx`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistEventRadarV99.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v99-watchlist-event-radar.md`
+
+Acceptance boundary:
+
+- The radar is private to the signed-in platform user, deterministic, no-AI, and does not run public search or feed ingestion.
+- Free and paid plans share the complete visible structure; processing limits are 10 and 50 respectively without deleting stored watchlist rows.
+- Only persisted items with traceable HTTP(S) sources can become source events; failures degrade without provider error disclosure.
+- Suggested alerts are not persisted into the global alert table until platform-user ownership exists.
+- No real payment, production key, production deployment, data-license approval, user-data deletion, or investment advice is introduced.

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [fix] Register accepted analysis tasks locally before SSE updates, refresh the platform browser E2E for the verified registration flow, and isolate platform-auth environment state across backend tests.
 - [feat] Automatically open a completed free platform-API trial report and show a localized premium-options entry without enabling real payment.
 - [feat] Add a privacy-bounded local V97 funnel for free query, registration, API trial, report opening, and premium-options viewing.
+- [新功能] 新增 V99 用户自选股事件雷达，以无 AI 方式汇总价格、MA20、量能、数据质量和可追溯来源事件，并为免费版与高级版提供相同的信息结构。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->

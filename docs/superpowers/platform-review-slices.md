@@ -1403,3 +1403,46 @@ Acceptance:
 - Frontend tests prove stable local session behavior and complete Chinese/English funnel labels.
 - Browser E2E proves the five events follow the actual guest-to-account flow in order.
 - Build, platform regressions, release package, V1 operability, V2 readiness, live 8018, and dirty-tree gates pass.
+
+## V99 Watchlist Event Radar Addendum
+
+Scope: local-only, user-owned daily watchlist review and event prioritization.
+
+Backend platform foundation:
+
+- `src/platform_watchlist.py`
+- `src/platform_watchlist_radar.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/platform.py`
+
+Frontend platform experience:
+
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/components/radar/WatchlistEventRadarV99.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Tests and verifiers:
+
+- `tests/test_platform_watchlist_event_radar_v99.py`
+- `tests/test_platform_watchlist_event_radar_v99_verifier.py`
+- `scripts/verify_platform_watchlist_event_radar_v99.py`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/radar/__tests__/WatchlistEventRadarV99.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Docs and config:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v99-watchlist-event-radar.md`
+
+Review focus:
+
+- User identity owns the complete request path; no global alert or cross-user watchlist state is reused.
+- Source events require a traceable persisted URL and do not promote placeholder text into news.
+- Free/paid differences affect processing capacity only; both plans retain the same information architecture.
+- No AI quota, public search, live feed ingestion, real payment, production key, or user-data deletion is introduced.

@@ -293,6 +293,14 @@ export interface PlatformWatchlistRefreshItem {
   routeLane?: string | null;
   currentPrice?: number | null;
   changePercent?: number | null;
+  ma5?: number | null;
+  ma20?: number | null;
+  priceChange5d?: number | null;
+  priceChange20d?: number | null;
+  volumeChangePercent?: number | null;
+  volumeSignal?: string | null;
+  signalScore?: number | null;
+  updatedAt?: string | null;
   freshness: string;
   degradationStatus: string;
   warningCodes: string[];
@@ -307,6 +315,64 @@ export interface PlatformWatchlistRefreshResponse {
   degraded: number;
   items: PlatformWatchlistRefreshItem[];
   aiUsed: boolean;
+}
+
+export interface PlatformWatchlistRadarEvent {
+  stockCode: string;
+  type: string;
+  severity: string;
+  direction: string;
+  value?: number | null;
+  referenceValue?: number | null;
+  title?: string | null;
+  summary?: string | null;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+  occurredAt?: string | null;
+  warningCodes: string[];
+  aiUsed: boolean;
+}
+
+export interface PlatformWatchlistRadarAlertSuggestion {
+  stockCode: string;
+  type: string;
+  threshold?: number | null;
+  referenceValue?: number | null;
+  aiUsed: boolean;
+}
+
+export interface PlatformWatchlistRadarItem extends PlatformWatchlistRefreshItem {
+  events: PlatformWatchlistRadarEvent[];
+  suggestedAlerts: PlatformWatchlistRadarAlertSuggestion[];
+  sourceStatus: string;
+}
+
+export interface PlatformWatchlistRadarSummaryItem {
+  stockCode: string;
+  stockName?: string | null;
+  changePercent?: number | null;
+}
+
+export interface PlatformWatchlistRadarResponse {
+  userId: number;
+  plan: PlatformPlan | string;
+  visibleLimit: number;
+  totalWatchlist: number;
+  processed: number;
+  hiddenCount: number;
+  degraded: number;
+  summary: {
+    strongest?: PlatformWatchlistRadarSummaryItem | null;
+    weakest?: PlatformWatchlistRadarSummaryItem | null;
+    eventCount: number;
+    riskCount: number;
+    sourceEventCount: number;
+  };
+  items: PlatformWatchlistRadarItem[];
+  events: PlatformWatchlistRadarEvent[];
+  generatedAt: string;
+  aiUsed: boolean;
+  analysisBoundary: string;
 }
 
 export interface PlatformSnapshotHistorySaveResponse {
@@ -413,6 +479,11 @@ export const platformApi = {
   refreshWatchlist: async (): Promise<PlatformWatchlistRefreshResponse> => {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/watchlist/refresh');
     return toCamelCase<PlatformWatchlistRefreshResponse>(response.data);
+  },
+
+  watchlistRadar: async (): Promise<PlatformWatchlistRadarResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/watchlist/radar');
+    return toCamelCase<PlatformWatchlistRadarResponse>(response.data);
   },
 
   saveSnapshotToHistory: async (snapshot: unknown): Promise<PlatformSnapshotHistorySaveResponse> => {

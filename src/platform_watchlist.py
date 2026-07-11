@@ -115,6 +115,9 @@ class PlatformWatchlistService:
             snapshot = self.basic_query_service.get_snapshot(stock_code)
             route = snapshot.get("route") or {}
             quote = snapshot.get("quote") or {}
+            indicators = snapshot.get("indicators") or {}
+            intelligence = snapshot.get("intelligence") or {}
+            signal_score = intelligence.get("signal_score") or {}
             degradation = snapshot.get("degradation") or {}
             warnings = snapshot.get("warnings") or []
             diagnostics = snapshot.get("diagnostics") or {}
@@ -126,6 +129,14 @@ class PlatformWatchlistService:
                 "route_lane": route.get("data_source_lane") or diagnostics.get("route_lane"),
                 "current_price": quote.get("current_price"),
                 "change_percent": quote.get("change_percent"),
+                "ma5": indicators.get("ma5"),
+                "ma20": indicators.get("ma20"),
+                "price_change_5d": indicators.get("price_change_5d"),
+                "price_change_20d": indicators.get("price_change_20d"),
+                "volume_change_percent": indicators.get("volume_change_vs_ma5"),
+                "volume_signal": indicators.get("volume_price_signal"),
+                "signal_score": signal_score.get("score"),
+                "updated_at": quote.get("update_time"),
                 "freshness": quote.get("freshness") or "unavailable",
                 "degradation_status": degradation.get("status") or status,
                 "warning_codes": [str(item.get("code")) for item in warnings if isinstance(item, dict) and item.get("code")],
@@ -140,6 +151,14 @@ class PlatformWatchlistService:
                 "route_lane": None,
                 "current_price": None,
                 "change_percent": None,
+                "ma5": None,
+                "ma20": None,
+                "price_change_5d": None,
+                "price_change_20d": None,
+                "volume_change_percent": None,
+                "volume_signal": None,
+                "signal_score": None,
+                "updated_at": None,
                 "freshness": "unavailable",
                 "degradation_status": "degraded",
                 "warning_codes": ["refresh_failed"],

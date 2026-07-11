@@ -192,3 +192,13 @@
 - General admin audit output strips the internal retention session hash and may expose only the fixed event source.
 - Frontend tracking is best-effort. Telemetry failure must never block free lookup, registration, API-trial submission, report opening, or account navigation.
 - V97 remains local-only, no-AI aggregation. It is not cross-site tracking, production analytics approval, real payment, or investment advice.
+
+## Watchlist Event Radar V99
+
+- `GET /api/v1/platform/watchlist/radar` is authenticated and scoped to the current platform user. It must never return another user's watchlist, account data, API key, token, or raw provider error.
+- The radar is no-AI by default. It does not consume platform API, BYOK, or local-model quota and does not run public search or live intelligence-feed ingestion.
+- Market events are deterministic summaries of current price movement, MA20 position, volume versus MA5, and data freshness. Missing or stale data must remain visible as a data-quality event.
+- A source update may be shown only when an already persisted intelligence item has a title, source, timestamp, and valid HTTP(S) URL. Placeholder quick-snapshot copy is not a news event.
+- Free and paid plans use the same visible radar structure. Free processes up to 10 watchlist symbols per review; pro, premium, and enterprise process up to 50. Symbols beyond the current review limit remain stored and are not deleted.
+- Suggested alerts are informational observation conditions only. V99 does not write them into the existing global alert table because that table does not yet provide platform-user ownership.
+- V99 remains local-only. It does not approve production market-data licensing, real payment, production deployment, or investment advice.

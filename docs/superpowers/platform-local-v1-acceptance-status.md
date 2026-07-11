@@ -455,3 +455,13 @@ git diff --check
 - The cockpit is derived from existing no-AI snapshot data and does not introduce AI calls, public search, real payment, production deployment, or real API Key handling.
 - Added `tests/test_platform_free_broker_conversion_v73.py` and `scripts/verify_platform_free_broker_conversion_v73.py`; the verifier prints `DSA_PLATFORM_FREE_BROKER_CONVERSION_V73_OK` only when required local checks pass.
 - V73 remains local-only. It is not public launch approval, not real payment, not production deployment, do not commit real API Key, and not investment advice.
+
+## 2026-07-11 V99 Watchlist Event Radar Acceptance
+
+- Signed-in platform users can build a private daily radar from their own A-share, US, Hong Kong, and crypto watchlist symbols.
+- The radar returns price movement, MA5/MA20, 5/20-day changes, volume versus MA5, signal score, freshness, event priority, and suggested observation alerts without invoking AI.
+- Only traceable persisted intelligence rows can appear as source updates. Missing feeds degrade to `source_unavailable` or `no_traceable_source` without exposing provider exceptions.
+- Free and paid users see the same radar layout. Free processes 10 symbols per review and paid plans process 50; excess watchlist rows remain stored.
+- Backend V17/V18/V99 compatibility tests and V99 endpoint isolation tests pass. Frontend API, component, HomePage, lint, build, verifier, and browser evidence are required before final acceptance.
+- The verifier prints `DSA_PLATFORM_WATCHLIST_EVENT_RADAR_V99_OK` only after required local checks pass.
+- V99 remains local-only. It is not public launch approval, real payment, production deployment, production key handling, or investment advice.

@@ -37,6 +37,7 @@ from api.v1.schemas.platform import (
     PlatformStatusResponse,
     PlatformUserResponse,
     PlatformWatchlistRefreshResponse,
+    PlatformWatchlistRadarResponse,
     PlatformWatchlistResponse,
     PlatformWatchlistUpsertRequest,
 )
@@ -59,6 +60,7 @@ from src.platform_audit import PlatformAuditLogger, redact_metadata
 from src.platform_rate_limit import check_platform_rate_limit
 from src.platform_retention_funnel import PlatformRetentionFunnelService
 from src.platform_watchlist import PlatformWatchlistService
+from src.platform_watchlist_radar import PlatformWatchlistRadarService
 from src.storage import DatabaseManager
 from src.services.local_functional_status import build_local_functional_status
 from src.services.platform_ops_health import build_platform_ops_health_status
@@ -430,6 +432,15 @@ async def platform_watchlist_remove(request: Request, stock_code: str):
 async def platform_watchlist_refresh(request: Request):
     identity = _require_identity(request)
     return PlatformWatchlistService().refresh(int(identity.user_id))
+
+
+@router.get("/watchlist/radar", response_model=PlatformWatchlistRadarResponse)
+async def platform_watchlist_radar(request: Request):
+    identity = _require_identity(request)
+    return PlatformWatchlistRadarService().build(
+        user_id=int(identity.user_id),
+        plan=identity.plan,
+    )
 
 
 @router.post("/history/snapshot", response_model=PlatformSnapshotHistorySaveResponse)

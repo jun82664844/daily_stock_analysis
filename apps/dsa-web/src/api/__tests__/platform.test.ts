@@ -208,6 +208,67 @@ describe('platformApi', () => {
     expect(removed.total).toBe(0);
   });
 
+  it('loads the user-scoped watchlist event radar as camelCase', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        user_id: 15,
+        plan: 'free',
+        visible_limit: 10,
+        total_watchlist: 1,
+        processed: 1,
+        hidden_count: 0,
+        degraded: 0,
+        summary: {
+          strongest: { stock_code: 'AAPL', stock_name: 'Apple Inc.', change_percent: 3.2 },
+          weakest: { stock_code: 'AAPL', stock_name: 'Apple Inc.', change_percent: 3.2 },
+          event_count: 1,
+          risk_count: 0,
+          source_event_count: 0,
+        },
+        items: [{
+          stock_code: 'AAPL',
+          stock_name: 'Apple Inc.',
+          market: 'us',
+          route_lane: 'us_market_data',
+          current_price: 210,
+          change_percent: 3.2,
+          ma20: 205,
+          volume_change_percent: 20,
+          signal_score: 75,
+          freshness: 'fresh',
+          degradation_status: 'ok',
+          warning_codes: [],
+          ai_used: false,
+          status: 'ok',
+          source_status: 'no_traceable_source',
+          events: [{
+            stock_code: 'AAPL',
+            type: 'price_move',
+            severity: 'warning',
+            direction: 'up',
+            value: 3.2,
+            warning_codes: [],
+            ai_used: false,
+          }],
+          suggested_alerts: [{ stock_code: 'AAPL', type: 'ma20_cross', reference_value: 205, ai_used: false }],
+        }],
+        events: [],
+        generated_at: '2026-07-11T09:30:00Z',
+        ai_used: false,
+        analysis_boundary: 'information_only_not_investment_advice',
+      },
+    });
+
+    const result = await platformApi.watchlistRadar();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/platform/watchlist/radar');
+    expect(result.visibleLimit).toBe(10);
+    expect(result.summary.strongest?.stockCode).toBe('AAPL');
+    expect(result.items[0].volumeChangePercent).toBe(20);
+    expect(result.items[0].suggestedAlerts[0].referenceValue).toBe(205);
+    expect(result.aiUsed).toBe(false);
+  });
+
   it('creates a local sandbox checkout session', async () => {
     post.mockResolvedValueOnce({
       data: {
