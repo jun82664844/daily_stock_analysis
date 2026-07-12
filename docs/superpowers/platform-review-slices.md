@@ -1953,3 +1953,14 @@ This untracked planning file appeared during V112 implementation. It is preserve
 - `.gitignore`
 
 Boundary: DSA-native local implementation only; no OpenStock AGPL code copied, no real payment/key/deployment, and no investment advice.
+
+## ai-market-pulse Isolated POC Review Slice
+
+### docs-and-config
+
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/third-party/ai-market-pulse-poc.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+The ignored checkout under `external/ai-market-pulse` is local evidence only and is not part of the DSA release package. No upstream runtime is connected to DSA.

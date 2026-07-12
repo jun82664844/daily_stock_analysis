@@ -2216,3 +2216,14 @@ Acceptance marker: `DSA_PLATFORM_MARKET_WORKSPACE_V113_OK markets=cn,hk,us guest
 Performance evidence: cold API overview measured A-share 2.06 seconds for four items, Hong Kong 2.01 seconds for four items, and US 0.31 seconds for five items. The browser rendered the same isolated market counts without cross-market leftovers or console errors.
 
 Boundary: local DSA-native implementation only. OpenStock AGPL source was not copied or installed. No real payment, production key, public deployment, data-license approval or investment-advice claim is included.
+
+## ai-market-pulse Isolated POC Documentation
+
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/third-party/ai-market-pulse-poc.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Local evidence: ignored checkout at commit `40da189d8b6f1d7c23b0fafa5fcf8788710db2c9`, MIT license, 104 upstream tests passed, Ruff passed, offline demo generated and browser-rendered without console errors.
+
+Boundary: this is not a DSA runtime integration or a fifth production feature. The external checkout, virtual environment and demo outputs are excluded from DSA Git and release artifacts. Online providers, notifications, portfolio imports, trading language, real keys and the standalone site remain disabled.
