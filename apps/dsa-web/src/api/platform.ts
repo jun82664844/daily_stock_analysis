@@ -115,6 +115,21 @@ export interface PlatformAccountSummary extends PlatformAuthPayload {
   recommendedQueryMode: 'platform' | 'user' | 'local' | string;
 }
 
+export interface PlatformLocalModelStatus {
+  enabled: boolean;
+  reachable: boolean;
+  ready: boolean;
+  quickReady: boolean;
+  deepReady: boolean;
+  reason: string;
+  runtime: 'ollama' | string;
+  quickModel?: string | null;
+  deepModel?: string | null;
+  quickModelAvailable: boolean;
+  deepModelAvailable: boolean;
+  maxConcurrent: number;
+}
+
 export interface BillingCheckoutSession {
   id?: number | null;
   userId?: number | null;
@@ -495,6 +510,11 @@ export const platformApi = {
   status: async (): Promise<{ platformAuthEnabled: boolean }> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/status');
     return toCamelCase<{ platformAuthEnabled: boolean }>(response.data);
+  },
+
+  localModelStatus: async (): Promise<PlatformLocalModelStatus> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/local-model/status');
+    return toCamelCase<PlatformLocalModelStatus>(response.data);
   },
 
   requestRegistrationCode: async (email: string): Promise<PlatformRegistrationVerificationResponse> => {

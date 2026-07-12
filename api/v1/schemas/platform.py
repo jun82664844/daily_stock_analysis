@@ -81,6 +81,10 @@ class PlatformPlanUpdateRequest(BaseModel):
     plan: str = Field(..., min_length=2, max_length=32)
 
 
+class PlatformFeatureToggleRequest(BaseModel):
+    enabled: bool
+
+
 class PlatformWatchlistUpsertRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

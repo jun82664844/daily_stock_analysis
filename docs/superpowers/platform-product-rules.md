@@ -258,6 +258,7 @@
 
 - The screening page provides market information, observed metrics, source freshness, data coverage, comparison, watchlist actions, and user-defined condition alerts only.
 - Anonymous users may read screening status/strategies/hotspots and run the no-AI screening task. AlphaSift install and configuration writes remain authenticated administrative actions.
+- Only a platform administrator or the existing local administrator session may change the AlphaSift feature flag. Ordinary users never receive a configuration-write control.
 - DSA must not present buy/sell/hold instructions, target prices, return forecasts, guaranteed outcomes, or model output as an investment recommendation.
 - Alerts report observed data events against thresholds chosen by the user. They are notifications, not trading instructions.
 - Free and paid users see the same information architecture. Paid capability may improve source/API availability or user-supplied API access, but must not change the information-only boundary.
@@ -273,4 +274,32 @@
 - The recent-snapshot fast path does not block on per-symbol network enrichment; detailed company data loads only after the user opens a symbol.
 - No-AI screening does not run AlphaSift pre-rank candidate-context providers; those providers are reserved for an explicitly selected AI/deep path.
 - A cache inside the selected V105 TTL is labeled as cached data, not as unavailable or a stale-source failure.
+- The default TTL is market-aware: 5 minutes during the A-share session, 18 hours on weekday off-hours, and 72 hours on weekends. Forced refresh always bypasses the cache.
+- Long source refreshes keep reporting bounded, elapsed-time progress below 90%; the UI must not present a fixed 75% state as completed work.
 - Every V105 surface remains information-and-data only and must not produce buy/sell/hold instructions, target prices, or expected returns.
+
+## V106 Financial Research Workflows
+
+- Anonymous, free, and paid users may open the same four research workflows: company snapshot, operating-data review, sector overview, and public-event calendar.
+- V106 reads the existing DSA no-AI stock snapshot. It does not run an external agent, public search, Claude API, or an MCP connector.
+- The local `anthropics/financial-services` checkout is a read-only research-method reference. Its presence is not a market-data license, redistribution approval, or production connector approval.
+- Only four explicitly allowlisted source references are recognized. Investment-banking, private-equity, wealth-management, KYC, accounting, transaction, and recommendation workflows remain disabled.
+- Missing facts remain visible as `partial`; V106 must not infer or fabricate revenue, profit, sector, events, valuation, or freshness fields.
+- Placeholder news, filing, profile, and data-quality lanes are context only and must not make the public-event calendar `available`; at least one non-placeholder event source is required.
+- Monetary and quantity facts carry explicit currency/unit metadata, and upstream growth percentages must not be scaled a second time in the browser.
+- The third-party reference is considered installed only when its Apache-2.0 license, allowlisted files, and accepted commit all match.
+- Chinese and English surfaces must show source installation, Apache-2.0 attribution, connector-disabled state, external-code-not-executed state, AI usage, and the information-only boundary.
+- V106 does not produce buy/sell/hold instructions, target prices, expected returns, guaranteed outcomes, or investment recommendations.
+
+## V107 Ollama Local AI Retention
+
+- Guest users continue to receive no-AI quote lookup and free deterministic research without login.
+- Signed-in free users may use the local Ollama lane under the separate `ai_local` weekly quota. Paid plans receive a larger local quota; platform API and BYOK remain separate buckets.
+- Fast local analysis and deep local analysis use separately configured models. A missing deep model must not disable an available fast lane.
+- Local mode never falls back to a paid remote provider. Disabled, unreachable, missing-model, busy and timeout states degrade explicitly without consuming a failed preflight quota.
+- A synchronous local request that fails after reservation but before producing a report releases its uniquely referenced `ai_local` reservation and returns a stable local-model error code.
+- The public local-model status endpoint exposes readiness and model labels only. It must not expose base URLs, paths, prompts, headers, environment values or keys.
+- Local-model reports provide information and data only. Before persistence, action labels are neutralized and target price, entry, stop-loss, take-profit, position sizing and action checklist fields are cleared.
+- Current and legacy Ollama reports are sanitized on read without deleting or rewriting stored user data. Their cards and report summaries use an information-only label instead of buy/sell/hold labels.
+- The legacy base weekly-quota view counts only platform `ai_quick` usage. `ai_local` usage is charged exclusively to the local-model bucket and must not reduce the platform API trial balance.
+- V107 is local development functionality. It does not approve production deployment, real payment, market-data licensing or public model capacity.

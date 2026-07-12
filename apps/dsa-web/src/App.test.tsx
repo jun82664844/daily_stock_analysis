@@ -48,6 +48,10 @@ vi.mock('./pages/DecisionSignalsPage', () => ({
   default: () => <div data-testid="decision-signals-page">Decision signals</div>,
 }));
 
+vi.mock('./pages/ResearchWorkflowsPage', () => ({
+  default: () => <div data-testid="research-workflows-page">Research workflows</div>,
+}));
+
 vi.mock('./pages/BacktestPage', () => ({
   default: () => <div data-testid="backtest-page">Backtest</div>,
 }));
@@ -179,6 +183,16 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenCalledWith('/decision-signals');
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('routes /research to the public financial research center', async () => {
+    window.history.pushState({}, '', '/research');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('research-workflows-page')).toBeInTheDocument();
+    expect(setCurrentRoute).toHaveBeenCalledWith('/research');
+    expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 
   it('redirects authenticated login visits back to the home page', async () => {

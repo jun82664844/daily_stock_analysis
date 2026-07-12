@@ -235,6 +235,41 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/screening/__tests__/MarketScreeningCardV104.test.tsx",
     "apps/dsa-web/src/components/screening/__tests__/ScreeningCompareTrayV104.test.tsx",
     "apps/dsa-web/src/components/screening/__tests__/ScreeningReminderPanelV104.test.tsx",
+    "scripts/verify_platform_financial_research_workflows_v106.py",
+    "tests/test_platform_financial_research_workflows_v106_verifier.py",
+    "tests/test_financial_research_workflow_service_v106.py",
+    "tests/test_financial_research_workflow_api_v106.py",
+    "src/services/financial_research_workflow_service.py",
+    "apps/dsa-web/src/api/researchWorkflows.ts",
+    "apps/dsa-web/src/api/__tests__/researchWorkflows.test.ts",
+    "apps/dsa-web/src/pages/ResearchWorkflowsPage.tsx",
+    "apps/dsa-web/src/pages/__tests__/ResearchWorkflowsPage.test.tsx",
+    "docs/superpowers/plans/2026-07-11-dsa-v106-financial-research-workflows.md",
+    "docs/superpowers/third-party/anthropic-financial-services.md",
+    "scripts/verify_platform_ollama_local_retention_v107.py",
+    "tests/test_platform_ollama_local_retention_v107_verifier.py",
+    "tests/test_ollama_runtime_service_v107.py",
+    "tests/test_platform_ollama_status_api_v107.py",
+    "tests/test_platform_ollama_analysis_v107.py",
+    "src/services/ollama_runtime_service.py",
+    "apps/dsa-web/src/components/retention/LocalModelStatusV107.tsx",
+    "apps/dsa-web/src/components/retention/__tests__/LocalModelStatusV107.test.tsx",
+    "docs/superpowers/plans/2026-07-11-dsa-v107-ollama-local-retention.md",
+    "docs/superpowers/plans/2026-07-12-dsa-v108-kronos-rtx5090-runtime.md",
+    "scripts/verify_platform_kronos_rtx5090_v108.py",
+    "tests/test_platform_kronos_rtx5090_v108_verifier.py",
+    "tests/test_kronos_runtime_v108.py",
+    "src/services/kronos_runtime.py",
+    "docs/superpowers/plans/2026-07-12-dsa-v109-a-stock-data-live-channels.md",
+    "scripts/verify_platform_a_stock_data_live_v109.py",
+    "docs/superpowers/plans/2026-07-12-dsa-v110-global-equity-public-data.md",
+    "scripts/verify_platform_global_equity_public_data_v110.py",
+    "tests/test_platform_global_equity_public_data_v110_verifier.py",
+    "tests/test_global_equity_enrichment_service_v110.py",
+    "tests/test_basic_query_global_equity_v110.py",
+    "src/services/global_equity_enrichment_service.py",
+    "apps/dsa-web/src/components/research/GlobalEquityEnrichmentCard.tsx",
+    "apps/dsa-web/src/components/research/__tests__/GlobalEquityEnrichmentCard.test.tsx",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -302,6 +337,11 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_daily_research_cockpit_v103.py",
     "scripts/verify_platform_market_screening_alerts_v104.py",
     "scripts/verify_platform_fast_useful_screening_v105.py",
+    "scripts/verify_platform_financial_research_workflows_v106.py",
+    "scripts/verify_platform_ollama_local_retention_v107.py",
+    "scripts/verify_platform_kronos_rtx5090_v108.py",
+    "scripts/verify_platform_a_stock_data_live_v109.py",
+    "scripts/verify_platform_global_equity_public_data_v110.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 
@@ -489,7 +529,7 @@ def classify_dirty_path(path: str) -> str | None:
         return "build-and-ignore-impact"
     if normalized == "requirements.txt":
         return "manual-confirmation"
-    if normalized.startswith("docs/superpowers/") or normalized == "docs/CHANGELOG.md":
+    if normalized.startswith("docs/superpowers/") or normalized in {"docs/CHANGELOG.md", ".env.example"}:
         return "docs-and-config"
     if normalized in {"apps/dsa-web/playwright.config.ts"} or normalized.startswith("apps/dsa-web/e2e/"):
         return "tests-and-verifiers"

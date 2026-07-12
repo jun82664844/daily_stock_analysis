@@ -18,6 +18,32 @@ describe('platformApi', () => {
     del.mockReset();
   });
 
+  it('loads public Ollama readiness as camelCase', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        enabled: true,
+        reachable: true,
+        ready: true,
+        quick_ready: true,
+        deep_ready: true,
+        reason: 'ready',
+        runtime: 'ollama',
+        quick_model: 'quick-model',
+        deep_model: 'deep-model',
+        quick_model_available: true,
+        deep_model_available: true,
+        max_concurrent: 1,
+      },
+    });
+
+    const result = await platformApi.localModelStatus();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/platform/local-model/status');
+    expect(result.quickReady).toBe(true);
+    expect(result.deepModel).toBe('deep-model');
+    expect(result.maxConcurrent).toBe(1);
+  });
+
   it('requests a local registration verification code as camelCase', async () => {
     post.mockResolvedValueOnce({
       data: {

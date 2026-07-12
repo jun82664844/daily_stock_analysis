@@ -1940,3 +1940,156 @@ The release boundary remains No-go for real payment, production API keys, produc
 - `tests/test_platform_release_candidate_package.py`
 
 Acceptance marker: `DSA_PLATFORM_FAST_USEFUL_SCREENING_V105_OK`.
+
+## V106 Financial Research Workflows Package
+
+- `.env.example`
+- `.gitignore`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `src/services/financial_research_workflow_service.py`
+- `apps/dsa-web/src/App.tsx`
+- `apps/dsa-web/src/App.test.tsx`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/api/researchWorkflows.ts`
+- `apps/dsa-web/src/api/__tests__/researchWorkflows.test.ts`
+- `apps/dsa-web/src/pages/ResearchWorkflowsPage.tsx`
+- `apps/dsa-web/src/pages/__tests__/ResearchWorkflowsPage.test.tsx`
+- `tests/test_financial_research_workflow_service_v106.py`
+- `tests/test_financial_research_workflow_api_v106.py`
+- `tests/test_platform_financial_research_workflows_v106_verifier.py`
+- `scripts/verify_platform_financial_research_workflows_v106.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v106-financial-research-workflows.md`
+- `docs/superpowers/third-party/anthropic-financial-services.md`
+
+The external checkout at `external/anthropic-financial-services` is intentionally ignored and is not included in the DSA commit. Accepted source commit: `4aa51ed3d379731f8f9beff498d749580372699c`; license: Apache-2.0.
+
+Acceptance marker: `DSA_PLATFORM_FINANCIAL_RESEARCH_WORKFLOWS_V106_OK`.
+
+Boundary: local-only, no external-code execution, no external connectors, no AI or public search by default, no production market-data license approval, and no investment advice.
+
+## V107 Ollama Local AI Retention Package
+
+- `.env.example`
+- `.gitignore`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/analysis.py`
+- `api/v1/endpoints/platform.py`
+- `src/analyzer.py`
+- `src/core/pipeline.py`
+- `src/services/analysis_service.py`
+- `src/services/ollama_runtime_service.py`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/components/retention/LocalModelStatusV107.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/LocalModelStatusV107.test.tsx`
+- `tests/test_ollama_runtime_service_v107.py`
+- `tests/test_platform_ollama_status_api_v107.py`
+- `tests/test_platform_ollama_analysis_v107.py`
+- `tests/test_platform_ollama_local_retention_v107_verifier.py`
+- `scripts/verify_platform_ollama_local_retention_v107.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v107-ollama-local-retention.md`
+
+Acceptance marker: `DSA_PLATFORM_OLLAMA_LOCAL_RETENTION_V107_OK`.
+
+Boundary: local-only Ollama runtime, no cloud fallback, no real payment, no production deployment, no production key and no investment advice.
+
+## V108 Kronos RTX 5090 Runtime Package
+
+- `.env.example`
+- `.gitignore`
+- `src/services/kronos_runtime.py`
+- `src/services/kronos_forecast_service.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `tests/test_kronos_runtime_v108.py`
+- `tests/test_kronos_forecast_service_v58.py`
+- `tests/test_kronos_forecast_api_v58.py`
+- `tests/test_platform_kronos_rtx5090_v108_verifier.py`
+- `scripts/verify_platform_kronos_rtx5090_v108.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-12-dsa-v108-kronos-rtx5090-runtime.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_KRONOS_RTX5090_V108_OK`.
+
+Boundary: real execution is local-only, offline-cache-first, single-concurrency by default, and available only to an explicit eligible request. Anonymous and free checks keep the local-rules fallback. Output remains experimental information analysis and is not investment advice.
+
+## V109 a-stock-data Live A-share Channels Package
+
+- `.env.example`
+- `.gitignore`
+- `src/services/a_share_enrichment_service.py`
+- `tests/test_a_share_enrichment_service.py`
+- `scripts/verify_platform_a_stock_data_live_v109.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-12-dsa-v109-a-stock-data-live-channels.md`
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+The pinned checkout at `external/a-stock-data` remains ignored and is not part of the DSA commit. Accepted source commit: `bcda4054b979166a3d06b628f16f3dc9b1ff7eb2`.
+
+Acceptance marker: `DSA_PLATFORM_A_STOCK_DATA_LIVE_V109_OK`.
+
+## V110 Global Equity Public Data Package
+
+- `src/services/global_equity_enrichment_service.py`
+- `src/services/basic_query_service.py`
+- `src/services/stock_service.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/components/research/GlobalEquityEnrichmentCard.tsx`
+- `apps/dsa-web/src/components/research/__tests__/GlobalEquityEnrichmentCard.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `tests/test_global_equity_enrichment_service_v110.py`
+- `tests/test_basic_query_global_equity_v110.py`
+- `tests/test_platform_global_equity_public_data_v110_verifier.py`
+- `scripts/verify_platform_global_equity_public_data_v110.py`
+- `docs/superpowers/plans/2026-07-12-dsa-v110-global-equity-public-data.md`
+- `.env.example`
+- `.gitignore`
+
+The package adds independent, no-AI US/Hong Kong public-source channels. It does not reuse A-share adapters, does not enable general web search, and does not provide investment advice or trading instructions. Production data licensing and source approval remain outside this local stage.
+
+Acceptance marker: `DSA_PLATFORM_GLOBAL_EQUITY_PUBLIC_DATA_V110_OK`.
+
+## Concurrent V111 Planning Artifact
+
+- `docs/superpowers/plans/2026-07-12-dsa-v111-multi-provider-byok-request-routing.md`
+
+This file appeared from a concurrent local planning task during V110 closeout. It is classified as planning-only and was not executed, rewritten, committed, or included in the V110 acceptance claim.
+
+Boundary: local cached public-source adapter, no AI, no public search, no data-license approval claim, and no investment advice. Empty or network-blocked sources remain visibly degraded.
+
+## Concurrent Product Research Notes Requiring Manual Confirmation
+
+- `docs/superpowers/plans/2026-07-11-dsa-api-membership-and-byok-conversation-notes.md`
+- `docs/superpowers/plans/2026-07-11-dsa-membership-api-pricing-market-research.md`
+
+These notes are inventoried but are not accepted as production pricing, payment, quota, legal or launch policy by the V107 package.

@@ -285,10 +285,10 @@ class StockService:
         if code.endswith((".SH", ".SZ", ".BJ")):
             return None
         if code.startswith("HK") and code[2:].isdigit():
-            return f"{code[2:].zfill(4)}.HK"
+            return f"{int(code[2:]):04d}.HK"
         if code.endswith(".HK"):
             digits = code[:-3]
-            return f"{digits.zfill(4)}.HK" if digits.isdigit() else code
+            return f"{int(digits):04d}.HK" if digits.isdigit() else code
         if code.isdigit():
             return f"{code.zfill(4)}.HK" if len(code) <= 5 else None
         return code

@@ -31,8 +31,7 @@ describe('alphasiftApi', () => {
   });
 
   it('enables the config and checks bundled AlphaSift availability', async () => {
-    getConfig.mockResolvedValueOnce({ configVersion: 'v1', maskToken: '******' });
-    updateConfig.mockResolvedValueOnce({ success: true });
+    post.mockResolvedValueOnce({ data: { enabled: true, reload_triggered: true } });
     get.mockResolvedValueOnce({
       data: {
         enabled: true,
@@ -43,20 +42,13 @@ describe('alphasiftApi', () => {
 
     await alphasiftApi.enable();
 
-    expect(updateConfig).toHaveBeenCalledWith({
-      configVersion: 'v1',
-      maskToken: '******',
-      reloadNow: true,
-      items: [{ key: 'ALPHASIFT_ENABLED', value: 'true' }],
-    });
+    expect(post).toHaveBeenCalledWith('/api/v1/platform/admin/features/alphasift', { enabled: true });
     expect(get).toHaveBeenCalledWith('/api/v1/alphasift/status');
-    expect(updateConfig).toHaveBeenCalledTimes(1);
-    expect(post).not.toHaveBeenCalled();
+    expect(updateConfig).not.toHaveBeenCalled();
   });
 
   it('keeps enable behavior when called without object binding', async () => {
-    getConfig.mockResolvedValueOnce({ configVersion: 'v1', maskToken: '******' });
-    updateConfig.mockResolvedValueOnce({ success: true });
+    post.mockResolvedValueOnce({ data: { enabled: true, reload_triggered: true } });
     get.mockResolvedValueOnce({
       data: {
         enabled: true,
@@ -68,15 +60,11 @@ describe('alphasiftApi', () => {
     const enable = alphasiftApi.enable;
     await enable();
 
-    expect(updateConfig).toHaveBeenCalledTimes(1);
-    expect(post).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledWith('/api/v1/platform/admin/features/alphasift', { enabled: true });
   });
 
   it('rolls back ALPHASIFT_ENABLED when bundled AlphaSift is unavailable', async () => {
-    getConfig
-      .mockResolvedValueOnce({ configVersion: 'v1', maskToken: '******' })
-      .mockResolvedValueOnce({ configVersion: 'v2', maskToken: '******' });
-    updateConfig.mockResolvedValue({ success: true });
+    post.mockResolvedValue({ data: { reload_triggered: true } });
     get.mockResolvedValueOnce({
       data: {
         enabled: true,
@@ -88,19 +76,9 @@ describe('alphasiftApi', () => {
 
     await expect(alphasiftApi.enable()).rejects.toThrow('pip install -r requirements.txt');
 
-    expect(updateConfig).toHaveBeenNthCalledWith(1, {
-      configVersion: 'v1',
-      maskToken: '******',
-      reloadNow: true,
-      items: [{ key: 'ALPHASIFT_ENABLED', value: 'true' }],
-    });
-    expect(updateConfig).toHaveBeenNthCalledWith(2, {
-      configVersion: 'v2',
-      maskToken: '******',
-      reloadNow: true,
-      items: [{ key: 'ALPHASIFT_ENABLED', value: 'false' }],
-    });
-    expect(post).not.toHaveBeenCalled();
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/platform/admin/features/alphasift', { enabled: true });
+    expect(post).toHaveBeenNthCalledWith(2, '/api/v1/platform/admin/features/alphasift', { enabled: false });
+    expect(updateConfig).not.toHaveBeenCalled();
   });
 
   it('loads strategies from the AlphaSift API', async () => {

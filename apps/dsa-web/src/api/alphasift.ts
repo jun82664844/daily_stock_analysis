@@ -1,5 +1,4 @@
 import apiClient from './index';
-import { systemConfigApi } from './systemConfig';
 import { toCamelCase } from './utils';
 
 const ALPHASIFT_SCREEN_TIMEOUT_MS = 180000;
@@ -271,12 +270,8 @@ export function notifySystemConfigChanged(): void {
 }
 
 async function setAlphaSiftEnabled(value: 'true' | 'false'): Promise<void> {
-  const config = await systemConfigApi.getConfig(false);
-  await systemConfigApi.update({
-    configVersion: config.configVersion,
-    maskToken: config.maskToken,
-    reloadNow: true,
-    items: [{ key: 'ALPHASIFT_ENABLED', value }],
+  await apiClient.post('/api/v1/platform/admin/features/alphasift', {
+    enabled: value === 'true',
   });
   notifyAlphaSiftConfigChanged();
 }

@@ -1623,6 +1623,13 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             "正在采集并筛选全市场数据，首次运行或外部数据源较慢时会持续后台处理",
         )
 
+    def test_long_running_screen_progress_remains_truthful(self) -> None:
+        progress, message = alphasift_endpoint._screen_progress_update(90)
+
+        self.assertGreaterEqual(progress, 80)
+        self.assertLess(progress, 90)
+        self.assertIn("90", message)
+
     def test_screen_task_status_returns_alphasift_result(self) -> None:
         task = TaskInfo(
             task_id="screen-task-1",

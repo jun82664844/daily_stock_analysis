@@ -474,6 +474,10 @@ class PlatformAccountService:
                         and_(
                             PlatformUsageEvent.user_id == user.id,
                             PlatformUsageEvent.event_type == "analysis",
+                            or_(
+                                PlatformUsageEvent.quota_bucket == "ai_quick",
+                                PlatformUsageEvent.quota_bucket == "analysis",
+                            ),
                             PlatformUsageEvent.period_start == period_start,
                         )
                     )
@@ -522,6 +526,10 @@ class PlatformAccountService:
                         and_(
                             PlatformUsageEvent.user_id == int(user_id),
                             PlatformUsageEvent.event_type == "analysis",
+                            or_(
+                                PlatformUsageEvent.quota_bucket == "ai_quick",
+                                PlatformUsageEvent.quota_bucket == "analysis",
+                            ),
                             PlatformUsageEvent.period_start == period_start,
                         )
                     )

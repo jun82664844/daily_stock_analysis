@@ -775,6 +775,8 @@ class StockAnalysisPipeline:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                if getattr(self.config, "informational_only_mode", False):
+                    self._apply_information_only_boundary(result)
 
             # Step 8: 保存分析历史记录
             if result and result.success:
@@ -1347,6 +1349,8 @@ class StockAnalysisPipeline:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                if getattr(self.config, "informational_only_mode", False):
+                    self._apply_information_only_boundary(result)
 
             resolved_stock_name = result.name if result and result.name else stock_name
 
@@ -1809,6 +1813,66 @@ class StockAnalysisPipeline:
         if explicit_action is None and isinstance(getattr(result, "dashboard", None), dict):
             explicit_action = result.dashboard.get("action")
         return populate_decision_action_fields(result, explicit_action=explicit_action)
+
+    @staticmethod
+    def _apply_information_only_boundary(result: AnalysisResult) -> AnalysisResult:
+        """Neutralize action fields before local-model results are persisted."""
+        report_language = normalize_report_language(
+            getattr(result, "report_language", "zh")
+        )
+        information_label = "Information only" if report_language == "en" else "仅供信息观察"
+        information_trend = "Information overview" if report_language == "en" else "信息观察"
+        information_summary = (
+            "This local-model report organizes market, trend, volume, company, and risk data. "
+            "It does not provide buy or sell instructions, position sizing, target prices, or return promises."
+            if report_language == "en"
+            else "本地模型仅整理行情、趋势、量价、公司资料与风险信息；不提供买卖指令、仓位比例、目标价或收益承诺。"
+        )
+        result.operation_advice = information_label
+        result.action = None
+        result.action_label = information_label
+        result.decision_type = "information"
+        result.sentiment_score = 50
+        result.trend_prediction = information_trend
+        result.analysis_summary = information_summary
+        result.short_term_outlook = ""
+        result.medium_term_outlook = ""
+        result.buy_reason = ""
+        if hasattr(result, "raw_response"):
+            result.raw_response = None
+
+        dashboard = getattr(result, "dashboard", None)
+        if isinstance(dashboard, dict):
+            dashboard["sentiment_score"] = 50
+            dashboard["trend_prediction"] = information_trend
+            dashboard["operation_advice"] = information_label
+            dashboard["analysis_summary"] = information_summary
+            dashboard["action"] = None
+            dashboard["action_label"] = information_label
+            core = dashboard.get("core_conclusion")
+            if isinstance(core, dict):
+                core["one_sentence"] = information_summary
+                core["signal_type"] = information_label
+                core["time_sensitivity"] = "Not applicable" if report_language == "en" else "不适用"
+                core["position_advice"] = {
+                    "no_position": information_label,
+                    "has_position": information_label,
+                }
+            battle_plan = dashboard.get("battle_plan")
+            if isinstance(battle_plan, dict):
+                battle_plan["sniper_points"] = {
+                    "ideal_buy": None,
+                    "secondary_buy": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                }
+                battle_plan["position_strategy"] = {
+                    "suggested_position": information_label,
+                    "entry_plan": information_label,
+                    "risk_control": information_label,
+                }
+                battle_plan["action_checklist"] = []
+        return result
 
     @staticmethod
     def _refresh_decision_action_for_final_result(

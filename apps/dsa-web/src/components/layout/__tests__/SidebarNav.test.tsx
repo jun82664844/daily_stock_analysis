@@ -88,7 +88,7 @@ describe('SidebarNav', () => {
 
     await screen.findByRole('link', { name: '市场筛选' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/screening', '/portfolio', '/decision-signals']);
+    expect(hrefs.slice(0, 6)).toEqual(['/', '/chat', '/screening', '/research', '/portfolio', '/decision-signals']);
   });
 
   it('does not hide market screening navigation after a config save event', async () => {
@@ -168,6 +168,20 @@ describe('SidebarNav', () => {
       const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
       expect(hrefs).toContain('/admin');
     });
+  });
+
+  it('shows the public research center directly after market screening', async () => {
+    render(
+      <MemoryRouter initialEntries={['/research']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    const researchLink = await screen.findByRole('link', { name: '研究中心' });
+    expect(researchLink).toHaveAttribute('href', '/research');
+    expect(researchLink).toHaveClass('font-medium');
+    const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+    expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/screening', '/research', '/portfolio']);
   });
 
   it('hides admin-only navigation and logout for public unauthenticated users', async () => {

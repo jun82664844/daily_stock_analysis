@@ -9,7 +9,8 @@ from zoneinfo import ZoneInfo
 
 
 TRADING_CACHE_TTL_SECONDS = 5 * 60
-OFF_HOURS_CACHE_TTL_SECONDS = 6 * 60 * 60
+OFF_HOURS_CACHE_TTL_SECONDS = 18 * 60 * 60
+WEEKEND_CACHE_TTL_SECONDS = 72 * 60 * 60
 
 
 def _parse_datetime(value: Any) -> Optional[datetime]:
@@ -37,9 +38,10 @@ def resolve_snapshot_cache_ttl_seconds(*, now: Optional[datetime] = None) -> int
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
     shanghai = current.astimezone(ZoneInfo("Asia/Shanghai"))
+    if shanghai.weekday() >= 5:
+        return WEEKEND_CACHE_TTL_SECONDS
     in_session = (
-        shanghai.weekday() < 5
-        and daytime(9, 15) <= shanghai.time().replace(tzinfo=None) <= daytime(15, 30)
+        daytime(9, 15) <= shanghai.time().replace(tzinfo=None) <= daytime(15, 30)
     )
     return TRADING_CACHE_TTL_SECONDS if in_session else OFF_HOURS_CACHE_TTL_SECONDS
 

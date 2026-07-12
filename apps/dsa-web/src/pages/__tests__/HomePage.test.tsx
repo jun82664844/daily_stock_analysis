@@ -84,6 +84,7 @@ vi.mock('../../api/platform', () => ({
   PLATFORM_SESSION_CHANGED_EVENT: 'dsa-platform-session-changed',
   platformApi: {
     status: vi.fn(),
+    localModelStatus: vi.fn(),
     current: vi.fn(),
     account: vi.fn(),
     listApiKeys: vi.fn(),
@@ -326,6 +327,20 @@ describe('HomePage', () => {
     });
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: false });
+    vi.mocked(platformApi.localModelStatus).mockResolvedValue({
+      enabled: true,
+      reachable: true,
+      ready: true,
+      quickReady: true,
+      deepReady: true,
+      reason: 'ready',
+      runtime: 'ollama',
+      quickModel: 'quick-model',
+      deepModel: 'deep-model',
+      quickModelAvailable: true,
+      deepModelAvailable: true,
+      maxConcurrent: 1,
+    });
     vi.mocked(platformApi.current).mockResolvedValue(null);
     vi.mocked(platformApi.account).mockRejectedValue(new Error('not signed in'));
     vi.mocked(platformApi.listApiKeys).mockResolvedValue([]);
@@ -484,6 +499,15 @@ describe('HomePage', () => {
       device: 'auto',
       dependencyStatus: { pandas: true, torch: false, einops: true, safetensors: true, huggingfaceHub: true, model: false },
       missingDependencies: ['torch', 'model'],
+      runtimeMetrics: {
+        resolvedDevice: 'not_run',
+        modelCacheHit: false,
+        modelLoadMs: 0,
+        inferenceMs: 0,
+        peakVramMb: 0,
+        inputBars: 0,
+        forecastBars: 0,
+      },
       scenarios: [
         {
           label: 'Upside-biased preview',
@@ -3987,6 +4011,11 @@ describe('HomePage', () => {
     expect(kronosResult).not.toHaveTextContent('Kronos market data fetch timed out');
     expect(kronosResult).not.toHaveTextContent('KRONOS_ENABLED is false');
     expect(kronosResult).not.toHaveTextContent('K-line context is short');
+    expect(kronosResult).toHaveTextContent('运行设备');
+    expect(kronosResult).toHaveTextContent('模型未运行');
+    expect(kronosResult).toHaveTextContent('模型加载 0ms');
+    expect(kronosResult).toHaveTextContent('推理 0ms');
+    expect(kronosResult).toHaveTextContent('峰值显存 0MB');
     expect(screen.getByTestId('basic-query-kronos-dependency-status')).toHaveTextContent('torch: 缺失');
     expect(screen.getByTestId('basic-query-kronos-backtest-summary')).toHaveTextContent('1 条记录');
     const premiumFeatureLadder = screen.getByTestId('basic-query-premium-feature-ladder');

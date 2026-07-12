@@ -8,7 +8,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from src.services.alphasift_screen_cache import inspect_snapshot_cache
+from src.services.alphasift_screen_cache import (
+    OFF_HOURS_CACHE_TTL_SECONDS,
+    WEEKEND_CACHE_TTL_SECONDS,
+    inspect_snapshot_cache,
+    resolve_snapshot_cache_ttl_seconds,
+)
 
 
 class AlphaSiftScreenCacheV105TestCase(unittest.TestCase):
@@ -70,6 +75,24 @@ class AlphaSiftScreenCacheV105TestCase(unittest.TestCase):
 
         self.assertEqual(decision["max_age_seconds"], 120)
         self.assertFalse(decision["use_cache"])
+
+    def test_weekend_reuses_previous_trading_snapshot(self) -> None:
+        with patch.dict(os.environ, {"DSA_ALPHASIFT_SCREEN_CACHE_TTL_SECONDS": ""}, clear=False):
+            ttl = resolve_snapshot_cache_ttl_seconds(
+                now=datetime(2026, 7, 12, 2, 0, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(ttl, WEEKEND_CACHE_TTL_SECONDS)
+        self.assertGreaterEqual(ttl, 48 * 60 * 60)
+
+    def test_weekday_off_hours_keeps_previous_close_available(self) -> None:
+        with patch.dict(os.environ, {"DSA_ALPHASIFT_SCREEN_CACHE_TTL_SECONDS": ""}, clear=False):
+            ttl = resolve_snapshot_cache_ttl_seconds(
+                now=datetime(2026, 7, 13, 0, 30, tzinfo=timezone.utc),
+            )
+
+        self.assertEqual(ttl, OFF_HOURS_CACHE_TTL_SECONDS)
+        self.assertGreaterEqual(ttl, 12 * 60 * 60)
 
 
 if __name__ == "__main__":

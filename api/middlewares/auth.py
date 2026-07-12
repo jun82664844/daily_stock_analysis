@@ -6,6 +6,7 @@ Auth middleware: protect /api/v1/* when admin auth is enabled.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Callable
 
 from fastapi import HTTPException
@@ -31,6 +32,7 @@ EXEMPT_PATHS = frozenset({
     "/api/v1/platform/register/verification-code",
     "/api/v1/platform/retention/events",
     "/api/v1/platform/status",
+    "/api/v1/platform/local-model/status",
     "/api/v1/billing/webhook",
     "/api/health",
     "/api/v1/health",
@@ -64,11 +66,10 @@ def _public_no_ai_query_path(request: Request) -> bool:
     if request.method.upper() != "GET":
         return False
     path = request.url.path.rstrip("/")
-    return path.startswith("/api/v1/stocks/") and (
-        path.endswith("/snapshot")
-        or path.endswith("/history")
-        or path.endswith("/kronos-forecast")
-    )
+    return re.fullmatch(
+        r"/api/v1/stocks/[^/]+/(?:snapshot|history|kronos-forecast|research-workflows)",
+        path,
+    ) is not None
 
 
 def _public_market_screening_path(request: Request) -> bool:

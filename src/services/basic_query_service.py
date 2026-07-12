@@ -69,11 +69,13 @@ class BasicQueryService:
         stale_revalidation_timeout_seconds: Optional[float] = None,
         source_health: Optional[MarketSourceHealthRegistry] = None,
         a_share_enrichment_service: Optional[Any] = None,
+        global_equity_enrichment_service: Optional[Any] = None,
     ):
         self.stock_service = stock_service or StockService()
         self.cache = cache or default_persistent_market_data_cache
         self.source_health = source_health or default_market_source_health
         self.a_share_enrichment_service = a_share_enrichment_service or AShareEnrichmentService()
+        self.global_equity_enrichment_service = global_equity_enrichment_service
         self.fetch_timeout_seconds = (
             _DEFAULT_FETCH_TIMEOUT_SECONDS if fetch_timeout_seconds is None else max(0.001, float(fetch_timeout_seconds))
         )
@@ -188,6 +190,13 @@ class BasicQueryService:
             profile=profile_payload,
             indicators=indicators,
         )
+        global_equity_enrichment = self._global_equity_enrichment_payload(
+            route=route,
+            code=code,
+            stock_name=(profile_payload or {}).get("company_name") or self._stock_name(quote, history, profile),
+            profile=profile_payload,
+            force_refresh=force_refresh,
+        )
 
         return {
             "stock_code": code,
@@ -205,6 +214,7 @@ class BasicQueryService:
                 trend=trend,
                 warnings=warnings,
                 a_share_enrichment=a_share_enrichment,
+                global_equity_enrichment=global_equity_enrichment,
             ),
             "route": route.to_payload(),
             "warnings": warnings,
@@ -846,6 +856,7 @@ class BasicQueryService:
         trend: Optional[Dict[str, Any]],
         warnings: list[Dict[str, str]],
         a_share_enrichment: Optional[Dict[str, Any]] = None,
+        global_equity_enrichment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         financial_summary, financial_status = self._financial_intelligence_summary(profile, route=route)
         quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
@@ -892,6 +903,7 @@ class BasicQueryService:
                 profile=profile,
                 indicators=indicators,
                 warnings=warnings,
+                global_equity_enrichment=global_equity_enrichment,
             ),
             "kline_forecast": self._kline_forecast_payload(
                 route=route,
@@ -901,6 +913,7 @@ class BasicQueryService:
                 warnings=warnings,
             ),
             "a_share_enrichment": a_share_enrichment,
+            "global_equity_enrichment": global_equity_enrichment,
             "items": [
                 {
                     "category": "news",
@@ -977,6 +990,46 @@ class BasicQueryService:
                 "boundary": "Information analysis only; not investment advice.",
             }
 
+    def _global_equity_enrichment_payload(
+        self,
+        *,
+        route: MarketRoute,
+        code: str,
+        stock_name: Optional[str],
+        profile: Optional[Dict[str, Any]],
+        force_refresh: bool,
+    ) -> Optional[Dict[str, Any]]:
+        if route.market not in {"us", "hk"}:
+            return None
+        if self.global_equity_enrichment_service is None:
+            return None
+        try:
+            return self.global_equity_enrichment_service.get_enrichment(
+                code,
+                market=route.market,
+                stock_name=stock_name,
+                profile=profile,
+                force_refresh=force_refresh,
+            )
+        except Exception:
+            market_label = "US equity" if route.market == "us" else "Hong Kong equity"
+            return {
+                "title": f"{market_label} public data expansion",
+                "summary": (
+                    f"{stock_name or code} public information sources are temporarily unavailable; "
+                    "the basic quote snapshot remains available."
+                ),
+                "market": route.market,
+                "status": "degraded",
+                "source": "global_equity_public_adapter",
+                "ai_used": False,
+                "public_search_used": False,
+                "channels": [],
+                "diagnostics": {"cache_hit": False, "errors": [{"channel": "adapter", "error": "unavailable"}]},
+                "premium_unlock": "Configured API feeds can add broader coverage and higher refresh limits.",
+                "boundary": "Information and data only; not investment advice or a trading instruction.",
+            }
+
     def _retention_brief_payload(
         self,
         *,
@@ -1047,6 +1100,7 @@ class BasicQueryService:
         profile: Optional[Dict[str, Any]],
         indicators: Dict[str, Any],
         warnings: list[Dict[str, str]],
+        global_equity_enrichment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         quote_updated_at = quote.get("update_time") if isinstance(quote, dict) else None
         sector = str((profile or {}).get("sector") or "").strip()
@@ -1126,6 +1180,42 @@ class BasicQueryService:
                 "updated_at": quote_updated_at,
             },
         ]
+        if global_equity_enrichment:
+            real_items: list[Dict[str, Any]] = []
+            for channel in global_equity_enrichment.get("channels") or []:
+                category = str(channel.get("category") or "information")
+                channel_items = channel.get("items") or []
+                for source_item in channel_items[:2]:
+                    if not isinstance(source_item, dict) or not source_item.get("title"):
+                        continue
+                    real_items.append(
+                        {
+                            "category": "announcements" if category == "filings" else category,
+                            "title": str(source_item.get("title")),
+                            "summary": str(source_item.get("summary") or channel.get("summary") or "Source data available."),
+                            "status": "available",
+                            "source": str(source_item.get("source") or channel.get("source") or "global_equity_public_adapter"),
+                            "action": str(channel.get("action") or "Open the source and confirm its timestamp."),
+                            "updated_at": source_item.get("published_at") or global_equity_enrichment.get("updated_at"),
+                            "url": source_item.get("url"),
+                        }
+                    )
+                if not channel_items and category == "filings":
+                    real_items.append(
+                        {
+                            "category": "announcements",
+                            "title": str(channel.get("title") or announcement_title),
+                            "summary": str(channel.get("summary") or announcement_summary),
+                            "status": str(channel.get("status") or "degraded"),
+                            "source": str(channel.get("source") or "global_equity_public_adapter"),
+                            "action": str(channel.get("action") or "Confirm through the official filing source."),
+                            "updated_at": global_equity_enrichment.get("updated_at"),
+                            "url": channel.get("official_url"),
+                        }
+                    )
+            if real_items:
+                retained = [item for item in items if item["category"] not in {"news", "announcements"}]
+                items = real_items + retained
         if warnings:
             items.append(
                 {
@@ -1139,17 +1229,27 @@ class BasicQueryService:
                 }
             )
         return {
-            "title": "Local news center",
+            "title": "Public information center" if global_equity_enrichment else "Local news center",
             "summary": (
-                f"{route.normalized_code} information lanes for {company_context}: news, announcements, "
-                "financials, sector context, and data quality. No AI or public search was used."
+                (
+                    f"{route.normalized_code} direct public-source lanes include linked news, filing status, "
+                    "financial facts, sector context, and data quality. No AI or general web search was used."
+                    if global_equity_enrichment
+                    else f"{route.normalized_code} information lanes for {company_context}: news, announcements, "
+                    "financials, sector context, and data quality. No AI or public search was used."
+                )
             ),
             "items": items,
-            "source": "no_ai_news_center_rules",
+            "source": "global_equity_public_adapter" if global_equity_enrichment else "no_ai_news_center_rules",
             "ai_used": False,
             "public_search_used": False,
-            "premium_unlock": "Premium can add realtime news, filings, source links, sector comparison, and AI summaries.",
-            "boundary": "Information analysis only; not investment advice.",
+            "premium_unlock": (
+                "Premium can use configured API feeds for broader coverage and higher refresh limits; "
+                "the visible module structure remains the same."
+                if global_equity_enrichment
+                else "Premium can add realtime news, filings, source links, sector comparison, and AI summaries."
+            ),
+            "boundary": "Information and data only; not investment advice or a trading instruction.",
         }
 
     def _kline_forecast_payload(

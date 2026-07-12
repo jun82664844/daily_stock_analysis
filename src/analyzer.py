@@ -2190,8 +2190,34 @@ class GeminiAnalyzer:
                 .replace("{default_skill_policy_section}", default_skill_policy_section)
                 .replace("{skills_section}", skills_section)
             )
+        informational_only = bool(
+            getattr(self._get_runtime_config(), "informational_only_mode", False)
+        )
+        information_guardrail = ""
+        if informational_only:
+            information_guardrail = (
+                """
+
+## Information-only boundary (highest priority)
+
+- Provide market information, source-backed data interpretation, uncertainty and items to monitor only.
+- Do not provide buy, sell, add, reduce or hold instructions, target prices, position sizing, stop-loss/take-profit levels, return forecasts or personalized investment advice.
+- Set `decision_type` to `hold` only for schema compatibility and write `operation_advice` as `Information only`.
+- Any nested action or position text must describe neutral observation conditions, never an instruction.
+"""
+                if lang == "en"
+                else """
+
+## 仅提供资讯和数据（最高优先级）
+
+- 只提供市场资讯、可追溯数据解读、不确定性和后续观察项目。
+- 不得给出买入、卖出、加仓、减仓、持有指令，不得给出目标价、仓位比例、止损止盈、收益预测或个性化投资建议。
+- `decision_type` 仅为兼容结构固定写 `hold`，`operation_advice` 固定写 `仅供信息观察`。
+- 所有嵌套行动或持仓文案只能描述中性观察条件，不能形成交易指令。
+"""
+            )
         if lang == "en":
-            return base_prompt + """
+            return base_prompt + information_guardrail + """
 
 ## Output Language (highest priority)
 
@@ -2201,7 +2227,7 @@ class GeminiAnalyzer:
 - Use the common English company name when you are confident; otherwise keep the original listed company name instead of inventing one.
 - This includes `stock_name`, `trend_prediction`, `operation_advice`, `confidence_level`, nested dashboard text, checklist items, and all narrative summaries.
 """
-        return base_prompt + """
+        return base_prompt + information_guardrail + """
 
 ## 输出语言（最高优先级）
 

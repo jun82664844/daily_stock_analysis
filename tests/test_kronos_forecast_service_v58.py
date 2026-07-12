@@ -51,6 +51,89 @@ class SlowHistoryKronosStockService(FakeKronosStockService):
 
 
 class KronosForecastServiceV58TestCase(unittest.TestCase):
+    def test_enabled_runtime_requires_explicit_model_permission(self) -> None:
+        from src.services.kronos_forecast_service import KronosForecastService
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            with patch.dict(
+                "os.environ",
+                {
+                    "KRONOS_ENABLED": "true",
+                    "KRONOS_RECORD_PATH": str(Path(temp_dir) / "kronos.jsonl"),
+                },
+            ):
+                service = KronosForecastService(
+                    stock_service=FakeKronosStockService(),
+                    dependency_probe=lambda: {
+                        "pandas": True,
+                        "torch": True,
+                        "einops": True,
+                        "safetensors": True,
+                        "huggingface_hub": True,
+                        "model": True,
+                    },
+                )
+                with patch.object(service, "_run_kronos_model") as run_model:
+                    result = service.forecast("AAPL", lookback=20, horizon=5, allow_model=False)
+
+        run_model.assert_not_called()
+        self.assertEqual(result["status"], "premium_required")
+        self.assertFalse(result["kronos_model_used"])
+        self.assertEqual(result["runtime_metrics"]["model_cache_hit"], False)
+
+    def test_successful_real_model_run_exposes_runtime_metrics(self) -> None:
+        from src.services.kronos_forecast_service import KronosForecastService
+
+        model_result = {
+            "points": [
+                {
+                    "timestamp": f"2026-07-{day:02d}",
+                    "open": 200.0 + day,
+                    "high": 202.0 + day,
+                    "low": 199.0 + day,
+                    "close": 201.0 + day,
+                    "volume": 1000.0,
+                    "amount": 200000.0,
+                }
+                for day in range(1, 6)
+            ],
+            "metrics": {
+                "resolved_device": "cuda",
+                "model_cache_hit": False,
+                "model_load_ms": 320.0,
+                "inference_ms": 650.0,
+                "peak_vram_mb": 42.0,
+                "input_bars": 20,
+                "forecast_bars": 5,
+            },
+        }
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            with patch.dict(
+                "os.environ",
+                {
+                    "KRONOS_ENABLED": "true",
+                    "KRONOS_RECORD_PATH": str(Path(temp_dir) / "kronos.jsonl"),
+                },
+            ):
+                service = KronosForecastService(
+                    stock_service=FakeKronosStockService(),
+                    dependency_probe=lambda: {
+                        "pandas": True,
+                        "torch": True,
+                        "einops": True,
+                        "safetensors": True,
+                        "huggingface_hub": True,
+                        "model": True,
+                    },
+                )
+                with patch.object(service, "_run_kronos_model", return_value=model_result):
+                    result = service.forecast("AAPL", lookback=20, horizon=5, allow_model=True)
+
+        self.assertEqual(result["status"], "model_ready")
+        self.assertTrue(result["kronos_model_used"])
+        self.assertEqual(result["runtime_metrics"]["resolved_device"], "cuda")
+        self.assertEqual(result["runtime_metrics"]["forecast_bars"], 5)
+
     def test_forecast_is_explicitly_unavailable_without_runtime_dependencies(self) -> None:
         from src.services.kronos_forecast_service import KronosForecastService
 

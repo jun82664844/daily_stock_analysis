@@ -6,6 +6,7 @@ import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistAlertRulesResponse, type PlatformWatchlistRadarAlertSuggestion, type PlatformWatchlistRadarHistoryResponse, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse, type PlatformWatchlistTriggeredAlert } from '../api/platform';
+import type { PlatformLocalModelStatus } from '../api/platform';
 import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -16,9 +17,11 @@ import { FreeApiTrialPanelV93 } from '../components/retention/FreeApiTrialPanelV
 import { FreeApiTrialConversionV96 } from '../components/retention/FreeApiTrialConversionV96';
 import { FreeApiTrialTaskStatusV95 } from '../components/retention/FreeApiTrialTaskStatusV95';
 import { QueryChangeSummaryV93 } from '../components/retention/QueryChangeSummaryV93';
+import { LocalModelStatusV107 } from '../components/retention/LocalModelStatusV107';
 import { WatchlistEventRadarV99 } from '../components/radar/WatchlistEventRadarV99';
 import { WatchlistAlertLoopV100 } from '../components/radar/WatchlistAlertLoopV100';
 import { DailyResearchCockpitV103 } from '../components/radar/DailyResearchCockpitV103';
+import { GlobalEquityEnrichmentCard } from '../components/research/GlobalEquityEnrichmentCard';
 import { findNewTrialHistoryItem } from '../components/retention/freeApiTrialReport';
 import { buildQueryObservation, compareQueryObservations, readPriorQueryObservation, storeQueryObservation, type QueryChangeSummary, type QueryObservation } from '../components/retention/queryChangeTracker';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -1261,6 +1264,7 @@ const HomePage: React.FC = () => {
   const [platformEnabled, setPlatformEnabled] = useState(false);
   const [platformSession, setPlatformSession] = useState<PlatformAuthPayload | null>(null);
   const [platformAccount, setPlatformAccount] = useState<PlatformAccountSummary | null>(null);
+  const [localModelStatus, setLocalModelStatus] = useState<PlatformLocalModelStatus | null>(null);
   const [platformKeys, setPlatformKeys] = useState<PlatformApiKeyItem[]>([]);
   const [platformWatchlist, setPlatformWatchlist] = useState<PlatformWatchlistResponse | null>(null);
   const [platformWatchlistRefresh, setPlatformWatchlistRefresh] = useState<PlatformWatchlistRefreshResponse | null>(null);
@@ -1515,6 +1519,20 @@ const HomePage: React.FC = () => {
       active = false;
     };
   }, [refreshPlatformSession]);
+
+  useEffect(() => {
+    let active = true;
+    platformApi.localModelStatus()
+      .then((status) => {
+        if (active) setLocalModelStatus(status);
+      })
+      .catch(() => {
+        if (active) setLocalModelStatus(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handlePlatformAuth = useCallback(async () => {
     const email = authEmail.trim();
@@ -2015,6 +2033,10 @@ const HomePage: React.FC = () => {
   const platformAiQuickQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_quick');
   const byokAiQuickQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_quick_user_key');
   const localAiQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'ai_local');
+  const currentPlatformPlan = (platformAccount?.user.plan || platformSession?.user.plan || 'free').toLowerCase();
+  const currentPlatformRole = (platformAccount?.user.role || platformSession?.user.role || '').toLowerCase();
+  const canRunKronosModel = currentPlatformRole === 'admin'
+    || ['pro', 'premium', 'enterprise'].includes(currentPlatformPlan);
   const accountQuotaText = platformSession ? formatQuotaLeft(baseQuota, uiLanguage) : localizeRuntimeLabel('unavailable', uiLanguage);
   const basicQuotaText = basicQueryQuota ? formatQuotaLeft(basicQueryQuota, uiLanguage) : (uiLanguage === 'en' ? 'unmetered locally' : '本地不限量');
   const platformAiQuotaText = platformAiQuickQuota ? formatQuotaLeft(platformAiQuickQuota, uiLanguage) : accountQuotaText;
@@ -4909,6 +4931,37 @@ const HomePage: React.FC = () => {
     [handleBasicQuery],
   );
 
+  const handleLocalModelQuickAnalyze = useCallback(async () => {
+    if (!basicSnapshot || isAnalyzing || !localModelStatus?.quickReady) {
+      return;
+    }
+    setDeepAnalysisNotice('');
+    setDeepAnalysisInlineNotice('');
+    setApiKeyMode('local');
+    const submitted = await submitAnalysis({
+      stockCode: basicSnapshot.stockCode,
+      stockName: basicSnapshot.stockName || undefined,
+      originalQuery: basicSnapshot.stockCode,
+      selectionSource: 'manual',
+      skills: selectedAnalysisSkills,
+      analysisDepth: 'fast',
+      apiKeyMode: 'local',
+    });
+    const accepted = submitted === true || (typeof submitted === 'object' && submitted.accepted);
+    if (accepted && platformSession) {
+      await loadPlatformAccount(platformSession);
+    }
+  }, [
+    basicSnapshot,
+    isAnalyzing,
+    loadPlatformAccount,
+    localModelStatus?.quickReady,
+    platformSession,
+    selectedAnalysisSkills,
+    setApiKeyMode,
+    submitAnalysis,
+  ]);
+
   const handlePlatformApiTrial = useCallback(async () => {
     if (!basicSnapshot || isAnalyzing) {
       return;
@@ -5731,9 +5784,10 @@ const HomePage: React.FC = () => {
                       </button>
                       <button
                         type="button"
+                        disabled={!localModelStatus?.quickReady}
                         onClick={() => handleApiKeyModeChange('local')}
                         data-testid="platform-mode-local"
-                        className={`px-2.5 py-1 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
+                        className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                       >
                         {uiLanguage === 'en' ? 'Local model' : '本地模型'}
                       </button>
@@ -8274,6 +8328,12 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                     ) : null}
+                    {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.globalEquityEnrichment ? (
+                      <GlobalEquityEnrichmentCard
+                        payload={basicSnapshot.intelligence.globalEquityEnrichment}
+                        language={uiLanguage}
+                      />
+                    ) : null}
                     {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.aShareEnrichment ? (
                       <div
                         data-testid="basic-query-a-share-enrichment"
@@ -8648,13 +8708,15 @@ const HomePage: React.FC = () => {
                               type="button"
                               variant="secondary"
                               size="sm"
-                              onClick={() => void handleRunKronosForecast(false)}
+                              onClick={() => void handleRunKronosForecast(canRunKronosModel)}
                               isLoading={isRunningKronosForecast}
                               loadingText={uiLanguage === 'en' ? 'Checking Kronos' : '正在运行 Kronos'}
                               data-testid="basic-query-kronos-run"
                             >
                               <Sparkles className="h-4 w-4" />
-                              {uiLanguage === 'en' ? 'Check Kronos' : '运行 Kronos 模型'}
+                              {canRunKronosModel
+                                ? (uiLanguage === 'en' ? 'Run Kronos model' : '运行 Kronos 模型')
+                                : (uiLanguage === 'en' ? 'Check Kronos readiness' : '检查 Kronos 就绪状态')}
                             </Button>
                           </div>
                           {kronosForecastError ? (
@@ -8709,6 +8771,45 @@ const HomePage: React.FC = () => {
                                 <span className="rounded-md border border-subtle/70 px-2 py-1">
                                   {kronosForecast.elapsedMs.toLocaleString(undefined, { maximumFractionDigits: 1 })}ms
                                 </span>
+                              </div>
+                              <div
+                                data-testid="basic-query-kronos-runtime-metrics"
+                                className="grid gap-2 text-xs text-secondary-text sm:grid-cols-2 xl:grid-cols-5"
+                              >
+                                <div className="rounded-md border border-subtle/70 px-2 py-2">
+                                  {uiLanguage === 'en' ? 'Runtime device' : '运行设备'}{' '}
+                                  <strong className="text-foreground">
+                                    {kronosForecast.runtimeMetrics.resolvedDevice === 'not_run'
+                                      ? (uiLanguage === 'en' ? 'model not run' : '模型未运行')
+                                      : kronosForecast.runtimeMetrics.resolvedDevice}
+                                  </strong>
+                                </div>
+                                <div className="rounded-md border border-subtle/70 px-2 py-2">
+                                  {uiLanguage === 'en' ? 'Model cache' : '模型缓存'}{' '}
+                                  <strong className="text-foreground">
+                                    {kronosForecast.runtimeMetrics.modelCacheHit
+                                      ? (uiLanguage === 'en' ? 'reused' : '已复用')
+                                      : (uiLanguage === 'en' ? 'cold / not run' : '冷启动/未运行')}
+                                  </strong>
+                                </div>
+                                <div className="rounded-md border border-subtle/70 px-2 py-2">
+                                  {uiLanguage === 'en' ? 'Model load' : '模型加载'}{' '}
+                                  <strong className="text-foreground">
+                                    {kronosForecast.runtimeMetrics.modelLoadMs.toLocaleString(undefined, { maximumFractionDigits: 1 })}ms
+                                  </strong>
+                                </div>
+                                <div className="rounded-md border border-subtle/70 px-2 py-2">
+                                  {uiLanguage === 'en' ? 'Inference' : '推理'}{' '}
+                                  <strong className="text-foreground">
+                                    {kronosForecast.runtimeMetrics.inferenceMs.toLocaleString(undefined, { maximumFractionDigits: 1 })}ms
+                                  </strong>
+                                </div>
+                                <div className="rounded-md border border-subtle/70 px-2 py-2">
+                                  {uiLanguage === 'en' ? 'Peak VRAM' : '峰值显存'}{' '}
+                                  <strong className="text-foreground">
+                                    {kronosForecast.runtimeMetrics.peakVramMb.toLocaleString(undefined, { maximumFractionDigits: 1 })}MB
+                                  </strong>
+                                </div>
                               </div>
                               <div className="grid gap-2 md:grid-cols-3">
                                 <div className="rounded-lg border border-subtle/80 bg-surface/35 p-3">
@@ -9381,6 +9482,15 @@ const HomePage: React.FC = () => {
                             {uiLanguage === 'en' ? 'Informational only; not investment advice' : '仅作信息分析，不构成投资建议'}
                           </span>
                         </div>
+                        <LocalModelStatusV107
+                          language={uiLanguage}
+                          plan={platformAccount?.user.plan || platformSession.user.plan}
+                          quotaText={localModelQuotaText}
+                          status={localModelStatus}
+                          onRunQuick={handleLocalModelQuickAnalyze}
+                          isRunning={isAnalyzing && apiKeyMode === 'local'}
+                          disabled={!basicSnapshot || (localAiQuota?.remaining ?? 1) <= 0}
+                        />
                         <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
                           <div className="inline-flex overflow-hidden rounded-lg border border-subtle">
                             <button
@@ -9402,9 +9512,10 @@ const HomePage: React.FC = () => {
                             </button>
                             <button
                               type="button"
+                              disabled={!localModelStatus?.quickReady}
                               onClick={() => handleApiKeyModeChange('local')}
                               data-testid="platform-mode-local"
-                              className={`px-2.5 py-1 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
+                              className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
                             >
                               {uiLanguage === 'en' ? 'Local model' : '本地模型'}
                             </button>

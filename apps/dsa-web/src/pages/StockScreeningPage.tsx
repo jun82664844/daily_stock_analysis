@@ -425,6 +425,7 @@ const StockScreeningPage: React.FC = () => {
   const [hotspotError, setHotspotError] = useState('');
   const [screenMeta, setScreenMeta] = useState<AlphaSiftScreenResponse | null>(null);
   const [platformUserId, setPlatformUserId] = useState<number | null>(null);
+  const [platformUserRole, setPlatformUserRole] = useState<string | null>(null);
   const [selectedCompareCodes, setSelectedCompareCodes] = useState<string[]>([]);
   const [watchlistStates, setWatchlistStates] = useState<Record<string, ScreeningWatchlistState>>({});
   const [reminderCode, setReminderCode] = useState<string | null>(null);
@@ -448,10 +449,16 @@ const StockScreeningPage: React.FC = () => {
     let active = true;
     void platformApi.current()
       .then((payload) => {
-        if (active) setPlatformUserId(payload?.user.id ?? null);
+        if (active) {
+          setPlatformUserId(payload?.user.id ?? null);
+          setPlatformUserRole(payload?.user.role?.toLowerCase() ?? null);
+        }
       })
       .catch(() => {
-        if (active) setPlatformUserId(null);
+        if (active) {
+          setPlatformUserId(null);
+          setPlatformUserRole(null);
+        }
       });
     return () => {
       active = false;
@@ -475,6 +482,7 @@ const StockScreeningPage: React.FC = () => {
       : ['LLM 重排未完成或未返回判断，当前候选来自 AlphaSift 本地因子评分。']
     : screenMessages;
   const isScreeningEnabled = enabled && available;
+  const canManageAlphaSift = platformUserRole === 'admin';
   const statusText = language === 'en'
     ? isScreeningEnabled ? 'Screening available' : 'Screening unavailable'
     : isScreeningEnabled ? '筛选已开启' : '筛选未开启';
@@ -937,12 +945,14 @@ const StockScreeningPage: React.FC = () => {
         <InlineAlert
           variant="info"
           title={language === 'en' ? 'AlphaSift is disabled' : 'AlphaSift 未开启'}
-          message={language === 'en' ? 'Enable the local AlphaSift adapter. If the dependency is missing, update the backend environment first.' : '点击后写入 ALPHASIFT_ENABLED=true；AlphaSift 已随后端依赖安装，若适配层缺失请先更新依赖或重建后端。'}
-          action={
+          message={language === 'en'
+            ? 'AlphaSift is installed but disabled. A local platform administrator can enable it; visitors and free users can run screening after it is enabled.'
+            : 'AlphaSift 已安装但当前关闭。请由本地平台管理员开启；开启后游客和免费用户都可以运行筛选。'}
+          action={canManageAlphaSift ? (
             <Button size="sm" isLoading={enabling} loadingText={language === 'en' ? 'Enabling...' : '开启中...'} onClick={() => void handleEnable()}>
               {language === 'en' ? 'Enable AlphaSift' : '开启 AlphaSift'}
             </Button>
-          }
+          ) : undefined}
         />
       ) : null}
 

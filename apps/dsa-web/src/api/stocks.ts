@@ -163,6 +163,7 @@ export type BasicStockSnapshot = {
         source: string;
         action: string;
         updatedAt?: string | null;
+        url?: string | null;
       }>;
       source: string;
       aiUsed: boolean;
@@ -211,6 +212,39 @@ export type BasicStockSnapshot = {
         }>;
         updatedAt?: string | null;
       }>;
+      premiumUnlock: string;
+      boundary: string;
+    } | null;
+    globalEquityEnrichment?: {
+      title: string;
+      summary: string;
+      market: 'us' | 'hk';
+      status: string;
+      source: string;
+      updatedAt?: string | null;
+      aiUsed: boolean;
+      publicSearchUsed: boolean;
+      channels: Array<{
+        category: string;
+        title: string;
+        summary: string;
+        status: string;
+        source: string;
+        items: Array<{
+          title?: string | null;
+          summary?: string | null;
+          publisher?: string | null;
+          publishedAt?: string | null;
+          url?: string | null;
+          source?: string | null;
+          documentType?: string | null;
+          label?: string | null;
+          value?: unknown;
+        }>;
+        officialUrl?: string | null;
+        action: string;
+      }>;
+      diagnostics?: Record<string, unknown>;
       premiumUnlock: string;
       boundary: string;
     } | null;
@@ -347,6 +381,15 @@ export type KronosForecastResponse = {
   device: string;
   dependencyStatus: Record<string, boolean>;
   missingDependencies: string[];
+  runtimeMetrics: {
+    resolvedDevice: string;
+    modelCacheHit: boolean;
+    modelLoadMs: number;
+    inferenceMs: number;
+    peakVramMb: number;
+    inputBars: number;
+    forecastBars: number;
+  };
   scenarios: Array<{
     label: string;
     direction: string;

@@ -24,6 +24,7 @@ from api.v1.schemas.platform import (
     PlatformApiKeyItem,
     PlatformApiKeyUpsertRequest,
     PlatformAuthResponse,
+    PlatformFeatureToggleRequest,
     PlatformLoginRequest,
     PlatformPlanUpdateRequest,
     PlatformQuotaResponse,
@@ -70,6 +71,7 @@ from src.storage import DatabaseManager
 from src.services.local_functional_status import build_local_functional_status
 from src.services.platform_ops_health import build_platform_ops_health_status
 from src.services.production_readiness import build_production_readiness_status
+from src.services.system_config_service import SystemConfigService
 from src.csrf import (
     CSRF_COOKIE_NAME as PLATFORM_CSRF_COOKIE,
     CSRF_HEADER_NAME as PLATFORM_CSRF_HEADER,
@@ -81,6 +83,14 @@ from src.csrf import (
 
 
 router = APIRouter()
+
+
+@router.get("/local-model/status")
+def local_model_status() -> Dict[str, Any]:
+    """Return secret-free readiness for the optional local Ollama lane."""
+    from src.services.ollama_runtime_service import get_ollama_runtime_service
+
+    return get_ollama_runtime_service().get_status()
 
 
 def _audit(*, user_id: int | None, action: str, metadata: Dict[str, Any] | None = None) -> None:
@@ -684,6 +694,35 @@ async def platform_admin_local_status(request: Request):
     identity = _require_admin_identity(request)
     _audit(user_id=identity.user_id, action="admin_local_status_viewed", metadata={})
     return build_local_functional_status()
+
+
+@router.post("/admin/features/alphasift")
+async def platform_admin_toggle_alphasift(
+    request: Request,
+    body: PlatformFeatureToggleRequest,
+):
+    """Toggle only the AlphaSift feature flag without exposing system config."""
+    _require_platform_csrf(request)
+    identity = _require_admin_identity(request)
+    service = SystemConfigService()
+    current = service.get_config(include_schema=False)
+    result = service.update(
+        config_version=current["config_version"],
+        items=[{"key": "ALPHASIFT_ENABLED", "value": "true" if body.enabled else "false"}],
+        mask_token=current.get("mask_token", "******"),
+        reload_now=True,
+    )
+    _audit(
+        user_id=identity.user_id,
+        action="admin_feature_toggled",
+        metadata={"feature": "alphasift", "enabled": body.enabled},
+    )
+    return {
+        "feature": "alphasift",
+        "enabled": body.enabled,
+        "reload_triggered": bool(result.get("reload_triggered")),
+        "updated_keys": list(result.get("updated_keys") or []),
+    }
 
 
 @router.get("/admin/production-readiness")

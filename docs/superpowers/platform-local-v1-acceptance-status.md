@@ -540,4 +540,32 @@ git diff --check
 - The recent-snapshot fast path skips blocking per-symbol enrichment; opening a result remains the explicit path for detailed company data.
 - Live acceptance on `http://127.0.0.1:8018/screening` reduced a cached repeat request from about 28.6 seconds before the fast-path correction to 55 milliseconds at the API client and 47 milliseconds in the service; the browser displayed the same cached run as 0.1 seconds.
 - Anonymous Chinese and English browser acceptance passed with localized sorting/filter controls, cache provenance, visible no-AI status, information-only copy, and no browser console errors.
+- AlphaSift feature enablement now uses a narrow platform-admin endpoint instead of the broad system-config write route. Ordinary users see the disabled state without a misleading enable button; once enabled, anonymous and free users can still run no-AI screening.
+- Weekend snapshots remain reusable for 72 hours and weekday off-hours for 18 hours, while the trading-session TTL stays at 5 minutes. Slow forced refreshes expose elapsed-time progress and remain below the completion threshold until results exist.
 - `scripts/verify_platform_fast_useful_screening_v105.py` prints `DSA_PLATFORM_FAST_USEFUL_SCREENING_V105_OK` only after static, backend, and frontend checks pass.
+
+## 2026-07-11 V106 Financial Research Workflows Acceptance
+
+- The official `anthropics/financial-services` source is installed as an ignored shallow checkout at accepted commit `4aa51ed3d379731f8f9beff498d749580372699c` under Apache-2.0.
+- DSA recognizes only company snapshot, earnings review, sector overview, and catalyst-calendar references. It never imports or executes the external agents, commands, scripts, or MCP connectors.
+- `GET /api/v1/stocks/{stock_code}/research-workflows` is public and deterministic. It reuses the current DSA no-AI stock snapshot and supports an explicit snapshot refresh without model or public-search usage.
+- `/research` provides a bilingual anonymous research center with factual values, source/freshness labels, missing-data reasons, source commit, license, disabled-connector state, and external-code-not-executed state.
+- Live browser acceptance on `8018` covered AAPL and `600519.SH`: growth percentages render without double scaling, Chinese mode hides internal English source/status tokens, and switching to English preserves the current symbol and result without an extra refetch.
+- Missing provider facts produce a partial workflow instead of fabricated content. Every response and page keeps the information-and-data-only boundary.
+- Review hardening keeps placeholder event lanes `partial`, attaches currency/unit metadata to facts, rejects an unaccepted external commit, and uses an exact anonymous GET route match.
+- The external checkout is not committed into the DSA Git history and is not evidence of market-data licensing, production connector approval, or public-launch readiness.
+
+## 2026-07-11 V107 Ollama Local AI Retention Acceptance
+
+- Local Ollama 0.24.0 is reachable and both configured fast/deep model lanes report ready through the secret-free status API.
+- A direct LiteLLM fast-model probe returned through the Ollama provider, and a complete AAPL local analysis finished with `model_used` set to the local Ollama model.
+- The full local result returns `仅供信息观察`; entry, stop-loss, take-profit and target fields are empty. The same boundary is applied before database persistence.
+- Browser regression generated a new AAPL report whose card reads `仅供信息观察 50`, whose summary contains no actionable levels, and whose model is `ollama/qwen3-vl:8b-instruct`.
+- Two earlier acceptance reports were preserved in storage; a read-only compatibility mask now renders all three Ollama history cards and details with the same information-only boundary.
+- Anonymous local-AI execution is rejected, while the readiness endpoint remains public. Unavailable preflight returns a stable 503 reason without charging `ai_local`.
+- Busy or timed-out synchronous local execution returns a stable local-model reason and releases its uniquely referenced quota reservation when no report was produced.
+- The HomePage displays bilingual local readiness, fast/deep models, remaining weekly quota and a dedicated local-AI detailed-read button while preserving the no-AI quick-analysis path.
+- Free and paid local usage remain separate from platform API and BYOK usage. Current limits retain the existing free 50 / paid 500 weekly local bucket policy.
+- Live quota regression showed platform API trial `5/5` and local-model quota `46/50` after four Ollama analyses; the fourth balance updated without a page reload, proving the local lane no longer double-charges the platform bucket and the UI refreshes immediately.
+- Acceptance marker: `DSA_PLATFORM_OLLAMA_LOCAL_RETENTION_V107_OK`.
+- V107 remains local-only and is not production-launch, real-payment, market-data-license or investment-advice approval.

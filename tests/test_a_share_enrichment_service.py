@@ -2,6 +2,7 @@
 import sys
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -37,6 +38,15 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         self.assertEqual(len(calls), 5)
         self.assertEqual(payload["diagnostics"]["execution"]["mode"], "parallel")
         self.assertEqual(payload["diagnostics"]["execution"]["timed_out_channels"], [])
+
+    def test_default_skill_root_is_inside_the_dsa_external_directory(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        with patch.dict("os.environ", {}, clear=True):
+            service = AShareEnrichmentService(http_enabled=False, source_mode="poc")
+
+        expected = Path(__file__).resolve().parents[1] / "external" / "a-stock-data"
+        self.assertEqual(Path(service.skill_root).resolve(), expected.resolve())
 
     def test_a_stock_data_total_budget_degrades_only_unfinished_channels(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService
@@ -279,7 +289,8 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
 
         self.assertEqual(poc.timeout_seconds, 1.2)
         self.assertEqual(real.timeout_seconds, 2.5)
-        self.assertEqual(real.total_timeout_seconds, 1.5)
+        self.assertEqual(real.total_timeout_seconds, 15.0)
+        self.assertGreater(real.total_timeout_seconds, poc.total_timeout_seconds)
 
     def test_a_stock_data_source_mode_reuses_stale_cache_during_rate_limit(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService
@@ -438,6 +449,7 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
                 source_mode="a_stock_data",
                 http_enabled=True,
                 min_interval_seconds=0,
+                eastmoney_min_interval_seconds=0,
             ).get_enrichment(
                 "600519.SH",
                 stock_name="贵州茅台",
@@ -632,6 +644,87 @@ class AShareEnrichmentServiceTestCase(unittest.TestCase):
         self.assertEqual(fund_flow["status"], "degraded")
         self.assertIn("资金流通道已查询", fund_flow["summary"])
         self.assertNotIn("reserved Eastmoney", fund_flow["summary"])
+
+    def test_minute_fund_flow_falls_back_to_recent_daily_history(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        calls: list[str] = []
+
+        class FakeResponse:
+            def __init__(self, payload: dict) -> None:
+                self._payload = payload
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return self._payload
+
+        class FakeRequests:
+            @staticmethod
+            def get(url: str, params=None, headers=None, timeout=None):
+                calls.append(url)
+                if "stock/fflow/kline/get" in url:
+                    return FakeResponse({"data": {"klines": []}})
+                if "stock/fflow/daykline/get" in url:
+                    return FakeResponse(
+                        {
+                            "data": {
+                                "klines": [
+                                    "2026-07-09,1000000,100000,200000,300000,400000,0",
+                                    "2026-07-10,-250000,50000,60000,-100000,-150000,0",
+                                ]
+                            }
+                        }
+                    )
+                raise AssertionError(f"unexpected URL {url}")
+
+        payload = AShareEnrichmentService(eastmoney_min_interval_seconds=0)._fetch_eastmoney_fund_flow(
+            FakeRequests,
+            "600519",
+            timeout=1,
+        )
+
+        self.assertEqual(payload["granularity"], "daily")
+        self.assertEqual(payload["period"], "recent_20_trading_days")
+        self.assertEqual(payload["latest_date"], "2026-07-10")
+        self.assertEqual(payload["main_net"], 750000)
+        self.assertEqual(payload["latest_main_net"], -250000)
+        self.assertEqual(len(payload["items"]), 2)
+        self.assertTrue(any("push2his.eastmoney.com" in url for url in calls))
+
+    def test_eastmoney_requests_share_one_process_wide_interval_gate(self) -> None:
+        from src.services.a_share_enrichment_service import AShareEnrichmentService
+
+        clock = [100.0]
+        sleeps: list[float] = []
+
+        def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            clock[0] += seconds
+
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {"data": {}}
+
+        class FakeRequests:
+            @staticmethod
+            def get(url: str, params=None, headers=None, timeout=None):
+                return FakeResponse()
+
+        service = AShareEnrichmentService(
+            eastmoney_min_interval_seconds=1.0,
+            time_provider=lambda: clock[0],
+            sleep_provider=fake_sleep,
+        )
+        service._request_json(FakeRequests, "GET", "https://push2.eastmoney.com/one")
+        service._request_json(FakeRequests, "GET", "https://reportapi.eastmoney.com/two")
+
+        self.assertEqual(len(sleeps), 1)
+        self.assertGreaterEqual(sleeps[0], 1.0)
 
     def test_default_adapter_timeout_keeps_checked_channel_copy(self) -> None:
         from src.services.a_share_enrichment_service import AShareEnrichmentService

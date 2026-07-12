@@ -152,15 +152,27 @@ class AnalysisService:
             normalized_api_key_mode = (api_key_mode or "platform").lower()
             if normalized_api_key_mode == "local":
                 from src.llm.local_model_router import get_default_local_model_router
+                from src.services.ollama_runtime_service import get_ollama_runtime_service
 
                 local_model_ticket = get_default_local_model_router().try_acquire()
                 if not local_model_ticket.acquired:
                     self.last_error = local_model_ticket.reason
                     logger.warning("本地模型不可用: %s", local_model_ticket.reason)
                     return None
-                config = copy.copy(config)
-                setattr(config, "litellm_model", os.getenv("LOCAL_LLM_MODEL", "qwen2.5:14b-instruct-q4"))
-                setattr(config, "litellm_api_base", os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:11434/v1"))
+                local_runtime = get_ollama_runtime_service()
+                local_status = local_runtime.get_status()
+                local_reason = local_runtime.readiness_reason(
+                    analysis_depth,
+                    status=local_status,
+                )
+                if local_reason != "ready":
+                    self.last_error = local_reason
+                    logger.warning("Local model preflight failed: %s", local_reason)
+                    return None
+                config = local_runtime.configure_analysis(
+                    config,
+                    analysis_depth=analysis_depth,
+                )
             elif platform_user_id and normalized_api_key_mode == "user":
                 from src.platform_accounts import PlatformAccountService
 
@@ -211,7 +223,12 @@ class AnalysisService:
                 return None
             
             # 构建响应
-            return self._build_analysis_response(result, query_id, report_type=rt.value)
+            return self._build_analysis_response(
+                result,
+                query_id,
+                report_type=rt.value,
+                informational_only=normalized_api_key_mode == "local",
+            )
             
         except Exception as e:
             self.last_error = str(e)
@@ -230,6 +247,7 @@ class AnalysisService:
         result: Any, 
         query_id: str,
         report_type: str = "detailed",
+        informational_only: bool = False,
     ) -> Dict[str, Any]:
         """
         构建分析响应
@@ -242,13 +260,20 @@ class AnalysisService:
         Returns:
             格式化的响应字典
         """
+        report_language = normalize_report_language(getattr(result, "report_language", "zh"))
+        if informational_only:
+            from src.core.pipeline import StockAnalysisPipeline
+
+            StockAnalysisPipeline._apply_information_only_boundary(result)
+
         # 获取狙击点位
         sniper_points = {}
         if hasattr(result, 'get_sniper_points'):
             sniper_points = result.get_sniper_points() or {}
         
         # 计算情绪标签
-        report_language = normalize_report_language(getattr(result, "report_language", "zh"))
+        if informational_only:
+            sniper_points = {}
         sentiment_label = get_sentiment_label(result.sentiment_score, report_language)
         stock_name = get_localized_stock_name(getattr(result, "name", None), result.code, report_language)
         action_fields = build_action_fields(
@@ -257,6 +282,11 @@ class AnalysisService:
             report_type=report_type,
             report_language=report_language,
         )
+        if informational_only:
+            action_fields = {
+                "action": None,
+                "action_label": getattr(result, "action_label", None),
+            }
         diagnostic_context = get_current_diagnostic_context()
         trace_id = diagnostic_context.trace_id if diagnostic_context is not None else query_id
         diagnostic_snapshot = diagnostic_context.snapshot() if diagnostic_context is not None else None

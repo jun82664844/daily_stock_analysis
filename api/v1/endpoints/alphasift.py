@@ -71,6 +71,19 @@ def _screening_task_not_found(task_id: str) -> HTTPException:
     )
 
 
+def _screen_progress_update(elapsed_seconds: int) -> tuple[int, str]:
+    """Return a bounded heartbeat while public market sources are still working."""
+    elapsed = max(0, int(elapsed_seconds))
+    if elapsed < 12:
+        return 30, "正在读取全市场数据快照"
+    if elapsed < 24:
+        return 50, "正在按指标条件过滤数据"
+    if elapsed < 42:
+        return 68, "正在核对候选数据完整度"
+    progress = min(88, 76 + max(0, elapsed - 42) // 12)
+    return progress, f"外部市场数据仍在后台刷新，已等待 {elapsed} 秒"
+
+
 @router.get("/status")
 def alphasift_status(config: Config = Depends(get_config_dep)) -> Dict[str, Any]:
     return _service(config).status()
@@ -138,15 +151,10 @@ def alphasift_start_screen_task(
         heartbeat_stop = threading.Event()
 
         def report_progress() -> None:
-            stages = (
-                (30, "正在读取全市场数据快照"),
-                (45, "正在按指标条件过滤数据"),
-                (60, "正在核对候选数据完整度"),
-                (75, "正在整理行情与来源状态"),
-            )
-            for progress, message in stages:
-                if heartbeat_stop.wait(6):
-                    return
+            elapsed = 0
+            while not heartbeat_stop.wait(6):
+                elapsed += 6
+                progress, message = _screen_progress_update(elapsed)
                 task_queue.update_task_progress(task_id, progress, message)
 
         task_queue.update_task_progress(

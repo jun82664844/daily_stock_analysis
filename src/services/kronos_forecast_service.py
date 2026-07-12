@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Optional
 
 from src.services.basic_query_service import BasicQueryService, MarketRoute
+from src.services.kronos_runtime import KRONOS_RUNTIME, KronosRuntime
 from src.services.stock_service import StockService
 
 
@@ -78,12 +79,14 @@ class KronosForecastService:
         *,
         stock_service: Optional[StockService] = None,
         dependency_probe: Optional[Callable[[], Dict[str, bool]]] = None,
+        runtime: Optional[KronosRuntime] = None,
         cache_ttl_seconds: Optional[float] = None,
         data_timeout_seconds: Optional[float] = None,
     ) -> None:
         self.stock_service = stock_service or StockService()
         self.basic_query_service = BasicQueryService(stock_service=self.stock_service)
         self.dependency_probe = dependency_probe or _default_dependency_probe
+        self.runtime = runtime or KRONOS_RUNTIME
         self.cache_ttl_seconds = (
             float(os.getenv("KRONOS_CACHE_TTL_SEC", "120"))
             if cache_ttl_seconds is None
@@ -112,15 +115,23 @@ class KronosForecastService:
             "device": os.getenv("KRONOS_DEVICE", "auto"),
             "max_context": _safe_int(os.getenv("KRONOS_MAX_CONTEXT", "512"), 512, minimum=16, maximum=2048),
             "timeout_sec": max(1.0, float(os.getenv("KRONOS_TIMEOUT_SEC", "30"))),
+            "local_files_only": _env_bool("KRONOS_LOCAL_FILES_ONLY", "true"),
         }
 
-    def forecast(self, stock_code: str, *, lookback: int = 120, horizon: int = 5) -> Dict[str, Any]:
+    def forecast(
+        self,
+        stock_code: str,
+        *,
+        lookback: int = 120,
+        horizon: int = 5,
+        allow_model: bool = False,
+    ) -> Dict[str, Any]:
         started = time.perf_counter()
         route = self.basic_query_service._resolve_route(stock_code)
         lookback = _safe_int(lookback, 120, minimum=5, maximum=512)
         horizon = _safe_int(horizon, 5, minimum=1, maximum=30)
         availability = self.check_availability()
-        cache_key = (route.normalized_code, lookback, horizon, bool(availability["enabled"]))
+        cache_key = (route.normalized_code, lookback, horizon, bool(availability["enabled"] and allow_model))
 
         cached = self._get_cached(cache_key)
         if cached is not None:
@@ -144,10 +155,16 @@ class KronosForecastService:
         status = str(availability["status"])
         source = self._fallback_source(status)
         kronos_model_used = False
+        runtime_metrics = self._empty_runtime_metrics()
 
-        if availability["enabled"] and not availability["missing_dependencies"]:
+        if availability["enabled"] and not availability["missing_dependencies"] and not allow_model:
+            status = "premium_required"
+            source = self._fallback_source(status)
+        if availability["enabled"] and not availability["missing_dependencies"] and allow_model:
             try:
-                model_points = self._run_kronos_model(recent_rows, horizon=horizon, availability=availability)
+                model_result = self._run_kronos_model(recent_rows, horizon=horizon, availability=availability)
+                model_points = list(model_result.get("points") or [])
+                runtime_metrics = {**runtime_metrics, **dict(model_result.get("metrics") or {})}
                 if model_points:
                     status = "model_ready"
                     source = "kronos_model_local"
@@ -195,6 +212,7 @@ class KronosForecastService:
             "device": availability["device"],
             "dependency_status": availability["dependency_status"],
             "missing_dependencies": availability["missing_dependencies"],
+            "runtime_metrics": runtime_metrics,
             "scenarios": signal["scenarios"],
             "forecast_points": forecast_points,
             "backtest_summary": backtest_summary,
@@ -358,7 +376,7 @@ class KronosForecastService:
         *,
         horizon: int,
         availability: Dict[str, Any],
-    ) -> list[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         if len(rows) < 5:
             return []
         acquired = _KRONOS_SEMAPHORE.acquire(blocking=False)
@@ -377,35 +395,28 @@ class KronosForecastService:
         rows: list[Dict[str, Any]],
         horizon: int,
         availability: Dict[str, Any],
-    ) -> list[Dict[str, Any]]:
-        import pandas as pd
-        import torch
-        from model import Kronos, KronosPredictor, KronosTokenizer
-
-        device = str(availability["device"])
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        tokenizer = KronosTokenizer.from_pretrained(str(availability["tokenizer_id"]))
-        model = Kronos.from_pretrained(str(availability["model_id"]))
-        try:
-            predictor = KronosPredictor(model, tokenizer, max_context=int(availability["max_context"]), device=device)
-        except TypeError:
-            predictor = KronosPredictor(model, tokenizer, max_context=int(availability["max_context"]))
-
-        x_df = pd.DataFrame(rows)[["open", "high", "low", "close", "volume", "amount"]].fillna(0)
-        x_timestamp = pd.to_datetime([row["timestamp"] for row in rows])
-        last_ts = x_timestamp.iloc[-1] if hasattr(x_timestamp, "iloc") else x_timestamp[-1]
-        y_timestamp = pd.Series([last_ts + pd.Timedelta(days=offset) for offset in range(1, horizon + 1)])
-        pred_df = predictor.predict(
-            df=x_df,
-            x_timestamp=pd.Series(x_timestamp),
-            y_timestamp=y_timestamp,
-            pred_len=horizon,
-            T=1.0,
-            top_p=0.9,
-            sample_count=1,
+    ) -> Dict[str, Any]:
+        return self.runtime.predict(
+            rows,
+            horizon=horizon,
+            model_id=str(availability["model_id"]),
+            tokenizer_id=str(availability["tokenizer_id"]),
+            device=str(availability["device"]),
+            max_context=int(availability["max_context"]),
+            local_files_only=bool(availability["local_files_only"]),
         )
-        return self._points_from_dataframe(pred_df, y_timestamp)
+
+    @staticmethod
+    def _empty_runtime_metrics() -> Dict[str, Any]:
+        return {
+            "resolved_device": "not_run",
+            "model_cache_hit": False,
+            "model_load_ms": 0.0,
+            "inference_ms": 0.0,
+            "peak_vram_mb": 0.0,
+            "input_bars": 0,
+            "forecast_bars": 0,
+        }
 
     def _points_from_dataframe(self, df: Any, timestamps: Any) -> list[Dict[str, Any]]:
         points: list[Dict[str, Any]] = []
@@ -498,6 +509,8 @@ class KronosForecastService:
         if status == "model_unavailable":
             missing = ", ".join(availability["missing_dependencies"])
             warnings.append(f"Kronos model unavailable; missing dependencies: {missing}.")
+        if status == "premium_required":
+            warnings.append("Real Kronos execution requires an explicit eligible local-model request.")
         if model_warning:
             warnings.append(model_warning)
         if len(rows) < 20:
@@ -512,6 +525,8 @@ class KronosForecastService:
             return "Kronos model sandbox is configured but failed; local rules fallback was used."
         if status == "model_disabled":
             return "Kronos adapter ready; KRONOS_ENABLED is false, so only local rules ran."
+        if status == "premium_required":
+            return "Kronos runtime is ready; real execution requires an explicit eligible local-model request."
         missing = ", ".join(availability["missing_dependencies"]) or "unknown"
         return f"Kronos adapter ready; model not invoked because dependencies are missing: {missing}."
 
@@ -520,6 +535,8 @@ class KronosForecastService:
             return "local_kline_rules_kronos_disabled"
         if status == "model_error":
             return "local_kline_rules_kronos_error"
+        if status == "premium_required":
+            return "local_kline_rules_kronos_permission_required"
         return "local_kline_rules_kronos_unavailable"
 
     def _record_path(self) -> Path:

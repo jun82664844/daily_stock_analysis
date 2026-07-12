@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] AlphaSift 一键启用改用窄权限平台管理员接口，普通用户不再看到不可用的配置写按钮；游客和免费用户在功能启用后仍可运行无 AI 筛选。
+- [性能] AlphaSift 全市场快照按交易时段动态复用，交易中保持 5 分钟，工作日非交易时段 18 小时，周末 72 小时；慢刷新持续展示真实等待进度。
+- [新功能] 新增 V107 Ollama 本地 AI 留存通道：免费注册用户按独立周额度使用本地快速模型，高级用户获得更高额度；深度模型、平台 API 与用户自有 API 保持独立，报告只提供资讯和数据。
+- [修复] 修通原有 local 模式的 LiteLLM/Ollama 路由，禁止本地失败回退到付费云模型，并在写入历史前清空交易指令、目标价、止损止盈和仓位文案。
+- [修复] Ollama 历史报告新增只读合规遮罩，旧报告不再展示买卖或目标价内容；本地模型额度不再重复计入平台 API 每周试用额度。
+- [修复] 同步 Ollama 分析在忙碌、超时或未生成报告时返回明确错误并回收本次本地额度预留，成功提交后前端即时刷新余额。
+
+- [新功能] 新增 V106 金融研究中心：游客可使用DSA现有行情和公司资料生成公司概览、经营复盘、行业概览和公开事件日历四类无AI研究清单；Anthropic外部源码仅作为只读方法来源，不执行外部Agent或付费连接器。
 - [fix] Bound the local A-share history provider route, skip unconfigured Pytdx discovery, and expose honest history timeout/source diagnostics.
 - [feat] Close the V95 free platform-API trial loop: accepted submissions retain a task id, the HomePage shows progress, and completion/failure is localized and honest.
 - [fix] Register accepted analysis tasks locally before SSE updates, refresh the platform browser E2E for the verified registration flow, and isolate platform-auth environment state across backend tests.

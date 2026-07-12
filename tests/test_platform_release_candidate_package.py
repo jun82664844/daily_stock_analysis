@@ -81,6 +81,28 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         self.assertIn("docs/superpowers/plans/2026-07-11-dsa-v105-fast-useful-market-screening.md", REQUIRED_FILES)
         self.assertIn("scripts/verify_platform_fast_useful_screening_v105.py", VERIFIER_FILES)
 
+    def test_v106_financial_research_verifier_is_part_of_release_package_contract(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_financial_research_workflows_v106.py", REQUIRED_FILES)
+        self.assertIn("tests/test_platform_financial_research_workflows_v106_verifier.py", REQUIRED_FILES)
+        self.assertIn("tests/test_financial_research_workflow_service_v106.py", REQUIRED_FILES)
+        self.assertIn("src/services/financial_research_workflow_service.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/pages/ResearchWorkflowsPage.tsx", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-11-dsa-v106-financial-research-workflows.md", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_financial_research_workflows_v106.py", VERIFIER_FILES)
+
+    def test_v107_ollama_retention_verifier_is_part_of_release_package_contract(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_ollama_local_retention_v107.py", REQUIRED_FILES)
+        self.assertIn("tests/test_platform_ollama_local_retention_v107_verifier.py", REQUIRED_FILES)
+        self.assertIn("tests/test_ollama_runtime_service_v107.py", REQUIRED_FILES)
+        self.assertIn("src/services/ollama_runtime_service.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/retention/LocalModelStatusV107.tsx", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-11-dsa-v107-ollama-local-retention.md", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_ollama_local_retention_v107.py", VERIFIER_FILES)
+
     def _write_file(self, root: Path, rel_path: str, content: str = "ok\n") -> None:
         path = root / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -2140,6 +2162,11 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
             classify_dirty_path("apps/dsa-web/index.html"),
             "frontend-platform-experience",
         )
+
+    def test_classifies_local_env_example(self):
+        from scripts.verify_platform_release_candidate_package import classify_dirty_path
+
+        self.assertEqual(classify_dirty_path(".env.example"), "docs-and-config")
 
     def test_classifies_backup_restore_runner(self):
         from scripts.verify_platform_release_candidate_package import classify_dirty_path

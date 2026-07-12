@@ -141,6 +141,15 @@ verify_*.py
 !scripts/verify_platform_free_daily_research_cockpit_v103.py
 !scripts/verify_platform_market_screening_alerts_v104.py
 !scripts/verify_platform_fast_useful_screening_v105.py
+!scripts/verify_platform_financial_research_workflows_v106.py
+!scripts/verify_platform_ollama_local_retention_v107.py
+!scripts/verify_platform_kronos_rtx5090_v108.py
+!scripts/verify_platform_a_stock_data_live_v109.py
+!scripts/verify_platform_global_equity_public_data_v110.py
+
+# Local third-party source checkouts are installed for inspection only.
+/external/
+/.local-runtime/
 
 # ignore Claude workspace artifacts, but keep shared repo skills versioned
 .claude/*

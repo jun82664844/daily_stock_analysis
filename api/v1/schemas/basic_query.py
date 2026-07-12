@@ -231,6 +231,7 @@ class BasicNewsCenterItemPayload(BaseModel):
     source: str = "no_ai_news_center_rules"
     action: str
     updated_at: Optional[str] = None
+    url: Optional[str] = None
 
 
 class BasicNewsCenterPayload(BaseModel):
@@ -333,6 +334,50 @@ class BasicAShareEnrichmentPayload(BaseModel):
     boundary: str = "Information analysis only; not investment advice."
 
 
+class BasicGlobalEquityItemPayload(BaseModel):
+    """One linked public-source fact for a US or Hong Kong equity."""
+
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    publisher: Optional[str] = None
+    published_at: Optional[str] = None
+    url: Optional[str] = None
+    source: Optional[str] = None
+    document_type: Optional[str] = None
+    label: Optional[str] = None
+    value: Optional[Any] = None
+
+
+class BasicGlobalEquityChannelPayload(BaseModel):
+    """One independent public data channel for US or Hong Kong equities."""
+
+    category: str
+    title: str
+    summary: str
+    status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
+    source: str
+    items: List[BasicGlobalEquityItemPayload] = Field(default_factory=list)
+    official_url: Optional[str] = None
+    action: str
+
+
+class BasicGlobalEquityEnrichmentPayload(BaseModel):
+    """No-AI direct public data expansion for US and Hong Kong equities."""
+
+    title: str
+    summary: str
+    market: str = Field(..., pattern="^(us|hk)$")
+    status: str = Field("degraded", pattern="^(available|degraded|unavailable)$")
+    source: str = "global_equity_public_adapter"
+    updated_at: Optional[str] = None
+    ai_used: bool = False
+    public_search_used: bool = False
+    channels: List[BasicGlobalEquityChannelPayload] = Field(default_factory=list)
+    diagnostics: Dict[str, Any] = Field(default_factory=dict)
+    premium_unlock: str
+    boundary: str = "Information and data only; not investment advice or a trading instruction."
+
+
 class KronosForecastScenarioPayload(BaseModel):
     """One scenario returned by the local Kronos sandbox endpoint."""
 
@@ -365,6 +410,18 @@ class KronosBacktestSummaryPayload(BaseModel):
     last_evaluated_at: Optional[str] = None
 
 
+class KronosRuntimeMetricsPayload(BaseModel):
+    """Secret-free evidence from one local Kronos runtime request."""
+
+    resolved_device: str = "not_run"
+    model_cache_hit: bool = False
+    model_load_ms: float = Field(0, ge=0)
+    inference_ms: float = Field(0, ge=0)
+    peak_vram_mb: float = Field(0, ge=0)
+    input_bars: int = Field(0, ge=0)
+    forecast_bars: int = Field(0, ge=0)
+
+
 class KronosForecastResponse(BaseModel):
     """Local Kronos forecast sandbox response with explicit fallback status."""
 
@@ -389,6 +446,7 @@ class KronosForecastResponse(BaseModel):
     device: str
     dependency_status: Dict[str, bool] = Field(default_factory=dict)
     missing_dependencies: List[str] = Field(default_factory=list)
+    runtime_metrics: KronosRuntimeMetricsPayload = Field(default_factory=KronosRuntimeMetricsPayload)
     scenarios: List[KronosForecastScenarioPayload] = Field(default_factory=list)
     forecast_points: List[KronosForecastPointPayload] = Field(default_factory=list)
     backtest_summary: KronosBacktestSummaryPayload = Field(default_factory=KronosBacktestSummaryPayload)
@@ -414,6 +472,7 @@ class BasicIntelligencePayload(BaseModel):
     news_center: Optional[BasicNewsCenterPayload] = None
     kline_forecast: Optional[BasicKlineForecastPayload] = None
     a_share_enrichment: Optional[BasicAShareEnrichmentPayload] = None
+    global_equity_enrichment: Optional[BasicGlobalEquityEnrichmentPayload] = None
     items: List[BasicIntelligenceItemPayload] = Field(default_factory=list)
     watch_points: List[BasicWatchPointPayload] = Field(default_factory=list)
     comparison_targets: List[BasicComparisonTargetPayload] = Field(default_factory=list)
@@ -456,6 +515,76 @@ class BasicStockSnapshot(BaseModel):
     degradation: BasicDegradationPayload = Field(default_factory=BasicDegradationPayload)
     diagnostics: Optional[BasicQueryDiagnosticsPayload] = None
     ai_used: bool = False
+
+
+class FinancialResearchFactPayload(BaseModel):
+    """One observed fact used by a deterministic research workflow."""
+
+    code: str
+    label_zh: str
+    label_en: str
+    value: Any
+    detail: Optional[str] = None
+    unit: str
+    currency: Optional[str] = None
+    source: str
+    freshness: str
+    as_of: Optional[str] = None
+
+
+class FinancialResearchWorkflowPayload(BaseModel):
+    """One allowlisted information-only research workflow."""
+
+    id: str
+    title_zh: str
+    title_en: str
+    purpose_zh: str
+    purpose_en: str
+    status: str = Field(..., pattern="^(available|partial)$")
+    source_reference: str
+    facts: List[FinancialResearchFactPayload] = Field(default_factory=list)
+    missing_data: List[str] = Field(default_factory=list)
+    ai_used: bool = False
+    public_search_used: bool = False
+
+
+class FinancialResearchSourceWorkflowPayload(BaseModel):
+    """Availability of one allowlisted workflow in the external source tree."""
+
+    id: str
+    source_reference: str
+    available: bool = False
+
+
+class FinancialResearchSourcePayload(BaseModel):
+    """Read-only diagnostics for the installed workflow reference repository."""
+
+    installed: bool = False
+    source_name: str
+    source_root_name: str
+    license: str
+    commit: Optional[str] = None
+    accepted_commit: str
+    commit_verified: bool = False
+    external_code_executed: bool = False
+    connectors_enabled: bool = False
+    workflows: List[FinancialResearchSourceWorkflowPayload] = Field(default_factory=list)
+
+
+class FinancialResearchWorkflowResponse(BaseModel):
+    """No-AI research workflow response backed by the existing stock snapshot."""
+
+    stock_code: str
+    stock_name: Optional[str] = None
+    market: str
+    generated_at: Optional[str] = None
+    mode: str = "deterministic_no_ai"
+    ai_used: bool = False
+    public_search_used: bool = False
+    source: FinancialResearchSourcePayload
+    workflows: List[FinancialResearchWorkflowPayload] = Field(default_factory=list)
+    boundary_zh: str
+    boundary_en: str
 
 
 class BasicPrewarmRequest(BaseModel):

@@ -12,6 +12,7 @@
 """
 
 import logging
+import os
 from typing import Optional
 import re
 
@@ -26,6 +27,7 @@ from api.v1.schemas.basic_query import (
     BasicPrewarmRequest,
     BasicPrewarmResponse,
     BasicStockSnapshot,
+    FinancialResearchWorkflowResponse,
     KronosForecastResponse,
 )
 from api.v1.schemas.stocks import (
@@ -51,6 +53,8 @@ from src.services.stock_service import StockService
 from src.services.basic_query_service import BasicQueryService
 from src.services.a_share_enrichment_service import AShareEnrichmentService
 from src.services.kronos_forecast_service import KronosForecastService
+from src.services.financial_research_workflow_service import FinancialResearchWorkflowService
+from src.services.global_equity_enrichment_service import GlobalEquityEnrichmentService
 from src.services.market_source_ops import build_market_source_ops_snapshot, recover_market_sources
 from src.services.stock_code_utils import normalize_crypto_symbol
 from src.services.system_config_service import SystemConfigService
@@ -64,6 +68,11 @@ router = APIRouter()
 
 # 须在 /{stock_code} 路由之前定义
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
+
+
+def _global_equity_enrichment_service_from_env() -> Optional[GlobalEquityEnrichmentService]:
+    enabled = str(os.getenv("GLOBAL_EQUITY_ENRICHMENT_ENABLED", "false")).strip().lower()
+    return GlobalEquityEnrichmentService() if enabled in {"1", "true", "yes", "on"} else None
 
 
 def _read_watchlist_codes(service: SystemConfigService) -> list:
@@ -564,7 +573,17 @@ def get_kronos_forecast(
                     "message": "A pro or higher plan is required to run the Kronos model sandbox.",
                 },
             )
-        forecast = KronosForecastService().forecast(normalized, lookback=lookback, horizon=horizon)
+        allow_model = bool(
+            require_model
+            and identity
+            and (identity.is_admin or identity.plan in {"pro", "premium", "enterprise"})
+        )
+        forecast = KronosForecastService().forecast(
+            normalized,
+            lookback=lookback,
+            horizon=horizon,
+            allow_model=allow_model,
+        )
         if require_model and not forecast.get("kronos_model_used"):
             raise HTTPException(
                 status_code=503,
@@ -582,6 +601,42 @@ def get_kronos_forecast(
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"Local Kronos forecast failed: {str(e)}"},
+        )
+
+
+@router.get(
+    "/{stock_code}/research-workflows",
+    response_model=FinancialResearchWorkflowResponse,
+    responses={
+        200: {"description": "No-AI financial research workflows"},
+        400: {"description": "Invalid stock code", "model": ErrorResponse},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Get information-only financial research workflows",
+    description=(
+        "Build four deterministic research checklists from the existing DSA stock snapshot. "
+        "The route does not execute external agents, connectors, public search, or AI."
+    ),
+)
+def get_financial_research_workflows(
+    stock_code: str,
+    refresh: bool = Query(False, description="Refresh the existing no-AI stock snapshot before building workflows."),
+) -> FinancialResearchWorkflowResponse:
+    """Return allowlisted financial research workflows for anonymous and logged-in users."""
+    try:
+        normalized = _validate_and_normalize_stock_code(stock_code)
+        snapshot = BasicQueryService(
+            global_equity_enrichment_service=_global_equity_enrichment_service_from_env(),
+        ).get_snapshot(normalized, force_refresh=refresh)
+        payload = FinancialResearchWorkflowService().build_research_workflows(snapshot)
+        return FinancialResearchWorkflowResponse.model_validate(payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Financial research workflow build failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Financial research workflow build failed."},
         )
 
 
@@ -610,7 +665,10 @@ def get_basic_stock_snapshot(
     try:
         normalized = _validate_and_normalize_stock_code(stock_code)
         a_share_enrichment_service = AShareEnrichmentService(source_mode=a_share_source_mode)
-        snapshot = BasicQueryService(a_share_enrichment_service=a_share_enrichment_service).get_snapshot(
+        snapshot = BasicQueryService(
+            a_share_enrichment_service=a_share_enrichment_service,
+            global_equity_enrichment_service=_global_equity_enrichment_service_from_env(),
+        ).get_snapshot(
             normalized,
             force_refresh=refresh,
         )

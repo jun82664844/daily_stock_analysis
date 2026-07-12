@@ -344,6 +344,15 @@ describe('stocksApi', () => {
         device: 'auto',
         dependency_status: { pandas: true, torch: false, einops: true, safetensors: true, huggingface_hub: true, model: false },
         missing_dependencies: ['torch', 'model'],
+        runtime_metrics: {
+          resolved_device: 'cuda',
+          model_cache_hit: true,
+          model_load_ms: 0,
+          inference_ms: 650.5,
+          peak_vram_mb: 42.25,
+          input_bars: 120,
+          forecast_bars: 5,
+        },
         scenarios: [
           {
             label: 'Upside-biased preview',
@@ -372,6 +381,9 @@ describe('stocksApi', () => {
     expect(result.kronosModelUsed).toBe(false);
     expect(result.dependencyStatus.huggingfaceHub).toBe(true);
     expect(result.missingDependencies).toContain('torch');
+    expect(result.runtimeMetrics.resolvedDevice).toBe('cuda');
+    expect(result.runtimeMetrics.modelCacheHit).toBe(true);
+    expect(result.runtimeMetrics.inferenceMs).toBe(650.5);
     expect(result.backtestSummary.hitRate).toBe(1);
     expect(result.aiUsed).toBe(false);
     expect(result.publicSearchUsed).toBe(false);

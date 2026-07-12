@@ -1703,3 +1703,106 @@ Boundary: local-only, no real payment, no production keys, no production deploym
 - `tests/test_platform_release_candidate_package.py`
 
 Boundary: local-only, no AI by default, no real payment, no production deployment, and no investment advice.
+
+## V106 Financial Research Workflows
+
+### backend-platform-foundation
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `src/services/financial_research_workflow_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/App.tsx`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/api/researchWorkflows.ts`
+- `apps/dsa-web/src/pages/ResearchWorkflowsPage.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/App.test.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `apps/dsa-web/src/api/__tests__/researchWorkflows.test.ts`
+- `apps/dsa-web/src/pages/__tests__/ResearchWorkflowsPage.test.tsx`
+- `tests/test_financial_research_workflow_service_v106.py`
+- `tests/test_financial_research_workflow_api_v106.py`
+- `tests/test_platform_financial_research_workflows_v106_verifier.py`
+- `scripts/verify_platform_financial_research_workflows_v106.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+### docs-and-config
+
+- `.env.example`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v106-financial-research-workflows.md`
+- `docs/superpowers/third-party/anthropic-financial-services.md`
+
+### build-and-ignore-impact
+
+- `.gitignore`
+
+Boundary: the ignored external checkout is a read-only Apache-2.0 research-method reference. V106 executes no external agent or connector, consumes no AI quota, and provides information and data only.
+
+## V107 Ollama Local AI Retention
+
+### backend-platform-foundation
+
+- `src/services/ollama_runtime_service.py`
+- `src/services/analysis_service.py`
+- `src/core/pipeline.py`
+- `src/analyzer.py`
+- `api/v1/endpoints/analysis.py`
+- `api/v1/endpoints/platform.py`
+- `api/middlewares/auth.py`
+- `src/platform_feature_policy.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/components/retention/LocalModelStatusV107.tsx`
+
+### tests-and-verifiers
+
+- `tests/test_ollama_runtime_service_v107.py`
+- `tests/test_platform_ollama_status_api_v107.py`
+- `tests/test_platform_ollama_analysis_v107.py`
+- `tests/test_platform_ollama_local_retention_v107_verifier.py`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/components/retention/__tests__/LocalModelStatusV107.test.tsx`
+- `scripts/verify_platform_ollama_local_retention_v107.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+
+### docs-and-config
+
+- `.env.example`
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/plans/2026-07-11-dsa-v107-ollama-local-retention.md`
+
+Boundary: local Ollama only, no remote paid fallback, no production enablement, and information/data output only.
+
+## Concurrent Product Research Notes
+
+### manual-confirmation
+
+- `docs/superpowers/plans/2026-07-11-dsa-api-membership-and-byok-conversation-notes.md`
+- `docs/superpowers/plans/2026-07-11-dsa-membership-api-pricing-market-research.md`
+
+These files appeared during V107 implementation and are classified for review coverage only. V107 does not adopt their pricing or production decisions.

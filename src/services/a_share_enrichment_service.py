@@ -26,6 +26,8 @@ _A_SHARE_ENRICHMENT_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 _A_SHARE_ENRICHMENT_SHARED_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
 _A_SHARE_ENRICHMENT_SHARED_LAST_REQUEST_AT: dict[tuple[str, str, str], float] = {}
 _A_SHARE_ENRICHMENT_SHARED_LOCK = threading.RLock()
+_A_STOCK_DATA_EASTMONEY_REQUEST_LOCK = threading.Lock()
+_A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT: Optional[float] = None
 
 
 class AShareEnrichmentService:
@@ -45,9 +47,12 @@ class AShareEnrichmentService:
     @classmethod
     def clear_shared_state_for_tests(cls) -> None:
         """Reset process-local adapter state between isolated tests."""
+        global _A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT
         with _A_SHARE_ENRICHMENT_SHARED_LOCK:
             _A_SHARE_ENRICHMENT_SHARED_CACHE.clear()
             _A_SHARE_ENRICHMENT_SHARED_LAST_REQUEST_AT.clear()
+        with _A_STOCK_DATA_EASTMONEY_REQUEST_LOCK:
+            _A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT = None
 
     def __init__(
         self,
@@ -60,9 +65,11 @@ class AShareEnrichmentService:
         cache_ttl_seconds: Optional[float] = None,
         timeout_cache_ttl_seconds: Optional[float] = None,
         min_interval_seconds: Optional[float] = None,
+        eastmoney_min_interval_seconds: Optional[float] = None,
         skill_root: Optional[str] = None,
         skill_revision: Optional[str] = None,
         time_provider: Optional[Callable[[], float]] = None,
+        sleep_provider: Optional[Callable[[float], None]] = None,
     ) -> None:
         self.source_mode = self._normalize_source_mode(source_mode or os.getenv("A_STOCK_DATA_SOURCE_MODE", "poc"))
         default_timeout = "2.5" if self.source_mode == "a_stock_data" else "1.2"
@@ -70,7 +77,7 @@ class AShareEnrichmentService:
             0.1,
             float(timeout_seconds or os.getenv("A_STOCK_DATA_POC_TIMEOUT_SEC", default_timeout)),
         )
-        default_total_timeout = "1.5"
+        default_total_timeout = "15" if self.source_mode == "a_stock_data" else "1.5"
         self.total_timeout_seconds = max(
             0.1,
             float(
@@ -103,12 +110,21 @@ class AShareEnrichmentService:
                 else os.getenv("A_STOCK_DATA_MIN_INTERVAL_SEC", "1")
             ),
         )
+        self.eastmoney_min_interval_seconds = max(
+            0.0,
+            float(
+                eastmoney_min_interval_seconds
+                if eastmoney_min_interval_seconds is not None
+                else os.getenv("A_STOCK_DATA_EASTMONEY_MIN_INTERVAL_SEC", "1")
+            ),
+        )
         self.skill_root = skill_root or os.getenv(
             "A_STOCK_DATA_SKILL_ROOT",
-            r"C:\Users\26879\Documents\Codex\external\a-stock-data",
+            str(Path(__file__).resolve().parents[2] / "external" / "a-stock-data"),
         )
         self.skill_revision = skill_revision or os.getenv("A_STOCK_DATA_SKILL_REVISION") or self._detect_skill_revision()
         self._time_provider = time_provider or time.monotonic
+        self._sleep_provider = sleep_provider or time.sleep
         enabled = http_enabled
         if enabled is None:
             enabled = (
@@ -621,6 +637,8 @@ class AShareEnrichmentService:
         main_net = self._float_or_none((payload or {}).get("main_net"))
         ratio = self._float_or_none((payload or {}).get("main_net_ratio"))
         if main_net is not None:
+            granularity = str((payload or {}).get("granularity") or "minute")
+            is_daily = granularity == "daily"
             ratio_text = f", ratio {self._format_percent(ratio)}" if ratio is not None else ""
             rows = (payload or {}).get("items") if isinstance(payload, dict) else []
             latest = rows[-1] if isinstance(rows, list) and rows else {}
@@ -630,13 +648,13 @@ class AShareEnrichmentService:
             return self._channel(
                 "capital_flow",
                 "资金流通道",
-                f"主力资金净额 {self._format_money(main_net)}{ratio_text}。",
+                f"{'近20日' if is_daily else '盘中'}主力资金净额 {self._format_money(main_net)}{ratio_text}。",
                 status="available",
                 source="a_stock_data_eastmoney_fund_flow",
-                action="继续观察主力资金是否连续回流，不要只看单次分钟波动。",
+                action="对照价格与成交量复核资金变化；日级回退不是实时盘中数据。" if is_daily else "继续观察主力资金是否连续回流，不要只看单次分钟波动。",
                 details=[
-                    self._detail("主力净额", self._format_money(main_net), "近几条分钟记录合计"),
-                    self._detail("最新分钟", self._format_money(latest_main), str((latest or {}).get("time") or "最新记录")),
+                    self._detail("近20日主力净额" if is_daily else "主力净额", self._format_money(main_net), "最近20个交易日合计" if is_daily else "近几条分钟记录合计"),
+                    self._detail("最近交易日" if is_daily else "最新分钟", self._format_money(latest_main), str((latest or {}).get("time") or "最新记录")),
                     self._detail("大单净额", self._format_money(self._float_or_none((latest or {}).get("large_net"))), "最新记录"),
                     self._detail("超大单净额", self._format_money(self._float_or_none((latest or {}).get("super_net"))), "最新记录"),
                 ],
@@ -922,7 +940,7 @@ class AShareEnrichmentService:
             }
             rows.append(row)
         if not rows:
-            return {"checked": True, "items": []}
+            return self._fetch_eastmoney_daily_fund_flow(requests_module, code, timeout=timeout)
         main_values = [value for value in (self._float_or_none(row.get("main_net")) for row in rows) if value is not None]
         return {
             "checked": True,
@@ -930,6 +948,71 @@ class AShareEnrichmentService:
             "latest_date": str(rows[-1].get("time") or ""),
             "main_net": sum(main_values) if main_values else None,
             "latest_main_net": rows[-1].get("main_net"),
+            "granularity": "minute",
+            "period": "current_trading_day",
+        }
+
+    def _fetch_eastmoney_daily_fund_flow(
+        self,
+        requests_module: Any,
+        code: str,
+        *,
+        timeout: Any = None,
+    ) -> dict[str, Any]:
+        data = self._request_json(
+            requests_module,
+            "GET",
+            "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
+            params={
+                "secid": self._eastmoney_secid(code),
+                "fields1": "f1,f2,f3,f7",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+                "lmt": "120",
+            },
+            headers={
+                "User-Agent": self.USER_AGENT,
+                "Referer": "https://quote.eastmoney.com/",
+                "Origin": "https://quote.eastmoney.com",
+            },
+            timeout=timeout,
+        )
+        rows: list[dict[str, Any]] = []
+        for line in ((data.get("data") or {}).get("klines") or []):
+            parts = str(line).split(",")
+            if len(parts) < 6:
+                continue
+            rows.append(
+                {
+                    "date": parts[0],
+                    "time": parts[0],
+                    "main_net": self._float_or_none(parts[1]),
+                    "small_net": self._float_or_none(parts[2]),
+                    "mid_net": self._float_or_none(parts[3]),
+                    "large_net": self._float_or_none(parts[4]),
+                    "super_net": self._float_or_none(parts[5]),
+                }
+            )
+        if not rows:
+            return {
+                "checked": True,
+                "items": [],
+                "granularity": "daily",
+                "period": "recent_20_trading_days",
+            }
+        recent = rows[-20:]
+        main_values = [
+            value
+            for value in (self._float_or_none(row.get("main_net")) for row in recent)
+            if value is not None
+        ]
+        return {
+            "checked": True,
+            "items": rows[-5:],
+            "latest_date": str(rows[-1].get("date") or ""),
+            "main_net": sum(main_values) if main_values else None,
+            "latest_main_net": rows[-1].get("main_net"),
+            "granularity": "daily",
+            "period": "recent_20_trading_days",
         }
 
     def _fetch_eastmoney_concept_blocks(self, requests_module: Any, code: str, *, timeout: Any = None) -> dict[str, Any]:
@@ -1153,13 +1236,47 @@ class AShareEnrichmentService:
         headers: Optional[dict[str, str]] = None,
         timeout: Any = None,
     ) -> dict[str, Any]:
-        if method.upper() == "POST":
+        if "eastmoney.com" in str(url).lower():
+            response = self._request_eastmoney_serialized(
+                requests_module,
+                method,
+                url,
+                params=params,
+                data=data,
+                headers=headers,
+                timeout=timeout,
+            )
+        elif method.upper() == "POST":
             response = requests_module.post(url, data=data, params=params, headers=headers, timeout=timeout)
         else:
             response = requests_module.get(url, params=params, headers=headers, timeout=timeout)
         response.raise_for_status()
         parsed = response.json()
         return parsed if isinstance(parsed, dict) else {}
+
+    def _request_eastmoney_serialized(
+        self,
+        requests_module: Any,
+        method: str,
+        url: str,
+        *,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: Any = None,
+    ) -> Any:
+        global _A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT
+        with _A_STOCK_DATA_EASTMONEY_REQUEST_LOCK:
+            now = self._time_provider()
+            if _A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT is not None:
+                elapsed = now - _A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT
+                delay = self.eastmoney_min_interval_seconds - elapsed
+                if delay > 0:
+                    self._sleep_provider(delay)
+            _A_STOCK_DATA_EASTMONEY_LAST_REQUEST_AT = self._time_provider()
+        if method.upper() == "POST":
+            return requests_module.post(url, data=data, params=params, headers=headers, timeout=timeout)
+        return requests_module.get(url, params=params, headers=headers, timeout=timeout)
 
     def _reader_summary(
         self,

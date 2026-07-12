@@ -10,6 +10,7 @@ Responsibilities:
 3. Generate detailed reports in Markdown format
 """
 from __future__ import annotations
+import copy
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -399,7 +400,10 @@ class HistoryService:
         )
 
     def _record_to_list_item_dict(self, record) -> Dict[str, Any]:
-        raw_result = parse_json_field(getattr(record, "raw_result", None))
+        raw_result = self._sanitize_informational_local_model_raw_result(
+            parse_json_field(getattr(record, "raw_result", None))
+        )
+        raw = raw_result if isinstance(raw_result, dict) else {}
         model_used = raw_result.get("model_used") if isinstance(raw_result, dict) else None
         display_code = self._display_stock_code(record.code)
         market_fields = self._extract_history_market_fields(
@@ -417,10 +421,10 @@ class HistoryService:
             "stock_code": display_code,
             "stock_name": record.name,
             "report_type": record.report_type,
-            "trend_prediction": record.trend_prediction,
-            "analysis_summary": record.analysis_summary,
-            "sentiment_score": record.sentiment_score,
-            "operation_advice": record.operation_advice,
+            "trend_prediction": raw.get("trend_prediction", record.trend_prediction),
+            "analysis_summary": raw.get("analysis_summary", record.analysis_summary),
+            "sentiment_score": raw.get("sentiment_score", record.sentiment_score),
+            "operation_advice": raw.get("operation_advice", record.operation_advice),
             "action": action_fields["action"],
             "action_label": action_fields["action_label"],
             "model_used": normalize_model_used(model_used),
@@ -682,11 +686,21 @@ class HistoryService:
         """
         Convert an AnalysisHistory ORM record to a detail response dict.
         """
-        raw_result = parse_json_field(record.raw_result)
+        raw_result = self._sanitize_informational_local_model_raw_result(
+            parse_json_field(record.raw_result)
+        )
+        raw = raw_result if isinstance(raw_result, dict) else {}
 
         model_used = (raw_result or {}).get("model_used") if isinstance(raw_result, dict) else None
         model_used = normalize_model_used(model_used)
-        sniper_points = self._get_display_sniper_points(record, raw_result)
+        informational_only = bool(
+            isinstance(raw_result, dict) and raw_result.get("informational_only_mode")
+        )
+        sniper_points = (
+            {"ideal_buy": None, "secondary_buy": None, "stop_loss": None, "take_profit": None}
+            if informational_only
+            else self._get_display_sniper_points(record, raw_result)
+        )
 
         context_snapshot = None
         if record.context_snapshot:
@@ -711,13 +725,15 @@ class HistoryService:
             "report_type": record.report_type,
             "created_at": record.created_at.isoformat() if record.created_at else None,
             "model_used": model_used,
-            "analysis_summary": market_review_content or record.analysis_summary,
-            "operation_advice": record.operation_advice,
+            "analysis_summary": market_review_content or raw.get("analysis_summary", record.analysis_summary),
+            "operation_advice": raw.get("operation_advice", record.operation_advice),
             "action": action_fields["action"],
             "action_label": action_fields["action_label"],
-            "trend_prediction": record.trend_prediction,
-            "sentiment_score": record.sentiment_score,
-            "sentiment_label": self._get_sentiment_label(record.sentiment_score or 50),
+            "trend_prediction": raw.get("trend_prediction", record.trend_prediction),
+            "sentiment_score": raw.get("sentiment_score", record.sentiment_score),
+            "sentiment_label": self._get_sentiment_label(
+                raw.get("sentiment_score", record.sentiment_score) or 50
+            ),
             "ideal_buy": sniper_points.get("ideal_buy"),
             "secondary_buy": sniper_points.get("secondary_buy"),
             "stop_loss": sniper_points.get("stop_loss"),
@@ -728,14 +744,94 @@ class HistoryService:
             "market_phase_summary": market_phase_summary,
         }
 
+    @staticmethod
+    def _sanitize_informational_local_model_raw_result(raw_result: Any) -> Any:
+        """Return a safe read-only view for current and legacy Ollama reports."""
+        if not isinstance(raw_result, dict):
+            return raw_result
+        model_used = str(normalize_model_used(raw_result.get("model_used")) or "").lower()
+        if not model_used.startswith("ollama/"):
+            return raw_result
+
+        sanitized = copy.deepcopy(raw_result)
+        report_language = normalize_report_language(sanitized.get("report_language"))
+        information_label = "Information only" if report_language == "en" else "仅供信息观察"
+        information_trend = "Information overview" if report_language == "en" else "信息观察"
+        information_summary = (
+            "This local-model report organizes market, trend, volume, company, and risk data. "
+            "It does not provide buy or sell instructions, position sizing, target prices, or return promises."
+            if report_language == "en"
+            else "本地模型仅整理行情、趋势、量价、公司资料与风险信息；不提供买卖指令、仓位比例、目标价或收益承诺。"
+        )
+        sanitized.update(
+            {
+                "informational_only_mode": True,
+                "sentiment_score": 50,
+                "operation_advice": information_label,
+                "action": None,
+                "action_label": information_label,
+                "decision_type": "information",
+                "trend_prediction": information_trend,
+                "analysis_summary": information_summary,
+                "short_term_outlook": "",
+                "medium_term_outlook": "",
+                "buy_reason": "",
+                "raw_response": None,
+            }
+        )
+        dashboard = sanitized.get("dashboard")
+        if isinstance(dashboard, dict):
+            dashboard.update(
+                {
+                    "sentiment_score": 50,
+                    "operation_advice": information_label,
+                    "action": None,
+                    "action_label": information_label,
+                    "trend_prediction": information_trend,
+                    "analysis_summary": information_summary,
+                }
+            )
+            core = dashboard.get("core_conclusion")
+            if isinstance(core, dict):
+                core.update(
+                    {
+                        "one_sentence": information_summary,
+                        "signal_type": information_label,
+                        "time_sensitivity": "Not applicable" if report_language == "en" else "不适用",
+                        "position_advice": {
+                            "no_position": information_label,
+                            "has_position": information_label,
+                        },
+                    }
+                )
+            battle_plan = dashboard.get("battle_plan")
+            if isinstance(battle_plan, dict):
+                battle_plan["sniper_points"] = {
+                    "ideal_buy": None,
+                    "secondary_buy": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                }
+                battle_plan["position_strategy"] = {
+                    "suggested_position": information_label,
+                    "entry_plan": information_label,
+                    "risk_control": information_label,
+                }
+                battle_plan["action_checklist"] = []
+        return sanitized
+
     def _decision_action_fields_for_record(self, record, raw_result: Any) -> Dict[str, Any]:
         raw = raw_result if isinstance(raw_result, dict) else {}
-        return build_action_fields(
+        fields = build_action_fields(
             operation_advice=raw.get("operation_advice") or getattr(record, "operation_advice", None),
             explicit_action=raw.get("action"),
             report_type=getattr(record, "report_type", None),
             report_language=normalize_report_language(raw.get("report_language")),
         )
+        explicit_label = str(raw.get("action_label") or "").strip()
+        if fields["action"] is None and explicit_label:
+            fields["action_label"] = explicit_label
+        return fields
 
     def delete_history_records(
         self,

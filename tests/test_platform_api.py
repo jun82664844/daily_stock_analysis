@@ -498,6 +498,54 @@ class PlatformApiTestCase(unittest.TestCase):
         quota = PlatformAccountService().get_quota_status(user_id)
         self.assertEqual(quota["weekly_limit"], 500)
 
+    def test_platform_admin_can_toggle_alphasift_but_free_user_cannot(self) -> None:
+        self.client.post(
+            "/api/v1/platform/register",
+            json={"email": "alphasift-user@example.com", "password": "password123"},
+        )
+
+        forbidden = self.client.post(
+            "/api/v1/platform/admin/features/alphasift",
+            json={"enabled": True},
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.client.post("/api/v1/platform/logout")
+        PlatformAccountService().create_user("alphasift-admin@example.com", "password123", role="admin")
+        login = self.client.post(
+            "/api/v1/platform/login",
+            json={"email": "alphasift-admin@example.com", "password": "password123"},
+        )
+        self.assertEqual(login.status_code, 200)
+
+        config_service = MagicMock()
+        config_service.get_config.return_value = {
+            "config_version": "v1",
+            "mask_token": "******",
+        }
+        config_service.update.return_value = {
+            "config_version": "v2",
+            "updated_keys": ["ALPHASIFT_ENABLED"],
+            "reload_triggered": True,
+        }
+        with patch(
+            "api.v1.endpoints.platform.SystemConfigService",
+            return_value=config_service,
+        ):
+            enabled = self.client.post(
+                "/api/v1/platform/admin/features/alphasift",
+                json={"enabled": True},
+            )
+
+        self.assertEqual(enabled.status_code, 200)
+        self.assertTrue(enabled.json()["enabled"])
+        config_service.update.assert_called_once_with(
+            config_version="v1",
+            items=[{"key": "ALPHASIFT_ENABLED", "value": "true"}],
+            mask_token="******",
+            reload_now=True,
+        )
+
     def test_platform_admin_can_view_usage_buckets_and_audit_events(self) -> None:
         register = self.client.post(
             "/api/v1/platform/register",

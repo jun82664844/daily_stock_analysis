@@ -167,6 +167,9 @@ describe('StockScreeningPage', () => {
   });
 
   it('re-syncs enabled state when AlphaSift availability check fails after config is enabled', async () => {
+    platformCurrent.mockResolvedValueOnce({
+      user: { id: 99, email: 'admin@example.com', role: 'admin', plan: 'pro', status: 'active' },
+    });
     getAlphaSiftStatus
       .mockResolvedValueOnce({
         enabled: false,
@@ -192,6 +195,28 @@ describe('StockScreeningPage', () => {
     expect(screen.getByRole('button', { name: /运行筛选/ })).toBeDisabled();
     expect(screen.getByText(/适配层当前不可用/)).toBeInTheDocument();
     expect(screen.getByText('AlphaSift 适配层不可用。请执行 pip install -r requirements.txt')).toBeInTheDocument();
+  });
+
+  it('does not offer the system feature toggle to an ordinary user', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: false,
+      available: false,
+      installSpecIsDefault: true,
+    });
+    platformCurrent.mockResolvedValueOnce({
+      user: { id: 7, email: 'user@example.com', role: 'user', plan: 'free', status: 'active' },
+    });
+
+    render(
+      <UiLanguageProvider>
+        <StockScreeningPage />
+      </UiLanguageProvider>,
+    );
+
+    expect(await screen.findByText('Screening unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enable AlphaSift' })).not.toBeInTheDocument();
+    expect(screen.getByText(/local platform administrator/i)).toBeInTheDocument();
   });
 
   it('loads AlphaSift hotspot themes on demand', async () => {

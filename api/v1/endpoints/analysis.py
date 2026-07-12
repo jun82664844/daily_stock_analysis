@@ -532,6 +532,32 @@ def trigger_analysis(
         if limited is not None:
             return limited
 
+    api_key_mode = _api_key_mode_for_request(request)
+    platform_user_id = _get_platform_user_id(http_request)
+    if api_key_mode in {"user", "local"} and platform_user_id is None:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "unauthorized", "message": "Login required"},
+        )
+    if api_key_mode == "local":
+        from src.services.ollama_runtime_service import get_ollama_runtime_service
+
+        local_runtime = get_ollama_runtime_service()
+        local_status = local_runtime.get_status()
+        local_reason = local_runtime.readiness_reason(
+            getattr(request, "analysis_depth", "fast") or "fast",
+            status=local_status,
+        )
+        if local_reason != "ready":
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": local_reason,
+                    "message": "Local model is unavailable",
+                    "local_model_status": local_status,
+                },
+            )
+
     # Sync mode only supports single-stock analysis.
     if not request.async_mode:
         if len(stock_codes) > 1:
@@ -540,19 +566,29 @@ def trigger_analysis(
                 "validation_error",
                 "同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析",
             )
+        reservation_reference = f"analysis:{uuid.uuid4().hex}"
         quota_error = _reserve_platform_analysis_quota(
             http_request,
             1,
             request=request,
-            reference_id=stock_codes[0],
+            reference_id=reservation_reference,
         )
         if quota_error is not None:
             return quota_error
-        return _handle_sync_analysis(
-            stock_codes[0],
-            request,
-            platform_user_id=_get_platform_user_id(http_request),
-        )
+        try:
+            return _handle_sync_analysis(
+                stock_codes[0],
+                request,
+                platform_user_id=_get_platform_user_id(http_request),
+            )
+        except Exception:
+            _release_platform_analysis_quota(
+                http_request,
+                1,
+                request=request,
+                reference_id=reservation_reference,
+            )
+            raise
 
     # Async mode submits one task per stock.
     quota_error = _ensure_platform_analysis_quota_available(http_request, len(stock_codes), request)
@@ -738,6 +774,12 @@ def _handle_sync_analysis(
 
         if result is None:
             error_message = service.last_error or f"分析股票 {stock_code} 失败"
+            if api_key_mode == "local":
+                normalized_error = str(error_message).strip().lower()
+                if normalized_error.startswith("local_model_"):
+                    raise api_error(503, normalized_error, "Local model is unavailable")
+                if "timeout" in normalized_error or "timed out" in normalized_error:
+                    raise api_error(504, "local_model_timeout", "Local model timed out")
             raise api_error(500, "analysis_failed", error_message)
 
         # 构建报告结构

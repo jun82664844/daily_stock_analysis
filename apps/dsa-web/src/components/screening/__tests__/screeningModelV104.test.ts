@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AlphaSiftCandidate } from '../../../api/alphasift';
+
 import {
   MAX_SCREENING_COMPARE,
   containsAdvisoryLanguage,
@@ -18,7 +20,7 @@ describe('screeningModelV104', () => {
       { code: 'A', name: 'A', rank: 1, reason: '', raw: {}, changePct: -1, screeningBrief: { observedMetrics: [{ code: 'pe_ratio', value: 30, source: 'snapshot' }] } },
       { code: 'B', name: 'B', rank: 2, reason: '', raw: {}, changePct: 2, screeningBrief: { observedMetrics: [{ code: 'pe_ratio', value: 12, source: 'snapshot' }] } },
       { code: 'C', name: 'C', rank: 3, reason: '', raw: {}, changePct: 1, screeningBrief: { observedMetrics: [{ code: 'pe_ratio', value: 8, source: 'snapshot' }] } },
-    ] as any;
+    ] as unknown as AlphaSiftCandidate[];
 
     expect(filterAndSortScreeningCandidates(candidates, { sort: 'pe_asc', minChangePct: 0, maxPe: 15 }).map((item) => item.code)).toEqual(['C', 'B']);
     expect(filterAndSortScreeningCandidates(candidates, { sort: 'change_desc' }).map((item) => item.code)).toEqual(['B', 'C', 'A']);
