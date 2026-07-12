@@ -24,6 +24,7 @@ from api.v1.endpoints import (
     history,
     intelligence,
     local_connector,
+    market_workspace,
     platform,
     portfolio,
     stocks,
@@ -133,4 +134,10 @@ router.include_router(
 router.include_router(
     local_connector.router,
     tags=["LocalConnector"]
+)
+
+router.include_router(
+    market_workspace.router,
+    prefix="/market-workspace",
+    tags=["MarketWorkspace"],
 )

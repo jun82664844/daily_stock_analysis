@@ -100,6 +100,17 @@ def _public_market_screening_path(request: Request) -> bool:
     }
 
 
+def _public_market_workspace_path(request: Request) -> bool:
+    """Keep V113 market data public while the personal daily brief stays private."""
+    if request.method.upper() != "GET":
+        return False
+    path = request.url.path.rstrip("/")
+    return path in {
+        "/api/v1/market-workspace/overview",
+        "/api/v1/market-workspace/search",
+    } or path.startswith("/api/v1/market-workspace/symbol/")
+
+
 def _csrf_failure_response(request: Request) -> JSONResponse | None:
     if not csrf_enabled() or request.method.upper() not in UNSAFE_METHODS:
         return None
@@ -134,6 +145,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if (
             _public_no_ai_query_path(request)
             or _public_market_screening_path(request)
+            or _public_market_workspace_path(request)
             or _connector_device_path(path)
         ):
             return await call_next(request)

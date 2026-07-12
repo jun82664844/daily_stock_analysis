@@ -254,6 +254,44 @@ class BasicQueryService:
             "ai_used": False,
         }
 
+    def get_quote_card(self, stock_code: str, *, force_refresh: bool = False) -> Dict[str, Any]:
+        """Return the quote-only subset used by multi-symbol market overviews."""
+        route = self._resolve_route(stock_code)
+        code = route.normalized_code
+        cached_history_available = bool(
+            not force_refresh and self.cache.get(f"history:{code}:daily:30") is not None
+        )
+        (
+            quote,
+            quote_freshness,
+            _quote_cache,
+            _quote_elapsed_ms,
+            _quote_source,
+            _quote_timeout,
+            _quote_fallback,
+            _quote_error,
+            _quote_health,
+            _quote_cache_origin,
+        ) = self._get_quote(
+            code,
+            route=route,
+            force_refresh=force_refresh,
+            cached_history_available=cached_history_available,
+        )
+        return {
+            "stock_code": code,
+            "stock_name": self._stock_name(quote, None, None),
+            "market": route.market,
+            "quote": self._quote_payload(
+                quote,
+                freshness=quote_freshness,
+                source_fallback=route.quote_sources[0],
+            ),
+            "profile": {},
+            "warnings": [] if quote else ["quote_unavailable"],
+            "ai_used": False,
+        }
+
     def prewarm_snapshots(self, stock_codes: Iterable[str]) -> Dict[str, Any]:
         started = time.perf_counter()
         seen: set[str] = set()

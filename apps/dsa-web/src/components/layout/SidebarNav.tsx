@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, BarChart3, Bell, BookOpenText, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
+import { Activity, BarChart3, Bell, BookOpenText, BriefcaseBusiness, Gauge, Globe2, Home, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { PLATFORM_SESSION_CHANGED_EVENT, platformApi } from '../../api/platform';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +30,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', labelKey: 'layout.nav.home', to: '/', icon: Home, exact: true },
   { key: 'chat', labelKey: 'layout.nav.chat', to: '/chat', icon: MessageSquareQuote, badge: 'completion' },
+  { key: 'market', labelKey: 'layout.nav.market', to: '/market', icon: Globe2 },
   { key: 'screening', labelKey: 'layout.nav.screening', to: '/screening', icon: Search },
   { key: 'research', labelKey: 'layout.nav.research', to: '/research', icon: BookOpenText },
   { key: 'portfolio', labelKey: 'layout.nav.portfolio', to: '/portfolio', icon: BriefcaseBusiness },

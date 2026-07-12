@@ -2170,3 +2170,49 @@ This planning-only file is preserved for review coverage. It is not part of the 
 - `docs/superpowers/plans/2026-07-11-dsa-membership-api-pricing-market-research.md`
 
 These notes are inventoried but are not accepted as production pricing, payment, quota, legal or launch policy by the V107 package.
+
+## V113 Native Market Workspace Package
+
+- `.env.example`
+- `.gitignore`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/__init__.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/router.py`
+- `api/v1/schemas/market_workspace.py`
+- `apps/dsa-web/src/App.tsx`
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/components/market-workspace/GlobalStockCommandV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketHeatmapV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketMoversV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketNewsTimelineV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketPulseV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolWorkspaceV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/WatchlistBriefV113.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/pages/MarketWorkspacePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `docs/superpowers/plans/2026-07-12-dsa-v113-openstock-inspired-market-workspace.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+- `scripts/verify_platform_market_workspace_v113.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `src/services/basic_query_service.py`
+- `src/services/market_daily_brief_service.py`
+- `src/services/market_search_service.py`
+- `src/services/market_workspace_service.py`
+- `tests/test_market_daily_brief_v113.py`
+- `tests/test_market_search_v113.py`
+- `tests/test_market_workspace_v113.py`
+- `tests/test_platform_market_workspace_v113_verifier.py`
+
+Acceptance marker: `DSA_PLATFORM_MARKET_WORKSPACE_V113_OK markets=cn,hk,us guest=true watchlist=true alerts=true ai_required=false agpl_code_copied=false`.
+
+Performance evidence: cold API overview measured A-share 2.06 seconds for four items, Hong Kong 2.01 seconds for four items, and US 0.31 seconds for five items. The browser rendered the same isolated market counts without cross-market leftovers or console errors.
+
+Boundary: local DSA-native implementation only. OpenStock AGPL source was not copied or installed. No real payment, production key, public deployment, data-license approval or investment-advice claim is included.

@@ -579,3 +579,13 @@ git diff --check
 - 本地已验：`REAL_USER_OLLAMA_WINDOWS_LOCAL_DEV_VERIFIED`。明确未验：`REAL_OPENAI_CLAUDE_BYOK_NOT_VERIFIED`、`REAL_USER_OLLAMA_MACOS_NOT_VERIFIED`、`LOCAL_CONNECTOR_SIGNING_NOT_READY`。
 - 发布边界：真实支付、生产密钥、Windows 正式签名、Apple Developer ID/notarization 和 macOS Intel/Apple Silicon 真机证据仍为阻塞项，不得宣称公网可上线。
 - 合规边界：只提供资讯和数据，不提供投资建议、买卖指令、仓位、目标价或收益承诺。
+
+## V113 本地市场工作台状态（2026-07-12）
+
+- 新增 `/market` 原生市场工作台，游客可查看 A 股、港股、美股总览、全局搜索、涨跌图、变化列表和来源状态；登录后可保存自选和客观价格条件提醒。
+- 后端公开 `overview`、`search`、`symbol`，私人 `daily-brief` 继续要求平台登录；所有 V113 响应保持 `ai_used=false` 和 `informational_only=true`。
+- 性能根因从完整快照链路收敛为报价卡片；总览使用有界并行和 2.5 秒整体截止时间。真实冷启动为 A 股 2.06 秒（4 条）、港股 2.01 秒（4 条）、美股 0.31 秒（5 条），缓存请求约毫秒级。
+- 浏览器验收发现并修复前端漏写 `/api/v1`、旧响应缺字段导致整页崩溃、跨市场列表残留和 A 股指数代码归一化冲突。最终 A 股 4 行、美股 5 行、港股 4 行，切换后无跨市场残留、无横向溢出、无控制台错误。
+- 聚焦后端测试 13 项通过；前端 API/页面测试 7 项通过；lint 与生产构建通过。
+- `scripts/verify_platform_market_workspace_v113.py` 输出 `DSA_PLATFORM_MARKET_WORKSPACE_V113_OK markets=cn,hk,us guest=true watchlist=true alerts=true ai_required=false agpl_code_copied=false`。
+- OpenStock 仍为产品灵感来源，不作为代码、依赖或运行服务安装。V113 不批准真实支付、生产密钥、公开部署或市场数据授权，也不构成投资建议。

@@ -1897,3 +1897,59 @@ Boundary: local sandbox only, no real key/payment, no investment advice, and no 
 - `docs/superpowers/plans/2026-07-12-dsa-v113-openstock-inspired-market-workspace.md`
 
 This untracked planning file appeared during V112 implementation. It is preserved and classified for package coverage only; V112 does not claim that V113 was executed.
+
+## V113 Review Slice
+
+### backend-platform-foundation
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/__init__.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/router.py`
+- `api/v1/schemas/market_workspace.py`
+- `src/services/basic_query_service.py`
+- `src/services/market_daily_brief_service.py`
+- `src/services/market_search_service.py`
+- `src/services/market_workspace_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/App.tsx`
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/components/market-workspace/GlobalStockCommandV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketHeatmapV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketMoversV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketNewsTimelineV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketPulseV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolWorkspaceV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/WatchlistBriefV113.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/pages/MarketWorkspacePage.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `scripts/verify_platform_market_workspace_v113.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_market_daily_brief_v113.py`
+- `tests/test_market_search_v113.py`
+- `tests/test_market_workspace_v113.py`
+- `tests/test_platform_market_workspace_v113_verifier.py`
+
+### docs-and-config
+
+- `.env.example`
+- `docs/superpowers/plans/2026-07-12-dsa-v113-openstock-inspired-market-workspace.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+### build-and-ignore-impact
+
+- `.gitignore`
+
+Boundary: DSA-native local implementation only; no OpenStock AGPL code copied, no real payment/key/deployment, and no investment advice.
