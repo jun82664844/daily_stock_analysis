@@ -2087,6 +2087,83 @@ This file appeared from a concurrent local planning task during V110 closeout. I
 
 Boundary: local cached public-source adapter, no AI, no public search, no data-license approval claim, and no investment advice. Empty or network-blocked sources remain visibly degraded.
 
+## V112 API Boost Pack and Simple Model Access Package
+
+- `.env.example`
+- `.gitignore`
+- `.github/workflows/local-connector-release.yml`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/__init__.py`
+- `api/v1/endpoints/analysis.py`
+- `api/v1/endpoints/billing.py`
+- `api/v1/endpoints/local_connector.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/router.py`
+- `api/v1/schemas/analysis.py`
+- `api/v1/schemas/billing.py`
+- `api/v1/schemas/local_connector.py`
+- `api/v1/schemas/platform.py`
+- `apps/dsa-local-connector/app.py`
+- `apps/dsa-local-connector/build-macos.sh`
+- `apps/dsa-local-connector/build-windows.ps1`
+- `apps/dsa-local-connector/client.py`
+- `apps/dsa-local-connector/dsa-local-connector.spec`
+- `apps/dsa-local-connector/ollama.py`
+- `apps/dsa-local-connector/runtime.py`
+- `apps/dsa-local-connector/requirements.txt`
+- `apps/dsa-web/src/api/analysis.ts`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/components/platform/__tests__/BoostPackCardV112.test.tsx`
+- `apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx`
+- `apps/dsa-web/src/components/platform/__tests__/SimpleModelPickerV112.test.tsx`
+- `src/services/api_boost_pack_service.py`
+- `src/services/byok_routing_service.py`
+- `src/services/member_model_catalog_service.py`
+- `src/services/user_local_connector_service.py`
+- `src/billing/lifecycle.py`
+- `src/billing/payment_provider.py`
+- `src/platform_accounts.py`
+- `src/platform_feature_policy.py`
+- `src/services/analysis_service.py`
+- `src/services/task_queue.py`
+- `src/storage.py`
+- `apps/dsa-web/src/components/platform/BoostPackCardV112.tsx`
+- `apps/dsa-web/src/components/platform/SimpleModelPickerV112.tsx`
+- `apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx`
+- `apps/dsa-web/src/pages/AccountPage.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/AccountPage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/stores/stockPoolStore.ts`
+- `apps/dsa-web/src/types/analysis.ts`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-12-dsa-v112-api-boost-pack-simple-model-access.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+- `tests/test_platform_boost_pack_v112.py`
+- `tests/test_member_model_catalog_v112.py`
+- `tests/test_analysis_model_selection_v112.py`
+- `tests/test_billing_subscription_lifecycle.py`
+- `tests/test_user_local_connector_v112.py`
+- `tests/test_local_connector_release_matrix_v112.py`
+- `tests/test_platform_api_keys_product.py`
+- `tests/test_platform_simple_model_access_v112_verifier.py`
+- `scripts/verify_platform_simple_model_access_v112.py`
+- `scripts/verify_platform_user_local_connector_live_v112.py`
+- `scripts/verify_platform_release_candidate_package.py`
+
+Acceptance marker: `DSA_PLATFORM_SIMPLE_MODEL_ACCESS_V112_OK`.
+
+Boundary: local sandbox billing only; no real payment or real provider key was used. Windows/macOS packages remain development candidates until code signing, notarization and physical-device verification are complete. All output is information and data only and does not constitute investment advice.
+
+## Concurrent V113 Planning Artifact
+
+- `docs/superpowers/plans/2026-07-12-dsa-v113-openstock-inspired-market-workspace.md`
+
+This planning-only file is preserved for review coverage. It is not part of the V112 implementation or acceptance claim.
+
 ## Concurrent Product Research Notes Requiring Manual Confirmation
 
 - `docs/superpowers/plans/2026-07-11-dsa-api-membership-and-byok-conversation-notes.md`

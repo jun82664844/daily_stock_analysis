@@ -20,6 +20,7 @@ import asyncio
 import copy
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime
@@ -88,6 +89,7 @@ from src.platform_accounts import (
     PlatformAccountService,
     QuotaExceeded,
     is_platform_user_auth_enabled,
+    normalize_membership_plan,
     platform_identity_from_request,
 )
 from src.platform_feature_policy import get_feature_policy
@@ -240,6 +242,43 @@ def _platform_quota_exceeded_response(exc: QuotaExceeded) -> JSONResponse:
     )
 
 
+def _member_api_quota_enabled(request: AnalyzeRequest, identity: Any) -> bool:
+    enabled = os.getenv("PLATFORM_MEMBER_MODEL_PICKER_ENABLED", "false").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+    return bool(
+        enabled
+        and identity is not None
+        and normalize_membership_plan(getattr(identity, "plan", "free")) in {"pro", "max"}
+        and _api_key_mode_for_request(request) == "platform"
+    )
+
+
+def _member_quota_shape(request: AnalyzeRequest, quantity: int) -> tuple[str, int]:
+    option_id = (getattr(request, "model_option_id", "") or "").strip()
+    if option_id == "platform_flagship":
+        return "pro", 5 * max(1, quantity)
+    if option_id == "platform_pro":
+        return "pro", 3 * max(1, quantity)
+    feature = _analysis_feature_for_request(request)
+    return ("pro", 3 * max(1, quantity)) if feature == "ai_deep" else ("flash", max(1, quantity))
+
+
+def _member_api_quota_exceeded_response(exc: Any, user_id: int) -> JSONResponse:
+    from src.services.api_boost_pack_service import ApiBoostPackService
+
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "member_api_quota_exhausted",
+            "quota_type": exc.quota_type,
+            "remaining": exc.remaining,
+            "requested": exc.requested,
+            "boost_pack": ApiBoostPackService().purchase_summary(user_id),
+        },
+    )
+
+
 def _get_platform_user_id(http_request: Optional[Request]) -> Optional[int]:
     if http_request is None or not hasattr(http_request, "cookies") or not is_platform_user_auth_enabled():
         return None
@@ -379,7 +418,7 @@ def _current_request_dep(request: Request) -> Request:
 
 def _api_key_mode_for_request(request: AnalyzeRequest) -> str:
     mode = (getattr(request, "api_key_mode", "platform") or "platform").strip().lower()
-    return mode if mode in {"user", "local"} else "platform"
+    return mode if mode in {"user", "local", "user_local"} else "platform"
 
 
 def _analysis_feature_for_request(request: AnalyzeRequest) -> str:
@@ -398,6 +437,16 @@ def _reserve_platform_analysis_quota(
     if user_id is None or quantity <= 0:
         return None
     try:
+        identity = _get_platform_identity(http_request)
+        if _member_api_quota_enabled(request, identity):
+            from src.services.api_boost_pack_service import ApiBoostPackService, MemberApiQuotaExceeded
+
+            quota_type, units = _member_quota_shape(request, quantity)
+            try:
+                ApiBoostPackService().reserve(user_id, quota_type, units, reference_id or "")
+            except MemberApiQuotaExceeded as exc:
+                return _member_api_quota_exceeded_response(exc, user_id)
+            return None
         PlatformAccountService().reserve_feature_quota(
             user_id=user_id,
             feature=_analysis_feature_for_request(request),
@@ -426,6 +475,12 @@ def _release_platform_analysis_quota(
     if user_id is None or quantity <= 0:
         return
     try:
+        identity = _get_platform_identity(http_request)
+        if _member_api_quota_enabled(request, identity):
+            from src.services.api_boost_pack_service import ApiBoostPackService
+
+            ApiBoostPackService().release(reference_id)
+            return
         PlatformAccountService().release_feature_quota(
             user_id=user_id,
             feature=_analysis_feature_for_request(request),
@@ -439,6 +494,21 @@ def _release_platform_analysis_quota(
             user_id,
             reference_id,
         )
+
+
+def _consume_platform_analysis_quota(
+    http_request: Optional[Request],
+    *,
+    request: AnalyzeRequest,
+    reference_id: str,
+) -> None:
+    user_id = _get_platform_user_id(http_request)
+    identity = _get_platform_identity(http_request)
+    if user_id is None or not _member_api_quota_enabled(request, identity):
+        return
+    from src.services.api_boost_pack_service import ApiBoostPackService
+
+    ApiBoostPackService().consume(reference_id)
 
 
 # ============================================================
@@ -534,7 +604,37 @@ def trigger_analysis(
 
     api_key_mode = _api_key_mode_for_request(request)
     platform_user_id = _get_platform_user_id(http_request)
-    if api_key_mode in {"user", "local"} and platform_user_id is None:
+    if platform_user_id is not None and os.getenv(
+        "PLATFORM_MEMBER_MODEL_PICKER_ENABLED", "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}:
+        from src.services.byok_routing_service import ByokRoutingError
+        from src.services.member_model_catalog_service import (
+            MemberModelCatalogService,
+            ModelOptionNotAvailable,
+        )
+
+        try:
+            resolved_option = MemberModelCatalogService().resolve(
+                user_id=platform_user_id,
+                model_option_id=getattr(request, "model_option_id", "platform_recommended"),
+            )
+        except (ModelOptionNotAvailable, ByokRoutingError) as exc:
+            code = getattr(exc, "code", "model_option_not_available")
+            return JSONResponse(status_code=400, content={"error": code})
+        selection = resolved_option.get("selection")
+        resolved_mode = resolved_option.get("api_key_mode")
+        if resolved_mode == "user_local" and isinstance(selection, dict):
+            request.api_key_mode = "user_local"
+            request.user_local_connector_id = selection["connector_id"]
+            request.user_local_model_name = selection["model_name"]
+            api_key_mode = "user_local"
+        elif selection is not None:
+            request.api_key_mode = "user"
+            request.provider = selection.provider
+            request.model = selection.model
+            request.api_key_id = selection.api_key_id
+            api_key_mode = "user"
+    if api_key_mode in {"user", "local", "user_local"} and platform_user_id is None:
         return JSONResponse(
             status_code=401,
             content={"error": "unauthorized", "message": "Login required"},
@@ -557,6 +657,17 @@ def trigger_analysis(
                     "local_model_status": local_status,
                 },
             )
+    if api_key_mode == "user_local" and (
+        not getattr(request, "user_local_connector_id", None)
+        or not getattr(request, "user_local_model_name", None)
+    ):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "user_local_model_unavailable",
+                "message": "User local connector model is unavailable",
+            },
+        )
 
     # Sync mode only supports single-stock analysis.
     if not request.async_mode:
@@ -576,11 +687,17 @@ def trigger_analysis(
         if quota_error is not None:
             return quota_error
         try:
-            return _handle_sync_analysis(
+            result = _handle_sync_analysis(
                 stock_codes[0],
                 request,
                 platform_user_id=_get_platform_user_id(http_request),
             )
+            _consume_platform_analysis_quota(
+                http_request,
+                request=request,
+                reference_id=reservation_reference,
+            )
+            return result
         except Exception:
             _release_platform_analysis_quota(
                 http_request,
@@ -638,35 +755,83 @@ def _handle_async_analysis_batch(
     if platform_user_id is not None:
         submit_kwargs["platform_user_id"] = platform_user_id
         submit_kwargs["api_key_mode"] = api_key_mode
+    if api_key_mode == "user_local":
+        submit_kwargs["user_local_connector_id"] = request.user_local_connector_id
+        submit_kwargs["user_local_model_name"] = request.user_local_model_name
     if report_language:
         submit_kwargs["report_language"] = report_language
     if skills is not None:
         submit_kwargs["skills"] = skills
 
-    reservation_reference = f"analysis:{uuid.uuid4().hex}"
     reserved_quantity = len(stock_codes)
-    quota_error = _reserve_platform_analysis_quota(
-        http_request,
-        reserved_quantity,
-        request=request,
-        reference_id=reservation_reference,
+    identity = _get_platform_identity(http_request)
+    member_quota_enabled = bool(
+        platform_user_id is not None and _member_api_quota_enabled(request, identity)
     )
-    if quota_error is not None:
-        return quota_error
+    reservation_reference = f"analysis:{uuid.uuid4().hex}"
+    member_quota_references: Dict[str, str] = {}
+    if member_quota_enabled:
+        for stock_code in stock_codes:
+            canonical_code = resolve_index_stock_code_for_analysis(stock_code)
+            reference = f"analysis:{uuid.uuid4().hex}"
+            quota_error = _reserve_platform_analysis_quota(
+                http_request,
+                1,
+                request=request,
+                reference_id=reference,
+            )
+            if quota_error is not None:
+                from src.services.api_boost_pack_service import ApiBoostPackService
 
-    try:
-        accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
-    except Exception:
-        _release_platform_analysis_quota(
+                quota_service = ApiBoostPackService()
+                for reserved_reference in member_quota_references.values():
+                    quota_service.release(reserved_reference)
+                return quota_error
+            member_quota_references[canonical_code] = reference
+        submit_kwargs["member_quota_references"] = member_quota_references
+    else:
+        quota_error = _reserve_platform_analysis_quota(
             http_request,
             reserved_quantity,
             request=request,
             reference_id=reservation_reference,
         )
+        if quota_error is not None:
+            return quota_error
+
+    try:
+        accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
+    except Exception:
+        if member_quota_enabled:
+            from src.services.api_boost_pack_service import ApiBoostPackService
+
+            quota_service = ApiBoostPackService()
+            for reference in member_quota_references.values():
+                quota_service.release(reference)
+        else:
+            _release_platform_analysis_quota(
+                http_request,
+                reserved_quantity,
+                request=request,
+                reference_id=reservation_reference,
+            )
         raise
 
-    rejected_quantity = max(0, reserved_quantity - len(accepted_tasks))
-    if rejected_quantity:
+    if member_quota_enabled:
+        from src.services.api_boost_pack_service import ApiBoostPackService
+
+        accepted_references = {
+            task.member_quota_reference
+            for task in accepted_tasks
+            if getattr(task, "member_quota_reference", None)
+        }
+        quota_service = ApiBoostPackService()
+        for reference in member_quota_references.values():
+            if reference not in accepted_references:
+                quota_service.release(reference)
+    else:
+        rejected_quantity = max(0, reserved_quantity - len(accepted_tasks))
+    if not member_quota_enabled and rejected_quantity:
         _release_platform_analysis_quota(
             http_request,
             rejected_quantity,
@@ -757,8 +922,19 @@ def _handle_sync_analysis(
         api_key_mode = _api_key_mode_for_request(request)
         if platform_user_id is not None:
             analysis_kwargs["platform_user_id"] = platform_user_id
-        if platform_user_id is not None or api_key_mode in {"user", "local"}:
+        if platform_user_id is not None or api_key_mode in {"user", "local", "user_local"}:
             analysis_kwargs["api_key_mode"] = api_key_mode
+        if api_key_mode == "user" and getattr(request, "api_key_id", None):
+            analysis_kwargs.update(
+                byok_provider=request.provider,
+                byok_model=request.model,
+                byok_api_key_id=request.api_key_id,
+            )
+        if api_key_mode == "user_local":
+            analysis_kwargs.update(
+                user_local_connector_id=request.user_local_connector_id,
+                user_local_model_name=request.user_local_model_name,
+            )
         result = service.analyze_stock(
             stock_code=stock_code,
             report_type=request.report_type,
@@ -780,6 +956,11 @@ def _handle_sync_analysis(
                     raise api_error(503, normalized_error, "Local model is unavailable")
                 if "timeout" in normalized_error or "timed out" in normalized_error:
                     raise api_error(504, "local_model_timeout", "Local model timed out")
+            if api_key_mode == "user_local":
+                normalized_error = str(error_message).strip().lower()
+                if "timeout" in normalized_error:
+                    raise api_error(504, "user_local_model_timeout", "User local model timed out")
+                raise api_error(503, normalized_error or "user_local_model_failed", "User local model failed")
             raise api_error(500, "analysis_failed", error_message)
 
         # 构建报告结构

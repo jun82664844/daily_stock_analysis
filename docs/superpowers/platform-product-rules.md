@@ -303,3 +303,13 @@
 - Current and legacy Ollama reports are sanitized on read without deleting or rewriting stored user data. Their cards and report summaries use an information-only label instead of buy/sell/hold labels.
 - The legacy base weekly-quota view counts only platform `ai_quick` usage. `ai_local` usage is charged exclusively to the local-model bucket and must not reduce the platform API trial balance.
 - V107 is local development functionality. It does not approve production deployment, real payment, market-data licensing or public model capacity.
+
+## V112 API 加油包与极简模型接入
+
+- 加油包固定为 `api_boost_168_28`：本地沙箱价格 HK$28，增加 168 次 Flash 和 28 次 Pro，不改变会员等级。
+- 只有有效 PRO/MAX 会员可购买；先扣会员月额度，再扣加油包，失败分析释放预留，重复支付事件不得重复发放。
+- 普通用户只选择服务端模型选项 ID，不填写 Base URL、端口或内部模型名。
+- BYOK 只允许 OpenAI、Claude/Anthropic、DeepSeek 三步接入；密钥加密保存，接口和日志永不返回明文。
+- 用户自有 Ollama 通过轻量连接器主动出站连接；云端不得访问用户 `localhost`，也不得与服务器 V107 Ollama 自动互相回退。
+- Windows/macOS 正式下载必须通过签名、公证和真机门禁；未通过时只标记开发候选。
+- 页面与报告只提供资讯和数据，必须持续显示“仅供信息分析，不构成投资建议”。

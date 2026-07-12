@@ -1806,3 +1806,94 @@ Boundary: local Ollama only, no remote paid fallback, no production enablement, 
 - `docs/superpowers/plans/2026-07-11-dsa-membership-api-pricing-market-research.md`
 
 These files appeared during V107 implementation and are classified for review coverage only. V107 does not adopt their pricing or production decisions.
+
+## V112 Review Slice
+
+### backend-platform-foundation
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/__init__.py`
+- `api/v1/endpoints/analysis.py`
+- `api/v1/endpoints/billing.py`
+- `api/v1/endpoints/local_connector.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/router.py`
+- `api/v1/schemas/analysis.py`
+- `api/v1/schemas/billing.py`
+- `api/v1/schemas/local_connector.py`
+- `api/v1/schemas/platform.py`
+- `src/billing/lifecycle.py`
+- `src/billing/payment_provider.py`
+- `src/platform_accounts.py`
+- `src/platform_feature_policy.py`
+- `src/services/analysis_service.py`
+- `src/services/api_boost_pack_service.py`
+- `src/services/byok_routing_service.py`
+- `src/services/member_model_catalog_service.py`
+- `src/services/user_local_connector_service.py`
+- `src/services/task_queue.py`
+- `src/storage.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/analysis.ts`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/components/platform/BoostPackCardV112.tsx`
+- `apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx`
+- `apps/dsa-web/src/components/platform/SimpleModelPickerV112.tsx`
+- `apps/dsa-web/src/pages/AccountPage.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/stores/stockPoolStore.ts`
+- `apps/dsa-web/src/types/analysis.ts`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/components/platform/__tests__/BoostPackCardV112.test.tsx`
+- `apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx`
+- `apps/dsa-web/src/components/platform/__tests__/SimpleModelPickerV112.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/AccountPage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `scripts/verify_platform_simple_model_access_v112.py`
+- `scripts/verify_platform_user_local_connector_live_v112.py`
+- `tests/test_analysis_model_selection_v112.py`
+- `tests/test_billing_subscription_lifecycle.py`
+- `tests/test_local_connector_release_matrix_v112.py`
+- `tests/test_member_model_catalog_v112.py`
+- `tests/test_platform_api_keys_product.py`
+- `tests/test_platform_boost_pack_v112.py`
+- `tests/test_platform_simple_model_access_v112_verifier.py`
+- `tests/test_user_local_connector_v112.py`
+
+### docs-and-config
+
+- `.env.example`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-12-dsa-v112-api-boost-pack-simple-model-access.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+### build-and-ignore-impact
+
+- `.gitignore`
+- `.github/workflows/local-connector-release.yml`
+- `apps/dsa-local-connector/app.py`
+- `apps/dsa-local-connector/build-macos.sh`
+- `apps/dsa-local-connector/build-windows.ps1`
+- `apps/dsa-local-connector/client.py`
+- `apps/dsa-local-connector/dsa-local-connector.spec`
+- `apps/dsa-local-connector/ollama.py`
+- `apps/dsa-local-connector/runtime.py`
+- `apps/dsa-local-connector/requirements.txt`
+
+Boundary: local sandbox only, no real key/payment, no investment advice, and no signed production artifact claim.
+
+## Concurrent V113 Planning Artifact
+
+### docs-and-config
+
+- `docs/superpowers/plans/2026-07-12-dsa-v113-openstock-inspired-market-workspace.md`
+
+This untracked planning file appeared during V112 implementation. It is preserved and classified for package coverage only; V112 does not claim that V113 was executed.

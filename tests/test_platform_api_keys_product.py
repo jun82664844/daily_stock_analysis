@@ -75,3 +75,28 @@ class PlatformApiKeysProductTestCase(unittest.TestCase):
         body = response.json()
         self.assertEqual(body[0]["model"], "deepseek/deepseek-v4-flash")
         self.assertNotIn("secret-abcdef", str(body))
+
+    def test_model_options_hide_internal_model_names_and_base_urls(self):
+        response = self.client.get("/api/v1/platform/model-options")
+
+        self.assertEqual(response.status_code, 200)
+        text = str(response.json()).lower()
+        self.assertNotIn("base_url", text)
+        self.assertNotIn("deepseek-v4", text)
+        self.assertEqual(response.json()["selected_option_id"], "platform_recommended")
+
+    def test_connect_api_key_returns_mask_and_options_without_plaintext(self):
+        with patch(
+            "src.services.member_model_catalog_service.MemberModelCatalogService._probe_provider",
+            return_value=True,
+        ):
+            response = self.client.post(
+                "/api/v1/platform/api-keys/connect",
+                json={"provider": "deepseek", "apiKey": "sk-test-connect-secret"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["api_key"]["masked_key"])
+        self.assertTrue(body["model_options"])
+        self.assertNotIn("sk-test-connect-secret", str(body))

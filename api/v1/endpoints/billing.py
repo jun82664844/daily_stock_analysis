@@ -12,13 +12,14 @@ import os
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from api.v1.schemas.billing import CheckoutRequest
+from api.v1.schemas.billing import BoostPackCheckoutRequest, CheckoutRequest
 from src.auth import COOKIE_NAME, verify_session
 from src.billing.lifecycle import BillingLifecycleService
 from src.billing.payment_provider import SandboxPaymentProvider, get_payment_provider_status
 from src.csrf import require_csrf
 from src.platform_accounts import PlatformAccountService, PlatformIdentity, platform_identity_from_request
 from src.platform_rate_limit import check_platform_rate_limit
+from src.services.api_boost_pack_service import ApiBoostPackService, BoostPackNotAvailable
 
 
 router = APIRouter()
@@ -118,6 +119,55 @@ async def create_checkout(request: Request, body: CheckoutRequest):
     )
 
 
+@router.post("/boost-pack/checkout")
+async def create_boost_pack_checkout(request: Request, body: BoostPackCheckoutRequest):
+    require_csrf(request)
+    user_id = _require_platform_user(request)
+    limited = check_platform_rate_limit(request, "billing_checkout", user_id=user_id)
+    if limited is not None:
+        return limited
+    if not os.getenv("PLATFORM_BOOST_PACK_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        return JSONResponse(status_code=404, content={"error": "boost_pack_disabled"})
+    if not _billing_enabled():
+        return JSONResponse(status_code=400, content={"error": "billing_disabled"})
+    provider_status = get_payment_provider_status()
+    if provider_status["provider"] != "sandbox":
+        return JSONResponse(
+            status_code=503,
+            content={"error": "billing_provider_not_ready", "provider": provider_status["provider"]},
+        )
+    service = ApiBoostPackService()
+    try:
+        subscription = service.assert_can_purchase(user_id=user_id)
+        checkout = SandboxPaymentProvider().create_add_on_checkout(
+            user_id=user_id,
+            product_code=body.product_code,
+        )
+        BillingLifecycleService().record_checkout_created(
+            user_id=user_id,
+            provider_session_id=checkout.provider_session_id,
+            checkout_url=checkout.checkout_url,
+            plan=subscription.plan,
+            product_type="add_on",
+            product_code=body.product_code,
+        )
+    except BoostPackNotAvailable as exc:
+        return JSONResponse(status_code=403, content={"error": exc.code})
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    return {
+        "checkout_url": checkout.checkout_url,
+        "provider_session_id": checkout.provider_session_id,
+        "provider": "sandbox",
+        "product_type": "add_on",
+        "product_code": body.product_code,
+        "amount": service.PRODUCT.price_hkd,
+        "currency": "HKD",
+        "status": "created",
+        "mode": "local_sandbox",
+    }
+
+
 @router.get("/account")
 async def billing_account(request: Request):
     user_id = _require_platform_user(request)
@@ -127,6 +177,7 @@ async def billing_account(request: Request):
         provider=_billing_provider_name(),
     )
     summary["provider_readiness"] = get_payment_provider_status()
+    summary["boost_pack"] = ApiBoostPackService().purchase_summary(user_id)
     return summary
 
 

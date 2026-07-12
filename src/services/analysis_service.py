@@ -13,6 +13,7 @@
 import logging
 import copy
 import os
+import re
 import uuid
 from typing import Optional, Dict, Any, Callable, List
 
@@ -79,6 +80,49 @@ def _with_request_analysis_depth(config: Any, analysis_depth: Optional[str]) -> 
     }
 
 
+_USER_LOCAL_PROHIBITED_PATTERNS = (
+    r"\bbuy\b",
+    r"\bsell\b",
+    r"\bhold\b",
+    r"position sizing",
+    r"target price",
+    r"stop[- ]loss",
+    r"take[- ]profit",
+    r"return forecast",
+    r"买入",
+    r"卖出",
+    r"持有",
+    r"加仓",
+    r"减仓",
+    r"仓位",
+    r"目标价",
+    r"止损",
+    r"止盈",
+    r"收益预测",
+)
+
+
+def _sanitize_user_local_summary(text: str, report_language: str) -> str:
+    sentences = re.split(r"(?<=[.!?。！？])\s+|[\r\n]+", str(text or ""))
+    safe_sentences = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip()
+        and not any(
+            re.search(pattern, sentence, flags=re.IGNORECASE)
+            for pattern in _USER_LOCAL_PROHIBITED_PATTERNS
+        )
+    ]
+    if report_language == "en":
+        fallback = "The local model did not return a compliant information summary."
+        boundary = "Information and data only; no investment advice or trading instruction."
+    else:
+        fallback = "本机模型未返回符合资讯边界的摘要。"
+        boundary = "仅提供资讯和数据，不构成投资建议或交易指令。"
+    summary = " ".join(safe_sentences).strip() or fallback
+    return f"{summary} {boundary}"[:12_000]
+
+
 class AnalysisService:
     """
     分析服务
@@ -108,6 +152,11 @@ class AnalysisService:
         report_language: Optional[str] = None,
         platform_user_id: Optional[int] = None,
         api_key_mode: str = "platform",
+        byok_provider: Optional[str] = None,
+        byok_model: Optional[str] = None,
+        byok_api_key_id: Optional[int] = None,
+        user_local_connector_id: Optional[int] = None,
+        user_local_model_name: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         执行股票分析
@@ -150,6 +199,73 @@ class AnalysisService:
             # 获取配置
             config = get_config()
             normalized_api_key_mode = (api_key_mode or "platform").lower()
+            if normalized_api_key_mode == "user_local":
+                if not platform_user_id or not user_local_connector_id or not user_local_model_name:
+                    self.last_error = "user_local_model_unavailable"
+                    return None
+                from src.services.basic_query_service import BasicQueryService
+                from src.services.user_local_connector_service import UserLocalConnectorService
+
+                normalized_report_language = normalize_report_language(report_language, default="zh")
+                snapshot = BasicQueryService().get_snapshot(
+                    stock_code,
+                    force_refresh=force_refresh,
+                )
+                connector_result = UserLocalConnectorService().run_analysis(
+                    user_id=platform_user_id,
+                    connector_id=user_local_connector_id,
+                    model_name=user_local_model_name,
+                    stock_code=stock_code,
+                    report_language=normalized_report_language,
+                    analysis_depth=analysis_depth,
+                    snapshot=snapshot,
+                )
+                information_label = (
+                    "Information only" if normalized_report_language == "en" else "仅供信息观察"
+                )
+                analysis_summary = _sanitize_user_local_summary(
+                    connector_result.get("text", ""),
+                    normalized_report_language,
+                )
+                stock_name = (
+                    snapshot.get("stock_name")
+                    or snapshot.get("name")
+                    or stock_code
+                )
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": stock_name,
+                    "query_id": query_id,
+                    "model_source": "user_local",
+                    "informational_only_mode": True,
+                    "report": {
+                        "meta": {
+                            "stock_code": stock_code,
+                            "stock_name": stock_name,
+                            "report_language": normalized_report_language,
+                            "model_used": f"user_local/{user_local_model_name}",
+                            "informational_only_mode": True,
+                        },
+                        "summary": {
+                            "analysis_summary": analysis_summary,
+                            "operation_advice": information_label,
+                            "action": None,
+                            "action_label": information_label,
+                            "decision_type": "information",
+                            "sentiment_score": 50,
+                        },
+                        "strategy": {
+                            "operation_advice": information_label,
+                            "action": None,
+                            "action_label": information_label,
+                        },
+                        "details": {
+                            "model_source": "user_local",
+                            "connector_diagnostics": connector_result.get("diagnostics", {}),
+                            "snapshot_freshness": snapshot.get("freshness"),
+                        },
+                    },
+                }
             if normalized_api_key_mode == "local":
                 from src.llm.local_model_router import get_default_local_model_router
                 from src.services.ollama_runtime_service import get_ollama_runtime_service
@@ -174,13 +290,31 @@ class AnalysisService:
                     analysis_depth=analysis_depth,
                 )
             elif platform_user_id and normalized_api_key_mode == "user":
-                from src.platform_accounts import PlatformAccountService
+                if byok_api_key_id and byok_provider and byok_model:
+                    from src.services.byok_routing_service import ByokRoutingService
 
-                config = PlatformAccountService().apply_user_llm_config(
-                    config,
-                    platform_user_id,
-                    mode=api_key_mode,
-                )
+                    allowed_models = [
+                        item.strip()
+                        for item in os.getenv("PLATFORM_BYOK_ALLOWED_MODELS", "").split(",")
+                        if item.strip()
+                    ]
+                    router = ByokRoutingService()
+                    selection = router.resolve_selection(
+                        user_id=platform_user_id,
+                        api_key_id=byok_api_key_id,
+                        provider=byok_provider,
+                        model=byok_model,
+                        allowed_models=allowed_models,
+                    )
+                    config = router.build_scoped_config(config, selection)
+                else:
+                    from src.platform_accounts import PlatformAccountService
+
+                    config = PlatformAccountService().apply_user_llm_config(
+                        config,
+                        platform_user_id,
+                        mode=api_key_mode,
+                    )
             config, pipeline_overrides = _with_request_analysis_depth(config, analysis_depth)
             normalized_report_language = normalize_report_language(report_language, default="")
             if normalized_report_language:

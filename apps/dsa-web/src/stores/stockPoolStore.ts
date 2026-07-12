@@ -32,6 +32,7 @@ type SubmitAnalysisOptions = {
   reportLanguage?: ReportLanguage;
   analysisDepth?: AnalysisDepth;
   apiKeyMode?: ApiKeyMode;
+  modelOptionId?: string;
 };
 
 export type SubmitAnalysisResult = {
@@ -882,6 +883,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         selectionSource,
         notify,
         apiKeyMode,
+        modelOptionId: options?.modelOptionId,
         forceRefresh,
         skills,
         ...(options?.reportLanguage !== undefined && { reportLanguage: options.reportLanguage }),

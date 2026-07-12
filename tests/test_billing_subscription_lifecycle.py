@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 from api.app import create_app
 from src.config import Config
 from src.platform_accounts import PlatformAccountService
-from src.storage import DatabaseManager
+from src.storage import DatabaseManager, PlatformQuotaGrant, utc_naive_now
 
 
 SANDBOX_SECRET = "local-subscription-lifecycle-secret"
@@ -127,6 +128,44 @@ class BillingSubscriptionLifecycleTestCase(unittest.TestCase):
         events = [event for event in account["recent_events"] if event["provider_event_id"] == "evt_completed_once"]
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["processing_status"], "processed")
+        with DatabaseManager.get_instance().get_session() as session:
+            membership_grants = session.query(PlatformQuotaGrant).filter_by(
+                user_id=user_id,
+                source_type="membership",
+            ).all()
+            self.assertEqual(len(membership_grants), 1)
+            self.assertEqual(membership_grants[0].flash_total, 268)
+            self.assertEqual(membership_grants[0].pro_total, 28)
+
+    def test_subscription_update_parses_period_and_refreshes_member_grant_once(self) -> None:
+        user_id = self._register(self.client, "billing-period-v112@example.com")
+        starts_at = utc_naive_now()
+        expires_at = starts_at + timedelta(days=31)
+        payload = {
+            "event": "subscription.updated",
+            "provider_event_id": "evt_period_v112",
+            "provider_subscription_id": "sub_period_v112",
+            "user_id": user_id,
+            "plan": "max",
+            "subscription_status": "active",
+            "current_period_start": starts_at.isoformat(),
+            "current_period_end": expires_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
+        }
+
+        first = self._signed_webhook(payload)
+        duplicate = self._signed_webhook(payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(duplicate.status_code, 200)
+        with DatabaseManager.get_instance().get_session() as session:
+            grant = session.query(PlatformQuotaGrant).filter_by(
+                user_id=user_id,
+                source_type="membership",
+            ).one()
+            self.assertEqual(grant.flash_total, 1688)
+            self.assertEqual(grant.pro_total, 168)
+            self.assertEqual(grant.expires_at, expires_at)
 
     def test_cancel_expire_and_payment_failed_events_do_not_upgrade_plan(self) -> None:
         user_id = self._register(self.client, "billing-negative@example.com")

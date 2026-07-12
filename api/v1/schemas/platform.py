@@ -73,6 +73,13 @@ class PlatformApiKeyItem(BaseModel):
     updated_at: Optional[str] = None
 
 
+class PlatformApiKeyConnectRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    provider: Literal["openai", "anthropic", "deepseek"]
+    api_key: str = Field(..., alias="apiKey", min_length=8, max_length=4096)
+
+
 class PlatformStatusResponse(BaseModel):
     platform_auth_enabled: bool
 

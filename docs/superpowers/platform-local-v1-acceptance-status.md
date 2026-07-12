@@ -569,3 +569,13 @@ git diff --check
 - Live quota regression showed platform API trial `5/5` and local-model quota `46/50` after four Ollama analyses; the fourth balance updated without a page reload, proving the local lane no longer double-charges the platform bucket and the UI refreshes immediately.
 - Acceptance marker: `DSA_PLATFORM_OLLAMA_LOCAL_RETENTION_V107_OK`.
 - V107 remains local-only and is not production-launch, real-payment, market-data-license or investment-advice approval.
+
+## V112 本地状态（2026-07-12）
+
+- 本地代码：API 加油包沙箱、统一模型目录、三步 BYOK、用户 Ollama 配对/令牌/加密任务和双平台构建门禁已纳入本地验收。
+- Windows 本地开发验收：连接器发现 9 个 Ollama 模型，统一目录展示 9 个本机选项；AAPL 实际分析 8.80 秒返回 200，`ai_local` 公平使用额度从 500 降为 499，输出保持“仅供信息观察”。
+- Windows 开发包：`DSA-Local-Connector-Windows-x64.exe` 已由 PyInstaller 构建，大小 19,647,339 bytes，SHA-256 `1950C4356ABB42D404673C55757AB521920F80764348063B1300C92022C9AE7F`；隐藏启动烟雾通过，`/downloads/DSA-Local-Connector-Windows-x64.exe` 返回 200。
+- 安全边界：明文 Key、设备 token、prompt 和模型结果不得写入审计或日志；BYOK 白名单默认空并 fail closed。
+- 本地已验：`REAL_USER_OLLAMA_WINDOWS_LOCAL_DEV_VERIFIED`。明确未验：`REAL_OPENAI_CLAUDE_BYOK_NOT_VERIFIED`、`REAL_USER_OLLAMA_MACOS_NOT_VERIFIED`、`LOCAL_CONNECTOR_SIGNING_NOT_READY`。
+- 发布边界：真实支付、生产密钥、Windows 正式签名、Apple Developer ID/notarization 和 macOS Intel/Apple Silicon 真机证据仍为阻塞项，不得宣称公网可上线。
+- 合规边界：只提供资讯和数据，不提供投资建议、买卖指令、仓位、目标价或收益承诺。

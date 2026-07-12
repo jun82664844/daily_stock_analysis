@@ -109,8 +109,8 @@ def get_payment_provider_status() -> dict[str, Any]:
 class SandboxPaymentProvider(PaymentProvider):
     """Local-only billing provider used for signed sandbox upgrade tests."""
 
-    ALLOWED_PLANS = {"pro", "premium", "enterprise"}
-    ALLOWED_SUBSCRIPTION_PLANS = {"free", "pro", "premium", "enterprise"}
+    ALLOWED_PLANS = {"pro", "premium", "max", "enterprise"}
+    ALLOWED_SUBSCRIPTION_PLANS = {"free", "plus", "pro", "premium", "max", "enterprise"}
     SUPPORTED_EVENTS = {
         "checkout.created",
         "checkout.completed",
@@ -129,6 +129,16 @@ class SandboxPaymentProvider(PaymentProvider):
             raise ValueError(f"unsupported sandbox plan: {plan}")
         nonce = secrets.token_urlsafe(8).replace("_", "")
         session_id = f"sandbox_{int(user_id)}_{normalized_plan}_{nonce}"
+        return CheckoutSession(
+            checkout_url=f"/sandbox/checkout/{session_id}",
+            provider_session_id=session_id,
+        )
+
+    def create_add_on_checkout(self, *, user_id: int, product_code: str) -> CheckoutSession:
+        if product_code != "api_boost_168_28":
+            raise ValueError("unsupported_product")
+        nonce = secrets.token_urlsafe(8).replace("_", "")
+        session_id = f"sandbox_{int(user_id)}_addon_{nonce}"
         return CheckoutSession(
             checkout_url=f"/sandbox/checkout/{session_id}",
             provider_session_id=session_id,
@@ -165,6 +175,9 @@ class SandboxPaymentProvider(PaymentProvider):
                 "subscription_status": str(
                     payload.get("subscription_status") or payload.get("status") or "active"
                 ).strip().lower(),
+                "current_period_start": payload.get("current_period_start"),
+                "current_period_end": payload.get("current_period_end"),
+                "expires_at": payload.get("expires_at"),
             }
 
         session_id = str(payload.get("provider_session_id") or "")
@@ -176,12 +189,16 @@ class SandboxPaymentProvider(PaymentProvider):
         except ValueError as exc:
             raise ValueError("invalid_session") from exc
         plan = parts[2]
-        if plan not in self.ALLOWED_PLANS:
+        if plan != "addon" and plan not in self.ALLOWED_PLANS:
             raise ValueError("unsupported_plan")
-        return {
+        result = {
             "event": event_type,
             "provider_event_id": str(payload.get("provider_event_id") or "").strip(),
             "provider_session_id": session_id,
             "user_id": user_id,
             "plan": plan,
         }
+        if plan == "addon":
+            result["product_type"] = "add_on"
+            result["product_code"] = "api_boost_168_28"
+        return result

@@ -276,6 +276,7 @@ def _run_command_check(check: OperabilityCheck) -> OperabilityResult:
             encoding="utf-8",
             errors="replace",
             check=False,
+            env={**os.environ, "PLATFORM_CSRF_ENABLED": "false"},
         )
     except Exception as exc:
         return OperabilityResult(

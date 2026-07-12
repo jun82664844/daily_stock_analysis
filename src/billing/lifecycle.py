@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import desc, select
@@ -32,6 +33,24 @@ def _iso(value: Any) -> Optional[str]:
     return value.isoformat() if value is not None else None
 
 
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError("invalid_subscription_period") from exc
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
 def _metadata_json(value: Dict[str, Any]) -> str:
     safe = {
         key: item
@@ -55,8 +74,13 @@ class BillingLifecycleService:
         checkout_url: str,
         plan: str,
         provider: str = "sandbox",
+        product_type: str = "subscription",
+        product_code: Optional[str] = None,
     ) -> None:
-        normalized_plan = self._normalize_plan(plan)
+        normalized_product_type = (product_type or "subscription").strip().lower()
+        if normalized_product_type not in {"subscription", "add_on"}:
+            raise ValueError("unsupported_product_type")
+        normalized_plan = self._normalize_plan(plan, allow_free=normalized_product_type == "add_on")
         provider_event_id = f"evt_checkout_created_{provider_session_id}"
         now = utc_naive_now()
 
@@ -69,8 +93,12 @@ class BillingLifecycleService:
                     provider_session_id=provider_session_id,
                     checkout_url=checkout_url,
                     plan=normalized_plan,
+                    product_type=normalized_product_type,
+                    product_code=product_code,
                     status="created",
-                    metadata_json=_metadata_json({"mode": "local_sandbox"}),
+                    metadata_json=_metadata_json(
+                        {"mode": "local_sandbox", "product_type": normalized_product_type, "product_code": product_code}
+                    ),
                     created_at=now,
                     updated_at=now,
                 )
@@ -85,7 +113,9 @@ class BillingLifecycleService:
                         event_type="checkout.created",
                         plan=normalized_plan,
                         processing_status="processed",
-                        metadata_json=_metadata_json({"source": "checkout"}),
+                        metadata_json=_metadata_json(
+                            {"source": "checkout", "product_type": normalized_product_type, "product_code": product_code}
+                        ),
                         created_at=now,
                         updated_at=now,
                     )
@@ -195,18 +225,47 @@ class BillingLifecycleService:
         checkout.status = checkout_status
         checkout.updated_at = now
 
-        subscription = self._ensure_subscription(session, user_id=int(checkout.user_id), provider=checkout.provider)
         target_plan = checkout.plan
+        subscription = self._ensure_subscription(session, user_id=int(checkout.user_id), provider=checkout.provider)
         subscription_status = subscription.status
-        if event_type == "checkout.completed":
-            self._set_user_plan(session, int(checkout.user_id), target_plan)
-            subscription.plan = target_plan
-            subscription.status = "active"
-            subscription_status = "active"
-        elif event_type == "payment.failed" and subscription.status == "active":
-            subscription.status = "past_due"
-            subscription_status = "past_due"
-        subscription.updated_at = now
+        grant = None
+        if checkout.product_type == "add_on":
+            if event_type == "checkout.completed":
+                if subscription.current_period_end is None or subscription.expires_at is None:
+                    raise ValueError("membership_period_unknown")
+                from src.services.api_boost_pack_service import ApiBoostPackService
+
+                grant = ApiBoostPackService(self.db).grant_from_payment_event(
+                    session,
+                    user_id=int(checkout.user_id),
+                    provider_event_id=provider_event_id,
+                    starts_at=now,
+                    expires_at=min(subscription.current_period_end, subscription.expires_at),
+                )
+        else:
+            if event_type == "checkout.completed":
+                self._set_user_plan(session, int(checkout.user_id), target_plan)
+                subscription.plan = target_plan
+                subscription.status = "active"
+                subscription_status = "active"
+                subscription.current_period_start = subscription.current_period_start or now
+                subscription.current_period_end = subscription.current_period_end or (now + timedelta(days=30))
+                subscription.expires_at = subscription.expires_at or subscription.current_period_end
+                if target_plan in {"pro", "premium", "max"}:
+                    from src.services.api_boost_pack_service import ApiBoostPackService
+
+                    ApiBoostPackService(self.db).grant_membership_period(
+                        user_id=int(checkout.user_id),
+                        plan=target_plan,
+                        period_reference=f"{provider_session_id}:{subscription.current_period_start.isoformat()}",
+                        starts_at=subscription.current_period_start,
+                        expires_at=min(subscription.current_period_end, subscription.expires_at),
+                        session=session,
+                    )
+            elif event_type == "payment.failed" and subscription.status == "active":
+                subscription.status = "past_due"
+                subscription_status = "past_due"
+            subscription.updated_at = now
 
         billing_event = PlatformBillingEvent(
             user_id=int(checkout.user_id),
@@ -220,6 +279,9 @@ class BillingLifecycleService:
                 {
                     "checkout_status": checkout_status,
                     "subscription_status": subscription_status,
+                    "product_type": checkout.product_type,
+                    "product_code": checkout.product_code,
+                    "quota_grant_id": int(grant.id) if grant is not None else None,
                 }
             ),
             created_at=now,
@@ -238,6 +300,9 @@ class BillingLifecycleService:
             "user_id": int(checkout.user_id),
             "checkout_status": checkout_status,
             "subscription_status": subscription_status,
+            "product_type": checkout.product_type,
+            "product_code": checkout.product_code,
+            "quota_grant_id": int(grant.id) if grant is not None else None,
         }
 
     def _process_subscription_updated(
@@ -261,7 +326,35 @@ class BillingLifecycleService:
         subscription.plan = target_plan
         subscription.status = "cancelled" if requested_status in {"cancelled", "canceled", "inactive"} else requested_status
         subscription.provider_subscription_id = str(payload.get("provider_subscription_id") or "") or None
+        subscription.current_period_start = (
+            _parse_datetime(payload.get("current_period_start")) or subscription.current_period_start
+        )
+        subscription.current_period_end = (
+            _parse_datetime(payload.get("current_period_end")) or subscription.current_period_end
+        )
+        subscription.expires_at = _parse_datetime(payload.get("expires_at")) or subscription.expires_at
         subscription.updated_at = now
+
+        if (
+            subscription.status == "active"
+            and target_plan in {"pro", "premium", "max"}
+            and subscription.current_period_start is not None
+            and subscription.current_period_end is not None
+        ):
+            from src.services.api_boost_pack_service import ApiBoostPackService
+
+            period_reference = subscription.provider_subscription_id or f"user-{user_id}"
+            ApiBoostPackService(self.db).grant_membership_period(
+                user_id=user_id,
+                plan=target_plan,
+                period_reference=f"{period_reference}:{subscription.current_period_start.isoformat()}",
+                starts_at=subscription.current_period_start,
+                expires_at=min(
+                    subscription.current_period_end,
+                    subscription.expires_at or subscription.current_period_end,
+                ),
+                session=session,
+            )
 
         billing_event = PlatformBillingEvent(
             user_id=user_id,
@@ -391,6 +484,9 @@ class BillingLifecycleService:
                 "provider_subscription_id": None,
                 "plan": "free",
                 "status": "none",
+                "current_period_start": None,
+                "current_period_end": None,
+                "expires_at": None,
                 "created_at": None,
                 "updated_at": None,
             }
@@ -400,6 +496,9 @@ class BillingLifecycleService:
             "provider_subscription_id": row.provider_subscription_id,
             "plan": row.plan,
             "status": row.status,
+            "current_period_start": _iso(row.current_period_start),
+            "current_period_end": _iso(row.current_period_end),
+            "expires_at": _iso(row.expires_at),
             "created_at": _iso(row.created_at),
             "updated_at": _iso(row.updated_at),
         }
@@ -413,6 +512,8 @@ class BillingLifecycleService:
             "checkout_url": row.checkout_url,
             "plan": row.plan,
             "status": row.status,
+            "product_type": row.product_type,
+            "product_code": row.product_code,
             "created_at": _iso(row.created_at),
             "updated_at": _iso(row.updated_at),
         }

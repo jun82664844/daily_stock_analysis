@@ -1,0 +1,68 @@
+name: local-connector-development-build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r apps/dsa-local-connector/requirements.txt
+      - shell: pwsh
+        working-directory: apps/dsa-local-connector
+        run: ./build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DSA-Local-Connector-Windows-x64-development
+          path: apps/dsa-local-connector/dist/DSA-Local-Connector-Windows-x64.exe
+
+  macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install -r apps/dsa-local-connector/requirements.txt
+      - working-directory: apps/dsa-local-connector
+        run: ./build-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DSA-Local-Connector-macOS-arm64-development
+          path: apps/dsa-local-connector/dist/DSA-Local-Connector-macOS-arm64.dmg
+
+  macos-x64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install -r apps/dsa-local-connector/requirements.txt
+      - working-directory: apps/dsa-local-connector
+        run: ./build-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DSA-Local-Connector-macOS-x64-development
+          path: apps/dsa-local-connector/dist/DSA-Local-Connector-macOS-x64.dmg
+
+  production-signing-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep unsigned development artifacts out of production downloads
+        shell: bash
+        env:
+          WINDOWS_CERTIFICATE_PRESENT: ${{ secrets.DSA_WINDOWS_SIGNING_CERTIFICATE }}
+          APPLE_CERTIFICATE_PRESENT: ${{ secrets.DSA_APPLE_DEVELOPER_ID_CERTIFICATE }}
+          APPLE_NOTARY_PROFILE_PRESENT: ${{ secrets.DSA_APPLE_NOTARY_PROFILE }}
+        run: |
+          if [[ -z "$WINDOWS_CERTIFICATE_PRESENT" || -z "$APPLE_CERTIFICATE_PRESENT" || -z "$APPLE_NOTARY_PROFILE_PRESENT" ]]; then
+            echo "LOCAL_CONNECTOR_SIGNING_NOT_READY"
+            exit 1
+          fi
+          echo "Signing credentials are present, but production signing and notarization remain a separate approval gate."
+          exit 1

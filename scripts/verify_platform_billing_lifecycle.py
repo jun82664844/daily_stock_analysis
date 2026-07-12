@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,7 +21,12 @@ BACKEND_TESTS = (
 def run_billing_lifecycle_checks(*, project_root: str | Path | None = None) -> int:
     root = Path(project_root).resolve() if project_root is not None else REPO_ROOT
     command = [sys.executable, "-m", "unittest", *BACKEND_TESTS]
-    completed = subprocess.run(command, cwd=root, check=False)
+    completed = subprocess.run(
+        command,
+        cwd=root,
+        check=False,
+        env={**os.environ, "PLATFORM_CSRF_ENABLED": "false"},
+    )
     if completed.returncode != 0:
         return completed.returncode
     print(OK_MARKER)

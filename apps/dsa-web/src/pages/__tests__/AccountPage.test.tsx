@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import AccountPage from '../AccountPage';
 
-const { account, billingAccount, saveApiKey, createSandboxCheckout } = vi.hoisted(() => ({
+const { account, billingAccount, saveApiKey, connectApiKey, createSandboxCheckout } = vi.hoisted(() => ({
   account: vi.fn(),
   billingAccount: vi.fn(),
   saveApiKey: vi.fn(),
+  connectApiKey: vi.fn(),
   createSandboxCheckout: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock('../../api/platform', () => ({
     account,
     billingAccount,
     saveApiKey,
+    connectApiKey,
     createSandboxCheckout,
   },
 }));
@@ -102,6 +104,10 @@ beforeEach(() => {
     maskedKey: 'sk-n...cret',
     enabled: true,
   });
+  connectApiKey.mockResolvedValue({
+    apiKey: { provider: 'deepseek', model: 'deepseek/deepseek-v4-flash', maskedKey: 'sk-n...cret', enabled: true },
+    modelOptions: [],
+  });
   createSandboxCheckout.mockResolvedValue({
     checkoutUrl: '/sandbox/checkout/sandbox_7_pro_abc',
     providerSessionId: 'sandbox_7_pro_abc',
@@ -129,7 +135,7 @@ describe('AccountPage', () => {
 
     expect(await screen.findByRole('heading', { name: '账户' })).toBeInTheDocument();
     expect(screen.getByText('API Key 托管')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '保存 API Key' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '连接并测试' })).toBeInTheDocument();
     expect(screen.getByText('本地支付沙箱')).toBeInTheDocument();
     expect(screen.getByText('仅本地模拟账单，真实支付仍关闭')).toBeInTheDocument();
     expect(screen.getByText(/本地沙箱账单/)).toBeInTheDocument();
@@ -177,19 +183,17 @@ describe('AccountPage', () => {
     expect(screen.queryByText(/sk-user-plaintext-secret/)).not.toBeInTheDocument();
   });
 
-  it('saves a deepseek API key and refreshes account data without rendering the plaintext value', async () => {
+  it('connects a deepseek API key and refreshes account data without rendering the plaintext value', async () => {
     renderPage();
     await screen.findByRole('heading', { name: 'Account' });
 
-    fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'deepseek' } });
-    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'deepseek/deepseek-v4-flash' } });
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-user-plaintext-secret' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save API key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'DeepSeek' }));
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-user-plaintext-secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect and test' }));
 
     await waitFor(() => {
-      expect(saveApiKey).toHaveBeenCalledWith({
+      expect(connectApiKey).toHaveBeenCalledWith({
         provider: 'deepseek',
-        model: 'deepseek/deepseek-v4-flash',
         apiKey: 'sk-user-plaintext-secret',
       });
     });
@@ -223,15 +227,15 @@ describe('AccountPage', () => {
   });
 
   it('shows a clear rate limited error when API key custody is throttled', async () => {
-    saveApiKey.mockRejectedValueOnce({
+    connectApiKey.mockRejectedValueOnce({
       parsedError: { message: 'Too many requests. Please wait before trying again.' },
     });
 
     renderPage();
     await screen.findByRole('heading', { name: 'Account' });
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-user-plaintext-secret' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save API key' }));
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-user-plaintext-secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect and test' }));
 
     expect(await screen.findByText('Too many requests. Please wait before trying again.')).toBeInTheDocument();
     expect(screen.queryByText(/sk-user-plaintext-secret/)).not.toBeInTheDocument();

@@ -29,7 +29,7 @@ class TaskStatusEnum(str, Enum):
 
 AnalysisPhase = Literal["auto", "premarket", "intraday", "postmarket"]
 AnalysisDepth = Literal["fast", "deep"]
-ApiKeyMode = Literal["platform", "user", "local"]
+ApiKeyMode = Literal["platform", "user", "local", "user_local"]
 
 
 class AnalyzeRequest(BaseModel):
@@ -71,6 +71,25 @@ class AnalyzeRequest(BaseModel):
         "platform",
         validation_alias=AliasChoices("api_key_mode", "apiKeyMode", "llm_key_mode", "llmKeyMode"),
         description="LLM API key mode: platform(default) or user(user-owned encrypted provider key)",
+    )
+    model_option_id: str = Field(
+        "platform_recommended",
+        alias="modelOptionId",
+        min_length=3,
+        max_length=160,
+    )
+    provider: Optional[str] = Field(default=None, max_length=32)
+    model: Optional[str] = Field(default=None, max_length=160)
+    api_key_id: Optional[int] = Field(default=None, alias="apiKeyId", ge=1)
+    user_local_connector_id: Optional[int] = Field(
+        default=None,
+        alias="userLocalConnectorId",
+        ge=1,
+    )
+    user_local_model_name: Optional[str] = Field(
+        default=None,
+        alias="userLocalModelName",
+        max_length=160,
     )
     stock_name: Optional[str] = Field(
         None,

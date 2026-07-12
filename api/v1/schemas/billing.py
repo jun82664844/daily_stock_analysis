@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -13,3 +15,7 @@ class CheckoutRequest(BaseModel):
 class CheckoutResponse(BaseModel):
     checkout_url: str
     provider_session_id: str
+
+
+class BoostPackCheckoutRequest(BaseModel):
+    product_code: Literal["api_boost_168_28"]

@@ -23,6 +23,7 @@ from api.v1.endpoints import (
     health,
     history,
     intelligence,
+    local_connector,
     platform,
     portfolio,
     stocks,
@@ -127,4 +128,9 @@ router.include_router(
 router.include_router(
     health.router,
     tags=["Health"]
+)
+
+router.include_router(
+    local_connector.router,
+    tags=["LocalConnector"]
 )

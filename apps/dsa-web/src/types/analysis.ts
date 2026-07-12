@@ -9,7 +9,7 @@ export type StockReportType = 'simple' | 'detailed' | 'full' | 'brief';
 export type ReportType = StockReportType | 'market_review';
 export type AnalysisPhase = 'auto' | 'premarket' | 'intraday' | 'postmarket';
 export type AnalysisDepth = 'fast' | 'deep';
-export type ApiKeyMode = 'platform' | 'user' | 'local';
+export type ApiKeyMode = 'platform' | 'user' | 'local' | 'user_local';
 
 export interface AnalysisRequest {
   stockCode?: string;
@@ -20,6 +20,7 @@ export interface AnalysisRequest {
   analysisPhase?: AnalysisPhase;
   analysisDepth?: AnalysisDepth;
   apiKeyMode?: ApiKeyMode;
+  modelOptionId?: string;
   stockName?: string;
   originalQuery?: string;
   selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image';

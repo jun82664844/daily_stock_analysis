@@ -13,7 +13,7 @@ import { useStockPoolStore } from '../../stores';
 import type { RunFlowSnapshot } from '../../types/runFlow';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
-import HomePage from '../HomePage';
+import HomePage, { localizeGeneratedText } from '../HomePage';
 
 const navigateMock = vi.fn();
 
@@ -314,6 +314,33 @@ const runFlowSnapshot: RunFlowSnapshot = {
 };
 
 describe('HomePage', () => {
+  it('localizes parameterized no-AI backend text in Chinese', () => {
+    expect(
+      localizeGeneratedText('Watch whether price can hold above MA20 190 after the next refresh.', 'zh'),
+    ).toBe('观察价格能否在下次刷新后守住 MA20 190。');
+    expect(
+      localizeGeneratedText(
+        'No-AI quick view for us_equity: quote freshness is cached; realtime news, filings, external search, and investment advice are not included.',
+        'zh',
+      ),
+    ).toBe('未用 AI 的美股快速视图：行情新鲜度为缓存；不包含实时新闻、公告文件、外部搜索或投资建议。');
+    expect(
+      localizeGeneratedText(
+        'No realtime news source is enabled in free no-AI mode for us_equity. No AI or public search was used.',
+        'zh',
+      ),
+    ).toBe('免费未用 AI 模式暂未启用美股实时新闻源；未使用 AI 或公共搜索。');
+    expect(
+      localizeGeneratedText(
+        'Premium can use configured API feeds for broader coverage and higher refresh limits; the visible module structure remains the same.',
+        'zh',
+      ),
+    ).toBe('高级版可使用已配置的 API 数据源扩大覆盖范围并提高刷新额度；页面模块结构保持一致。');
+    expect(
+      localizeGeneratedText('Information and data only; not investment advice or a trading instruction.', 'zh'),
+    ).toBe('仅提供资讯和数据，不构成投资建议或交易指令。');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
@@ -1093,15 +1120,11 @@ describe('HomePage', () => {
     );
 
     const modePanel = await screen.findByTestId('platform-query-mode-panel');
-    expect(modePanel).toHaveTextContent('Analysis channel');
-    expect(modePanel).toHaveTextContent('Platform API');
-    expect(modePanel).toHaveTextContent('BYOK');
-    expect(modePanel).toHaveTextContent('Local model');
-    expect(within(modePanel).getByTestId('platform-api-key-model')).toHaveAttribute('placeholder', 'Model name');
-    expect(within(modePanel).getByTestId('platform-api-key-save')).toHaveTextContent('Save key');
-    expect(modePanel).not.toHaveTextContent('平台 API');
-    expect(modePanel).not.toHaveTextContent('我的 API');
-    expect(modePanel).not.toHaveTextContent('本地模型');
+    expect(modePanel).toHaveTextContent('Choose analysis model');
+    expect(modePanel).toHaveTextContent('Platform recommended');
+    expect(modePanel).toHaveTextContent('Fast information analysis');
+    expect(modePanel).not.toHaveTextContent('模型名称');
+    expect(modePanel).not.toHaveTextContent('接口地址');
   });
 
   it('localizes structured no-AI query content when UI language is Chinese', async () => {
@@ -1127,7 +1150,7 @@ describe('HomePage', () => {
       intelligence: {
         mode: 'no_ai_low_cost',
         aiUsed: false,
-        boundary: 'Information analysis only; not investment advice.',
+        boundary: 'Information and data only; not investment advice or a trading instruction.',
         signalScore: {
           score: 47,
           label: 'Weak quick signal',
@@ -5077,9 +5100,9 @@ describe('HomePage', () => {
     expect(status).toHaveTextContent('退出');
     expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('平台 API、我的 API 或本地模型');
     expect(screen.getByTestId('platform-ai-cost-warning')).not.toHaveTextContent('BYOK');
-    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('分析通道');
-    expect(screen.getByTestId('platform-mode-user')).toHaveTextContent('我的 API');
-    expect(screen.getByTestId('platform-api-key-save')).toHaveTextContent('保存密钥');
+    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('选择分析模型');
+    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('平台推荐');
+    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('快速资讯分析');
     expect(screen.getByTestId('platform-watchlist-panel')).toHaveTextContent('暂无');
     expect(screen.getByTestId('platform-watchlist-add-current')).toHaveTextContent('加入当前');
     expect(panel.textContent?.match(/zh-user@example\.com/g)?.length ?? 0).toBe(1);

@@ -36,7 +36,9 @@ PLAN_LIMITS = {
         "market_review": 0,
     },
     "pro": PAID_PLAN_LIMITS,
+    "plus": PAID_PLAN_LIMITS,
     "premium": PAID_PLAN_LIMITS,
+    "max": PAID_PLAN_LIMITS,
     "enterprise": {
         "ai_quick": None,
         "ai_quick_user_key": None,
@@ -73,7 +75,7 @@ def get_feature_policy(feature: str, *, plan: str, api_key_mode: str = "platform
     if normalized_feature in {"analysis", "ai_quick"} and normalized_mode == "user":
         return FeaturePolicy("ai_quick", "ai_quick_user_key", True, 0, 1, limits["ai_quick_user_key"])
 
-    if normalized_feature in {"analysis", "ai_quick"} and normalized_mode == "local":
+    if normalized_feature in {"analysis", "ai_quick"} and normalized_mode in {"local", "user_local"}:
         return FeaturePolicy("ai_quick", "ai_local", True, 0, 1, limits["ai_local"])
 
     if normalized_feature in {"analysis", "ai_quick"}:
@@ -82,7 +84,7 @@ def get_feature_policy(feature: str, *, plan: str, api_key_mode: str = "platform
     if normalized_feature == "ai_deep" and normalized_mode == "user":
         return FeaturePolicy("ai_deep", "ai_deep_user_key", True, 0, 1, limits["ai_deep_user_key"])
 
-    if normalized_feature == "ai_deep" and normalized_mode == "local":
+    if normalized_feature == "ai_deep" and normalized_mode in {"local", "user_local"}:
         return FeaturePolicy("ai_deep", "ai_local", True, 0, 1, limits["ai_local"])
 
     if normalized_feature == "ai_deep":

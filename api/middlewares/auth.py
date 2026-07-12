@@ -61,6 +61,14 @@ def _platform_user_path(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in PLATFORM_USER_PATH_PREFIXES)
 
 
+def _connector_device_path(path: str) -> bool:
+    """Delegate device authentication to the connector Bearer-token endpoints."""
+    normalized = path.rstrip("/") or "/"
+    return normalized == "/api/v1/local-connector/claim" or normalized.startswith(
+        "/api/v1/local-connector/"
+    )
+
+
 def _public_no_ai_query_path(request: Request) -> bool:
     """Allow anonymous users to try public no-AI stock research paths."""
     if request.method.upper() != "GET":
@@ -123,7 +131,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api/v1/"):
             return await call_next(request)
 
-        if _public_no_ai_query_path(request) or _public_market_screening_path(request):
+        if (
+            _public_no_ai_query_path(request)
+            or _public_market_screening_path(request)
+            or _connector_device_path(path)
+        ):
             return await call_next(request)
 
         admin_cookie_val = request.cookies.get(COOKIE_NAME)

@@ -49,6 +49,40 @@ const displayValue = (value: unknown) => {
   return String(value);
 };
 
+const STRUCTURED_LABEL_ZH: Record<string, string> = {
+  Sector: '板块',
+  Industry: '行业',
+  Exchange: '交易所',
+  Currency: '币种',
+  'Market cap': '总市值',
+  'PE ratio': '市盈率',
+  'Dividend yield': '股息率',
+  Revenue: '营收',
+  'Net profit': '净利润',
+};
+
+const STRUCTURED_VALUE_ZH: Record<string, string> = {
+  Technology: '科技',
+  'Consumer Electronics': '消费电子',
+  'United States': '美国',
+};
+
+const itemTitle = (value: string, language: 'zh' | 'en') => (
+  language === 'zh' ? STRUCTURED_LABEL_ZH[value] || value : value
+);
+
+const itemValue = (value: unknown, language: 'zh' | 'en') => {
+  const displayed = displayValue(value);
+  return language === 'zh' ? STRUCTURED_VALUE_ZH[displayed] || displayed : displayed;
+};
+
+const itemSummary = (value: string | undefined, language: 'zh' | 'en') => {
+  if (!value || language === 'en') return value;
+  const filing = value.match(/^Filed (.+?); report date (.+?)\.$/);
+  if (filing) return `提交日期 ${filing[1]}；报告期 ${filing[2]}。`;
+  return value;
+};
+
 export function GlobalEquityEnrichmentCard({ payload, language }: Props) {
   const isEnglish = language === 'en';
 
@@ -123,7 +157,8 @@ export function GlobalEquityEnrichmentCard({ payload, language }: Props) {
 
             <div className="min-w-0 divide-y divide-subtle/70 border-l-0 lg:border-l lg:border-subtle/70 lg:pl-4">
               {channel.items.length > 0 ? channel.items.map((item, index) => {
-                const title = item.title || item.label || `${channelLabel(channel.category, channel.title, language)} ${index + 1}`;
+                const rawTitle = item.title || item.label || `${channelLabel(channel.category, channel.title, language)} ${index + 1}`;
+                const title = item.label ? itemTitle(rawTitle, language) : rawTitle;
                 return (
                   <div key={`${title}-${index}`} className="min-w-0 py-2 first:pt-0 last:pb-0">
                     {item.url ? (
@@ -140,10 +175,10 @@ export function GlobalEquityEnrichmentCard({ payload, language }: Props) {
                       <div className="text-sm font-semibold text-foreground">{title}</div>
                     )}
                     {item.value !== undefined ? (
-                      <div className="mt-1 text-sm text-foreground">{displayValue(item.value)}</div>
+                      <div className="mt-1 text-sm text-foreground">{itemValue(item.value, language)}</div>
                     ) : null}
                     {item.summary ? (
-                      <p className="mt-1 text-xs leading-relaxed text-secondary-text">{item.summary}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-secondary-text">{itemSummary(item.summary, language)}</p>
                     ) : null}
                     <div className="mt-1 flex min-w-0 flex-wrap gap-2 text-[11px] text-secondary-text">
                       {item.documentType ? <span>{item.documentType}</span> : null}

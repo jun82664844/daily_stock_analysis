@@ -9,7 +9,7 @@ function emitPlatformSessionChanged(): void {
   }
 }
 
-export type PlatformPlan = 'free' | 'pro' | 'premium' | 'enterprise';
+export type PlatformPlan = 'free' | 'plus' | 'pro' | 'premium' | 'max' | 'enterprise';
 
 export interface PlatformUser {
   id: number;
@@ -176,6 +176,45 @@ export interface PlatformBillingAccountResponse {
   subscription: PlatformBillingSubscription;
   checkoutSessions: BillingCheckoutSession[];
   recentEvents: PlatformBillingEvent[];
+  boostPack?: PlatformBoostPack | null;
+}
+
+export interface PlatformBoostPack {
+  productCode: string;
+  priceHkd: number;
+  flash: number;
+  pro: number;
+  balance: { flash: number; pro: number };
+  expiresAt: string | null;
+  canPurchase: boolean;
+  unavailableReason?: string | null;
+}
+
+export interface PlatformModelOption {
+  optionId: string;
+  labelZh: string;
+  labelEn: string;
+  source: 'platform' | 'byok' | 'user_local';
+  providerLabel: string;
+  speed: 'fast' | 'balanced' | 'strong';
+  purpose: string;
+  purposeZh?: string;
+  purposeEn?: string;
+  quotaType: 'flash' | 'pro' | null;
+  costUnits: number;
+  recommended: boolean;
+}
+
+export interface PlatformModelOptionsResponse {
+  selectedOptionId: string;
+  options: PlatformModelOption[];
+  realByokStatus: string;
+}
+
+export interface LocalConnectorPairing {
+  code: string;
+  expiresAt: string;
+  ttlSeconds: number;
 }
 
 export interface PlatformAdminBillingEventsResponse {
@@ -662,6 +701,26 @@ export const platformApi = {
   saveApiKey: async (data: { provider: string; apiKey: string; model?: string | null }): Promise<PlatformApiKeyItem> => {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/api-keys', data);
     return toCamelCase<PlatformApiKeyItem>(response.data);
+  },
+
+  connectApiKey: async (data: { provider: string; apiKey: string }): Promise<{ apiKey: PlatformApiKeyItem; modelOptions: PlatformModelOption[] }> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/api-keys/connect', data);
+    return toCamelCase<{ apiKey: PlatformApiKeyItem; modelOptions: PlatformModelOption[] }>(response.data);
+  },
+
+  modelOptions: async (): Promise<PlatformModelOptionsResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/model-options');
+    return toCamelCase<PlatformModelOptionsResponse>(response.data);
+  },
+
+  createBoostPackCheckout: async (): Promise<BillingCheckoutSession> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/billing/boost-pack/checkout', { product_code: 'api_boost_168_28' });
+    return toCamelCase<BillingCheckoutSession>(response.data);
+  },
+
+  createLocalConnectorPairing: async (): Promise<LocalConnectorPairing> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/local-connectors/pairing-code');
+    return toCamelCase<LocalConnectorPairing>(response.data);
   },
 
   createSandboxCheckout: async (plan: PlatformPlan): Promise<BillingCheckoutSession> => {

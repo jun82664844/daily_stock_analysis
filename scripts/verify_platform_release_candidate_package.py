@@ -270,6 +270,29 @@ REQUIRED_FILES = (
     "src/services/global_equity_enrichment_service.py",
     "apps/dsa-web/src/components/research/GlobalEquityEnrichmentCard.tsx",
     "apps/dsa-web/src/components/research/__tests__/GlobalEquityEnrichmentCard.test.tsx",
+    "docs/superpowers/plans/2026-07-12-dsa-v112-api-boost-pack-simple-model-access.md",
+    "scripts/verify_platform_simple_model_access_v112.py",
+    "scripts/verify_platform_user_local_connector_live_v112.py",
+    "tests/test_platform_simple_model_access_v112_verifier.py",
+    "tests/test_platform_boost_pack_v112.py",
+    "tests/test_member_model_catalog_v112.py",
+    "tests/test_analysis_model_selection_v112.py",
+    "tests/test_user_local_connector_v112.py",
+    "tests/test_local_connector_release_matrix_v112.py",
+    "src/services/api_boost_pack_service.py",
+    "src/services/byok_routing_service.py",
+    "src/services/member_model_catalog_service.py",
+    "src/services/user_local_connector_service.py",
+    "api/v1/endpoints/local_connector.py",
+    "api/v1/schemas/local_connector.py",
+    "apps/dsa-web/src/components/platform/BoostPackCardV112.tsx",
+    "apps/dsa-web/src/components/platform/SimpleModelPickerV112.tsx",
+    "apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx",
+    "apps/dsa-local-connector/app.py",
+    "apps/dsa-local-connector/client.py",
+    "apps/dsa-local-connector/ollama.py",
+    "apps/dsa-local-connector/runtime.py",
+    ".github/workflows/local-connector-release.yml",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -342,6 +365,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_kronos_rtx5090_v108.py",
     "scripts/verify_platform_a_stock_data_live_v109.py",
     "scripts/verify_platform_global_equity_public_data_v110.py",
+    "scripts/verify_platform_simple_model_access_v112.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 
@@ -525,7 +549,11 @@ def _git_status_entries(root: Path) -> list[DirtyEntry]:
 
 def classify_dirty_path(path: str) -> str | None:
     normalized = _normalize_rel_path(path)
-    if normalized in {".gitignore"} or normalized.startswith("static/"):
+    if (
+        normalized in {".gitignore", ".github/workflows/local-connector-release.yml"}
+        or normalized.startswith("static/")
+        or normalized.startswith("apps/dsa-local-connector/")
+    ):
         return "build-and-ignore-impact"
     if normalized == "requirements.txt":
         return "manual-confirmation"

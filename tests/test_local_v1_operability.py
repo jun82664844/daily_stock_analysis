@@ -76,6 +76,7 @@ class LocalV1OperabilityCheckTestCase(unittest.TestCase):
         kwargs = run_command.call_args.kwargs
         self.assertEqual(kwargs["encoding"], "utf-8")
         self.assertEqual(kwargs["errors"], "replace")
+        self.assertEqual(kwargs["env"]["PLATFORM_CSRF_ENABLED"], "false")
         self.assertEqual(result.status, "passed")
 
     def test_dry_run_returns_serializable_plan_without_executing(self):

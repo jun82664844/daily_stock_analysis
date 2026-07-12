@@ -181,6 +181,8 @@ class PlatformBillingCheckoutSession(Base):
     provider_session_id = Column(String(128), nullable=False, unique=True, index=True)
     checkout_url = Column(String(512), nullable=False)
     plan = Column(String(32), nullable=False, index=True)
+    product_type = Column(String(32), nullable=False, default='subscription', index=True)
+    product_code = Column(String(64), index=True)
     status = Column(String(32), nullable=False, default='created', index=True)
     metadata_json = Column(Text, nullable=False, default="{}")
     created_at = Column(DateTime, default=utc_naive_now, index=True)
@@ -202,6 +204,9 @@ class PlatformBillingSubscription(Base):
     provider_subscription_id = Column(String(128), index=True)
     plan = Column(String(32), nullable=False, default='free', index=True)
     status = Column(String(32), nullable=False, default='none', index=True)
+    current_period_start = Column(DateTime, index=True)
+    current_period_end = Column(DateTime, index=True)
+    expires_at = Column(DateTime, index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
 
@@ -227,6 +232,78 @@ class PlatformBillingEvent(Base):
         Index('ix_platform_billing_events_user_time', 'user_id', 'created_at'),
         Index('ix_platform_billing_events_type_time', 'event_type', 'created_at'),
     )
+
+
+class PlatformQuotaGrant(Base):
+    """Expiring monthly membership or add-on API allowance."""
+
+    __tablename__ = 'platform_quota_grants'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    source_type = Column(String(32), nullable=False, index=True)
+    source_reference = Column(String(128), nullable=False, unique=True, index=True)
+    flash_total = Column(Integer, nullable=False, default=0)
+    flash_used = Column(Integer, nullable=False, default=0)
+    pro_total = Column(Integer, nullable=False, default=0)
+    pro_used = Column(Integer, nullable=False, default=0)
+    starts_at = Column(DateTime, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    status = Column(String(32), nullable=False, default='active', index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index('ix_platform_quota_grant_user_expiry', 'user_id', 'status', 'expires_at'),
+    )
+
+
+class PlatformQuotaReservation(Base):
+    """Idempotent allocation of one analysis request across API grants."""
+
+    __tablename__ = 'platform_quota_reservations'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    reference_id = Column(String(128), nullable=False, unique=True, index=True)
+    quota_type = Column(String(16), nullable=False, index=True)
+    units = Column(Integer, nullable=False)
+    allocations_json = Column(Text, nullable=False, default='[]')
+    status = Column(String(16), nullable=False, default='reserved', index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+
+class PlatformLocalConnector(Base):
+    """A user-owned outbound connector; only token hashes are persisted."""
+
+    __tablename__ = 'platform_local_connectors'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    device_name = Column(String(128), nullable=False)
+    device_token_hash = Column(String(128), nullable=False, unique=True, index=True)
+    models_json = Column(Text, nullable=False, default='[]')
+    status = Column(String(16), nullable=False, default='offline', index=True)
+    last_seen_at = Column(DateTime, index=True)
+    revoked_at = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+
+
+class PlatformLocalModelJob(Base):
+    """Short-lived encrypted job delivered only to its owner's connector."""
+
+    __tablename__ = 'platform_local_model_jobs'
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    connector_id = Column(Integer, ForeignKey('platform_local_connectors.id'), nullable=False, index=True)
+    model_name = Column(String(160), nullable=False)
+    request_ciphertext = Column(Text, nullable=False)
+    response_ciphertext = Column(Text)
+    status = Column(String(16), nullable=False, default='queued', index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
 
 
 class PlatformWatchlistItem(Base):
@@ -1186,6 +1263,19 @@ _PLATFORM_USER_API_KEY_COLUMN_SQL: Dict[str, str] = {
 }
 
 
+_PLATFORM_BILLING_CHECKOUT_V112_COLUMN_SQL: Dict[str, str] = {
+    "product_type": "VARCHAR(32) NOT NULL DEFAULT 'subscription'",
+    "product_code": "VARCHAR(64)",
+}
+
+
+_PLATFORM_BILLING_SUBSCRIPTION_V112_COLUMN_SQL: Dict[str, str] = {
+    "current_period_start": "DATETIME",
+    "current_period_end": "DATETIME",
+    "expires_at": "DATETIME",
+}
+
+
 _ANALYSIS_HISTORY_PLATFORM_COLUMN_SQL: Dict[str, str] = {
     "platform_user_id": "INTEGER",
 }
@@ -1491,6 +1581,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             self._ensure_llm_usage_telemetry_columns()
             self._ensure_platform_usage_event_columns()
             self._ensure_platform_user_api_key_columns()
+            self._ensure_platform_billing_v112_columns()
             self._ensure_analysis_history_platform_columns()
             self._ensure_intelligence_item_scope_values()
             self._ensure_schema_migration_record()
@@ -1758,6 +1849,38 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     existing.add(column)
                     continue
                 raise
+
+    def _ensure_platform_billing_v112_columns(self) -> None:
+        """Add V112 checkout/subscription fields without rebuilding legacy tables."""
+        if not self._is_sqlite_engine:
+            return
+        table_columns = (
+            (PlatformBillingCheckoutSession.__tablename__, _PLATFORM_BILLING_CHECKOUT_V112_COLUMN_SQL),
+            (PlatformBillingSubscription.__tablename__, _PLATFORM_BILLING_SUBSCRIPTION_V112_COLUMN_SQL),
+        )
+        for table_name, definitions in table_columns:
+            try:
+                existing = {
+                    column["name"]
+                    for column in inspect(self._engine).get_columns(table_name)
+                }
+            except Exception as exc:
+                logger.warning("[Platform billing V112] failed to inspect %s: %s", table_name, exc)
+                continue
+            for column, column_type in definitions.items():
+                if column in existing:
+                    continue
+                try:
+                    with self._engine.begin() as connection:
+                        connection.exec_driver_sql(
+                            f"ALTER TABLE {table_name} ADD COLUMN {column} {column_type}"
+                        )
+                    existing.add(column)
+                except OperationalError as exc:
+                    if self._is_sqlite_duplicate_column_error(exc, column):
+                        existing.add(column)
+                        continue
+                    raise
 
     def _ensure_analysis_history_platform_columns(self) -> None:
         """Add nullable owner scope columns to existing analysis history tables."""

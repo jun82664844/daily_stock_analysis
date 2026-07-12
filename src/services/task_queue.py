@@ -89,6 +89,9 @@ class TaskInfo:
     trace_id: Optional[str] = None
     platform_user_id: Optional[int] = None
     api_key_mode: str = "platform"
+    member_quota_reference: Optional[str] = None
+    user_local_connector_id: Optional[int] = None
+    user_local_model_name: Optional[str] = None
     flow_events: List[Dict[str, Any]] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -139,6 +142,9 @@ class TaskInfo:
             trace_id=self.trace_id or self.task_id,
             platform_user_id=self.platform_user_id,
             api_key_mode=self.api_key_mode,
+            member_quota_reference=self.member_quota_reference,
+            user_local_connector_id=self.user_local_connector_id,
+            user_local_model_name=self.user_local_model_name,
             flow_events=copy.deepcopy(self.flow_events),
         )
 
@@ -398,6 +404,9 @@ class AnalysisTaskQueue:
         report_language: Optional[str] = None,
         platform_user_id: Optional[int] = None,
         api_key_mode: str = "platform",
+        member_quota_references: Optional[Dict[str, str]] = None,
+        user_local_connector_id: Optional[int] = None,
+        user_local_model_name: Optional[str] = None,
     ) -> Tuple[List[TaskInfo], List[DuplicateTaskError]]:
         """
         Submit analysis tasks in batch.
@@ -444,6 +453,9 @@ class AnalysisTaskQueue:
                     report_language=report_language,
                     platform_user_id=platform_user_id,
                     api_key_mode=api_key_mode or "platform",
+                    member_quota_reference=(member_quota_references or {}).get(stock_code),
+                    user_local_connector_id=user_local_connector_id,
+                    user_local_model_name=user_local_model_name,
                 )
                 self._tasks[task_id] = task_info
                 self._analyzing_stocks[dedupe_key] = task_id
@@ -713,6 +725,9 @@ class AnalysisTaskQueue:
             portfolio_context = dict(task.portfolio_context) if isinstance(task.portfolio_context, dict) else None
             platform_user_id = task.platform_user_id
             api_key_mode = task.api_key_mode or "platform"
+            member_quota_reference = task.member_quota_reference
+            user_local_connector_id = task.user_local_connector_id
+            user_local_model_name = task.user_local_model_name
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.now()
             task.message = "正在分析中..."
@@ -756,11 +771,17 @@ class AnalysisTaskQueue:
                 report_language=report_language,
                 platform_user_id=platform_user_id,
                 api_key_mode=api_key_mode,
+                user_local_connector_id=user_local_connector_id,
+                user_local_model_name=user_local_model_name,
             )
             reset_run_diagnostic_context(diag_token)
             diag_token = None
             
             if result:
+                if member_quota_reference:
+                    from src.services.api_boost_pack_service import ApiBoostPackService
+
+                    ApiBoostPackService().consume(member_quota_reference)
                 # 更新任务状态为完成
                 with self._data_lock:
                     task = self._tasks.get(task_id)
@@ -789,6 +810,16 @@ class AnalysisTaskQueue:
                 raise Exception(service.last_error or "分析返回空结果")
                 
         except Exception as e:
+            if "member_quota_reference" in locals() and member_quota_reference:
+                try:
+                    from src.services.api_boost_pack_service import ApiBoostPackService
+
+                    ApiBoostPackService().release(member_quota_reference)
+                except Exception:
+                    logger.exception(
+                        "Failed to release member API quota for async task: %s",
+                        task_id,
+                    )
             if "diag_token" in locals():
                 reset_run_diagnostic_context(diag_token)
             error_msg = str(e)

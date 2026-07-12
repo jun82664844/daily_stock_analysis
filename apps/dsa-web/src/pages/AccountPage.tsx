@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CreditCard, Gauge, KeyRound, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
-import { platformApi, type BillingCheckoutSession, type PlatformAccountSummary, type PlatformBillingAccountResponse, type PlatformPlan, type PlatformQuotaBucket } from '../api/platform';
+import { platformApi, type BillingCheckoutSession, type PlatformAccountSummary, type PlatformBillingAccountResponse, type PlatformModelOption, type PlatformPlan, type PlatformQuotaBucket } from '../api/platform';
 import { AppPage, Card, PageHeader, StatCard } from '../components/common';
+import BoostPackCardV112 from '../components/platform/BoostPackCardV112';
+import ModelConnectionWizardV112 from '../components/platform/ModelConnectionWizardV112';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { cn } from '../utils/cn';
 
@@ -254,9 +256,7 @@ const AccountPage: React.FC = () => {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [checkoutState, setCheckoutState] = useState<'idle' | 'creating'>('idle');
   const [checkoutSession, setCheckoutSession] = useState<BillingCheckoutSession | null>(null);
-  const [provider, setProvider] = useState('deepseek');
-  const [model, setModel] = useState('deepseek/deepseek-v4-flash');
-  const apiKeyInputRef = useRef<HTMLInputElement | null>(null);
+  const [modelOptions, setModelOptions] = useState<PlatformModelOption[]>([]);
   const requestSeqRef = useRef(0);
 
   const loadAccount = useCallback(async () => {
@@ -265,15 +265,20 @@ const AccountPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [response, billingResponse] = await Promise.all([
+      const modelOptionsPromise = typeof platformApi.modelOptions === 'function'
+        ? platformApi.modelOptions()
+        : Promise.resolve({ selectedOptionId: 'platform_recommended', options: [], realByokStatus: '' });
+      const [response, billingResponse, modelOptionsResponse] = await Promise.all([
         platformApi.account(),
         platformApi.billingAccount(),
+        modelOptionsPromise,
       ]);
       if (requestSeq !== requestSeqRef.current) {
         return;
       }
       setAccount(response);
       setBilling(billingResponse);
+      setModelOptions(modelOptionsResponse.options);
     } catch (err) {
       if (requestSeq !== requestSeqRef.current) {
         return;
@@ -293,25 +298,30 @@ const AccountPage: React.FC = () => {
     };
   }, [loadAccount]);
 
-  const handleSaveApiKey = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const apiKey = apiKeyInputRef.current?.value?.trim() ?? '';
-    if (!apiKey) {
-      setError(text.errorApiKeyRequired);
-      return;
-    }
+  const handleConnectApiKey = async ({ provider, apiKey }: { provider: 'openai' | 'anthropic' | 'deepseek'; apiKey: string }) => {
     setSaveState('saving');
     setError(null);
     try {
-      await platformApi.saveApiKey({ provider, model, apiKey });
-      if (apiKeyInputRef.current) {
-        apiKeyInputRef.current.value = '';
-      }
+      await platformApi.connectApiKey({ provider, apiKey });
       setSaveState('saved');
       await loadAccount();
     } catch (err) {
       setError(localizeError(errorMessage(err, text.errorApiKeySave), text, language));
       setSaveState('idle');
+    }
+  };
+
+  const handleBoostPackPurchase = async () => {
+    setCheckoutState('creating');
+    setError(null);
+    try {
+      const session = await platformApi.createBoostPackCheckout();
+      setCheckoutSession(session);
+      await loadAccount();
+    } catch (err) {
+      setError(localizeError(errorMessage(err, text.errorSandboxCheckout), text, language));
+    } finally {
+      setCheckoutState('idle');
     }
   };
 
@@ -440,30 +450,21 @@ const AccountPage: React.FC = () => {
                 )}
               </div>
 
-              <form className="grid gap-3" onSubmit={(event) => void handleSaveApiKey(event)}>
-                <label className="grid gap-1 text-sm font-medium text-foreground">
-                  {text.provider}
-                  <select className="input-base" value={provider} onChange={(event) => setProvider(event.target.value)}>
-                    <option value="deepseek">deepseek</option>
-                    <option value="openai">openai</option>
-                    <option value="anthropic">anthropic</option>
-                    <option value="gemini">gemini</option>
-                  </select>
-                </label>
-                <label className="grid gap-1 text-sm font-medium text-foreground">
-                  {text.model}
-                  <input className="input-base" value={model} onChange={(event) => setModel(event.target.value)} />
-                </label>
-                <label className="grid gap-1 text-sm font-medium text-foreground">
-                  {text.apiKey}
-                  <input ref={apiKeyInputRef} className="input-base" type="password" autoComplete="off" />
-                </label>
-                <button type="submit" className="btn-primary inline-flex items-center justify-center gap-2" disabled={saveState === 'saving'}>
-                  <KeyRound className="h-4 w-4" />
-                  {saveState === 'saving' ? text.saving : text.saveApiKey}
-                </button>
-                {saveState === 'saved' ? <p className="text-sm text-success">{text.apiKeySaved}</p> : null}
-              </form>
+              <ModelConnectionWizardV112
+                language={language}
+                onConnect={handleConnectApiKey}
+                onCreatePairing={() => platformApi.createLocalConnectorPairing()}
+                onRefreshModels={async () => {
+                  const response = await platformApi.modelOptions();
+                  setModelOptions(response.options);
+                }}
+              />
+              {saveState === 'saved' ? <p className="text-sm text-success">{text.apiKeySaved}</p> : null}
+              {modelOptions.length > 0 ? (
+                <p className="text-xs text-secondary-text">
+                  {language === 'zh' ? `已开放 ${modelOptions.length} 个安全模型选项。` : `${modelOptions.length} safe model options available.`}
+                </p>
+              ) : null}
             </div>
           </Card>
 
@@ -538,6 +539,10 @@ const AccountPage: React.FC = () => {
             </div>
           </Card>
         </section>
+
+        {billing?.boostPack ? (
+          <BoostPackCardV112 language={language} product={billing.boostPack} onPurchase={() => void handleBoostPackPurchase()} />
+        ) : null}
       </div>
     </AppPage>
   );

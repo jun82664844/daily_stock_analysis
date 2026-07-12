@@ -22,6 +22,7 @@ from src.auth import (
 )
 from api.v1.schemas.platform import (
     PlatformApiKeyItem,
+    PlatformApiKeyConnectRequest,
     PlatformApiKeyUpsertRequest,
     PlatformAuthResponse,
     PlatformFeatureToggleRequest,
@@ -72,6 +73,7 @@ from src.services.local_functional_status import build_local_functional_status
 from src.services.platform_ops_health import build_platform_ops_health_status
 from src.services.production_readiness import build_production_readiness_status
 from src.services.system_config_service import SystemConfigService
+from src.services.member_model_catalog_service import MemberModelCatalogService
 from src.csrf import (
     CSRF_COOKIE_NAME as PLATFORM_CSRF_COOKIE,
     CSRF_HEADER_NAME as PLATFORM_CSRF_HEADER,
@@ -641,11 +643,58 @@ async def platform_store_api_key(request: Request, body: PlatformApiKeyUpsertReq
         _audit(
             user_id=int(identity.user_id),
             action="api_key_saved",
-            metadata={"provider": body.provider, "model": body.model, "api_key": body.api_key},
+            metadata={"provider": body.provider, "model": body.model, "api_key_id": item.get("id")},
         )
         return item
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": "invalid_api_key", "message": str(exc)})
+
+
+@router.get("/model-options")
+async def platform_model_options(request: Request):
+    identity = _require_identity(request)
+    options = MemberModelCatalogService().list_options(
+        plan=identity.plan,
+        user_id=int(identity.user_id),
+    )
+    return {
+        "selected_option_id": "platform_recommended",
+        "options": [option.to_dict() for option in options],
+        "real_byok_status": "REAL_OPENAI_CLAUDE_BYOK_NOT_VERIFIED",
+    }
+
+
+@router.post("/api-keys/connect")
+async def platform_connect_api_key(request: Request, body: PlatformApiKeyConnectRequest):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "api_keys", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+    try:
+        result = MemberModelCatalogService().connect_api_key(
+            user_id=int(identity.user_id),
+            provider=body.provider,
+            api_key=body.api_key,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        allowed = {
+            "invalid_api_key",
+            "provider_balance_insufficient",
+            "provider_unreachable",
+            "provider_not_supported",
+        }
+        return JSONResponse(status_code=400, content={"error": code if code in allowed else "invalid_api_key"})
+    _audit(
+        user_id=int(identity.user_id),
+        action="api_key_connected",
+        metadata={
+            "provider": body.provider,
+            "api_key_id": result["api_key"].get("id"),
+        },
+    )
+    return result
 
 
 @router.get("/admin/users")

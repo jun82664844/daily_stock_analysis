@@ -1,11 +1,12 @@
 import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArchiveRestore, BarChart3, Check, Download, Eye, Flag, KeyRound, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
+import { Archive, ArchiveRestore, BarChart3, Check, Download, Eye, Flag, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
-import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistAlertRulesResponse, type PlatformWatchlistRadarAlertSuggestion, type PlatformWatchlistRadarHistoryResponse, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse, type PlatformWatchlistTriggeredAlert } from '../api/platform';
+import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformModelOption, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistAlertRulesResponse, type PlatformWatchlistRadarAlertSuggestion, type PlatformWatchlistRadarHistoryResponse, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse, type PlatformWatchlistTriggeredAlert } from '../api/platform';
+import SimpleModelPickerV112, { type SimpleModelOption } from '../components/platform/SimpleModelPickerV112';
 import type { PlatformLocalModelStatus } from '../api/platform';
 import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
 import { agentApi, type SkillInfo } from '../api/agent';
@@ -32,7 +33,7 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
-import type { AnalysisDepth, AnalysisReport, ApiKeyMode, HistoryFilters, HistoryItem, HistoryStateUpdatePayload, MarketReviewPayload, ReportType, StockBarItem, TaskInfo } from '../types/analysis';
+import type { AnalysisDepth, AnalysisReport, HistoryFilters, HistoryItem, HistoryStateUpdatePayload, MarketReviewPayload, ReportType, StockBarItem, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { downloadTextFile } from '../utils/downloadText';
@@ -378,6 +379,8 @@ const GENERATED_TERM_ZH: Record<string, string> = {
   'Technology / Consumer Electronics': '科技 / 消费电子',
   'Consumer Electronics': '消费电子',
   Technology: '科技',
+  'United States': '美国',
+  'US growth and technology benchmark.': '美国成长与科技基准。',
   a_share: 'A股',
   'hk equity': '港股',
   'crypto spot': '加密货币现货',
@@ -413,7 +416,9 @@ const localizeGeneratedHorizon = (value: unknown, language: string): string => {
   return match ? `未来 ${match[1]} 根K线` : text || '-';
 };
 
-const localizeGeneratedText = (value: unknown, language: string): string => {
+// Exported for deterministic localization coverage alongside the page-level browser test.
+// eslint-disable-next-line react-refresh/only-export-components
+export const localizeGeneratedText = (value: unknown, language: string): string => {
   const text = String(value ?? '');
   if (language === 'en' || !text) return text;
   if (GENERATED_TEXT_ZH[text]) return GENERATED_TEXT_ZH[text];
@@ -677,8 +682,6 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
     .replace(/^Refresh once$/, '先刷新一次行情。')
     .replace(/^Refresh once before market action and confirm whether price stays (below|above) MA20\.$/, (_, direction: string) => `先刷新一次行情，并确认价格是否仍然${direction === 'below' ? '低于' : '高于'} MA20。`)
     .replace(/^Refresh once before market action and confirm whether price stays (below|above) MA20 ([^.]+)\.$/, '先刷新一次行情，并确认价格是否仍然$1 MA20 $2。')
-    .replace('below MA20', '低于 MA20')
-    .replace('above MA20', '高于 MA20')
     .replace(/^Compare this move with (.+?) instead of reading it alone\.$/, '把这次波动与 $1 对比，不要孤立解读。')
     .replace(/^Compare this move with (.+?) and (.+?) before reading (.+?) in isolation\.$/, '解读 $3 前，先把这次波动与 $1 和 $2 对比。')
     .replace(/^No-AI quick view does not include realtime news, filings, or external search\.$/, '未用 AI 快速视图不包含实时新闻、公告文件或外部搜索。')
@@ -706,11 +709,20 @@ const localizeGeneratedText = (value: unknown, language: string): string => {
     .replace(/^Open peer comparison or deep sector view for richer cross-asset context\.$/, '可打开同业对比或深度板块视图，获得更完整的跨资产背景。')
     .replace(/^No realtime news source is enabled in free no-AI mode\.$/, '免费未用 AI 模式未启用实时新闻源。')
     .replace(/^No realtime news source is enabled in free no-AI mode for (.+?)\. No AI or public search was used\. Current market data is degraded\.$/, '免费未用 AI 模式暂未启用 $1 实时新闻源；未使用 AI 或公共搜索，当前行情数据存在降级。')
+    .replace(/^No realtime news source is enabled in free no-AI mode for (.+?)\. No AI or public search was used\.$/, (_, lane: string) => `免费未用 AI 模式暂未启用${lane === 'us_equity' ? '美股' : lane === 'hk_equity' ? '港股' : lane}实时新闻源；未使用 AI 或公共搜索。`)
     .replace(/^No filing or announcement source is enabled in free no-AI mode\.$/, '免费未用 AI 模式未启用公告或文件来源。')
     .replace(/^No filing or announcement source is enabled in free no-AI mode for (.+?)\. Deep analysis can add filings, announcements, and source links when configured\.$/, '免费未用 AI 模式暂未启用 $1 公告或文件来源；配置后深度分析可补充公告、文件和来源链接。')
     .replace(/^Quote is stale; quick view uses cached quote and latest available history\.$/, '行情已过期；快速视图使用缓存行情和最新可用历史。')
     .replace(/^Refresh market data before treating the quick snapshot as current\.$/, '先刷新行情，再把快速快照当作当前数据解读。')
     .replace(/^Premium can add realtime news, filings, source links, sector comparison, and AI summaries\.$/, '免费版展示同样资讯入口并使用网络/本地公开源；高级版使用 API 获取实时新闻、公告、来源链接、板块对比和 AI 摘要。')
+    .replace(/^Premium can use configured API feeds for broader coverage and higher refresh limits; the visible module structure remains the same\.$/, '高级版可使用已配置的 API 数据源扩大覆盖范围并提高刷新额度；页面模块结构保持一致。')
+    .replace(/^Information and data only; not investment advice or a trading instruction\.$/, '仅提供资讯和数据，不构成投资建议或交易指令。')
+    .replace(/^Filings and full news require deep mode or configured sources$/, '公告文件和完整资讯需要深度模式或已配置数据源。')
+    .replace(/^Watch whether price can hold (below|above) MA20 ([^ ]+) after the next refresh\.$/, (_, direction: string, ma20: string) => `观察价格能否在下次刷新后守住${direction === 'below' ? '低于' : ''} MA20 ${ma20}。`)
+    .replace('below MA20', '低于 MA20')
+    .replace('above MA20', '高于 MA20')
+    .replace(/^Keep the analysis informational, confirm source freshness, and treat this as a no-AI quick view\.$/, '保持信息分析边界，先确认来源新鲜度，并将其视为未用 AI 快速研判。')
+    .replace(/^No-AI quick view for (.+?): quote freshness is (.+?); realtime news, filings, external search, and investment advice are not included\.$/, (_, lane: string, freshness: string) => `未用 AI 的${lane === 'us_equity' ? '美股' : lane === 'hk_equity' ? '港股' : lane}快速视图：行情新鲜度为${localizeGeneratedStatus(freshness, language)}；不包含实时新闻、公告文件、外部搜索或投资建议。`)
     .replace(/^Kronos adapter ready; local rules preview only; Kronos model not installed or invoked\.$/, 'Kronos 适配器已就绪；当前是本地规则预览，尚未运行 Kronos 模型。')
     .replace(/^Kronos adapter ready; local rules preview only\.$/, 'Kronos 适配器已就绪；当前是本地规则预览。')
     .replace(/^Kronos adapter ready; model not invoked because dependencies are missing: (.+)\.$/, 'Kronos 适配器已就绪；因依赖缺失尚未运行模型：$1。')
@@ -1266,6 +1278,8 @@ const HomePage: React.FC = () => {
   const [platformAccount, setPlatformAccount] = useState<PlatformAccountSummary | null>(null);
   const [localModelStatus, setLocalModelStatus] = useState<PlatformLocalModelStatus | null>(null);
   const [platformKeys, setPlatformKeys] = useState<PlatformApiKeyItem[]>([]);
+  const [memberModelOptions, setMemberModelOptions] = useState<PlatformModelOption[]>([]);
+  const [modelOptionId, setModelOptionId] = useState(() => window.localStorage.getItem('dsa.modelOptionId') || 'platform_recommended');
   const [platformWatchlist, setPlatformWatchlist] = useState<PlatformWatchlistResponse | null>(null);
   const [platformWatchlistRefresh, setPlatformWatchlistRefresh] = useState<PlatformWatchlistRefreshResponse | null>(null);
   const [platformWatchlistRadar, setPlatformWatchlistRadar] = useState<PlatformWatchlistRadarResponse | null>(null);
@@ -1284,10 +1298,6 @@ const HomePage: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [authVerificationBusy, setAuthVerificationBusy] = useState(false);
-  const [apiKeyDraft, setApiKeyDraft] = useState('');
-  const [apiKeyProvider, setApiKeyProvider] = useState('deepseek');
-  const [apiKeyModel, setApiKeyModel] = useState('deepseek/deepseek-v4-flash');
-  const [apiKeySaving, setApiKeySaving] = useState(false);
   const marketReviewPollTimer = useRef<number | null>(null);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const basicSnapshotRef = useRef<HTMLDivElement | null>(null);
@@ -1442,6 +1452,8 @@ const HomePage: React.FC = () => {
       setPlatformSession(null);
       setPlatformAccount(null);
       setPlatformKeys([]);
+      setMemberModelOptions([]);
+      setModelOptionId('platform_recommended');
       setPlatformWatchlist(null);
       setPlatformWatchlistRefresh(null);
       setPlatformWatchlistRadar(null);
@@ -1456,7 +1468,13 @@ const HomePage: React.FC = () => {
     const expectedUserId = session.user.id;
     setPlatformSession(session);
     try {
-      const account = await platformApi.account();
+      const modelOptionsPromise = typeof platformApi.modelOptions === 'function'
+        ? platformApi.modelOptions()
+        : Promise.resolve({ selectedOptionId: 'platform_recommended', options: [], realByokStatus: '' });
+      const [account, modelOptions] = await Promise.all([
+        platformApi.account(),
+        modelOptionsPromise,
+      ]);
       if (
         platformSessionGenerationRef.current !== generation
         || account.user.id !== expectedUserId
@@ -1464,6 +1482,12 @@ const HomePage: React.FC = () => {
       setPlatformAccount(account);
       setPlatformSession({ user: account.user, quota: account.quota });
       setPlatformKeys(account.apiKeys);
+      setMemberModelOptions(modelOptions.options);
+      const validOption = modelOptions.options.some((option) => option.optionId === modelOptionId)
+        ? modelOptionId
+        : modelOptions.selectedOptionId;
+      setModelOptionId(validOption);
+      window.localStorage.setItem('dsa.modelOptionId', validOption);
     } catch {
       if (platformSessionGenerationRef.current !== generation) return;
       setPlatformAccount(null);
@@ -1475,7 +1499,7 @@ const HomePage: React.FC = () => {
       loadPlatformWatchlist(generation, expectedUserId),
       loadPlatformWatchlistAutomation(generation, expectedUserId),
     ]);
-  }, [loadPlatformWatchlist, loadPlatformWatchlistAutomation, setApiKeyMode]);
+  }, [loadPlatformWatchlist, loadPlatformWatchlistAutomation, modelOptionId, setApiKeyMode]);
 
   const refreshPlatformSession = useCallback(async () => {
     const generation = platformSessionGenerationRef.current + 1;
@@ -1669,7 +1693,6 @@ const HomePage: React.FC = () => {
       setPlatformTriggeredAlerts([]);
       setPlatformWatchlistBusy(false);
       setPlatformAlertBusy(false);
-      setApiKeySaving(false);
       setBasicRetentionBusy(false);
       setPlatformWatchlistError('');
       setApiKeyMode('platform');
@@ -1683,28 +1706,6 @@ const HomePage: React.FC = () => {
       resetDashboardState();
     }
   }, [resetDashboardState, setApiKeyMode, uiLanguage]);
-
-  const handleSaveApiKey = useCallback(async () => {
-    const secret = apiKeyDraft.trim();
-    if (!secret || !platformSession) return;
-    const generation = platformSessionGenerationRef.current;
-    const sessionAtStart = platformSession;
-    setApiKeySaving(true);
-    try {
-      await platformApi.saveApiKey({
-        provider: apiKeyProvider,
-        apiKey: secret,
-        model: apiKeyModel.trim() || undefined,
-      });
-      if (platformSessionGenerationRef.current !== generation) return;
-      setApiKeyDraft('');
-      await loadPlatformAccount(sessionAtStart, generation);
-      if (platformSessionGenerationRef.current !== generation) return;
-      setApiKeyMode('user');
-    } finally {
-      if (platformSessionGenerationRef.current === generation) setApiKeySaving(false);
-    }
-  }, [apiKeyDraft, apiKeyModel, apiKeyProvider, loadPlatformAccount, platformSession, setApiKeyMode]);
 
   const handleAddCurrentQueryToPlatformWatchlist = useCallback(async () => {
     const target = (basicSnapshot?.stockCode || query).trim();
@@ -2023,10 +2024,37 @@ const HomePage: React.FC = () => {
     () => analysisSkills.find((skill) => skill.id === selectedStrategyId),
     [analysisSkills, selectedStrategyId],
   );
-  const hasUserApiKey = platformKeys.some((key) => key.enabled);
-  const handleApiKeyModeChange = useCallback((mode: ApiKeyMode) => {
-    setApiKeyMode(mode);
-  }, [setApiKeyMode]);
+  const simpleModelOptions: SimpleModelOption[] = useMemo(() => {
+    const source = memberModelOptions.length > 0 ? memberModelOptions : [{
+      optionId: 'platform_recommended',
+      labelZh: '平台推荐',
+      labelEn: 'Platform recommended',
+      source: 'platform' as const,
+      providerLabel: 'DSA',
+      speed: 'fast' as const,
+      purpose: uiLanguage === 'en' ? 'Fast information analysis' : '快速资讯分析',
+      quotaType: 'flash' as const,
+      costUnits: 1,
+      recommended: true,
+    }];
+    return source.map((option) => ({
+      optionId: option.optionId,
+      label: uiLanguage === 'en' ? option.labelEn : option.labelZh,
+      source: option.source,
+      providerLabel: option.providerLabel,
+      speed: option.speed,
+      purpose: uiLanguage === 'en' ? (option.purposeEn || option.purpose) : (option.purposeZh || option.purpose),
+      quotaType: option.quotaType,
+      costUnits: option.costUnits,
+      recommended: option.recommended,
+    }));
+  }, [memberModelOptions, uiLanguage]);
+  const handleModelOptionChange = useCallback((nextOptionId: string) => {
+    const option = simpleModelOptions.find((item) => item.optionId === nextOptionId);
+    setModelOptionId(nextOptionId);
+    window.localStorage.setItem('dsa.modelOptionId', nextOptionId);
+    setApiKeyMode(option?.source === 'byok' ? 'user' : option?.source === 'user_local' ? 'user_local' : 'platform');
+  }, [setApiKeyMode, simpleModelOptions]);
   const primaryApiKey = platformKeys.find((key) => key.enabled);
   const baseQuota = platformAccount?.quota ?? platformSession?.quota ?? null;
   const basicQueryQuota = platformAccount?.quotaBuckets.find((bucket) => bucket.quotaBucket === 'basic_query');
@@ -4883,9 +4911,10 @@ const HomePage: React.FC = () => {
         selectionSource: selectionSource ?? 'manual',
         skills: selectedAnalysisSkills,
         analysisDepth,
+        modelOptionId,
       });
     },
-    [query, selectedAnalysisSkills, submitAnalysis],
+    [modelOptionId, query, selectedAnalysisSkills, submitAnalysis],
   );
 
   const handleDeepAnalyze = useCallback(
@@ -5761,76 +5790,7 @@ const HomePage: React.FC = () => {
                     data-testid="platform-query-mode-panel"
                     className="flex min-w-0 flex-wrap items-center gap-2 border-t border-subtle/70 pt-2"
                   >
-                    <span className="whitespace-nowrap text-xs font-medium text-foreground">
-                      {uiLanguage === 'en' ? 'Analysis channel' : '分析通道'}
-                    </span>
-                    <div className="inline-flex overflow-hidden rounded-lg border border-subtle">
-                      <button
-                        type="button"
-                        onClick={() => handleApiKeyModeChange('platform')}
-                        data-testid="platform-mode-platform"
-                        className={`px-2.5 py-1 ${apiKeyMode === 'platform' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
-                      >
-                        {uiLanguage === 'en' ? 'Platform API' : '平台 API'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!hasUserApiKey}
-                        onClick={() => handleApiKeyModeChange('user')}
-                        data-testid="platform-mode-user"
-                        className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'user' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
-                      >
-                        {uiLanguage === 'en' ? 'BYOK' : '我的 API'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!localModelStatus?.quickReady}
-                        onClick={() => handleApiKeyModeChange('local')}
-                        data-testid="platform-mode-local"
-                        className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
-                      >
-                        {uiLanguage === 'en' ? 'Local model' : '本地模型'}
-                      </button>
-                    </div>
-                    <select
-                      value={apiKeyProvider}
-                      onChange={(event) => setApiKeyProvider(event.target.value)}
-                      data-testid="platform-api-key-provider"
-                      className="h-8 rounded-lg border border-subtle bg-surface px-2 text-foreground"
-                    >
-                      <option value="deepseek">DeepSeek</option>
-                      <option value="openai">OpenAI</option>
-                      <option value="anthropic">Anthropic</option>
-                      <option value="gemini">Gemini</option>
-                    </select>
-                    <input
-                      type="text"
-                      value={apiKeyModel}
-                      onChange={(event) => setApiKeyModel(event.target.value)}
-                      data-testid="platform-api-key-model"
-                      placeholder={platformKeys[0]?.model || (uiLanguage === 'en' ? 'Model name' : '模型名')}
-                      className="h-8 w-full min-w-[12rem] max-w-[22rem] flex-1 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text md:w-56 md:flex-none"
-                    />
-                    <input
-                      type="password"
-                      value={apiKeyDraft}
-                      onChange={(event) => setApiKeyDraft(event.target.value)}
-                      data-testid="platform-api-key-secret"
-                      placeholder={platformKeys[0]?.maskedKey || 'API Key'}
-                      className="h-8 w-full min-w-[10rem] max-w-[18rem] flex-1 rounded-lg border border-subtle bg-surface px-2 text-foreground placeholder:text-muted-text md:w-40 md:flex-none"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      isLoading={apiKeySaving}
-                      disabled={!apiKeyDraft.trim()}
-                      onClick={() => void handleSaveApiKey()}
-                      data-testid="platform-api-key-save"
-                    >
-                      <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-                      {uiLanguage === 'en' ? 'Save key' : '保存密钥'}
-                    </Button>
+                    <SimpleModelPickerV112 options={simpleModelOptions} value={modelOptionId} onChange={handleModelOptionChange} language={uiLanguage} />
                   </div>
                 </>
               ) : (
@@ -9492,34 +9452,7 @@ const HomePage: React.FC = () => {
                           disabled={!basicSnapshot || (localAiQuota?.remaining ?? 1) <= 0}
                         />
                         <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-                          <div className="inline-flex overflow-hidden rounded-lg border border-subtle">
-                            <button
-                              type="button"
-                              onClick={() => handleApiKeyModeChange('platform')}
-                              data-testid="platform-mode-platform"
-                              className={`px-2.5 py-1 ${apiKeyMode === 'platform' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
-                            >
-                              {uiLanguage === 'en' ? 'Platform API' : '平台 API'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!hasUserApiKey}
-                              onClick={() => handleApiKeyModeChange('user')}
-                              data-testid="platform-mode-user"
-                              className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'user' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
-                            >
-                              {uiLanguage === 'en' ? 'BYOK' : '我的 API'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!localModelStatus?.quickReady}
-                              onClick={() => handleApiKeyModeChange('local')}
-                              data-testid="platform-mode-local"
-                              className={`px-2.5 py-1 disabled:cursor-not-allowed disabled:opacity-50 ${apiKeyMode === 'local' ? 'bg-primary text-primary-foreground' : 'bg-surface text-secondary-text hover:text-foreground'}`}
-                            >
-                              {uiLanguage === 'en' ? 'Local model' : '本地模型'}
-                            </button>
-                          </div>
+                          <SimpleModelPickerV112 options={simpleModelOptions} value={modelOptionId} onChange={handleModelOptionChange} language={uiLanguage} />
                           <Button
                             type="button"
                             variant="secondary"

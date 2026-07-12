@@ -79,6 +79,8 @@ verify_*.py
 !scripts/verify_local_v1_operability.py
 !scripts/verify_platform_v2_readiness.py
 !scripts/verify_platform_release_candidate_package.py
+!scripts/verify_platform_simple_model_access_v112.py
+!scripts/verify_platform_user_local_connector_live_v112.py
 !scripts/verify_platform_user_e2e.py
 !scripts/verify_platform_billing_lifecycle.py
 !scripts/verify_platform_query_quality_v4.py

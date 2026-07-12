@@ -2,11 +2,11 @@
 
 > **For agentic workers:** Use `executing-plans` or an available multi-agent workflow to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 DSA 增加 HK$28 API 加油包、会员可选模型、极简 BYOK 接入和用户自有 Ollama 接入，让不熟悉 API、端口和模型名称的普通用户也能在三步以内完成设置。
+**Goal:** 为 DSA 增加 HK$28 API 加油包、会员可选模型、极简 BYOK 接入，以及 Windows + macOS 首版可用的用户自有 Ollama 接入，让不熟悉 API、端口和模型名称的普通用户也能在三步以内完成设置。
 
-**Architecture:** 复用现有平台账号、计费生命周期、额度流水、V111 请求级 BYOK 路由和分析主链，不再增加第二套账号或分析系统。V112-A 先交付加油包、统一模型目录和“选择供应商 → 粘贴 Key → 连接”的 Web 流程；V112-B 再交付只有连接状态的轻量本地连接器，通过出站 HTTPS 长轮询连接用户电脑上的 Ollama，不开发完整桌面版，也不让云端直接访问用户的 `localhost`。
+**Architecture:** 复用现有平台账号、计费生命周期、额度流水、V111 请求级 BYOK 路由和分析主链，不再增加第二套账号或分析系统。V112-A 先交付加油包、统一模型目录和“选择供应商 → 粘贴 Key → 连接”的 Web 流程；V112-B 同步交付 Windows 与 macOS 轻量本地连接器，通过出站 HTTPS 长轮询连接用户电脑上的 Ollama，不开发完整桌面版，也不让云端直接访问用户的 `localhost`。
 
-**Tech Stack:** Python 3、FastAPI、SQLAlchemy、SQLite、Pydantic、React 19、TypeScript、Vitest、Testing Library、Playwright、PyInstaller、Windows Credential Manager。
+**Tech Stack:** Python 3、FastAPI、SQLAlchemy、SQLite、Pydantic、React 19、TypeScript、Vitest、Testing Library、Playwright、PyInstaller、Windows Credential Manager、macOS Keychain、GitHub Actions 双平台构建。
 
 ---
 
@@ -59,10 +59,12 @@
 纯 Web 云端无法直接、安全、稳定地调用用户电脑的 `127.0.0.1`。首期只支持 Ollama，并提供一个轻量的 `DSA Local Connector`：
 
 - 它不是 DSA 桌面版，只负责连接和转发本地模型任务。
-- 用户下载安装后双击运行；小窗口只显示“未连接 / 已连接 / Ollama 未启动 / 没有模型”。
+- 首版同时支持 Windows 和 macOS；Windows 提供 `.exe`，macOS 提供 `.dmg` 内的 `.app`。
+- macOS 最低支持 macOS 14 Sonoma；Apple Silicon 使用 CPU/GPU，Intel Mac 使用 CPU 并在下载页提示性能较慢。
+- 用户下载安装后双击运行；两个系统的小窗口只显示“未连接 / 已连接 / Ollama 未启动 / 没有模型”。
 - 连接器自动访问 `127.0.0.1:11434`，自动发现模型，不让用户填写地址、端口或模型名。
 - 连接器只主动向 DSA 发起 HTTPS 请求，不开放公网端口。
-- 浏览器生成一次性配对码；连接器领取短期设备令牌后保存到 Windows Credential Manager。
+- 浏览器生成一次性配对码；连接器领取短期设备令牌后，Windows 保存到 Credential Manager，macOS 保存到 Keychain。
 - 云端只保存设备令牌哈希、模型清单摘要和在线状态，不保存用户本地模型文件。
 - 用户可以在账号页随时断开设备并使设备令牌失效。
 - V107 的 `api_key_mode=local` 继续只代表 DSA 服务器自有 Ollama；用户电脑上的 Ollama 使用新的 `user_local` 来源，二者不得混用或互相回退。
@@ -96,7 +98,7 @@
 ```text
 连接本地模型
 
-1. [下载 DSA Local Connector]
+1. [下载 Windows 版] [下载 macOS 版]
 2. 双击运行连接器
 3. 配对码： 882 168   [复制]
 
@@ -141,15 +143,19 @@ API 加油包  HK$28
 - `apps/dsa-web/src/components/platform/BoostPackCardV112.tsx`：加油包余额和购买入口。
 - `apps/dsa-web/src/components/platform/SimpleModelPickerV112.tsx`：三个来源的统一模型选择器。
 - `apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx`：三步 BYOK 和本地连接向导。
-- `apps/dsa-local-connector/app.py`：Windows 小窗口和启动入口。
+- `apps/dsa-local-connector/app.py`：Windows/macOS 共用小窗口和启动入口。
 - `apps/dsa-local-connector/client.py`：配对、心跳和长轮询客户端。
 - `apps/dsa-local-connector/ollama.py`：只允许访问回环地址的 Ollama 发现与调用。
 - `apps/dsa-local-connector/requirements.txt`：连接器独立依赖。
 - `apps/dsa-local-connector/dsa-local-connector.spec`：PyInstaller 打包配置。
+- `apps/dsa-local-connector/build-windows.ps1`：Windows x64 本机构建入口。
+- `apps/dsa-local-connector/build-macos.sh`：macOS arm64/x86_64 本机构建和 DMG 入口。
+- `.github/workflows/local-connector-release.yml`：Windows/macOS 双平台构建、测试、签名门禁和 artifact 发布。
 - `tests/test_platform_boost_pack_v112.py`：加油包资格、幂等、失效和扣减测试。
 - `tests/test_member_model_catalog_v112.py`：模型目录和会员过滤测试。
 - `tests/test_analysis_model_selection_v112.py`：请求级模型选择和额度权重测试。
 - `tests/test_user_local_connector_v112.py`：配对、令牌、长轮询、失效和越权测试。
+- `tests/test_local_connector_release_matrix_v112.py`：Windows/macOS 构建矩阵、artifact 名称和签名门禁测试。
 - `apps/dsa-web/src/components/platform/__tests__/BoostPackCardV112.test.tsx`。
 - `apps/dsa-web/src/components/platform/__tests__/SimpleModelPickerV112.test.tsx`。
 - `apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx`。
@@ -923,7 +929,7 @@ git add src/services/user_local_connector_service.py api/v1/endpoints/local_conn
 git commit -m "feat: add user-owned Ollama connector backend"
 ```
 
-### Task 7: 交付一键式 Windows 本地连接器
+### Task 7: 同步交付一键式 Windows 与 macOS 本地连接器
 
 **Files:**
 - Create: `apps/dsa-local-connector/app.py`
@@ -931,9 +937,13 @@ git commit -m "feat: add user-owned Ollama connector backend"
 - Create: `apps/dsa-local-connector/ollama.py`
 - Create: `apps/dsa-local-connector/requirements.txt`
 - Create: `apps/dsa-local-connector/dsa-local-connector.spec`
+- Create: `apps/dsa-local-connector/build-windows.ps1`
+- Create: `apps/dsa-local-connector/build-macos.sh`
+- Create: `.github/workflows/local-connector-release.yml`
 - Modify: `apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx`
 - Modify: `apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx`
 - Test: `tests/test_user_local_connector_v112.py`
+- Test: `tests/test_local_connector_release_matrix_v112.py`
 
 - [ ] **Step 1: 写失败测试，禁止非回环 Ollama 地址**
 
@@ -955,7 +965,16 @@ def test_discover_models_reads_tags_without_pulling(monkeypatch):
     assert all("/api/pull" not in call for call in calls)
 ```
 
-- [ ] **Step 3: 实现只有四种状态的小窗口**
+```python
+def test_release_matrix_requires_windows_and_macos_artifacts():
+    workflow = Path(".github/workflows/local-connector-release.yml").read_text(encoding="utf-8")
+    assert "DSA-Local-Connector-Windows-x64.exe" in workflow
+    assert "DSA-Local-Connector-macOS-arm64.dmg" in workflow
+    assert "DSA-Local-Connector-macOS-x64.dmg" in workflow
+    assert "LOCAL_CONNECTOR_SIGNING_NOT_READY" in workflow
+```
+
+- [ ] **Step 3: 实现 Windows/macOS 共用的四状态小窗口**
 
 Tkinter 窗口只显示：
 
@@ -964,13 +983,13 @@ Tkinter 窗口只显示：
 - `已连接：发现 N 个 Ollama 模型`
 - `Ollama 未启动或没有模型`
 
-窗口只有“打开 DSA 账号页”“重新连接”“退出”三个按钮，不提供地址、端口、模型参数或高级设置。
+窗口只有“打开 DSA 账号页”“重新连接”“退出”三个按钮，不提供地址、端口、模型参数或高级设置。Tkinter 代码保持共用，只把系统通知、开机启动和凭据存储封装为小型平台适配函数。
 
 - [ ] **Step 4: 实现令牌安全保存和长轮询**
 
-设备 token 使用 `keyring` 保存到 Windows Credential Manager；日志只记录 connector ID、状态码和耗时，不记录 token、prompt、模型输出或用户数据。长轮询失败使用 1、2、5、10、30 秒上限退避，恢复后立即重新 heartbeat。
+设备 token 使用 `keyring` 保存：Windows 落到 Credential Manager，macOS 落到 Keychain。日志只记录 connector ID、状态码和耗时，不记录 token、prompt、模型输出或用户数据。长轮询失败使用 1、2、5、10、30 秒上限退避，恢复后立即重新 heartbeat。
 
-- [ ] **Step 5: 打包为单文件 exe**
+- [ ] **Step 5: 分别构建 Windows 和 macOS 安装包**
 
 `requirements.txt` 固定包含：
 
@@ -979,27 +998,44 @@ keyring>=25,<26
 pyinstaller>=6,<7
 ```
 
-Run:
+Windows Run:
 
 ```powershell
 Set-Location E:\DSA项目\apps\dsa-local-connector
 python -m pip install -r requirements.txt
-pyinstaller dsa-local-connector.spec --clean --noconfirm
+.\build-windows.ps1
 ```
 
-Expected: 生成 `dist/DSA-Local-Connector.exe`；构建产物不提交仓库，只作为发布 artifact。
+Windows Expected: 生成 `dist/DSA-Local-Connector-Windows-x64.exe`。
+
+macOS Run:
+
+```bash
+cd apps/dsa-local-connector
+python3 -m pip install -r requirements.txt
+./build-macos.sh
+```
+
+macOS Expected：Apple Silicon 构建 `dist/DSA-Local-Connector-macOS-arm64.dmg`，Intel 构建 `dist/DSA-Local-Connector-macOS-x64.dmg`。两个脚本都运行相同测试和 PyInstaller spec；构建产物不提交仓库，只作为发布 artifact。
+
+`.github/workflows/local-connector-release.yml` 使用 Windows x64、macOS arm64 和 macOS x86_64 原生构建任务，禁止在 Windows 上交叉伪造 Mac 包。下载页根据浏览器系统默认推荐对应文件，但始终保留手动选择。
 
 - [ ] **Step 6: 完成 Web 配对状态**
 
-账号页点击“连接本地模型”后生成 6 位配对码并显示 5 分钟倒计时。连接成功后自动刷新模型目录；断开设备需要确认，但不删除历史分析。中英文文案都说明“这是轻量连接器，不是 DSA 桌面版”。
+账号页点击“连接本地模型”后先选择 Windows 或 macOS，再生成 6 位配对码并显示 5 分钟倒计时。连接成功后自动刷新模型目录；断开设备需要确认，但不删除历史分析。中英文文案都说明“这是轻量连接器，不是 DSA 桌面版”。
 
-- [ ] **Step 7: 运行连接器和前端测试**
+- [ ] **Step 7: 加入签名和 macOS notarization 发布门禁**
+
+本地开发允许生成未签名 artifact，但正式下载页不得发布未签名文件。Windows 正式包必须通过 Authenticode 签名；macOS `.app` 必须使用 Developer ID Application 签名、启用 hardened runtime，并完成 Apple notarization 和 stapling。证书、Apple ID、Team ID 和 notarization 凭据只存 GitHub Actions secrets，不写入仓库或日志。缺少任一正式凭据时状态保持 `LOCAL_CONNECTOR_SIGNING_NOT_READY`，不得把开发包标成正式首版。
+
+- [ ] **Step 8: 运行双平台连接器和前端测试**
 
 Run:
 
 ```powershell
 Set-Location E:\DSA项目
 python -m pytest tests/test_user_local_connector_v112.py -q
+python -m pytest tests/test_local_connector_release_matrix_v112.py -q
 Set-Location E:\DSA项目\apps\dsa-web
 npm test -- src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx src/pages/__tests__/AccountPage.test.tsx
 npm run build
@@ -1007,12 +1043,21 @@ npm run build
 
 Expected: PASS；前端构建成功。
 
-- [ ] **Step 8: 条件提交**
+- [ ] **Step 9: 双平台真机验收**
+
+至少完成以下真机矩阵：
+
+- Windows 11 x64：安装、启动、配对、Ollama 自动发现、模型调用、断开和卸载。
+- macOS 14+ Apple Silicon：DMG 安装、Gatekeeper 校验、配对、GPU 可用模型调用、断开和卸载。
+- macOS 14+ Intel：DMG 安装、配对、CPU 模式模型调用和性能提示；若没有 Intel 真机证据，x64 artifact 只能保留候选状态，首版不得宣称 Intel 已验收。
+- 两个平台都验证重启后凭据仍可使用、撤销设备后立即失效、日志没有 token/prompt/结果明文。
+
+- [ ] **Step 10: 条件提交**
 
 只有在潘总明确授权提交后执行：
 
 ```powershell
-git add apps/dsa-local-connector apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx tests/test_user_local_connector_v112.py
+git add apps/dsa-local-connector .github/workflows/local-connector-release.yml apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx tests/test_user_local_connector_v112.py tests/test_local_connector_release_matrix_v112.py
 git commit -m "feat: add one-click Ollama connector"
 ```
 
@@ -1064,6 +1109,7 @@ BACKEND_TESTS = (
     "tests/test_member_model_catalog_v112.py",
     "tests/test_analysis_model_selection_v112.py",
     "tests/test_user_local_connector_v112.py",
+    "tests/test_local_connector_release_matrix_v112.py",
     "tests/test_platform_byok_routing_v111.py",
     "tests/test_platform_ai_feature_quota.py",
     "tests/test_billing_subscription_lifecycle.py",
@@ -1081,7 +1127,7 @@ if completed.returncode != 0:
 然后运行 Web 定向测试和 build。全部成功后打印：
 
 ```text
-DSA_PLATFORM_SIMPLE_MODEL_ACCESS_V112_OK boost=168+28 price_hkd=28 sources=platform,byok,user_local secrets_exposed=false
+DSA_PLATFORM_SIMPLE_MODEL_ACCESS_V112_OK boost=168+28 price_hkd=28 sources=platform,byok,user_local platforms=windows,macos secrets_exposed=false
 ```
 
 - [ ] **Step 4: 同步产品、状态、manifest 和 changelog**
@@ -1121,14 +1167,15 @@ Expected: V112 marker、release candidate marker、pytest、lint 和 build 全�
 - 加油包：无资格、可购买、支付完成、重复 webhook、额度耗尽、会员月结束、会员到期。
 - 模型：平台推荐、PRO 目录、MAX 目录、BYOK、用户本地、模型下线回到推荐。
 - API：连接成功、Key 无效、余额不足、网络不可用、禁用、删除、无明文泄漏。
-- 本地模型：未安装连接器、Ollama 未启动、无模型、连接成功、设备离线、设备撤销、任务超时。
+- 本地模型：Windows/macOS 未安装连接器、Ollama 未启动、无模型、连接成功、设备离线、设备撤销、任务超时。
 - 页面必须显示准确额度、准确失效时间、数据发送说明和“仅供信息分析，不构成投资建议”。
 
 验收截图放在 PR 描述或 Actions artifact，不提交仓库。未完成真实 OpenAI/Claude/DeepSeek 和真实用户 Ollama 验收时，状态必须分别保持：
 
 ```text
 REAL_OPENAI_CLAUDE_BYOK_NOT_VERIFIED
-REAL_USER_OLLAMA_CONNECTOR_NOT_VERIFIED
+REAL_USER_OLLAMA_WINDOWS_NOT_VERIFIED
+REAL_USER_OLLAMA_MACOS_NOT_VERIFIED
 ```
 
 - [ ] **Step 7: 密钥和日志泄漏扫描**
@@ -1161,12 +1208,13 @@ git commit -m "docs: add V112 acceptance package"
 5. 用户只通过一个模型选择器切换平台、BYOK 和用户本地模型。
 6. PRO/MAX 只能看到各自获准目录；PLUS 只能看到免费平台模型、自己的 API 和自己的本地模型。
 7. BYOK 用户不需要输入 Base URL 或模型内部名，Key 永不由接口返回明文。
-8. 用户本地模型只通过轻量连接器出站连接，不与 DSA 服务器 V107 Ollama 混用。
+8. Windows 和 macOS 首版都通过轻量连接器出站连接用户 Ollama，不与 DSA 服务器 V107 Ollama 混用。
 9. 同步、异步、重试、失败释放都使用同一模型选择和额度语义。
 10. 中英文、多角色和 A/H/美股浏览器验收通过。
 11. V112 验收器、release candidate、后端测试、前端测试、lint 和 build 全部通过。
-12. 真实供应商或真实本地连接器未验收时，文档不升级对应状态。
-13. 工作树中用户既有改动未被覆盖、删除或误提交。
+12. Windows x64、macOS Apple Silicon 和 macOS Intel 的构建状态分别可追踪；Windows 和 macOS 任一平台未完成签名门禁与真机验收时，V112-B 不得宣布完成。
+13. 真实供应商或真实本地连接器未验收时，文档不升级对应状态。
+14. 工作树中用户既有改动未被覆盖、删除或误提交。
 
 ## 7. 回滚方案
 

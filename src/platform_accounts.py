@@ -32,10 +32,28 @@ PLATFORM_PASSWORD_ITERATIONS = 120_000
 PLATFORM_SESSION_MAX_AGE_HOURS_DEFAULT = 24 * 14
 PLATFORM_ANALYSIS_PLANS: Dict[str, Optional[int]] = {
     "free": 5,
+    "plus": 25,
     "pro": 500,
     "premium": 500,
+    "max": 2000,
     "enterprise": None,
 }
+
+MEMBERSHIP_MONTH_QUOTAS: Dict[str, Dict[str, int]] = {
+    "plus": {"flash": 0, "pro": 0},
+    "pro": {"flash": 268, "pro": 28},
+    "max": {"flash": 1688, "pro": 168},
+}
+LEGACY_PLAN_ALIASES = {"premium": "max"}
+
+
+def normalize_membership_plan(plan: str) -> str:
+    normalized = (plan or "free").strip().lower()
+    return LEGACY_PLAN_ALIASES.get(normalized, normalized)
+
+
+def membership_month_quota(plan: str) -> Dict[str, int]:
+    return dict(MEMBERSHIP_MONTH_QUOTAS.get(normalize_membership_plan(plan), {"flash": 0, "pro": 0}))
 
 
 class PlatformAccountError(Exception):
@@ -690,12 +708,40 @@ class PlatformAccountService:
                 },
             )
             session.execute(stmt)
+        with self.db.get_session() as session:
+            row = session.execute(
+                select(PlatformUserApiKey).where(
+                    PlatformUserApiKey.user_id == int(user_id),
+                    PlatformUserApiKey.provider == normalized_provider,
+                )
+            ).scalars().one()
+            record_id = int(row.id)
         return {
+            "id": record_id,
             "provider": normalized_provider,
             "model": normalized_model,
             "masked_key": masked,
             "enabled": True,
         }
+
+    def get_api_key_record(self, user_id: int, api_key_id: int) -> Optional[Dict[str, Any]]:
+        with self.db.get_session() as session:
+            row = session.execute(
+                select(PlatformUserApiKey).where(
+                    PlatformUserApiKey.id == int(api_key_id),
+                    PlatformUserApiKey.user_id == int(user_id),
+                )
+            ).scalars().first()
+            if row is None:
+                return None
+            return {
+                "id": int(row.id),
+                "user_id": int(row.user_id),
+                "provider": row.provider,
+                "model": row.model,
+                "masked_key": row.masked_key,
+                "enabled": bool(row.enabled),
+            }
 
     def list_api_keys(self, user_id: int) -> List[Dict[str, Any]]:
         with self.db.get_session() as session:

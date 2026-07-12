@@ -39,13 +39,25 @@ const payload = {
       items: [
         {
           title: '10-Q - Quarterly report',
-          summary: 'Filed 2026-07-10.',
+          summary: 'Filed 2026-07-10; report date 2026-06-30.',
           documentType: '10-Q',
           url: 'https://www.sec.gov/example',
           source: 'sec_edgar_submissions',
         },
       ],
       action: 'Read filing.',
+    },
+    {
+      category: 'fundamentals',
+      title: 'Company facts',
+      summary: 'Two normalized company facts are available.',
+      status: 'available',
+      source: 'yfinance_profile',
+      items: [
+        { label: 'Sector', value: 'Technology', source: 'yfinance_profile' },
+        { label: 'Industry', value: 'Consumer Electronics', source: 'yfinance_profile' },
+      ],
+      action: 'Review facts.',
     },
   ],
   diagnostics: { cacheHit: false, elapsedMs: 120 },
@@ -61,6 +73,10 @@ describe('GlobalEquityEnrichmentCard', () => {
     expect(screen.getByText('港美股公开数据')).toBeInTheDocument();
     expect(screen.getByText('公司资讯')).toBeInTheDocument();
     expect(screen.getByText('SEC 文件')).toBeInTheDocument();
+    expect(screen.getByText('板块')).toBeInTheDocument();
+    expect(screen.getByText('行业')).toBeInTheDocument();
+    expect(screen.getByText('提交日期 2026-07-10；报告期 2026-06-30。')).toBeInTheDocument();
+    expect(screen.queryByText('Sector')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Apple publishes a product update' })).toHaveAttribute(
       'href',
       'https://finance.yahoo.com/news/apple-update',
