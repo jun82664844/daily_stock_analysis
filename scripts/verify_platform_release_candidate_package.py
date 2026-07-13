@@ -322,6 +322,23 @@ REQUIRED_FILES = (
     "src/services/market_data_contract.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
+    "docs/superpowers/plans/2026-07-13-dsa-v116-public-market-home-and-price-alerts.md",
+    "scripts/verify_platform_public_market_price_alerts_v116.py",
+    "tests/test_platform_public_market_price_alerts_v116_verifier.py",
+    "tests/test_public_market_home_v116.py",
+    "tests/test_platform_price_alert_worker_v116.py",
+    "src/services/public_market_home_service.py",
+    "src/services/platform_price_alert_worker.py",
+    "apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx",
+    "apps/dsa-web/src/components/alerts/PriceAlertFormV116.tsx",
+    "apps/dsa-web/src/components/alerts/PriceAlertInboxV116.tsx",
+    "apps/dsa-web/e2e/public-market-home-price-alerts-v116.spec.ts",
+    "docs/superpowers/plans/2026-07-13-dsa-v117-six-feature-experience-closure.md",
+    "scripts/verify_platform_six_feature_experience_v117.py",
+    "tests/test_platform_six_feature_experience_v117_verifier.py",
+    "apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts",
+    "apps/dsa-web/src/hooks/useDashboardLifecycle.ts",
+    "apps/dsa-web/src/hooks/__tests__/useDashboardLifecycle.test.tsx",
 )
 
 VERIFIER_FILES = (
@@ -395,6 +412,8 @@ VERIFIER_FILES = (
     "scripts/verify_platform_simple_model_access_v112.py",
     "scripts/verify_platform_market_workspace_v113.py",
     "scripts/verify_platform_unified_market_data_v115.py",
+    "scripts/verify_platform_public_market_price_alerts_v116.py",
+    "scripts/verify_platform_six_feature_experience_v117.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 
@@ -586,7 +605,7 @@ def classify_dirty_path(path: str) -> str | None:
         return "build-and-ignore-impact"
     if normalized == "requirements.txt":
         return "manual-confirmation"
-    if normalized.startswith("docs/superpowers/") or normalized in {"docs/CHANGELOG.md", ".env.example"}:
+    if normalized.startswith("docs/superpowers/") or normalized in {"docs/CHANGELOG.md", "docs/alerts.md", ".env.example"}:
         return "docs-and-config"
     if normalized in {"apps/dsa-web/playwright.config.ts"} or normalized.startswith("apps/dsa-web/e2e/"):
         return "tests-and-verifiers"
@@ -599,7 +618,7 @@ def classify_dirty_path(path: str) -> str | None:
         return "tests-and-verifiers"
     if normalized == "apps/dsa-web/index.html" or normalized.startswith("apps/dsa-web/src/"):
         return "frontend-platform-experience"
-    if normalized.startswith("api/") or normalized.startswith("src/") or normalized.startswith("data_provider/"):
+    if normalized == "main.py" or normalized.startswith("api/") or normalized.startswith("src/") or normalized.startswith("data_provider/"):
         return "backend-platform-foundation"
     return None
 

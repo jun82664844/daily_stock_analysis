@@ -460,3 +460,11 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 - P5 新增 Alert API/Web 支持的技术指标规则。最小回滚方式是 revert P5 PR；已创建的 P5 `alert_rules` 记录不会自动删除，旧代码会在 worker 加载阶段 skip unsupported `alert_type`，不影响 legacy 三类规则执行。如需清理，需要维护者确认后手动删除相关规则记录。
 - P6 新增 Alert API/Web 支持的 watchlist、portfolio holdings 与 portfolio account 规则。最小回滚方式是 revert P6 PR；没有新表或迁移，已创建的 P6 `alert_rules` 会保留。回滚前建议 disable/delete 非 `single_symbol` 的 P6 规则；否则旧 worker 可能把 `watchlist` / `portfolio_holdings` 的父级 `target` 当作股票代码评估并产生 failed/skipped 噪声，portfolio 专用 `alert_type` 会在 worker 加载阶段被 skip。
 - P7 新增 Alert API/Web 支持的 `market` 规则和大盘复盘 `market_light_snapshots` 历史快照。最小回滚方式是 revert P7 PR；没有新表或迁移，已创建的 P7 `alert_rules` 会保留。回滚前建议 disable/delete `target_scope=market` 规则；旧 worker 会 skip unsupported `market_light_*` 类型或因 scope/type 不识别产生配置噪声。
+
+## V116 会员私有到价提醒与 APP 复用边界
+
+- Web、PWA、桌面壳和未来移动 APP 使用同一组平台用户提醒规则与事件 API：`/api/v1/platform/watchlist/alert-rules` 和 `/api/v1/platform/watchlist/alert-events`。
+- V116 Cookie 会话只适用于 Web/PWA。原生 APP 的短期访问令牌、刷新令牌、Keychain/Keystore 与 APNs/FCM 属于后续独立认证和推送项目。
+- APP 不得在客户端复制提醒规则真源，也不得自行轮询第三方行情；服务端事件是唯一提醒真源。
+- `PLATFORM_PRICE_ALERT_MONITOR_ENABLED=false` 为安全默认值。只允许一个 schedule 进程运行监控，不能让每个 Uvicorn Web worker 各自运行。
+- 精确到价提醒只陈述用户自定义条件是否被客观数据穿越，不是平台目标价、交易信号或投资建议。

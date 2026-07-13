@@ -599,3 +599,23 @@ git diff --check
 - Kronos 和 AI 继续属于派生信息层，不得覆盖行情、财务或公告事实。
 - `scripts/verify_platform_unified_market_data_v115.py` 通过时输出 `DSA_PLATFORM_UNIFIED_MARKET_DATA_V115_OK canonical_snapshot=true source_arbitration=true deduplication=true no_averaging=true ai_required=false`。
 - V115 仍是本地功能闭环，不代表真实支付、公开部署、生产密钥或市场数据授权获批；所有内容仅为资讯和数据，不构成投资建议。
+
+## V116 首页市场速览与精确到价提醒状态（2026-07-13）
+
+- 首页新增公开三市场聚合，固定按 A股、港股、美股顺序返回；单市场失败不会清空另外两个市场。
+- 精确到价规则复用 V100 私有提醒表，支持首次基线、真实穿越、stale 不触发、同股单轮去重和 A/B 用户隔离。
+- 站内提醒事件支持私有列表、单条已读和全部已读；全站页头提醒铃每 60 秒重新确认平台会话。
+- 游客到价提醒草稿保存 30 分钟，注册后恢复为待确认表单，不会静默创建提醒。
+- `scripts/verify_platform_public_market_price_alerts_v116.py` 通过时输出 `DSA_PLATFORM_PUBLIC_MARKET_PRICE_ALERTS_V116_OK markets=cn,hk,us guest_home=true exact_price_alerts=true background_monitor=true private_events=true ai_required=false realtime_claim=false`。
+- 本状态仅代表本地验收，不代表市场数据授权、生产部署、原生 APP、推送通道、支付或法律审批；内容不构成投资建议。
+
+## V117 六项功能体验与 Ollama 验收状态（2026-07-13）
+
+- 六项 DSA 产品能力统一验收：Kronos、a-stock-data A 股增强、AlphaSift、Financial Services、市场工作台和市场脉搏/自选简报。
+- 本地 Ollama 快速模型分别完成 AAPL 与 `600519.SH` 信息分析；成功结果不含买卖动作或目标价，继续使用独立 `ai_local` 额度。
+- Kronos RTX 5090 探针继续真实运行；模型状态、行情源降级和端到端耗时分别展示。
+- 港股和美股详情获得公开行情/历史兜底；市场总览与股票详情分层加载，直达链接不再被旧市场请求覆盖。
+- AlphaSift 筛选结果支持当前浏览器会话恢复，过期快照快速路径必须显式配置并标记 `snapshot_cache_stale`。
+- 中文和英文页面统一格式化来源、状态、时间、数值和警告；游客首页不再建立需要登录的任务事件流。
+- `scripts/verify_platform_six_feature_experience_v117.py` 通过时输出 `DSA_PLATFORM_SIX_FEATURE_EXPERIENCE_V117_OK features=6 ollama=true markets=cn,hk,us guest_data=true investment_advice=false`。
+- 本状态仍是本地功能验收，不代表真实支付、生产密钥、公开部署、市场数据商业授权或法律审批。

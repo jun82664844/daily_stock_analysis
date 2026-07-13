@@ -2257,3 +2257,123 @@ Boundary: one DSA-native fact contract, no new external runtime, no AI requireme
 - `docs/superpowers/plans/2026-07-12-dsa-hong-kong-market-simple-comparison.md`
 
 These files appeared from concurrent local research during V115 verification. They are classified for dirty-tree coverage only and were not edited or accepted as production pricing, legal, market-data licensing, launch, or investment-advice policy by V115.
+
+## V116 Public Market Home And Private Price Alerts
+
+Backend and configuration:
+
+- `.env.example`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/endpoints/platform.py`
+- `api/v1/schemas/market_workspace.py`
+- `api/v1/schemas/platform.py`
+- `main.py`
+- `src/config.py`
+- `src/platform_watchlist_automation.py`
+- `src/services/market_workspace_service.py`
+- `src/services/platform_price_alert_worker.py`
+- `src/services/public_market_home_service.py`
+- `src/storage.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/platform.ts`
+- `apps/dsa-web/src/components/alerts/PriceAlertFormV116.tsx`
+- `apps/dsa-web/src/components/alerts/PriceAlertInboxV116.tsx`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolWorkspaceV113.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/MarketWorkspacePage.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/e2e/public-market-home-price-alerts-v116.spec.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/api/__tests__/platform.test.ts`
+- `apps/dsa-web/src/components/alerts/__tests__/PriceAlertFormV116.test.tsx`
+- `apps/dsa-web/src/components/alerts/__tests__/PriceAlertInboxV116.test.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/ShellHeader.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `scripts/verify_platform_public_market_price_alerts_v116.py`
+- `tests/test_market_workspace_v113.py`
+- `tests/test_platform_price_alert_worker_v116.py`
+- `tests/test_platform_public_market_price_alerts_v116_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_watchlist_alert_loop_v100.py`
+- `tests/test_public_market_home_v116.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/alerts.md`
+- `docs/superpowers/plans/2026-07-13-dsa-v116-public-market-home-and-price-alerts.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+- `scripts/verify_platform_release_candidate_package.py`
+
+Acceptance marker: `DSA_PLATFORM_PUBLIC_MARKET_PRICE_ALERTS_V116_OK markets=cn,hk,us guest_home=true exact_price_alerts=true background_monitor=true private_events=true ai_required=false realtime_claim=false`.
+
+Boundary: local acceptance only. No production market-data authorization, native APP authentication/push, payment, production deployment or investment-advice claim.
+
+## V117 Six Feature Experience Closure
+
+Backend and configuration:
+
+- `.env.example`
+- `src/services/alphasift_service.py`
+- `src/services/basic_query_service.py`
+- `src/services/market_workspace_service.py`
+- `src/services/stock_service.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/alphasift.ts`
+- `apps/dsa-web/src/components/analysis/decisionJourneyModel.ts`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketMoversV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/MarketPulseV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolWorkspaceV113.tsx`
+- `apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts`
+- `apps/dsa-web/src/hooks/useDashboardLifecycle.ts`
+- `apps/dsa-web/src/hooks/__tests__/useDashboardLifecycle.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/MarketWorkspacePage.tsx`
+- `apps/dsa-web/src/pages/StockScreeningPage.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/src/components/analysis/__tests__/decisionJourneyModel.test.ts`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/StockScreeningPage.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `scripts/verify_platform_six_feature_experience_v117.py`
+- `tests/test_alphasift_api.py`
+- `tests/test_basic_query_no_ai.py`
+- `tests/test_market_workspace_v113.py`
+- `tests/test_platform_ollama_analysis_v107.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_six_feature_experience_v117_verifier.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/plans/2026-07-13-dsa-v117-six-feature-experience-closure.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_SIX_FEATURE_EXPERIENCE_V117_OK features=6 ollama=true markets=cn,hk,us guest_data=true investment_advice=false`.
+
+Boundary: six DSA product capabilities do not mean six complete upstream runtimes are installed. Local information-and-data acceptance only; no production, payment, market-data license or investment-advice approval.

@@ -2003,3 +2003,24 @@ Review focus: stable marker, Git visibility, dirty-file classification, no produ
 - `docs/superpowers/plans/2026-07-12-dsa-hong-kong-market-simple-comparison.md`
 
 These concurrent documents are inventoried without modifying their content. Review them separately before accepting any pricing, legal, market-data licensing or launch decision.
+
+## V116 Public Market Home And Private Price Alerts
+
+- `backend-platform-foundation`: V100 schema compatibility, exact-price rule service, public market aggregation, private worker/event APIs, config and schedule integration.
+- `frontend-platform-experience`: public three-market home, shared price-alert form, private inbox, market deep-link and HomePage registration draft recovery.
+- `tests-and-verifiers`: backend/unit/component/API tests, Playwright E2E and V116 verifier.
+- `docs-and-config`: safe defaults, product rules, alerts boundary, local acceptance, changelog and V116 plan.
+- `build-and-ignore-impact`: `.gitignore` only exposes the V116 verifier; no generated `static/` output is part of the source review.
+- `manual-confirmation`: no requirements or production dependency change.
+
+Review focus: no realtime or market-wide claim without authorization, first observation does not trigger, stale data does not trigger, A/B isolation, one schedule process, no secrets, and information-only copy.
+
+## V117 Six Feature Experience Closure
+
+- `backend-platform-foundation`: public history fallback, lightweight market overview/detail split, AlphaSift stale-cache fast path and Ollama test isolation.
+- `frontend-platform-experience`: request-race guard, localized source/status/time/warnings, decision-journey source labels, chart sizing, guest stream suppression, screening session restore, and query-result-first collapse/expand behavior for market-home and guest account panels.
+- `tests-and-verifiers`: focused backend/frontend regressions, V117 verifier and release-package coverage.
+- `docs-and-config`: V117 plan, integration ledger, product rules, local acceptance, changelog and safe AlphaSift default.
+- `build-and-ignore-impact`: `.gitignore` exposes only the V117 verifier; generated static assets remain ignored.
+
+Review focus: six product capabilities are not six installed upstream runtimes, latest market request wins, no raw internal warning codes, no secret exposure, no investment advice, and no production claim.

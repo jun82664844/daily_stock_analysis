@@ -41,6 +41,25 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v117_six_feature_experience_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_six_feature_experience_v117.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_six_feature_experience_v117.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_six_feature_experience_v117_verifier.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-13-dsa-v117-six-feature-experience-closure.md", REQUIRED_FILES)
+
+    def test_v116_public_market_price_alerts_are_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_public_market_price_alerts_v116.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_public_market_price_alerts_v116.py", VERIFIER_FILES)
+        self.assertIn("src/services/public_market_home_service.py", REQUIRED_FILES)
+        self.assertIn("src/services/platform_price_alert_worker.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-13-dsa-v116-public-market-home-and-price-alerts.md", REQUIRED_FILES)
+
     def test_v102_speed_verifier_is_part_of_release_package_contract(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

@@ -185,3 +185,12 @@ DSA 当前有 4 个正式 GitHub 功能接入，另有 1 个 `ai-market-pulse` �
 - **后续方向**：只把每日自选简报、相对基准变化、历史轨迹和中性条件提醒按 DSA 原生接口重写。
 - **安全边界**：不迁入交易指令、推荐排名、目标价、收益预测、真实持仓导入或密钥存储。
 - 详细记录：`docs/superpowers/third-party/ai-market-pulse-poc.md`。
+
+## V117 六项产品能力统一验收（2026-07-13）
+
+- 正式外部接入统计仍为 4 个：Kronos、a-stock-data、AlphaSift、Financial Services；`ai-market-pulse` 仍是隔离 POC，OpenStock 仍未安装。
+- 面向用户验收的“六项功能”是产品能力口径：上述 4 项正式接入，加上 DSA 原生市场工作台和 DSA 原生市场脉搏/自选简报。
+- DSA 原生两项只参考 OpenStock 与 ai-market-pulse 的通用体验，不复制上游站点、账号、数据库、交易语言或运行时。
+- 六项能力统一读取 DSA 数据契约，模型与筛选结果不能覆盖事实数据；来源冲突继续按新鲜度和市场优先级处理。
+- V117 验收包含 Ollama、RTX 5090 Kronos、A 股/港股/美股公开数据、AlphaSift、四类研究工作流及桌面/移动页面。
+- 这些验收不构成市场数据商业授权、生产部署批准或投资建议。
