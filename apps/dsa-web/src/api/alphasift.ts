@@ -233,6 +233,7 @@ export type AlphaSiftScreenResponse = {
   portfolioDiversityEnabled?: boolean | null;
   portfolioConcentrationNotes?: string[];
   snapshotCacheUsed?: boolean;
+  snapshotCacheFreshness?: 'cached' | 'stale' | 'unavailable';
   snapshotCachedAt?: string | null;
   snapshotAgeSeconds?: number | null;
   snapshotCacheTtlSeconds?: number | null;

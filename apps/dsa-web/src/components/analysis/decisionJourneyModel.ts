@@ -190,6 +190,41 @@ const localizeFreshness = (freshness: string, language: DecisionJourneyLanguage)
   return freshness || '未知';
 };
 
+const localizeSource = (source: unknown, language: DecisionJourneyLanguage): string => {
+  const value = String(source || '-');
+  const labels: Record<string, { zh: string; en: string }> = {
+    free_web_chart: { zh: '免费网络行情', en: 'Free web quote' },
+    free_history: { zh: '免费历史行情', en: 'Free price history' },
+    free_profile: { zh: '免费公司资料', en: 'Free company profile' },
+    a_share_realtime: { zh: 'A股实时行情', en: 'A-share realtime quote' },
+    a_share_history: { zh: 'A股历史行情', en: 'A-share price history' },
+    us_realtime: { zh: '美股实时行情', en: 'US realtime quote' },
+    us_history: { zh: '美股历史行情', en: 'US price history' },
+    yahoo_chart: { zh: 'Yahoo 行情', en: 'Yahoo quote' },
+    yfinance_profile: { zh: 'Yahoo 公司资料', en: 'Yahoo company profile' },
+    TencentFetcher: { zh: '腾讯行情历史', en: 'Tencent price history' },
+    cn_free_lane: { zh: 'A股免费数据通道', en: 'A-share free data lane' },
+    us_free_lane: { zh: '美股免费数据通道', en: 'US free data lane' },
+    hk_free_lane: { zh: '港股免费数据通道', en: 'HK free data lane' },
+    crypto_free_lane: { zh: '加密货币免费数据通道', en: 'Crypto free data lane' },
+  };
+  return labels[value]?.[language] || value;
+};
+
+const formatTimestamp = (value: unknown, language: DecisionJourneyLanguage): string => {
+  const text = String(value || '');
+  if (!text) return '-';
+  const timestamp = new Date(text);
+  if (Number.isNaN(timestamp.getTime())) return text;
+  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(timestamp);
+};
+
 export const buildDecisionJourneyModel = ({
   snapshot,
   language,
@@ -235,10 +270,10 @@ export const buildDecisionJourneyModel = ({
   const newsItems = snapshot.intelligence?.newsCenter?.items ?? [];
   const comparisonTargets = snapshot.intelligence?.comparisonTargets ?? [];
   const profile = snapshot.profile;
-  const quoteSource = snapshot.quote.source || snapshot.route?.quoteSources?.[0] || '-';
-  const historySource = snapshot.trend?.source || snapshot.route?.historySources?.[0] || '-';
-  const profileSource = profile?.source || snapshot.route?.profileSources?.[0] || '-';
-  const routeLane = snapshot.route?.dataSourceLane || snapshot.route?.channel || snapshot.diagnostics?.routeLane || '-';
+  const quoteSource = localizeSource(snapshot.quote.source || snapshot.route?.quoteSources?.[0], language);
+  const historySource = localizeSource(snapshot.trend?.source || snapshot.route?.historySources?.[0], language);
+  const profileSource = localizeSource(profile?.source || snapshot.route?.profileSources?.[0], language);
+  const routeLane = localizeSource(snapshot.route?.dataSourceLane || snapshot.route?.channel || snapshot.diagnostics?.routeLane, language);
   const marketFocus = marketFocusFor(market, language);
   const evidence = isEnglish
     ? `Last ${formatNumber(currentPrice)}, MA20 ${formatNumber(ma20)}, RSI14 ${formatNumber(rsi14)}.`
@@ -278,7 +313,7 @@ export const buildDecisionJourneyModel = ({
       items: [
         { label: marketFocus.items[0], value: eventHeadline, detail: eventDetail },
         { label: isEnglish ? 'Peer references' : '同业参照', value: peerSymbols.join(' / ') || marketFocus.benchmark, detail: isEnglish ? 'Compare the move with market and sector references.' : '与大盘、行业和同业参照比较本次波动。' },
-        { label: isEnglish ? 'Event freshness' : '事件新鲜度', value: newsItems[0]?.updatedAt || '-', detail: snapshot.intelligence?.newsCenter?.source || (isEnglish ? 'Free local rules' : '免费本地规则') },
+        { label: isEnglish ? 'Event freshness' : '事件新鲜度', value: formatTimestamp(newsItems[0]?.updatedAt, language), detail: localizeSource(snapshot.intelligence?.newsCenter?.source || (isEnglish ? 'Free local rules' : '免费本地规则'), language) },
       ],
     },
     {
@@ -296,7 +331,7 @@ export const buildDecisionJourneyModel = ({
       label: isEnglish ? 'Sources' : '来源可信度',
       summary: isEnglish ? 'Source, freshness, route, and timing are visible before interpretation.' : '解读前先核对来源、新鲜度、路由和耗时。',
       items: [
-        { label: isEnglish ? 'Quote source' : '行情来源', value: quoteSource, detail: `${localizeFreshness(snapshot.quote.freshness, language)} / ${snapshot.quote.updateTime || '-'}` },
+        { label: isEnglish ? 'Quote source' : '行情来源', value: quoteSource, detail: `${localizeFreshness(snapshot.quote.freshness, language)} / ${formatTimestamp(snapshot.quote.updateTime, language)}` },
         { label: isEnglish ? 'History / profile' : '历史 / 资料来源', value: `${historySource} / ${profileSource}`, detail: routeLane },
         { label: isEnglish ? 'Response time' : '响应耗时', value: `${snapshot.diagnostics?.elapsedMs ?? 0} ms`, detail: isEnglish ? 'Free web/local route, no AI quota used.' : '免费网络/本地通道，未使用 AI 额度。' },
       ],
@@ -339,7 +374,7 @@ export const buildDecisionJourneyModel = ({
       historySource,
       profileSource,
       freshness: localizeFreshness(snapshot.quote.freshness, language),
-      updatedAt: snapshot.quote.updateTime || '-',
+      updatedAt: formatTimestamp(snapshot.quote.updateTime, language),
       routeLane,
       elapsed: `${snapshot.diagnostics?.elapsedMs ?? 0} ms`,
     },

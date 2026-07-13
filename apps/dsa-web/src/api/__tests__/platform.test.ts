@@ -325,6 +325,24 @@ describe('platformApi', () => {
     expect(result.aiUsed).toBe(false);
   });
 
+  it('loads and marks private price-alert events as camelCase', async () => {
+    get.mockResolvedValueOnce({ data: {
+      user_id: 15, total: 1, unread: 1, ai_used: false,
+      items: [{ id: 81, stock_code: 'AAPL', rule_type: 'price_above', direction: 'above', value: 201.25, threshold: 200, source: 'us_quote', observed_at: '2026-07-13T01:30:00', read_at: null, ai_used: false }],
+    } });
+    post.mockResolvedValue({ data: { user_id: 15, total: 1, unread: 0, items: [], ai_used: false } });
+
+    const feed = await platformApi.alertEvents(true, 20);
+    await platformApi.markAlertEventRead(81);
+    await platformApi.markAllAlertEventsRead();
+
+    expect(get).toHaveBeenCalledWith('/api/v1/platform/watchlist/alert-events', { params: { unread_only: true, limit: 20 } });
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/platform/watchlist/alert-events/81/read');
+    expect(post).toHaveBeenNthCalledWith(2, '/api/v1/platform/watchlist/alert-events/read-all');
+    expect(feed.items[0].stockCode).toBe('AAPL');
+    expect(feed.items[0].observedAt).toBe('2026-07-13T01:30:00');
+  });
+
   it('runs and manages the private V100 watchlist alert loop', async () => {
     post
       .mockResolvedValueOnce({ data: { user_id: 15, run_id: 9, visible_limit: 10, total_watchlist: 0, processed: 0, hidden_count: 0, degraded: 0, summary: { event_count: 0, risk_count: 0, source_event_count: 0 }, items: [], events: [], triggered_alerts: [], generated_at: '2026-07-11T09:30:00Z', ai_used: false, analysis_boundary: 'information_only_not_investment_advice' } })

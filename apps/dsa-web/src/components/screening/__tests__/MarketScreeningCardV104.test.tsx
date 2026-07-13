@@ -16,7 +16,7 @@ const candidate: AlphaSiftCandidate = {
   screeningBrief: {
     matchedConditionCodes: ['screen_score', 'factor:quality'],
     observedMetrics: [
-      { code: 'screen_score', value: 88, source: 'alphasift' },
+      { code: 'screen_score', value: 88, source: 'market_snapshot' },
       { code: 'factor:quality', value: 92, source: 'alphasift' },
     ],
     informationFlags: ['valuation_data_high'],
@@ -54,6 +54,8 @@ describe('MarketScreeningCardV104', () => {
     expect(card).toHaveTextContent('后续数据观察项');
     expect(card).toHaveTextContent('筛选条件不再满足的情形');
     expect(card).toHaveTextContent('未使用 AI');
+    expect(card).toHaveTextContent('市场快照');
+    expect(card).not.toHaveTextContent('market_snapshot');
     expect(card).not.toHaveTextContent(/建议买入|建议卖出|目标价|预期收益/);
   });
 

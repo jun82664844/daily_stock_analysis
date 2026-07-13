@@ -52,6 +52,25 @@ export type MarketWorkspaceOverview = {
   informationalOnly: boolean;
 };
 
+export type PublicMarketHomeSection = {
+  market: MarketCode;
+  sessionState: 'open' | 'closed' | 'unknown';
+  displayMode: 'latest_available' | 'delayed' | 'realtime';
+  rankingScope: 'configured_universe' | 'market_wide';
+  selectionBasis: string;
+  indices: MarketSecurityItem[];
+  attention: MarketSecurityItem[];
+  sources: DataSourceState[];
+  warnings: string[];
+};
+
+export type PublicMarketHomeResponse = {
+  asOf: string;
+  markets: PublicMarketHomeSection[];
+  aiUsed: boolean;
+  informationalOnly: boolean;
+};
+
 export type MarketSearchItem = {
   symbol: string;
   name: string;
@@ -107,6 +126,20 @@ export type MarketDailyBriefResponse = {
 };
 
 export const marketWorkspaceApi = {
+  async getHome(): Promise<PublicMarketHomeResponse> {
+    const response = await apiClient.get('/api/v1/market-workspace/home');
+    const body = toCamelCase<PublicMarketHomeResponse>(response.data);
+    return {
+      ...body,
+      markets: Array.isArray(body.markets) ? body.markets.map((market) => ({
+        ...market,
+        indices: Array.isArray(market.indices) ? market.indices : [],
+        attention: Array.isArray(market.attention) ? market.attention : [],
+        sources: Array.isArray(market.sources) ? market.sources : [],
+        warnings: Array.isArray(market.warnings) ? market.warnings : [],
+      })) : [],
+    };
+  },
   async getOverview(market: MarketCode): Promise<MarketWorkspaceOverview> {
     const response = await apiClient.get('/api/v1/market-workspace/overview', { params: { market } });
     const body = toCamelCase<MarketWorkspaceOverview>(response.data);

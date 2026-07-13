@@ -1,11 +1,14 @@
 import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArchiveRestore, BarChart3, Check, Download, Eye, Flag, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronDown, ChevronUp, Download, Eye, Flag, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { platformApi, type PlatformAccountSummary, type PlatformApiKeyItem, type PlatformAuthPayload, type PlatformModelOption, type PlatformQuota, type PlatformRetentionEventName, type PlatformRetentionEventSource, type PlatformWatchlistAlertRulesResponse, type PlatformWatchlistRadarAlertSuggestion, type PlatformWatchlistRadarHistoryResponse, type PlatformWatchlistRadarResponse, type PlatformWatchlistRefreshResponse, type PlatformWatchlistResponse, type PlatformWatchlistTriggeredAlert } from '../api/platform';
+import { marketWorkspaceApi, type PublicMarketHomeResponse } from '../api/marketWorkspace';
+import PublicMarketHomeV116 from '../components/market-home/PublicMarketHomeV116';
+import PriceAlertFormV116, { type PriceAlertDraft } from '../components/alerts/PriceAlertFormV116';
 import SimpleModelPickerV112, { type SimpleModelOption } from '../components/platform/SimpleModelPickerV112';
 import type { PlatformLocalModelStatus } from '../api/platform';
 import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type KronosForecastResponse } from '../api/stocks';
@@ -322,8 +325,10 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   'Upside-biased preview': '上行倾向预览',
   'Breakout confirmation': '突破确认',
   'Pullback risk': '回落风险',
+  'Range-watch preview': '区间观察预览',
   downside_risk: '下行风险',
   upside_bias: '上行倾向',
+  range_watch: '区间观察',
   model_ready: '模型已就绪',
   model_unavailable: '模型不可用',
   model_disabled: '模型未启用',
@@ -345,6 +350,7 @@ const SOURCE_ZH: Record<string, string> = {
   no_ai_quick_snapshot: '免费快照',
   no_ai_route_rules: '免费市场通道规则',
   a_stock_data_poc_adapter: 'A股增强适配器',
+  a_stock_data_skill_adapter: 'A股数据适配器',
   a_stock_data_poc_local_rules: 'A股本地增强规则',
   a_stock_data_cninfo_or_f10: '公告/F10来源',
   a_stock_data_eastmoney_fund_flow: '东财资金流',
@@ -373,6 +379,7 @@ const SOURCE_ZH: Record<string, string> = {
   unit_history: '历史行情',
   yfinance_profile: '公司资料',
   unit_profile: '公司资料',
+  TencentFetcher: '腾讯行情历史',
 };
 
 const GENERATED_TERM_ZH: Record<string, string> = {
@@ -414,6 +421,20 @@ const localizeGeneratedHorizon = (value: unknown, language: string): string => {
   if (language === 'en') return text || '-';
   const match = text.match(/^next_(\d+)_bars$/);
   return match ? `未来 ${match[1]} 根K线` : text || '-';
+};
+
+const formatGeneratedTimestamp = (value: unknown, language: string): string => {
+  const text = String(value ?? '');
+  if (!text) return '';
+  const timestamp = new Date(text);
+  if (Number.isNaN(timestamp.getTime())) return text;
+  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(timestamp);
 };
 
 // Exported for deterministic localization coverage alongside the page-level browser test.
@@ -1217,6 +1238,46 @@ type StockAnalysisNavigationState = {
   selectionSource?: string;
 };
 
+const V116_PENDING_ALERT_KEY = 'dsa_v116_pending_price_alert';
+const V116_PENDING_ALERT_TTL_MS = 30 * 60 * 1000;
+
+const validPriceAlertDraft = (value: unknown): value is PriceAlertDraft => {
+  if (!value || typeof value !== 'object') return false;
+  const draft = value as Partial<PriceAlertDraft>;
+  return typeof draft.stockCode === 'string'
+    && /^[A-Za-z0-9.-]{1,32}$/.test(draft.stockCode)
+    && typeof draft.stockName === 'string'
+    && draft.stockName.length <= 160
+    && (draft.ruleType === 'price_above' || draft.ruleType === 'price_below')
+    && typeof draft.threshold === 'number'
+    && Number.isFinite(draft.threshold)
+    && draft.threshold > 0
+    && draft.threshold <= 1_000_000_000;
+};
+
+const readPendingPriceAlert = (): PriceAlertDraft | null => {
+  try {
+    const raw = window.sessionStorage.getItem(V116_PENDING_ALERT_KEY);
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as { expiresAt?: number; draft?: unknown };
+    if (!stored.expiresAt || stored.expiresAt <= Date.now() || !validPriceAlertDraft(stored.draft)) {
+      window.sessionStorage.removeItem(V116_PENDING_ALERT_KEY);
+      return null;
+    }
+    return stored.draft;
+  } catch {
+    window.sessionStorage.removeItem(V116_PENDING_ALERT_KEY);
+    return null;
+  }
+};
+
+const storePendingPriceAlert = (draft: PriceAlertDraft) => {
+  window.sessionStorage.setItem(V116_PENDING_ALERT_KEY, JSON.stringify({
+    expiresAt: Date.now() + V116_PENDING_ALERT_TTL_MS,
+    draft,
+  }));
+};
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1228,6 +1289,12 @@ const HomePage: React.FC = () => {
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [basicSnapshot, setBasicSnapshot] = useState<BasicStockSnapshot | null>(null);
+  const [publicMarketHome, setPublicMarketHome] = useState<PublicMarketHomeResponse | null>(null);
+  const [publicMarketHomeLoading, setPublicMarketHomeLoading] = useState(true);
+  const [publicMarketHomeExpanded, setPublicMarketHomeExpanded] = useState(false);
+  const [platformAuthPanelExpanded, setPlatformAuthPanelExpanded] = useState(false);
+  const [pendingPriceAlert, setPendingPriceAlert] = useState<PriceAlertDraft | null>(() => readPendingPriceAlert());
+  const [priceAlertNotice, setPriceAlertNotice] = useState('');
   const [basicSnapshotViewMode, setBasicSnapshotViewMode] = useState<BasicSnapshotViewMode>('query');
   const [basicQueryChange, setBasicQueryChange] = useState<QueryChangeSummary | null>(null);
   const [aShareSourceMode, setAShareSourceMode] = useState<AShareSourceMode>('a_stock_data');
@@ -1408,6 +1475,15 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     void stocksApi.prewarm(['600519', 'AAPL', 'HK00700', 'BTC-USD']).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    marketWorkspaceApi.getHome()
+      .then((payload) => { if (active) setPublicMarketHome(payload); })
+      .catch(() => { if (active) setPublicMarketHome(null); })
+      .finally(() => { if (active) setPublicMarketHomeLoading(false); });
+    return () => { active = false; };
   }, []);
 
   const loadPlatformWatchlist = useCallback(async (generation: number, expectedUserId: number) => {
@@ -1661,6 +1737,7 @@ const HomePage: React.FC = () => {
   }, [authEmail, uiLanguage]);
 
   const handlePlatformAuthModeChange = useCallback((mode: 'login' | 'register') => {
+    setPlatformAuthPanelExpanded(true);
     setAuthMode(mode);
     setAuthError('');
     setAuthPassword('');
@@ -1671,6 +1748,41 @@ const HomePage: React.FC = () => {
       platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
     }, 0);
   }, []);
+
+  const handlePublicPriceAlert = useCallback(async (draft: PriceAlertDraft) => {
+    setPriceAlertNotice('');
+    if (!platformSession) {
+      try { storePendingPriceAlert(draft); } catch { /* Restricted storage must not block registration. */ }
+      setPendingPriceAlert(draft);
+      setPlatformAuthPanelExpanded(true);
+      setAuthMode('register');
+      setPriceAlertNotice(uiLanguage === 'en'
+        ? 'Register to keep this private price alert. Confirm it after sign-in.'
+        : '注册后可保存这条私有到价提醒；登录后仍需再次确认。');
+      window.setTimeout(() => {
+        platformAuthPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+        platformAuthPanelRef.current?.querySelector<HTMLInputElement>('[data-testid="platform-auth-email"]')?.focus();
+      }, 0);
+      return;
+    }
+    try {
+      const rules = await platformApi.saveWatchlistAlertRule({
+        stockCode: draft.stockCode,
+        ruleType: draft.ruleType,
+        threshold: draft.threshold,
+        enabled: true,
+      });
+      setPlatformAlertRules(rules);
+      setPendingPriceAlert(null);
+      try { window.sessionStorage.removeItem(V116_PENDING_ALERT_KEY); } catch { /* no-op */ }
+      setPriceAlertNotice(uiLanguage === 'en' ? 'Private price alert saved.' : '私有到价提醒已保存。');
+    } catch (error) {
+      const parsed = getParsedApiError(error);
+      setPriceAlertNotice(parsed.status === 429
+        ? (uiLanguage === 'en' ? 'Too many requests. Retry shortly.' : '操作过于频繁，请稍后重试。')
+        : (uiLanguage === 'en' ? 'Price alert could not be saved.' : '到价提醒保存失败，请稍后重试。'));
+    }
+  }, [platformSession, uiLanguage]);
 
   const handlePlatformLogout = useCallback(async () => {
     platformSessionGenerationRef.current += 1;
@@ -1713,6 +1825,7 @@ const HomePage: React.FC = () => {
       return;
     }
     if (!platformSession) {
+      setPlatformAuthPanelExpanded(true);
       setAuthMode('register');
       setPlatformWatchlistError('');
       setBasicRetentionStatus('');
@@ -1747,6 +1860,7 @@ const HomePage: React.FC = () => {
       return;
     }
     if (!platformSession) {
+      setPlatformAuthPanelExpanded(true);
       setAuthMode('register');
       setBasicRetentionStatus('');
       setBasicRetentionError(uiLanguage === 'en' ? 'Register or login to save this no-AI snapshot.' : '注册或登录后可保存这份未用 AI 快照。');
@@ -2094,7 +2208,7 @@ const HomePage: React.FC = () => {
       { label: isEnglish ? 'Change' : '涨跌额', value: formatBasicNumber(basicSnapshot.quote.change) },
       { label: isEnglish ? 'Volume' : '成交量', value: formatBasicCompactNumber(basicSnapshot.quote.volume) },
       { label: isEnglish ? 'Turnover' : '成交额', value: formatBasicCompactNumber(basicSnapshot.quote.amount) },
-      { label: isEnglish ? 'Updated' : '更新时间', value: basicSnapshot.quote.updateTime || '-' },
+      { label: isEnglish ? 'Updated' : '更新时间', value: formatGeneratedTimestamp(basicSnapshot.quote.updateTime, uiLanguage) || '-' },
     ];
   }, [basicSnapshot, uiLanguage]);
   const basicTechnicalDetailItems = useMemo(() => {
@@ -4407,6 +4521,7 @@ const HomePage: React.FC = () => {
     syncTaskFailed,
     refreshActiveTasks,
     removeTask,
+    streamEnabled: Boolean(platformSession),
   });
 
   const watchlistState = useWatchlist();
@@ -4432,6 +4547,7 @@ const HomePage: React.FC = () => {
     }
 
     setBasicSnapshotViewMode(viewMode);
+    setPlatformAuthPanelExpanded(false);
     setAutocompleteCloseSignal((current) => current + 1);
     setIsQueryingBasic(true);
     setBasicQueryError(null);
@@ -4942,6 +5058,7 @@ const HomePage: React.FC = () => {
         const loginNotice = uiLanguage === 'en'
           ? 'Deep analysis requires login and a selected Platform API, user API, or local model. Free query and quick analysis remain available without AI.'
           : '深度分析需要先登录，并选择平台 API、我的 API 或本地模型。免费查询和快速分析可继续使用，不消耗 AI。';
+        setPlatformAuthPanelExpanded(true);
         setAuthMode('login');
         setAuthError('');
         setDeepAnalysisNotice(loginNotice);
@@ -5011,6 +5128,7 @@ const HomePage: React.FC = () => {
       return;
     }
     if (!platformSession) {
+      setPlatformAuthPanelExpanded(true);
       setAuthMode('register');
       setAuthError('');
       setBasicRetentionError('');
@@ -5497,13 +5615,19 @@ const HomePage: React.FC = () => {
     ],
   );
 
+  const publicMarketHomeOpen = !basicSnapshot || publicMarketHomeExpanded || Boolean(pendingPriceAlert);
+  const platformAuthFormOpen = !basicSnapshot || platformAuthPanelExpanded || Boolean(authError);
+
   return (
     <div
       data-testid="home-dashboard"
       className="flex h-[calc(100vh-5rem)] w-full flex-col overflow-hidden md:flex-row sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
     >
       <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full lg:max-w-6xl mx-auto w-full">
-        <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
+        <header
+          data-testid="home-query-toolbar"
+          className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4"
+        >
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <button
@@ -5651,9 +5775,72 @@ const HomePage: React.FC = () => {
           </div>
         </header>
 
+        {publicMarketHome || publicMarketHomeLoading || pendingPriceAlert ? (
+          <div className={`${publicMarketHomeOpen ? 'max-h-[40vh] overflow-y-auto' : ''} shrink-0 border-b border-border/60`}>
+            {basicSnapshot ? (
+              <div
+                data-testid={publicMarketHomeOpen ? 'public-market-home-expanded' : 'public-market-home-collapsed'}
+                className="flex min-w-0 items-center justify-between gap-3 px-4 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-foreground">
+                    {uiLanguage === 'en' ? 'Three-market overview' : '三地市场速览'}
+                  </div>
+                  <p className="truncate text-xs text-secondary-text">
+                    {uiLanguage === 'en' ? 'Collapsed so the current symbol stays first.' : '已折叠，优先查看当前个股结果。'}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="public-market-home-toggle"
+                  onClick={() => setPublicMarketHomeExpanded((expanded) => !expanded)}
+                  className="shrink-0"
+                >
+                  {publicMarketHomeOpen ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                  {publicMarketHomeOpen
+                    ? (uiLanguage === 'en' ? 'Collapse' : '收起')
+                    : (uiLanguage === 'en' ? 'Expand' : '展开')}
+                </Button>
+              </div>
+            ) : null}
+            {publicMarketHomeOpen ? (
+              <PublicMarketHomeV116
+                language={uiLanguage}
+                data={publicMarketHome}
+                loading={publicMarketHomeLoading}
+                onOpenSymbol={(symbol) => navigate(`/market?symbol=${encodeURIComponent(symbol)}`)}
+                onCreateAlert={handlePublicPriceAlert}
+              />
+            ) : null}
+            {priceAlertNotice ? <p className="mx-4 mb-3 text-sm text-primary" role="status">{priceAlertNotice}</p> : null}
+            {platformSession && pendingPriceAlert ? (
+              <section className="mx-4 mb-4 rounded-lg border border-primary/40 bg-primary/5 p-4" data-testid="pending-price-alert-confirmation">
+                <h2 className="font-semibold text-foreground">{uiLanguage === 'en' ? 'Confirm saved price-alert draft' : '确认保留的到价提醒草稿'}</h2>
+                <p className="mt-1 text-xs text-secondary-text">{uiLanguage === 'en' ? 'Registration restored your draft; saving still requires this final confirmation.' : '注册已恢复草稿，仍需您在此最终确认后才会保存。'}</p>
+                <div className="mt-3">
+                  <PriceAlertFormV116
+                    language={uiLanguage}
+                    stockCode={pendingPriceAlert.stockCode}
+                    stockName={pendingPriceAlert.stockName}
+                    currentPrice={pendingPriceAlert.threshold}
+                    currency={pendingPriceAlert.currency}
+                    initialRuleType={pendingPriceAlert.ruleType}
+                    onSave={handlePublicPriceAlert}
+                  />
+                </div>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+
         {platformEnabled && !basicQueryError && !marketReviewReport && (!platformSession || !basicSnapshot) ? (
-          <div ref={platformAuthPanelRef} className="px-3 pb-2 md:px-4">
-            <div className={`flex flex-col gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-xs text-secondary-text ${platformSession ? 'md:items-stretch' : 'md:flex-row md:items-center md:justify-between'}`}>
+          <div ref={platformAuthPanelRef} data-testid="platform-auth-panel" className="px-3 pb-2 md:px-4">
+            <div
+              data-testid={platformSession || platformAuthFormOpen ? 'platform-auth-panel-expanded' : 'platform-auth-panel-collapsed'}
+              className={`flex flex-col gap-2 rounded-lg border border-subtle bg-surface/70 px-3 py-2 text-xs text-secondary-text ${platformSession ? 'md:items-stretch' : 'md:flex-row md:items-center md:justify-between'}`}
+            >
               {platformSession ? (
                 <>
                   <div data-testid="platform-signed-in-panel" className="flex min-w-0 w-full flex-col gap-2">
@@ -5827,9 +6014,31 @@ const HomePage: React.FC = () => {
                     >
                       {uiLanguage === 'en' ? 'Register' : '注册'}
                     </button>
+                    {basicSnapshot ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-testid="platform-auth-panel-toggle"
+                        onClick={() => setPlatformAuthPanelExpanded((expanded) => !expanded)}
+                        className="ml-auto"
+                      >
+                        {platformAuthFormOpen ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
+                        {platformAuthFormOpen
+                          ? (uiLanguage === 'en' ? 'Collapse' : '收起')
+                          : (uiLanguage === 'en' ? 'Expand' : '展开')}
+                      </Button>
+                    ) : null}
                     {authError ? <span className="text-danger" data-testid="platform-auth-error">{authError}</span> : null}
                   </div>
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {platformAuthFormOpen ? (
+                    <>
+                      <p className="max-w-2xl text-xs leading-5 text-secondary-text" data-testid="platform-registration-benefit-v116">
+                        {uiLanguage === 'en'
+                          ? 'Register to receive 5 quick analyses and 1 deep analysis each week, plus 1 extra deep analysis in the first month.'
+                          : '注册后每周赠送 5 次快速分析及 1 次深度分析，首月额外赠送 1 次深度分析。'}
+                      </p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <input
                       type="email"
                       name="dsa-platform-email"
@@ -5914,12 +6123,20 @@ const HomePage: React.FC = () => {
                         ? (uiLanguage === 'en' ? 'Register' : '注册')
                         : (uiLanguage === 'en' ? 'Login' : '登录')}
                     </Button>
-                    {authMode === 'register' && authVerificationStatus ? (
-                      <span className="text-success" data-testid="platform-auth-verification-status">
-                        {authVerificationStatus}
-                      </span>
-                    ) : null}
-                  </div>
+                        {authMode === 'register' && authVerificationStatus ? (
+                          <span className="text-success" data-testid="platform-auth-verification-status">
+                            {authVerificationStatus}
+                          </span>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="min-w-0 flex-1 text-xs leading-5 text-secondary-text" data-testid="platform-auth-compact-copy">
+                      {uiLanguage === 'en'
+                        ? 'Sign in to save history, watchlists and alerts. Free query remains available.'
+                        : '登录后可保存历史、自选和提醒；当前免费查询不受影响。'}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -5992,10 +6209,14 @@ const HomePage: React.FC = () => {
                     </span>
                   </div>
                   <div className="mt-2 text-base font-semibold text-foreground">
-                    先免费查一只标的，再决定是否登录保存历史和自选。
+                    {uiLanguage === 'en'
+                      ? 'Check one stock for free before deciding whether to sign in and save history or watchlists.'
+                      : '先免费查一只标的，再决定是否登录保存历史和自选。'}
                   </div>
                   <p className="mt-1 max-w-3xl text-xs leading-5 text-secondary-text">
-                    输入代码即可查看行情、均线、量价、信号评分和观察点；登录只用于保存历史、自选股和额度管理，不阻断当前查询。
+                    {uiLanguage === 'en'
+                      ? 'Enter a symbol to view quotes, moving averages, volume-price context, signal scores and watch points. Sign-in is only for saving history, watchlists and quota state; it never blocks the current query.'
+                      : '输入代码即可查看行情、均线、量价、信号评分和观察点；登录只用于保存历史、自选股和额度管理，不阻断当前查询。'}
                   </p>
                 </div>
                 <div className="flex min-w-0 flex-wrap gap-2">
@@ -8286,7 +8507,7 @@ const HomePage: React.FC = () => {
                                 </span>
                                 {item.updatedAt ? (
                                   <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                    {item.updatedAt}
+                                    {formatGeneratedTimestamp(item.updatedAt, uiLanguage)}
                                   </span>
                                 ) : null}
                               </div>
@@ -8396,7 +8617,7 @@ const HomePage: React.FC = () => {
                             </span>
                             {aShareEnrichment?.updatedAt ? (
                               <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                {aShareEnrichment.updatedAt}
+                                {formatGeneratedTimestamp(aShareEnrichment.updatedAt, uiLanguage)}
                               </span>
                             ) : null}
                           </div>
@@ -8556,7 +8777,7 @@ const HomePage: React.FC = () => {
                                 </span>
                                 {item.updatedAt ? (
                                   <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                    {item.updatedAt}
+                                    {formatGeneratedTimestamp(item.updatedAt, uiLanguage)}
                                   </span>
                                 ) : null}
                               </div>
@@ -8947,7 +9168,7 @@ const HomePage: React.FC = () => {
                                 </span>
                                 {item.updatedAt ? (
                                   <span className="max-w-full truncate rounded-md border border-subtle/70 px-1.5 py-0.5">
-                                    {item.updatedAt}
+                                  {formatGeneratedTimestamp(item.updatedAt, uiLanguage)}
                                   </span>
                                 ) : null}
                               </div>

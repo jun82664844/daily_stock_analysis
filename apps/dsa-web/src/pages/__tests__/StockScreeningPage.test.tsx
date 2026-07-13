@@ -932,6 +932,40 @@ describe('StockScreeningPage', () => {
     expect(window.sessionStorage.getItem('dsa.alphasift.activeScreenTask.v1')).toBeNull();
   });
 
+  it('restores the latest completed screening result after returning to the page', async () => {
+    getAlphaSiftStatus.mockResolvedValue({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [{
+        rank: 1,
+        code: '000001',
+        name: '保留的筛选结果',
+        score: 88.5,
+        reason: 'completed result',
+        raw: {},
+      }],
+      candidateCount: 1,
+    });
+
+    const firstRender = render(<StockScreeningPage />);
+    expect(await screen.findByText('筛选已开启')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /运行筛选/ }));
+    expect(await screen.findByText('保留的筛选结果')).toBeInTheDocument();
+    expect(window.sessionStorage.getItem('dsa.alphasift.lastScreenResult.v1')).toContain('保留的筛选结果');
+
+    firstRender.unmount();
+    getScreenTask.mockClear();
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('保留的筛选结果')).toBeInTheDocument();
+    expect(screen.getByText('筛选完成')).toBeInTheDocument();
+    expect(getScreenTask).not.toHaveBeenCalled();
+  });
+
   it('keeps a restored screening task recoverable when status polling times out', async () => {
     getAlphaSiftStatus.mockResolvedValue({
       enabled: true,

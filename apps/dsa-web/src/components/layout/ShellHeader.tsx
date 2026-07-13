@@ -5,6 +5,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
 import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import PriceAlertInboxV116 from '../alerts/PriceAlertInboxV116';
 
 type ShellHeaderProps = {
   collapsed: boolean;
@@ -33,7 +34,7 @@ export const ShellHeader: React.FC<ShellHeaderProps> = ({
   onOpenMobileNav,
 }) => {
   const location = useLocation();
-  const { t } = useUiLanguage();
+  const { t, language } = useUiLanguage();
   const current = TITLES[location.pathname];
 
   return (
@@ -62,6 +63,7 @@ export const ShellHeader: React.FC<ShellHeaderProps> = ({
           <p className="truncate text-xs text-secondary-text">{current ? t(current.description) : t('layout.appFallbackDescription')}</p>
         </div>
 
+        <PriceAlertInboxV116 language={language} />
         <UiLanguageToggle />
         <ThemeToggle />
       </div>

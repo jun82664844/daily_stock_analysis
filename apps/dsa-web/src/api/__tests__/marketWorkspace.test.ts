@@ -35,6 +35,17 @@ describe('marketWorkspaceApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/market-workspace/overview', { params: { market: 'us' } });
   });
 
+  it('loads the public three-market home contract as camelCase', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {
+      as_of: '2026-07-13T01:30:00Z', ai_used: false, informational_only: true,
+      markets: [{ market: 'us', session_state: 'open', display_mode: 'latest_available', ranking_scope: 'configured_universe', selection_basis: 'turnover_then_absolute_change', indices: [], attention: [], sources: [], warnings: [] }],
+    } });
+    const body = await marketWorkspaceApi.getHome();
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/market-workspace/home');
+    expect(body.asOf).toBe('2026-07-13T01:30:00Z');
+    expect(body.markets[0].displayMode).toBe('latest_available');
+  });
+
   it('defaults overview collection fields when an older cached response omits them', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: {

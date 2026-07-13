@@ -1,5 +1,6 @@
 import { Clock3, Database, Radio } from 'lucide-react';
 import type { MarketWorkspaceOverview } from '../../api/marketWorkspace';
+import { formatSourceLabel } from './marketWorkspaceFormat';
 
 type Props = { language: 'zh' | 'en'; overview: MarketWorkspaceOverview };
 
@@ -18,7 +19,7 @@ export default function MarketPulseV113({ language, overview }: Props) {
       <div><span className="flex items-center gap-2 text-sm text-secondary-text"><Radio className="h-4 w-4" />{en ? 'Market status' : '市场状态'}</span><strong className="mt-2 block text-lg text-foreground">{statusText(overview.sessionState, en)}</strong></div>
       <div><span className="flex items-center gap-2 text-sm text-secondary-text"><Clock3 className="h-4 w-4" />{en ? 'Data time' : '数据时间'}</span><strong className="mt-2 block text-sm text-foreground">{new Date(overview.asOf).toLocaleString(en ? 'en-US' : 'zh-CN')}</strong></div>
       <div><span className="text-sm text-secondary-text">{en ? 'Market breadth' : '涨跌分布'}</span><strong className="mt-2 block text-lg text-foreground"><span className="text-emerald-400">{overview.breadth.advancers}</span> / <span className="text-rose-400">{overview.breadth.decliners}</span> / {overview.breadth.unchanged}</strong></div>
-      <div><span className="flex items-center gap-2 text-sm text-secondary-text"><Database className="h-4 w-4" />{en ? 'Data sources' : '数据来源'}</span><div className="mt-2 flex flex-wrap gap-2">{overview.sources.map((source) => <span key={source.source} className="rounded-full border border-border px-2 py-1 text-xs text-secondary-text">{source.source} · {statusText(source.status, en)}</span>)}</div></div>
+      <div><span className="flex items-center gap-2 text-sm text-secondary-text"><Database className="h-4 w-4" />{en ? 'Data sources' : '数据来源'}</span><div className="mt-2 flex flex-wrap gap-2">{overview.sources.map((source) => <span key={source.source} className="rounded-full border border-border px-2 py-1 text-xs text-secondary-text">{formatSourceLabel(source.source, language)} · {statusText(source.status, en)}</span>)}</div></div>
     </section>
   );
 }

@@ -236,4 +236,25 @@ describe('useDashboardLifecycle', () => {
 
     expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
   });
+
+  it('keeps guest polling available without opening the authenticated SSE stream', () => {
+    const loadInitialHistory = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory,
+        refreshHistory: vi.fn().mockResolvedValue(undefined),
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+        streamEnabled: false,
+        ...defaultMocks,
+      }),
+    );
+
+    expect(loadInitialHistory).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(useTaskStream)).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }));
+  });
 });

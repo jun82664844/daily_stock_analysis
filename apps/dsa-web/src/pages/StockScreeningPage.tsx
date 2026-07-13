@@ -57,7 +57,9 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 
 const marketLabel = (language: 'zh' | 'en') => (language === 'en' ? 'A-share' : 'A 股');
 const SCREEN_TASK_STORAGE_KEY = 'dsa.alphasift.activeScreenTask.v1';
+const SCREEN_RESULT_STORAGE_KEY = 'dsa.alphasift.lastScreenResult.v1';
 const SCREEN_TASK_POLL_INTERVAL_MS = 2000;
+const SCREEN_RESULT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 type PersistedScreenTask = {
   taskId: string;
@@ -107,6 +109,58 @@ const clearPersistedScreenTask = () => {
   }
 };
 
+const readPersistedScreenResult = (): PersistedScreenResult | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(SCREEN_RESULT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<PersistedScreenResult>;
+    if (
+      typeof parsed.savedAt !== 'number'
+      || Date.now() - parsed.savedAt > SCREEN_RESULT_MAX_AGE_MS
+      || !parsed.result
+      || !Array.isArray(parsed.result.candidates)
+    ) {
+      window.sessionStorage.removeItem(SCREEN_RESULT_STORAGE_KEY);
+      return null;
+    }
+    return {
+      savedAt: parsed.savedAt,
+      market: typeof parsed.market === 'string' && parsed.market.trim() ? parsed.market : 'cn',
+      strategy: typeof parsed.strategy === 'string' && parsed.strategy.trim() ? parsed.strategy : 'dual_low',
+      maxResults: Number.isFinite(Number(parsed.maxResults))
+        ? Math.min(100, Math.max(1, Number(parsed.maxResults)))
+        : 3,
+      result: parsed.result,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const persistScreenResult = (payload: Omit<PersistedScreenResult, 'savedAt'>) => {
+  try {
+    window.sessionStorage.setItem(SCREEN_RESULT_STORAGE_KEY, JSON.stringify({
+      ...payload,
+      savedAt: Date.now(),
+    }));
+  } catch {
+    // Completed-result restoration is best-effort.
+  }
+};
+
+const clearPersistedScreenResult = () => {
+  try {
+    window.sessionStorage.removeItem(SCREEN_RESULT_STORAGE_KEY);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+};
+
 const isUnrecoverableScreenTaskError = (error: ParsedApiError) =>
   error.title === '筛选任务不可恢复';
 
@@ -115,6 +169,14 @@ const formatNumber = (value: unknown, digits = 2) => {
     return '-';
   }
   return Number(value).toFixed(digits);
+};
+
+type PersistedScreenResult = {
+  savedAt: number;
+  market: string;
+  strategy: string;
+  maxResults: number;
+  result: AlphaSiftScreenResponse;
 };
 
 const formatPercent = (value: unknown) => {
@@ -179,12 +241,17 @@ const parseSourceDiagnostic = (value: string) => {
   };
 };
 
-const normalizeScreenMessageKey = (value: string) => {
-  const formatted = formatScreenMessage(value);
+const normalizeScreenMessageKey = (value: string, language: 'zh' | 'en') => {
+  const formatted = formatScreenMessage(value, language);
   return formatted ? formatted.trim().toLowerCase() : value.trim().toLowerCase();
 };
 
-const formatScreenMessage = (value: string) => {
+const formatScreenMessage = (value: string, language: 'zh' | 'en') => {
+  if (value === 'snapshot_cache_stale') {
+    return language === 'en'
+      ? 'Using the last successful market snapshot for a faster result. Data is outside the normal cache window; force refresh when current-market data is required.'
+      : '为加快筛选，当前使用上次成功的全市场快照。数据已超出常规缓存时效，需要当日数据时可勾选强制刷新。';
+  }
   if (/^DSA provider context applied \d+ of \d+ candidates/i.test(value)) {
     return '';
   }
@@ -208,7 +275,7 @@ const formatScreenMessage = (value: string) => {
   return truncateMessageDetail(value);
 };
 
-const getScreenMessages = (meta: AlphaSiftScreenResponse | null) => {
+const getScreenMessages = (meta: AlphaSiftScreenResponse | null, language: 'zh' | 'en') => {
   if (!meta) {
     return [];
   }
@@ -216,11 +283,11 @@ const getScreenMessages = (meta: AlphaSiftScreenResponse | null) => {
   const seen = new Set<string>();
   [...toMessageList(meta.warnings), ...toMessageList(meta.sourceErrors), ...toMessageList(meta.llmParseErrors)].forEach(
     (value) => {
-      const key = normalizeScreenMessageKey(value);
+      const key = normalizeScreenMessageKey(value, language);
       if (seen.has(key)) {
         return;
       }
-      const message = formatScreenMessage(value);
+      const message = formatScreenMessage(value, language);
       if (!message) {
         return;
       }
@@ -404,13 +471,16 @@ const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useUiLanguage();
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
+  const [restoredResult] = useState<PersistedScreenResult | null>(() => (
+    restoredTask ? null : readPersistedScreenResult()
+  ));
   const [enabled, setEnabled] = useState(false);
   const [available, setAvailable] = useState(false);
-  const [market, setMarket] = useState(restoredTask?.market || 'cn');
-  const [strategy, setStrategy] = useState(restoredTask?.strategy || 'dual_low');
+  const [market, setMarket] = useState(restoredTask?.market || restoredResult?.market || 'cn');
+  const [strategy, setStrategy] = useState(restoredTask?.strategy || restoredResult?.strategy || 'dual_low');
   const [strategies, setStrategies] = useState<AlphaSiftStrategy[]>([]);
-  const [maxResults, setMaxResults] = useState(restoredTask?.maxResults || 3);
-  const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
+  const [maxResults, setMaxResults] = useState(restoredTask?.maxResults || restoredResult?.maxResults || 3);
+  const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>(restoredResult?.result.candidates || []);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
   const [hotspotsExpanded, setHotspotsExpanded] = useState(false);
@@ -423,7 +493,7 @@ const StockScreeningPage: React.FC = () => {
   const [hotspotDetailError, setHotspotDetailError] = useState('');
   const [loadingHotspots, setLoadingHotspots] = useState(false);
   const [hotspotError, setHotspotError] = useState('');
-  const [screenMeta, setScreenMeta] = useState<AlphaSiftScreenResponse | null>(null);
+  const [screenMeta, setScreenMeta] = useState<AlphaSiftScreenResponse | null>(restoredResult?.result || null);
   const [platformUserId, setPlatformUserId] = useState<number | null>(null);
   const [platformUserRole, setPlatformUserRole] = useState<string | null>(null);
   const [selectedCompareCodes, setSelectedCompareCodes] = useState<string[]>([]);
@@ -474,7 +544,7 @@ const StockScreeningPage: React.FC = () => {
   const selectedStrategyTitle = selectedStrategyView.name;
   const selectedStrategyTag = selectedStrategyView.category;
   const displayedStrategy = selectedStrategy ? selectedStrategyTitle : `${selectedStrategyTitle} (${strategy})`;
-  const screenMessages = useMemo(() => getScreenMessages(screenMeta), [screenMeta]);
+  const screenMessages = useMemo(() => getScreenMessages(screenMeta, language), [language, screenMeta]);
   const llmDegraded = screenMeta?.llmRanked === false && screenMessages.some((message) => /LLM|API Key|模型/i.test(message));
   const alertMessages = llmDegraded
     ? screenMessages.length > 0
@@ -516,9 +586,11 @@ const StockScreeningPage: React.FC = () => {
     setSelectedCompareCodes((current) => current.filter((code) => nextCandidates.some((item) => item.code === code)));
     setReminderCode(null);
     setReminderState('idle');
-  }, []);
+    persistScreenResult({ market, strategy, maxResults, result });
+  }, [market, maxResults, strategy]);
 
   const clearScreeningResults = () => {
+    clearPersistedScreenResult();
     setCandidates([]);
     setScreenMeta(null);
     setSelectedCompareCodes([]);
@@ -893,6 +965,7 @@ const StockScreeningPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    clearPersistedScreenResult();
     setLoading(true);
     setError('');
     setScreenMeta(null);

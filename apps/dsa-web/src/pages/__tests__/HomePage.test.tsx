@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
+import { marketWorkspaceApi } from '../../api/marketWorkspace';
 import { platformApi, type PlatformWatchlistRadarItem, type PlatformWatchlistRadarResponse } from '../../api/platform';
 import { stocksApi } from '../../api/stocks';
 import type { BasicStockSnapshot } from '../../api/stocks';
@@ -40,6 +41,10 @@ vi.mock('../../api/history', () => ({
     batchUpdateState: vi.fn(),
     deleteByCode: vi.fn(),
   },
+}));
+
+vi.mock('../../api/marketWorkspace', () => ({
+  marketWorkspaceApi: { getHome: vi.fn() },
 }));
 
 vi.mock('../../api/analysis', async () => {
@@ -339,12 +344,17 @@ describe('HomePage', () => {
     expect(
       localizeGeneratedText('Information and data only; not investment advice or a trading instruction.', 'zh'),
     ).toBe('仅提供资讯和数据，不构成投资建议或交易指令。');
+    expect(localizeGeneratedText('range_watch', 'zh')).toBe('区间观察');
+    expect(localizeGeneratedText('Range-watch preview', 'zh')).toBe('区间观察预览');
+    expect(localizeGeneratedText('TencentFetcher', 'zh')).toBe('腾讯行情历史');
+    expect(localizeGeneratedText('a_stock_data_skill_adapter', 'zh')).toBe('A股数据适配器');
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
     window.localStorage.clear();
+    window.sessionStorage.clear();
     useStockPoolStore.getState().resetDashboardState();
     vi.mocked(analysisApi.getTasks).mockResolvedValue({
       total: 0,
@@ -353,6 +363,7 @@ describe('HomePage', () => {
       tasks: [],
     });
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
+    vi.mocked(marketWorkspaceApi.getHome).mockRejectedValue(new Error('V116 disabled in legacy test'));
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: false });
     vi.mocked(platformApi.localModelStatus).mockResolvedValue({
       enabled: true,
@@ -571,6 +582,34 @@ describe('HomePage', () => {
     });
   });
 
+  it('shows V116 market data before query and preserves a guest price-alert draft for registration', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(platformApi.current).mockResolvedValue(null);
+    vi.mocked(marketWorkspaceApi.getHome).mockResolvedValue({
+      asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
+      markets: [
+        { market: 'cn', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [{ symbol: '600519.SH', name: '贵州茅台', market: 'cn', currentPrice: 1188.8, changePercent: -1.5, sourceState: { source: 'cn_quote', status: 'fresh' } }] },
+        { market: 'hk', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [] },
+        { market: 'us', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [] },
+      ],
+    });
+
+    render(<UiLanguageProvider><MemoryRouter><HomePage /></MemoryRouter></UiLanguageProvider>);
+    expect(await screen.findByRole('heading', { name: '三地市场速览' })).toBeInTheDocument();
+    const queryToolbar = screen.getByTestId('home-query-toolbar');
+    const marketHome = screen.getByTestId('public-market-home-v116');
+    expect(queryToolbar.compareDocumentPosition(marketHome) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '为 贵州茅台 设置到价提醒' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: '到价阈值' }), { target: { value: '1200' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存到价提醒' }));
+
+    expect(await screen.findByText('注册后可保存这条私有到价提醒；登录后仍需再次确认。')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-register-tab')).toHaveClass('bg-primary');
+    expect(screen.getByTestId('platform-registration-benefit-v116')).toHaveTextContent('注册后每周赠送 5 次快速分析及 1 次深度分析');
+    expect(window.sessionStorage.getItem('dsa_v116_pending_price_alert')).toContain('600519.SH');
+  });
+
   it('does not restore a stale private account load after logout', async () => {
     let resolveAccount: ((value: Awaited<ReturnType<typeof platformApi.account>>) => void) | undefined;
     const pendingAccount = new Promise<Awaited<ReturnType<typeof platformApi.account>>>((resolve) => {
@@ -742,6 +781,25 @@ describe('HomePage', () => {
     expect(screen.getByTestId('guest-example-00700.HK')).toBeInTheDocument();
     expect(screen.getByTestId('guest-example-BTC-USD')).toBeInTheDocument();
     expect(screen.getByTestId('history-center-filters')).toBeInTheDocument();
+  });
+
+  it('keeps the guest-first query entry fully English in English mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(historyApi.getList).mockResolvedValue({ total: 0, page: 1, limit: 20, items: [] });
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    const entry = await screen.findByTestId('guest-query-entry');
+    expect(entry).toHaveTextContent('Check one stock for free before deciding whether to sign in');
+    expect(entry).toHaveTextContent('Enter a symbol to view quotes, moving averages, volume-price context, signal scores and watch points.');
+    expect(entry).not.toHaveTextContent('先免费查一只标的');
+    expect(entry).not.toHaveTextContent('输入代码即可查看行情');
   });
 
   it('submits the visible free platform API trial as fast platform analysis', async () => {
@@ -1129,6 +1187,15 @@ describe('HomePage', () => {
 
   it('localizes structured no-AI query content when UI language is Chinese', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
+    vi.mocked(marketWorkspaceApi.getHome).mockResolvedValue({
+      asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
+      markets: [
+        { market: 'cn', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [{ symbol: '600519.SH', name: '贵州茅台', market: 'cn', currentPrice: 1188.8, changePercent: -1.5, sourceState: { source: 'cn_quote', status: 'fresh' } }] },
+        { market: 'hk', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [] },
+        { market: 'us', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [] },
+      ],
+    });
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -1251,11 +1318,14 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    expect(await screen.findByTestId('public-market-home-v116')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-panel')).toBeInTheDocument();
+
     expect(await screen.findByTestId('history-center-market-filter')).toHaveTextContent('全部市场');
     expect(screen.getByTestId('history-center-code-filter')).toHaveAttribute('placeholder', '代码或名称');
     expect(screen.getByTestId('history-center-filters')).not.toHaveTextContent('All markets');
 
-    const input = await screen.findByRole('textbox');
+    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519.SH' } });
     fireEvent.click(screen.getByRole('button', { name: '查询' }));
 
@@ -1265,6 +1335,28 @@ describe('HomePage', () => {
       });
     });
     await openQuickAnalysisFromCurrentSnapshot();
+
+    expect(screen.getByTestId('public-market-home-collapsed')).toBeInTheDocument();
+    expect(screen.queryByTestId('public-market-home-v116')).not.toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-panel-collapsed')).toBeInTheDocument();
+    expect(screen.queryByTestId('platform-auth-email')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('platform-auth-register-tab'));
+    expect(screen.getByTestId('platform-auth-panel-expanded')).toBeInTheDocument();
+    expect(screen.getByTestId('platform-auth-email')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('platform-auth-panel-toggle'));
+    expect(screen.getByTestId('platform-auth-panel-collapsed')).toBeInTheDocument();
+    expect(screen.queryByTestId('platform-auth-email')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('public-market-home-toggle'));
+    expect(screen.getByTestId('public-market-home-expanded')).toBeInTheDocument();
+    expect(screen.getByTestId('public-market-home-v116')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('public-market-home-toggle'));
+    expect(screen.getByTestId('public-market-home-collapsed')).toBeInTheDocument();
+    expect(screen.queryByTestId('public-market-home-v116')).not.toBeInTheDocument();
 
     const freeReport = await screen.findByTestId('basic-query-free-report');
     expect(freeReport).toHaveTextContent('未用 AI');
@@ -1317,6 +1409,7 @@ describe('HomePage', () => {
     expect(aShareEnrichment).toHaveTextContent('不构成投资建议');
     expect(aShareEnrichment).not.toHaveTextContent('Fund-flow channel');
     expect(aShareEnrichment).not.toHaveTextContent('Dragon-tiger channel');
+    expect(aShareEnrichment).not.toHaveTextContent('2026-07-07T09:30:00Z');
 
     const klineForecast = screen.getByTestId('basic-query-kline-forecast-lab');
     expect(klineForecast).toHaveTextContent('K线预测实验室');

@@ -137,10 +137,12 @@ describe('buildDecisionJourneyModel', () => {
     expect(model.technical.rsi14).toBe(100);
     expect(model.technical.trendState).toBe('偏强');
     expect(model.chart.points).toHaveLength(40);
-    expect(model.trust.quoteSource).toBe('free_web_chart');
-    expect(model.trust.historySource).toBe('free_history');
+    expect(model.trust.quoteSource).toBe('免费网络行情');
+    expect(model.trust.historySource).toBe('免费历史行情');
+    expect(model.trust.profileSource).toBe('免费公司资料');
     expect(model.trust.freshness).toBe('新鲜');
-    expect(model.trust.updatedAt).toContain('2026-07-10');
+    expect(model.trust.updatedAt).not.toContain('T09:30:00');
+    expect(model.tabs.find((tab) => tab.key === 'sources')?.items[0]?.value).toBe('免费网络行情');
   });
 
   it('keeps the same reading structure while describing the paid source improvement', () => {

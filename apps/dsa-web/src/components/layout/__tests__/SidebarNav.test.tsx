@@ -77,7 +77,7 @@ describe('SidebarNav', () => {
     expect(await screen.findByRole('link', { name: '市场筛选' })).toHaveAttribute('href', '/screening');
   });
 
-  it('places screening directly after chat when AlphaSift is enabled', async () => {
+  it('places screening after the public market workspace when AlphaSift is enabled', async () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: false });
 
     render(
@@ -88,7 +88,7 @@ describe('SidebarNav', () => {
 
     await screen.findByRole('link', { name: '市场筛选' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 6)).toEqual(['/', '/chat', '/screening', '/research', '/portfolio', '/decision-signals']);
+    expect(hrefs.slice(0, 6)).toEqual(['/', '/chat', '/market', '/screening', '/research', '/portfolio']);
   });
 
   it('does not hide market screening navigation after a config save event', async () => {
@@ -181,7 +181,7 @@ describe('SidebarNav', () => {
     expect(researchLink).toHaveAttribute('href', '/research');
     expect(researchLink).toHaveClass('font-medium');
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/screening', '/research', '/portfolio']);
+    expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/market', '/screening', '/research']);
   });
 
   it('hides admin-only navigation and logout for public unauthenticated users', async () => {

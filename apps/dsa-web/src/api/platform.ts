@@ -477,9 +477,34 @@ export interface PlatformWatchlistAlertRule {
   ruleType: string;
   threshold?: number | null;
   referenceValue?: number | null;
+  lastObservedValue?: number | null;
+  lastObservedAt?: string | null;
+  lastTriggeredAt?: string | null;
   enabled: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface PlatformWatchlistAlertEvent {
+  id: number;
+  stockCode: string;
+  ruleType: string;
+  direction?: string | null;
+  value?: number | null;
+  threshold?: number | null;
+  source?: string | null;
+  observedAt?: string | null;
+  createdAt?: string | null;
+  readAt?: string | null;
+  aiUsed: boolean;
+}
+
+export interface PlatformWatchlistAlertEventsResponse {
+  userId: number;
+  total: number;
+  unread: number;
+  items: PlatformWatchlistAlertEvent[];
+  aiUsed: boolean;
 }
 
 export interface PlatformWatchlistAlertRulesResponse {
@@ -675,6 +700,23 @@ export const platformApi = {
   deleteWatchlistAlertRule: async (ruleId: number): Promise<PlatformWatchlistAlertRulesResponse> => {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/platform/watchlist/alert-rules/${ruleId}`);
     return toCamelCase<PlatformWatchlistAlertRulesResponse>(response.data);
+  },
+
+  alertEvents: async (unreadOnly = false, limit = 20): Promise<PlatformWatchlistAlertEventsResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/platform/watchlist/alert-events', {
+      params: { unread_only: unreadOnly, limit },
+    });
+    return toCamelCase<PlatformWatchlistAlertEventsResponse>(response.data);
+  },
+
+  markAlertEventRead: async (eventId: number): Promise<PlatformWatchlistAlertEventsResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>(`/api/v1/platform/watchlist/alert-events/${eventId}/read`);
+    return toCamelCase<PlatformWatchlistAlertEventsResponse>(response.data);
+  },
+
+  markAllAlertEventsRead: async (): Promise<PlatformWatchlistAlertEventsResponse> => {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/platform/watchlist/alert-events/read-all');
+    return toCamelCase<PlatformWatchlistAlertEventsResponse>(response.data);
   },
 
   saveSnapshotToHistory: async (snapshot: unknown): Promise<PlatformSnapshotHistorySaveResponse> => {

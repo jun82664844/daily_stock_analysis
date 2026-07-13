@@ -26,6 +26,18 @@ type Props = {
   onOpenReminder: (code: string) => void;
 };
 
+const sourceLabel = (source: string | null | undefined, en: boolean) => {
+  const labels: Record<string, [string, string]> = {
+    market_snapshot: ['市场快照', 'Market snapshot'],
+    snapshot: ['市场快照', 'Market snapshot'],
+    alphasift: ['AlphaSift', 'AlphaSift'],
+    basic_query: ['DSA 基础快照', 'DSA basic snapshot'],
+    yfinance_profile: ['Yahoo 公司资料', 'Yahoo company profile'],
+  };
+  const normalized = String(source || '').trim();
+  return labels[normalized]?.[en ? 1 : 0] ?? (normalized || '-');
+};
+
 export default function MarketScreeningCardV104({
   candidate,
   language,
@@ -74,7 +86,7 @@ export default function MarketScreeningCardV104({
             <div key={metric.code} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2">
               <span className="block truncate text-xs text-secondary-text">{metricLabel(metric.code, language)}</span>
               <strong className="mt-1 block text-sm text-foreground">{formatScreeningMetric(metric.code, metric.value, language)}</strong>
-              <span className="mt-1 block truncate text-[11px] text-secondary-text">{metric.source || '-'}</span>
+              <span className="mt-1 block truncate text-[11px] text-secondary-text">{sourceLabel(metric.source, en)}</span>
             </div>
           ))
         ) : (

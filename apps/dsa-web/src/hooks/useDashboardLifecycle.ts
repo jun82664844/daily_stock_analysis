@@ -15,6 +15,7 @@ type UseDashboardLifecycleOptions = {
   syncTaskFailed: (task: TaskInfo) => void;
   removeTask: (taskId: string) => void;
   enabled?: boolean;
+  streamEnabled?: boolean;
 };
 
 export function useDashboardLifecycle({
@@ -30,6 +31,7 @@ export function useDashboardLifecycle({
   syncTaskFailed,
   removeTask,
   enabled = true,
+  streamEnabled = true,
 }: UseDashboardLifecycleOptions): void {
   const removalTimeoutsRef = useRef<number[]>([]);
 
@@ -114,7 +116,7 @@ export function useDashboardLifecycle({
     onError: () => {
       console.warn('SSE connection disconnected, reconnecting...');
     },
-    enabled,
+    enabled: enabled && streamEnabled,
   });
 }
 
