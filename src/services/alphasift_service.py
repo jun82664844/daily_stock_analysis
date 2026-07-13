@@ -1086,6 +1086,24 @@ class AlphaSiftService:
         started_at = time.monotonic()
         cache_path = _resolve_alphasift_data_dir() / "snapshot.last_good.json"
         snapshot_cache = inspect_snapshot_cache(cache_path, force_refresh=force_refresh)
+        snapshot_cache_freshness = "unavailable"
+        stale_cache_fast_path_enabled = os.getenv(
+            "ALPHASIFT_STALE_CACHE_FAST_PATH_ENABLED",
+            "false",
+        ).strip().lower() in {"1", "true", "yes", "on"} and (
+            getattr(adapter, "__name__", "") == ALPHASIFT_DSA_ADAPTER_MODULE
+        )
+        if snapshot_cache.get("use_cache"):
+            snapshot_cache_freshness = "cached"
+        elif (
+            stale_cache_fast_path_enabled
+            and snapshot_cache.get("available")
+            and snapshot_cache.get("reason") == "expired"
+            and not force_refresh
+        ):
+            snapshot_cache["use_cache"] = True
+            snapshot_cache["reason"] = "stale_hit"
+            snapshot_cache_freshness = "stale"
         try:
             try:
                 raw = _call_alphasift_screen(
@@ -1102,6 +1120,7 @@ class AlphaSiftService:
                     raise
                 snapshot_cache["use_cache"] = False
                 snapshot_cache["reason"] = "cache_rejected"
+                snapshot_cache_freshness = "unavailable"
                 raw = _call_alphasift_screen(
                     screen,
                     strategy,
@@ -1151,7 +1170,7 @@ class AlphaSiftService:
             if snapshot_cache.get("use_cache"):
                 context = candidate.get("dsa_context") if isinstance(candidate.get("dsa_context"), dict) else {}
                 context = dict(context)
-                context.setdefault("freshness", "cached")
+                context.setdefault("freshness", snapshot_cache_freshness)
                 context.setdefault("source", snapshot_cache.get("source") or "market_snapshot_cache")
                 context.setdefault("updated_at", snapshot_cache.get("cached_at"))
                 candidate["dsa_context"] = context
@@ -1187,6 +1206,7 @@ class AlphaSiftService:
             "portfolio_diversity_enabled": raw_data.get("portfolio_diversity_enabled"),
             "portfolio_concentration_notes": raw_data.get("portfolio_concentration_notes") or [],
             "snapshot_cache_used": bool(snapshot_cache.get("use_cache")),
+            "snapshot_cache_freshness": snapshot_cache_freshness,
             "snapshot_cached_at": snapshot_cache.get("cached_at"),
             "snapshot_age_seconds": snapshot_cache.get("age_seconds"),
             "snapshot_cache_ttl_seconds": snapshot_cache.get("max_age_seconds"),
@@ -1199,12 +1219,15 @@ def _screening_warnings(value: Any, snapshot_cache: Dict[str, Any]) -> List[str]
     warnings = _list_text_values(value)
     if not snapshot_cache.get("use_cache"):
         return warnings
-    warnings = [
-        warning
-        for warning in warnings
-        if not ("last_good_cache" in warning.lower() and "stale" in warning.lower())
-    ]
-    return warnings
+    if snapshot_cache.get("reason") == "stale_hit":
+        warnings.append("snapshot_cache_stale")
+    else:
+        warnings = [
+            warning
+            for warning in warnings
+            if not ("last_good_cache" in warning.lower() and "stale" in warning.lower())
+        ]
+    return list(dict.fromkeys(warnings))
 
 
 def _normalize_alphasift_hotspot_detail(detail: Any, *, provider: str, requested_topic: str) -> Dict[str, Any]:

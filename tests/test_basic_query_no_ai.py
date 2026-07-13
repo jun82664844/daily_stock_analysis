@@ -86,6 +86,7 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         }
 
         with patch("src.services.stock_service.StockService.get_realtime_quote", return_value=quote), \
+             patch("src.services.stock_service.StockService.get_public_history_data", return_value=history), \
              patch("src.services.stock_service.StockService.get_history_data", return_value=history), \
              patch("src.services.stock_service.StockService.get_basic_company_profile", return_value=profile), \
              patch("src.services.analysis_service.AnalysisService") as analysis_service:
@@ -727,10 +728,12 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
             def get_basic_company_profile(self, stock_code: str):
                 return None
 
-        snapshot = BasicQueryService(
+        service = BasicQueryService(
             stock_service=HkHistoryOnlyStockService(),
             cache=MarketDataCache(default_ttl_seconds=60),
-        ).get_snapshot("00700.HK")
+        )
+        with patch.object(service, "_fetch_reference_quote_from_yahoo_chart", return_value=None):
+            snapshot = service.get_snapshot("00700.HK")
 
         self.assertFalse(snapshot["ai_used"])
         self.assertEqual(snapshot["market"], "hk")
@@ -744,6 +747,60 @@ class BasicQueryNoAiTestCase(unittest.TestCase):
         warning_codes = {item["code"] for item in snapshot["warnings"]}
         self.assertIn("quote_from_history_close", warning_codes)
         self.assertNotIn("missing_quote", warning_codes)
+
+    def test_hk_snapshot_uses_fast_public_quote_and_history_fallbacks(self) -> None:
+        class HkPublicFallbackStockService:
+            def get_realtime_quote(self, _stock_code: str):
+                return None
+
+            def get_public_history_data(self, stock_code: str, **_kwargs):
+                return {
+                    "stock_code": stock_code,
+                    "stock_name": "Tencent Holdings Limited",
+                    "source": "yahoo_chart_history",
+                    "data": [
+                        {"date": "2026-07-01", "close": 450.0, "volume": 1_000_000},
+                        {"date": "2026-07-02", "close": 458.2, "volume": 1_200_000},
+                    ],
+                }
+
+            def get_history_data(self, *_args, **_kwargs):
+                raise AssertionError("HK quick query should use the bounded public history path first")
+
+            def get_basic_company_profile(self, _stock_code: str):
+                return None
+
+        service = BasicQueryService(
+            stock_service=HkPublicFallbackStockService(),
+            cache=MarketDataCache(default_ttl_seconds=60),
+        )
+        public_quote = {
+            "stock_code": "HK00700",
+            "stock_name": "Tencent Holdings Limited",
+            "current_price": 458.2,
+            "change": 6.2,
+            "change_percent": 1.3717,
+            "volume": 22_852_542,
+            "source": "yahoo_chart_reference",
+            "freshness": "fresh",
+        }
+
+        with (
+            patch.object(
+                service,
+                "_fetch_reference_quote_from_yahoo_chart",
+                side_effect=lambda code: public_quote if code == "HK00700" else None,
+            ),
+            patch.object(service, "_comparison_targets_with_reference_quotes", return_value=[]),
+        ):
+            snapshot = service.get_snapshot("00700.HK")
+
+        self.assertEqual(snapshot["market"], "hk")
+        self.assertEqual(snapshot["quote"]["current_price"], 458.2)
+        self.assertEqual(snapshot["quote"]["source"], "yahoo_chart_reference")
+        self.assertEqual(snapshot["quote"]["freshness"], "fresh")
+        self.assertEqual(snapshot["trend"]["points"][-1]["close"], 458.2)
+        self.assertEqual(snapshot["diagnostics"]["sources"]["history"], "yahoo_chart_history")
 
 
 if __name__ == "__main__":

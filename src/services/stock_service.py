@@ -432,6 +432,17 @@ class StockService:
             "data": rows,
         }
 
+    def get_public_history_data(
+        self,
+        stock_code: str,
+        period: str = "daily",
+        days: int = 30,
+    ) -> Optional[Dict[str, Any]]:
+        """Return the bounded Yahoo chart fallback for supported global equities."""
+        if period != "daily":
+            return None
+        return self._get_public_yahoo_history_data(stock_code, period=period, days=days)
+
     @staticmethod
     def _supports_public_history_fallback(stock_code: str) -> bool:
         code = (stock_code or "").strip().upper()

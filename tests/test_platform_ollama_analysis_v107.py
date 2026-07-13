@@ -26,6 +26,8 @@ class PlatformOllamaAnalysisV107TestCase(unittest.TestCase):
             {
                 "DATABASE_PATH": str(Path(self.temp_dir.name) / "ollama-analysis.sqlite"),
                 "PLATFORM_USER_AUTH_ENABLED": "true",
+                "PLATFORM_CSRF_ENABLED": "false",
+                "PLATFORM_MEMBER_MODEL_PICKER_ENABLED": "false",
                 "LOCAL_LLM_ENABLED": "true",
             },
             clear=False,

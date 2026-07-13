@@ -745,6 +745,11 @@ class Config:
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
+    platform_price_alert_monitor_enabled: bool = False
+    platform_price_alert_monitor_interval_seconds: int = 60
+    platform_price_alert_monitor_max_rules_per_cycle: int = 1000
+    platform_price_alert_monitor_max_workers: int = 8
+    platform_price_alert_monitor_quote_timeout_seconds: float = 3.0
 
     # === 通知配置（可同时配置多个，全部推送）===
     
@@ -1576,6 +1581,25 @@ class Config:
             agent_context_compression_trigger_tokens=agent_context_compression_trigger_tokens,
             agent_context_protected_turns=agent_context_protected_turns,
             agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
+            platform_price_alert_monitor_enabled=parse_env_bool(
+                os.getenv('PLATFORM_PRICE_ALERT_MONITOR_ENABLED'), default=False
+            ),
+            platform_price_alert_monitor_interval_seconds=parse_env_int(
+                os.getenv('PLATFORM_PRICE_ALERT_MONITOR_INTERVAL_SECONDS'), 60,
+                field_name='PLATFORM_PRICE_ALERT_MONITOR_INTERVAL_SECONDS', minimum=30, maximum=3600,
+            ),
+            platform_price_alert_monitor_max_rules_per_cycle=parse_env_int(
+                os.getenv('PLATFORM_PRICE_ALERT_MONITOR_MAX_RULES_PER_CYCLE'), 1000,
+                field_name='PLATFORM_PRICE_ALERT_MONITOR_MAX_RULES_PER_CYCLE', minimum=1, maximum=10000,
+            ),
+            platform_price_alert_monitor_max_workers=parse_env_int(
+                os.getenv('PLATFORM_PRICE_ALERT_MONITOR_MAX_WORKERS'), 8,
+                field_name='PLATFORM_PRICE_ALERT_MONITOR_MAX_WORKERS', minimum=1, maximum=32,
+            ),
+            platform_price_alert_monitor_quote_timeout_seconds=parse_env_float(
+                os.getenv('PLATFORM_PRICE_ALERT_MONITOR_QUOTE_TIMEOUT_SECONDS'), 3.0,
+                field_name='PLATFORM_PRICE_ALERT_MONITOR_QUOTE_TIMEOUT_SECONDS', minimum=0.5, maximum=10.0,
+            ),
             agent_event_monitor_interval_minutes=parse_env_int(
                 os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES'),
                 5,

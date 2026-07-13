@@ -12,6 +12,7 @@ from api.v1.schemas.market_workspace import (
     MarketDailyBriefResponse,
     MarketSearchResponse,
     MarketWorkspaceOverview,
+    PublicMarketHomeResponse,
     SymbolWorkspaceResponse,
 )
 from src.platform_accounts import platform_identity_from_request
@@ -19,11 +20,13 @@ from src.platform_rate_limit import check_platform_rate_limit
 from src.services.market_daily_brief_service import MarketDailyBriefService
 from src.services.market_search_service import MarketSearchService
 from src.services.market_workspace_service import MarketWorkspaceService
+from src.services.public_market_home_service import PublicMarketHomeService
 
 
 router = APIRouter()
 _workspace_service = MarketWorkspaceService()
 _search_service = MarketSearchService()
+_public_home_service = PublicMarketHomeService(_workspace_service)
 
 
 def _enabled() -> bool:
@@ -33,6 +36,22 @@ def _enabled() -> bool:
 def _require_enabled() -> None:
     if not _enabled():
         raise HTTPException(status_code=404, detail={"error": "market_workspace_disabled"})
+
+
+def _require_home_enabled() -> None:
+    _require_enabled()
+    if os.getenv("PLATFORM_PUBLIC_MARKET_HOME_V116_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
+        raise HTTPException(status_code=404, detail={"error": "public_market_home_disabled"})
+
+
+@router.get("/home", response_model=PublicMarketHomeResponse)
+def market_home(request: Request):
+    _require_home_enabled()
+    identity = platform_identity_from_request(request)
+    limited = check_platform_rate_limit(request, "market_workspace_home", user_id=identity.user_id if identity else None)
+    if limited is not None:
+        return limited
+    return PublicMarketHomeResponse.model_validate(_public_home_service.build())
 
 
 def _markets(value: str) -> List[str]:

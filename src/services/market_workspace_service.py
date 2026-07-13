@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timezone
@@ -25,6 +26,24 @@ _DEFAULT_MARKET_SYMBOLS: Mapping[str, Sequence[str]] = {
     "us": ("AAPL", "MSFT", "NVDA", "AMZN", "TSLA"),
 }
 
+
+def _configured_market_symbols() -> Mapping[str, Sequence[str]]:
+    result: Dict[str, Sequence[str]] = {}
+    for market, defaults in _DEFAULT_MARKET_SYMBOLS.items():
+        raw = os.getenv(f"PLATFORM_PUBLIC_MARKET_HOME_SYMBOLS_{market.upper()}", "")
+        values = []
+        seen = set()
+        for item in raw.split(",") if raw.strip() else defaults:
+            symbol = str(item).strip().upper()
+            if not symbol or len(symbol) > 32 or not re.fullmatch(r"[A-Z0-9.-]+", symbol) or symbol in seen:
+                continue
+            seen.add(symbol)
+            values.append(symbol)
+            if len(values) >= 20:
+                break
+        result[market] = tuple(values or defaults)
+    return result
+
 _MARKET_OVERVIEW_EXECUTOR = ThreadPoolExecutor(
     max_workers=max(4, int(os.getenv("PLATFORM_MARKET_WORKSPACE_MAX_WORKERS", "8"))),
     thread_name_prefix="market-workspace",
@@ -36,23 +55,32 @@ def _utc_now() -> str:
 
 
 class MarketWorkspaceService:
+    _MARKET_CURRENCIES = {"cn": "CNY", "hk": "HKD", "us": "USD"}
+
     def __init__(
         self,
         snapshot_loader: Optional[SnapshotLoader] = None,
+        detail_loader: Optional[SnapshotLoader] = None,
         news_loader: Optional[NewsLoader] = None,
         market_symbols: Optional[Mapping[str, Sequence[str]]] = None,
         cache_ttl_seconds: Optional[int] = None,
         overview_timeout_seconds: Optional[float] = None,
     ) -> None:
-        self.snapshot_loader = snapshot_loader or BasicQueryService(
-            a_share_enrichment_service=AShareEnrichmentService(source_mode="off"),
-            fetch_timeout_seconds=2.0,
-            profile_timeout_seconds=0.8,
-            reference_quote_timeout_seconds=0.4,
-            stale_revalidation_timeout_seconds=0.3,
-        ).get_quote_card
+        if snapshot_loader is None:
+            query_service = BasicQueryService(
+                a_share_enrichment_service=AShareEnrichmentService(source_mode="off"),
+                fetch_timeout_seconds=2.0,
+                profile_timeout_seconds=0.8,
+                reference_quote_timeout_seconds=0.4,
+                stale_revalidation_timeout_seconds=0.3,
+            )
+            self.snapshot_loader = query_service.get_quote_card
+            self.detail_loader = detail_loader or query_service.get_snapshot
+        else:
+            self.snapshot_loader = snapshot_loader
+            self.detail_loader = detail_loader or snapshot_loader
         self.news_loader = news_loader
-        self.market_symbols = {key: tuple(value) for key, value in (market_symbols or _DEFAULT_MARKET_SYMBOLS).items()}
+        self.market_symbols = {key: tuple(value) for key, value in (market_symbols or _configured_market_symbols()).items()}
         self.cache_ttl_seconds = max(
             1,
             int(cache_ttl_seconds or os.getenv("PLATFORM_MARKET_WORKSPACE_CACHE_TTL_SECONDS", "60")),
@@ -126,18 +154,24 @@ class MarketWorkspaceService:
             "unchanged": sum(1 for value in valid_changes if float(value) == 0),
             "unavailable": not bool(valid_changes),
         }
-        quote_status = "fresh" if items and all(item["source_state"]["status"] == "fresh" for item in items) else (
-            "cached" if items else "unavailable"
-        )
+        quote_states = [str(item["source_state"]["status"]) for item in items]
+        if not quote_states or all(status == "unavailable" for status in quote_states):
+            quote_status = "unavailable"
+        elif all(status == "fresh" for status in quote_states):
+            quote_status = "fresh"
+        elif any(status in {"fresh", "cached"} for status in quote_states):
+            quote_status = "cached"
+        else:
+            quote_status = "stale"
         quote_state = {
             "source": f"{normalized_market}_market_snapshot",
             "status": quote_status,
             "observed_at": max((item["source_state"].get("observed_at") or "" for item in items), default=None) or None,
             "fetched_at": fetched_at,
             "delay_seconds": 0 if quote_status == "fresh" else None,
-            "warning_code": None if items else "market_quotes_unavailable",
+            "warning_code": "market_quotes_unavailable" if quote_status == "unavailable" else None,
         }
-        if not items:
+        if quote_status == "unavailable":
             warnings.append("market_quotes_unavailable")
         sorted_items = sorted(
             items,
@@ -163,7 +197,7 @@ class MarketWorkspaceService:
         return payload
 
     def get_symbol(self, symbol: str, *, personalization_user_id: Optional[int] = None) -> Dict[str, Any]:
-        snapshot = self.snapshot_loader(symbol)
+        snapshot = self.detail_loader(symbol)
         market = self._normalize_snapshot_market(snapshot.get("market"), symbol)
         quote = dict(snapshot.get("quote") or {})
         profile = dict(snapshot.get("profile") or {})
@@ -196,7 +230,7 @@ class MarketWorkspaceService:
             "symbol": str(snapshot.get("stock_code") or symbol).upper(),
             "name": str(snapshot.get("stock_name") or profile.get("company_name") or symbol),
             "market": market,
-            "currency": profile.get("currency"),
+            "currency": profile.get("currency") or self._MARKET_CURRENCIES.get(market),
             "as_of": str(observed_at) if observed_at else None,
             "quote": quote,
             "history": history[:120],
@@ -241,8 +275,8 @@ class MarketWorkspaceService:
             return "us"
         return PlatformWatchlistService.market_for_code(symbol)
 
-    @staticmethod
-    def _security_item(snapshot: Dict[str, Any], market: str) -> Dict[str, Any]:
+    @classmethod
+    def _security_item(cls, snapshot: Dict[str, Any], market: str) -> Dict[str, Any]:
         quote = snapshot.get("quote") or {}
         profile = snapshot.get("profile") or {}
         freshness = str(quote.get("freshness") or "unavailable")
@@ -253,7 +287,7 @@ class MarketWorkspaceService:
             "symbol": str(snapshot.get("stock_code") or ""),
             "name": str(snapshot.get("stock_name") or profile.get("company_name") or snapshot.get("stock_code") or ""),
             "market": market,
-            "currency": profile.get("currency"),
+            "currency": profile.get("currency") or cls._MARKET_CURRENCIES.get(market),
             "current_price": quote.get("current_price"),
             "change_percent": quote.get("change_percent"),
             "volume": quote.get("volume"),

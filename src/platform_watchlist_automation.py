@@ -8,7 +8,7 @@ import math
 from threading import RLock
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 
 from src.platform_accounts import PlatformAccountService
 from src.platform_watchlist import PlatformWatchlistService
@@ -22,8 +22,11 @@ from src.storage import (
 )
 
 
-ALERT_RULE_TYPES = {"price_move", "ma20_cross", "volume_change", "source_update", "data_quality"}
-PAID_PLANS = {"pro", "premium", "enterprise"}
+EXACT_PRICE_RULE_TYPES = {"price_above", "price_below"}
+ALERT_RULE_TYPES = EXACT_PRICE_RULE_TYPES | {
+    "price_move", "ma20_cross", "volume_change", "source_update", "data_quality",
+}
+PAID_PLANS = {"plus", "pro", "max", "premium", "enterprise"}
 
 
 class AlertRuleLimitExceeded(ValueError):
@@ -118,6 +121,9 @@ class PlatformWatchlistAutomationService:
         if normalized_type in {"price_move", "volume_change"}:
             if normalized_threshold is None or normalized_threshold <= 0 or normalized_threshold > 1000:
                 raise ValueError("threshold must be greater than zero")
+        if normalized_type in EXACT_PRICE_RULE_TYPES:
+            if normalized_threshold is None or normalized_threshold <= 0 or normalized_threshold > 1_000_000_000:
+                raise ValueError("threshold must be a finite positive price")
         now = utc_naive_now()
         with self.db.session_scope() as session:
             existing = session.execute(
@@ -171,6 +177,10 @@ class PlatformWatchlistAutomationService:
                 existing.threshold = normalized_threshold
                 existing.reference_value = normalized_reference
                 existing.enabled = bool(enabled)
+                if normalized_type in EXACT_PRICE_RULE_TYPES:
+                    existing.last_observed_value = None
+                    existing.last_observed_at = None
+                    existing.last_triggered_at = None
                 existing.updated_at = now
         return self.list_rules(user_id, plan=plan)
 
@@ -193,6 +203,135 @@ class PlatformWatchlistAutomationService:
             row.enabled = False
             row.updated_at = utc_naive_now()
             return True
+
+    def list_enabled_exact_price_rules(self, *, limit: int = 1000) -> List[PlatformWatchlistAlertRule]:
+        safe_limit = max(1, min(int(limit), 10_000))
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(PlatformWatchlistAlertRule)
+                .where(
+                    and_(
+                        PlatformWatchlistAlertRule.enabled.is_(True),
+                        PlatformWatchlistAlertRule.rule_type.in_(EXACT_PRICE_RULE_TYPES),
+                    )
+                )
+                .order_by(PlatformWatchlistAlertRule.id.asc())
+                .limit(safe_limit)
+            ).scalars().all()
+            for row in rows:
+                session.expunge(row)
+            return list(rows)
+
+    def apply_price_alert_results(self, results: List[Dict[str, Any]]) -> int:
+        """Persist valid observations and private events for one monitor cycle."""
+        triggered_by_user: Dict[int, List[Dict[str, Any]]] = {}
+        with self.db.session_scope() as session:
+            for result in results:
+                rule = session.get(PlatformWatchlistAlertRule, int(result["rule_id"]))
+                if rule is None or not rule.enabled or rule.rule_type not in EXACT_PRICE_RULE_TYPES:
+                    continue
+                if result.get("status") != "observed":
+                    continue
+                rule.last_observed_value = float(result["price"])
+                rule.last_observed_at = result.get("observed_at") or utc_naive_now()
+                rule.updated_at = utc_naive_now()
+                if result.get("triggered"):
+                    rule.last_triggered_at = result.get("observed_at") or utc_naive_now()
+                    triggered_by_user.setdefault(int(rule.user_id), []).append({**result, "rule": rule})
+
+            for user_id, triggered in triggered_by_user.items():
+                payload = {
+                    "run_kind": "price_monitor",
+                    "items": [
+                        {
+                            "stock_code": item["rule"].stock_code,
+                            "rule_type": item["rule"].rule_type,
+                            "direction": item.get("direction"),
+                            "value": item.get("price"),
+                            "threshold": item["rule"].threshold,
+                            "source": item.get("source"),
+                            "observed_at": (item.get("observed_at") or utc_naive_now()).isoformat(),
+                        }
+                        for item in triggered
+                    ],
+                    "ai_used": False,
+                }
+                run = PlatformWatchlistRadarRun(
+                    user_id=user_id,
+                    plan=self._user_plan(user_id),
+                    run_kind="price_monitor",
+                    processed=len(triggered),
+                    triggered_count=len(triggered),
+                    payload_json=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                    created_at=utc_naive_now(),
+                )
+                session.add(run)
+                session.flush()
+                for item in triggered:
+                    rule = item["rule"]
+                    session.add(
+                        PlatformWatchlistAlertEvent(
+                            user_id=user_id,
+                            rule_id=int(rule.id),
+                            radar_run_id=int(run.id),
+                            stock_code=rule.stock_code,
+                            rule_type=rule.rule_type,
+                            direction=item.get("direction"),
+                            value=float(item["price"]),
+                            threshold=rule.threshold,
+                            source=str(item.get("source") or "unknown")[:64],
+                            observed_at=item.get("observed_at") or utc_naive_now(),
+                            created_at=utc_naive_now(),
+                        )
+                    )
+        return sum(len(items) for items in triggered_by_user.values())
+
+    def list_alert_events(self, user_id: int, *, unread_only: bool = False, limit: int = 20) -> Dict[str, Any]:
+        safe_limit = max(1, min(int(limit), 100))
+        conditions = [PlatformWatchlistAlertEvent.user_id == int(user_id)]
+        if unread_only:
+            conditions.append(PlatformWatchlistAlertEvent.read_at.is_(None))
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(PlatformWatchlistAlertEvent)
+                .where(and_(*conditions))
+                .order_by(PlatformWatchlistAlertEvent.created_at.desc(), PlatformWatchlistAlertEvent.id.desc())
+                .limit(safe_limit)
+            ).scalars().all()
+            total = int(session.scalar(select(func.count()).select_from(PlatformWatchlistAlertEvent).where(
+                PlatformWatchlistAlertEvent.user_id == int(user_id)
+            )) or 0)
+            unread = int(session.scalar(select(func.count()).select_from(PlatformWatchlistAlertEvent).where(
+                and_(
+                    PlatformWatchlistAlertEvent.user_id == int(user_id),
+                    PlatformWatchlistAlertEvent.read_at.is_(None),
+                )
+            )) or 0)
+            items = [self._alert_event_payload(row) for row in rows]
+        return {"user_id": int(user_id), "total": total, "unread": unread, "items": items, "ai_used": False}
+
+    def mark_alert_event_read(self, user_id: int, event_id: int) -> bool:
+        with self.db.session_scope() as session:
+            row = session.execute(select(PlatformWatchlistAlertEvent).where(and_(
+                PlatformWatchlistAlertEvent.id == int(event_id),
+                PlatformWatchlistAlertEvent.user_id == int(user_id),
+            ))).scalars().first()
+            if row is None:
+                return False
+            if row.read_at is None:
+                row.read_at = utc_naive_now()
+            return True
+
+    def mark_all_alert_events_read(self, user_id: int) -> int:
+        with self.db.session_scope() as session:
+            rows = session.execute(select(PlatformWatchlistAlertEvent).where(and_(
+                PlatformWatchlistAlertEvent.user_id == int(user_id),
+                PlatformWatchlistAlertEvent.read_at.is_(None),
+            ))).scalars().all()
+            now = utc_naive_now()
+            for row in rows:
+                row.read_at = now
+            return len(rows)
 
     def run_and_save(self, *, user_id: int, plan: str) -> Dict[str, Any]:
         with self._user_lock(user_id):
@@ -246,14 +385,22 @@ class PlatformWatchlistAutomationService:
         with self.db.get_session() as session:
             rows = session.execute(
                 select(PlatformWatchlistRadarRun)
-                .where(PlatformWatchlistRadarRun.user_id == int(user_id))
+                .where(
+                    and_(
+                        PlatformWatchlistRadarRun.user_id == int(user_id),
+                        PlatformWatchlistRadarRun.run_kind == "radar",
+                    )
+                )
                 .order_by(PlatformWatchlistRadarRun.created_at.desc(), PlatformWatchlistRadarRun.id.desc())
                 .limit(safe_limit)
             ).scalars().all()
             total = len(
-                session.execute(
-                    select(PlatformWatchlistRadarRun.id).where(PlatformWatchlistRadarRun.user_id == int(user_id))
-                ).all()
+                session.execute(select(PlatformWatchlistRadarRun.id).where(
+                    and_(
+                        PlatformWatchlistRadarRun.user_id == int(user_id),
+                        PlatformWatchlistRadarRun.run_kind == "radar",
+                    )
+                )).all()
             )
             items = [self._history_payload(row) for row in rows]
         return {"user_id": int(user_id), "items": items, "total": total, "ai_used": False}
@@ -414,6 +561,9 @@ class PlatformWatchlistAutomationService:
             "rule_type": row.rule_type,
             "threshold": row.threshold,
             "reference_value": row.reference_value,
+            "last_observed_value": row.last_observed_value,
+            "last_observed_at": row.last_observed_at.isoformat() if row.last_observed_at else None,
+            "last_triggered_at": row.last_triggered_at.isoformat() if row.last_triggered_at else None,
             "enabled": bool(row.enabled),
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
@@ -437,6 +587,22 @@ class PlatformWatchlistAutomationService:
             "strongest": (summary or {}).get("strongest"),
             "weakest": (summary or {}).get("weakest"),
             "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+
+    @staticmethod
+    def _alert_event_payload(row: PlatformWatchlistAlertEvent) -> Dict[str, Any]:
+        return {
+            "id": int(row.id),
+            "stock_code": row.stock_code,
+            "rule_type": row.rule_type,
+            "direction": row.direction,
+            "value": row.value,
+            "threshold": row.threshold,
+            "source": row.source,
+            "observed_at": row.observed_at.isoformat() if row.observed_at else None,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "read_at": row.read_at.isoformat() if row.read_at else None,
+            "ai_used": False,
         }
 
     def _user_plan(self, user_id: int) -> str:

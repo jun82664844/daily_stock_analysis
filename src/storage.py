@@ -338,6 +338,7 @@ class PlatformWatchlistRadarRun(Base):
     risk_count = Column(Integer, nullable=False, default=0)
     source_event_count = Column(Integer, nullable=False, default=0)
     triggered_count = Column(Integer, nullable=False, default=0)
+    run_kind = Column(String(32), nullable=False, default='radar', index=True)
     payload_json = Column(Text, nullable=False, default='{}')
     created_at = Column(DateTime, default=utc_naive_now, index=True)
 
@@ -358,6 +359,9 @@ class PlatformWatchlistAlertRule(Base):
     threshold = Column(Float)
     reference_value = Column(Float)
     enabled = Column(Boolean, nullable=False, default=True, index=True)
+    last_observed_value = Column(Float)
+    last_observed_at = Column(DateTime)
+    last_triggered_at = Column(DateTime)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
 
@@ -381,6 +385,9 @@ class PlatformWatchlistAlertEvent(Base):
     direction = Column(String(24))
     value = Column(Float)
     threshold = Column(Float)
+    source = Column(String(64))
+    observed_at = Column(DateTime)
+    read_at = Column(DateTime, index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
 
     __table_args__ = (
@@ -1275,6 +1282,22 @@ _PLATFORM_BILLING_SUBSCRIPTION_V112_COLUMN_SQL: Dict[str, str] = {
     "expires_at": "DATETIME",
 }
 
+_PLATFORM_ALERT_V116_COLUMN_SQL: Dict[str, Dict[str, str]] = {
+    PlatformWatchlistAlertRule.__tablename__: {
+        "last_observed_value": "FLOAT",
+        "last_observed_at": "DATETIME",
+        "last_triggered_at": "DATETIME",
+    },
+    PlatformWatchlistRadarRun.__tablename__: {
+        "run_kind": "VARCHAR(32) NOT NULL DEFAULT 'radar'",
+    },
+    PlatformWatchlistAlertEvent.__tablename__: {
+        "source": "VARCHAR(64)",
+        "observed_at": "DATETIME",
+        "read_at": "DATETIME",
+    },
+}
+
 
 _ANALYSIS_HISTORY_PLATFORM_COLUMN_SQL: Dict[str, str] = {
     "platform_user_id": "INTEGER",
@@ -1582,6 +1605,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             self._ensure_platform_usage_event_columns()
             self._ensure_platform_user_api_key_columns()
             self._ensure_platform_billing_v112_columns()
+            self._ensure_platform_alert_v116_columns()
             self._ensure_analysis_history_platform_columns()
             self._ensure_intelligence_item_scope_values()
             self._ensure_schema_migration_record()
@@ -1866,6 +1890,31 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 }
             except Exception as exc:
                 logger.warning("[Platform billing V112] failed to inspect %s: %s", table_name, exc)
+                continue
+            for column, column_type in definitions.items():
+                if column in existing:
+                    continue
+                try:
+                    with self._engine.begin() as connection:
+                        connection.exec_driver_sql(
+                            f"ALTER TABLE {table_name} ADD COLUMN {column} {column_type}"
+                        )
+                    existing.add(column)
+                except OperationalError as exc:
+                    if self._is_sqlite_duplicate_column_error(exc, column):
+                        existing.add(column)
+                        continue
+                    raise
+
+    def _ensure_platform_alert_v116_columns(self) -> None:
+        """Add V116 private price-alert state without rebuilding SQLite tables."""
+        if not self._is_sqlite_engine:
+            return
+        for table_name, definitions in _PLATFORM_ALERT_V116_COLUMN_SQL.items():
+            try:
+                existing = {column["name"] for column in inspect(self._engine).get_columns(table_name)}
+            except Exception as exc:
+                logger.warning("[Platform alerts V116] failed to inspect %s: %s", table_name, exc)
                 continue
             for column, column_type in definitions.items():
                 if column in existing:

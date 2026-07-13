@@ -113,6 +113,27 @@ class MarketWorkspaceServiceV113TestCase(unittest.TestCase):
         self.assertIn("market_news_unavailable", overview["warnings"])
         self.assertEqual(overview["sources"][1]["status"], "unavailable")
 
+    def test_overview_does_not_label_all_unavailable_quotes_as_cached(self) -> None:
+        from src.services.market_workspace_service import MarketWorkspaceService
+
+        unavailable = _snapshot("0700.HK", market="hk")
+        unavailable["quote"] = {
+            "current_price": None,
+            "change_percent": None,
+            "source": "hk_realtime",
+            "freshness": "unavailable",
+        }
+        service = MarketWorkspaceService(
+            snapshot_loader=lambda _symbol: unavailable,
+            market_symbols={"cn": [], "hk": ["0700.HK"], "us": []},
+        )
+
+        overview = service.get_overview("hk")
+
+        self.assertEqual(overview["sources"][0]["status"], "unavailable")
+        self.assertEqual(overview["sources"][0]["warning_code"], "market_quotes_unavailable")
+        self.assertIn("market_quotes_unavailable", overview["warnings"])
+
     def test_market_symbols_are_loaded_with_bounded_parallelism(self) -> None:
         from src.services.market_workspace_service import MarketWorkspaceService
 
@@ -166,6 +187,23 @@ class MarketWorkspaceServiceV113TestCase(unittest.TestCase):
         self.assertFalse(body["ai_used"])
         self.assertTrue(body["informational_only"])
         self.assertNotIn("raw", body)
+
+    def test_symbol_workspace_uses_full_detail_loader_instead_of_overview_card(self) -> None:
+        from src.services.market_workspace_service import MarketWorkspaceService
+
+        overview_card = _snapshot("0700.HK", market="hk")
+        overview_card["trend"] = {"points": []}
+        full_snapshot = _snapshot("0700.HK", market="hk")
+
+        service = MarketWorkspaceService(
+            snapshot_loader=lambda _symbol: overview_card,
+            detail_loader=lambda _symbol: full_snapshot,
+        )
+        body = service.get_symbol("0700.HK")
+
+        self.assertEqual(body["market"], "hk")
+        self.assertEqual(body["history"][0]["close"], 99.0)
+        self.assertEqual(body["currency"], "USD")
 
 
 class MarketWorkspaceEndpointV113TestCase(unittest.TestCase):

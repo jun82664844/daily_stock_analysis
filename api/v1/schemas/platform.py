@@ -265,6 +265,9 @@ class PlatformWatchlistAlertRuleItem(BaseModel):
     rule_type: str
     threshold: Optional[float] = None
     reference_value: Optional[float] = None
+    last_observed_value: Optional[float] = None
+    last_observed_at: Optional[str] = None
+    last_triggered_at: Optional[str] = None
     enabled: bool = True
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -277,6 +280,28 @@ class PlatformWatchlistAlertRulesResponse(BaseModel):
     total: int
     remaining: int
     items: List[PlatformWatchlistAlertRuleItem] = Field(default_factory=list)
+    ai_used: bool = False
+
+
+class PlatformWatchlistAlertEventItem(BaseModel):
+    id: int
+    stock_code: str
+    rule_type: str
+    direction: Optional[str] = None
+    value: Optional[float] = None
+    threshold: Optional[float] = None
+    source: Optional[str] = None
+    observed_at: Optional[str] = None
+    created_at: Optional[str] = None
+    read_at: Optional[str] = None
+    ai_used: bool = False
+
+
+class PlatformWatchlistAlertEventsResponse(BaseModel):
+    user_id: int
+    total: int
+    unread: int
+    items: List[PlatformWatchlistAlertEventItem] = Field(default_factory=list)
     ai_used: bool = False
 
 

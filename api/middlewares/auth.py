@@ -106,6 +106,7 @@ def _public_market_workspace_path(request: Request) -> bool:
         return False
     path = request.url.path.rstrip("/")
     return path in {
+        "/api/v1/market-workspace/home",
         "/api/v1/market-workspace/overview",
         "/api/v1/market-workspace/search",
     } or path.startswith("/api/v1/market-workspace/symbol/")

@@ -402,6 +402,12 @@ class BasicQueryService:
                 else None
             ),
         )
+        public_quote_fallback = False
+        if not quote and route.market in {"hk", "us"}:
+            quote = self._fetch_reference_quote_from_yahoo_chart(code)
+            if quote:
+                error = None
+                public_quote_fallback = True
         elapsed_ms = self._elapsed_ms(started)
         if quote:
             quote = dict(quote)
@@ -420,7 +426,7 @@ class BasicQueryService:
             return stale_hit.value, "stale", "stale_fallback", elapsed_ms, source, error == "timeout", self._cache_fallback(stale_hit), error, health, stale_hit.origin
         source = self._payload_source(quote, source_id)
         cache_state = "refresh" if force_refresh and quote else ("revalidated" if stale_hit is not None and quote else ("miss" if error is None else "unavailable"))
-        fallback = "live" if quote else "none"
+        fallback = "yahoo_chart_public" if public_quote_fallback else ("live" if quote else "none")
         return quote, "fresh" if quote else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
 
     def _get_history(
@@ -446,7 +452,7 @@ class BasicQueryService:
                 return stale_hit.value, "stale", "stale_fallback", self._elapsed_ms(started), source, False, self._cache_fallback(stale_hit), "cooling_down", health, stale_hit.origin
             return None, "unavailable", "unavailable", self._elapsed_ms(started), source_id, False, "none", "cooling_down", health, "none"
         history, error = self._call_with_timeout(
-            lambda: self.stock_service.get_history_data(code, period="daily", days=30),
+            lambda: self._load_history_for_route(code, route=route),
             timeout_seconds=(
                 min(self.fetch_timeout_seconds, self.stale_revalidation_timeout_seconds)
                 if stale_hit is not None
@@ -473,6 +479,15 @@ class BasicQueryService:
         cache_state = "refresh" if force_refresh and history else ("revalidated" if stale_hit is not None and history else ("miss" if error is None else "unavailable"))
         fallback = "live" if history else "none"
         return history, "fresh" if history else "unavailable", cache_state, elapsed_ms, source, error == "timeout", fallback, error, health, "none"
+
+    def _load_history_for_route(self, code: str, *, route: MarketRoute) -> Optional[Dict[str, Any]]:
+        if route.market in {"hk", "us"}:
+            public_loader = getattr(self.stock_service, "get_public_history_data", None)
+            if callable(public_loader):
+                public_history = public_loader(code, period="daily", days=30)
+                if isinstance(public_history, dict) and public_history.get("data"):
+                    return public_history
+        return self.stock_service.get_history_data(code, period="daily", days=30)
 
     def _get_profile(
         self,

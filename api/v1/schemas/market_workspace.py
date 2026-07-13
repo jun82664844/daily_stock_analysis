@@ -76,6 +76,25 @@ class MarketWorkspaceOverview(StrictModel):
     informational_only: bool = True
 
 
+class PublicMarketHomeSection(StrictModel):
+    market: Literal["cn", "hk", "us"]
+    session_state: Literal["open", "closed", "unknown"] = "unknown"
+    display_mode: Literal["latest_available", "delayed", "realtime"] = "latest_available"
+    ranking_scope: Literal["configured_universe", "market_wide"] = "configured_universe"
+    selection_basis: str
+    indices: List[MarketSecurityItem] = Field(default_factory=list)
+    attention: List[MarketSecurityItem] = Field(default_factory=list)
+    sources: List[DataSourceState] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class PublicMarketHomeResponse(StrictModel):
+    as_of: str
+    markets: List[PublicMarketHomeSection] = Field(default_factory=list)
+    ai_used: bool = False
+    informational_only: bool = True
+
+
 class MarketSearchItem(StrictModel):
     symbol: str
     name: str

@@ -41,6 +41,7 @@ from api.v1.schemas.platform import (
     PlatformWatchlistRefreshResponse,
     PlatformWatchlistAlertRuleUpsertRequest,
     PlatformWatchlistAlertRulesResponse,
+    PlatformWatchlistAlertEventsResponse,
     PlatformWatchlistRadarHistoryResponse,
     PlatformWatchlistRadarResponse,
     PlatformWatchlistRadarRunResponse,
@@ -543,6 +544,43 @@ async def platform_watchlist_alert_rule_delete(request: Request, rule_id: int):
         metadata={"rule_id": int(rule_id)},
     )
     return service.list_rules(int(identity.user_id), plan=identity.plan)
+
+
+@router.get("/watchlist/alert-events", response_model=PlatformWatchlistAlertEventsResponse)
+async def platform_watchlist_alert_events(
+    request: Request,
+    unread_only: bool = Query(default=False),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    identity = _require_identity(request)
+    return PlatformWatchlistAutomationService().list_alert_events(
+        int(identity.user_id), unread_only=unread_only, limit=limit
+    )
+
+
+@router.post("/watchlist/alert-events/read-all", response_model=PlatformWatchlistAlertEventsResponse)
+async def platform_watchlist_alert_events_read_all(request: Request):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "watchlist_alert_events", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+    service = PlatformWatchlistAutomationService()
+    service.mark_all_alert_events_read(int(identity.user_id))
+    return service.list_alert_events(int(identity.user_id))
+
+
+@router.post("/watchlist/alert-events/{event_id}/read", response_model=PlatformWatchlistAlertEventsResponse)
+async def platform_watchlist_alert_event_read(request: Request, event_id: int):
+    _require_platform_csrf(request)
+    identity = _require_identity(request)
+    limited = check_platform_rate_limit(request, "watchlist_alert_events", user_id=int(identity.user_id))
+    if limited is not None:
+        return limited
+    service = PlatformWatchlistAutomationService()
+    if not service.mark_alert_event_read(int(identity.user_id), event_id):
+        raise HTTPException(status_code=404, detail="Alert event not found")
+    return service.list_alert_events(int(identity.user_id))
 
 
 @router.post("/history/snapshot", response_model=PlatformSnapshotHistorySaveResponse)

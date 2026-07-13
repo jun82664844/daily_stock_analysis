@@ -1962,6 +1962,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             "force_refresh": False,
         }
         with (
+            patch.dict(os.environ, {"ALPHASIFT_STALE_CACHE_FAST_PATH_ENABLED": "true"}),
             patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
             patch("src.services.alphasift_service.inspect_snapshot_cache", return_value=cache_decision),
             patch("src.services.alphasift_service._enrich_candidates_with_dsa") as enrich_mock,
@@ -1982,6 +1983,52 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["dsa_enrichment"]["mode"], "snapshot_fast_path")
         self.assertEqual(payload["candidates"][0]["screening_brief"]["data_freshness"], "cached")
         self.assertEqual(payload["warnings"], [])
+        enrich_mock.assert_not_called()
+
+    def test_screen_uses_expired_snapshot_as_an_explicit_fast_fallback(self) -> None:
+        config = self._config(enabled=True)
+        fake_module = _make_adapter_module(
+            screen=MagicMock(return_value={
+                "snapshot_count": 5524,
+                "snapshot_source": "last_good_cache",
+                "candidates": [{
+                    "code": "600519",
+                    "price": 1480.0,
+                    "factor_scores": {"value": 70.0},
+                    "raw": {"pe_ratio": 24.5},
+                }],
+            })
+        )
+        fake_module.__name__ = "alphasift.dsa_adapter"
+        cache_decision = {
+            "available": True,
+            "use_cache": False,
+            "reason": "expired",
+            "cached_at": "2026-07-11T10:00:00Z",
+            "age_seconds": 1800,
+            "max_age_seconds": 300,
+            "source": "sina",
+            "row_count": 5524,
+            "force_refresh": False,
+        }
+        with (
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            patch("src.services.alphasift_service.inspect_snapshot_cache", return_value=cache_decision),
+            patch("src.services.alphasift_service._enrich_candidates_with_dsa") as enrich_mock,
+        ):
+            payload = self._screen(
+                config,
+                market="cn",
+                strategy="dual_low",
+                max_results=5,
+                mock_enrichment=False,
+            )
+
+        self.assertTrue(payload["snapshot_cache_used"])
+        self.assertEqual(payload["snapshot_cache_freshness"], "stale")
+        self.assertEqual(payload["dsa_enrichment"]["mode"], "snapshot_fast_path")
+        self.assertEqual(payload["candidates"][0]["screening_brief"]["data_freshness"], "stale")
+        self.assertIn("snapshot_cache_stale", payload["warnings"])
         enrich_mock.assert_not_called()
 
     def test_screen_prefers_dsa_daily_history_for_alphasift_enrichment(self) -> None:

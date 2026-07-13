@@ -318,6 +318,48 @@ class PlatformWatchlistAlertLoopV100TestCase(unittest.TestCase):
                 reference_value=float("inf"),
             )
 
+    def test_exact_price_rules_are_private_and_supported(self) -> None:
+        from src.platform_watchlist_automation import PlatformWatchlistAutomationService
+
+        service = PlatformWatchlistAutomationService(db_manager=self.db, radar_service=_RadarSequence([]))
+        service.save_rule(
+            user_id=self.user_a.id,
+            plan="free",
+            stock_code="AAPL",
+            rule_type="price_above",
+            threshold=200.0,
+        )
+        result = service.save_rule(
+            user_id=self.user_a.id,
+            plan="free",
+            stock_code="AAPL",
+            rule_type="price_below",
+            threshold=180.0,
+        )
+
+        self.assertEqual(
+            {item["rule_type"] for item in result["items"]},
+            {"price_above", "price_below"},
+        )
+        self.assertEqual(service.list_rules(self.user_b.id, plan="free")["items"], [])
+
+    def test_exact_price_threshold_and_paid_plan_aliases(self) -> None:
+        from src.platform_watchlist_automation import PlatformWatchlistAutomationService
+
+        service = PlatformWatchlistAutomationService(db_manager=self.db, radar_service=_RadarSequence([]))
+        for plan in ("plus", "pro", "max", "premium", "enterprise"):
+            self.assertEqual(service.rule_limit(plan), 50)
+        self.assertEqual(service.rule_limit("free"), 3)
+        for invalid in (0, -1, float("nan"), float("inf"), 1_000_000_001):
+            with self.assertRaisesRegex(ValueError, "threshold"):
+                service.save_rule(
+                    user_id=self.user_a.id,
+                    plan="free",
+                    stock_code="AAPL",
+                    rule_type="price_above",
+                    threshold=invalid,
+                )
+
     def test_delete_rule_cannot_cross_user_boundary(self) -> None:
         from src.platform_watchlist_automation import PlatformWatchlistAutomationService
 

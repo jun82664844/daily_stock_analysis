@@ -1297,6 +1297,21 @@ def main() -> int:
                     "name": "agent_event_monitor",
                 })
 
+            if getattr(config, 'platform_price_alert_monitor_enabled', False):
+                from src.services.platform_price_alert_worker import PlatformPriceAlertWorker
+
+                price_alert_worker = PlatformPriceAlertWorker(
+                    max_rules_per_cycle=config.platform_price_alert_monitor_max_rules_per_cycle,
+                    max_workers=config.platform_price_alert_monitor_max_workers,
+                    quote_timeout_seconds=config.platform_price_alert_monitor_quote_timeout_seconds,
+                )
+                background_tasks.append({
+                    "task": price_alert_worker.run_once,
+                    "interval_seconds": config.platform_price_alert_monitor_interval_seconds,
+                    "run_immediately": True,
+                    "name": "platform_price_alert_monitor",
+                })
+
             run_with_schedule(
                 task=scheduled_task,
                 schedule_time=config.schedule_time,
