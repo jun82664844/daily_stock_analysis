@@ -149,6 +149,7 @@ verify_*.py
 !scripts/verify_platform_kronos_rtx5090_v108.py
 !scripts/verify_platform_a_stock_data_live_v109.py
 !scripts/verify_platform_global_equity_public_data_v110.py
+!scripts/verify_platform_unified_market_data_v115.py
 
 # Local third-party source checkouts are installed for inspection only.
 /external/

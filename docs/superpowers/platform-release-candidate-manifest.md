@@ -2227,3 +2227,33 @@ Boundary: local DSA-native implementation only. OpenStock AGPL source was not co
 Local evidence: ignored checkout at commit `40da189d8b6f1d7c23b0fafa5fcf8788710db2c9`, MIT license, 104 upstream tests passed, Ruff passed, offline demo generated and browser-rendered without console errors.
 
 Boundary: this is not a DSA runtime integration or a fifth production feature. The external checkout, virtual environment and demo outputs are excluded from DSA Git and release artifacts. Online providers, notifications, portfolio imports, trading language, real keys and the standalone site remain disabled.
+
+## V115 Unified Market Data Contract Package
+
+- `.gitignore`
+- `api/v1/schemas/basic_query.py`
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `src/services/basic_query_service.py`
+- `src/services/market_data_contract.py`
+- `tests/test_market_data_contract_v115.py`
+- `tests/test_platform_unified_market_data_v115_verifier.py`
+- `scripts/verify_platform_unified_market_data_v115.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-12-dsa-v115-unified-market-data-contract.md`
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_UNIFIED_MARKET_DATA_V115_OK canonical_snapshot=true source_arbitration=true deduplication=true no_averaging=true ai_required=false`.
+
+Boundary: one DSA-native fact contract, no new external runtime, no AI requirement, no averaging of conflicting facts, and no investment-advice claim. OpenStock remains uninstalled and ai-market-pulse remains an isolated POC.
+
+## Concurrent Hong Kong Market Research Artifacts
+
+- `docs/superpowers/plans/2026-07-12-dsa-hong-kong-market-competitive-research.md`
+- `docs/superpowers/plans/2026-07-12-dsa-hong-kong-market-simple-comparison.md`
+
+These files appeared from concurrent local research during V115 verification. They are classified for dirty-tree coverage only and were not edited or accepted as production pricing, legal, market-data licensing, launch, or investment-advice policy by V115.

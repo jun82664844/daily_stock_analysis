@@ -327,6 +327,32 @@ export type BasicStockSnapshot = {
     severity: string;
     message: string;
   } | null;
+  canonicalData?: {
+    contractVersion: string;
+    symbol: string;
+    market: string;
+    policy: {
+      strategy?: string;
+      noAveraging?: boolean;
+      factsAndModelsSeparated?: boolean;
+    };
+    selectedSources: Record<string, {
+      source: string;
+      freshness: string;
+      observedAt?: string | null;
+      priority?: number | null;
+      cacheState?: string | null;
+    }>;
+    fieldProvenance: Record<string, string>;
+    conflicts: Array<Record<string, unknown>>;
+    deduplication: {
+      inputCount?: number;
+      outputCount?: number;
+      removedCount?: number;
+    };
+    informationalOnly: boolean;
+    aiUsed: boolean;
+  } | null;
   diagnostics?: {
     elapsedMs: number;
     quoteElapsedMs: number;

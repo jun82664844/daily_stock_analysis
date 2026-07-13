@@ -497,6 +497,32 @@ class BasicQueryDiagnosticsPayload(BaseModel):
     refresh: Dict[str, Any] = Field(default_factory=dict)
     route_lane: Optional[str] = None
     performance: Dict[str, Any] = Field(default_factory=dict)
+    canonical_data: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BasicCanonicalSourcePayload(BaseModel):
+    """Selected source state for one canonical fact domain."""
+
+    source: str
+    freshness: str = Field(..., pattern="^(fresh|cached|stale|unavailable)$")
+    observed_at: Optional[str] = None
+    priority: Optional[int] = Field(None, ge=0)
+    cache_state: Optional[str] = None
+
+
+class BasicCanonicalDataPayload(BaseModel):
+    """Field-level provenance and deduplication contract for one snapshot."""
+
+    contract_version: str = "v1"
+    symbol: str
+    market: str
+    policy: Dict[str, Any] = Field(default_factory=dict)
+    selected_sources: Dict[str, BasicCanonicalSourcePayload] = Field(default_factory=dict)
+    field_provenance: Dict[str, str] = Field(default_factory=dict)
+    conflicts: List[Dict[str, Any]] = Field(default_factory=list)
+    deduplication: Dict[str, int] = Field(default_factory=dict)
+    informational_only: bool = True
+    ai_used: bool = False
 
 
 class BasicStockSnapshot(BaseModel):
@@ -514,6 +540,7 @@ class BasicStockSnapshot(BaseModel):
     warnings: List[BasicWarningPayload] = Field(default_factory=list)
     degradation: BasicDegradationPayload = Field(default_factory=BasicDegradationPayload)
     diagnostics: Optional[BasicQueryDiagnosticsPayload] = None
+    canonical_data: Optional[BasicCanonicalDataPayload] = None
     ai_used: bool = False
 
 

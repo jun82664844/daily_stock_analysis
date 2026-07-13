@@ -315,6 +315,11 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/market-workspace/MarketNewsTimelineV113.tsx",
     "apps/dsa-web/src/components/market-workspace/SymbolWorkspaceV113.tsx",
     "apps/dsa-web/src/components/market-workspace/WatchlistBriefV113.tsx",
+    "docs/superpowers/plans/2026-07-12-dsa-v115-unified-market-data-contract.md",
+    "scripts/verify_platform_unified_market_data_v115.py",
+    "tests/test_platform_unified_market_data_v115_verifier.py",
+    "tests/test_market_data_contract_v115.py",
+    "src/services/market_data_contract.py",
     "apps/dsa-web/playwright.config.ts",
     "apps/dsa-web/e2e/platform-user-e2e.spec.ts",
 )
@@ -389,6 +394,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_global_equity_public_data_v110.py",
     "scripts/verify_platform_simple_model_access_v112.py",
     "scripts/verify_platform_market_workspace_v113.py",
+    "scripts/verify_platform_unified_market_data_v115.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

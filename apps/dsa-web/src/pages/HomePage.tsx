@@ -163,7 +163,7 @@ const buildBasicSparkline = (
 const volumePriceSignalLabel = (value: unknown, language: string): string => {
   const signal = typeof value === 'string' ? value : '';
   const isEnglish = language === 'en';
-  if (signal === 'price_volume_confirmed') return isEnglish ? 'Price-volume confirmed' : '价量确认';
+  if (signal === 'price_volume_confirmed' || signal === 'price volume confirmed') return isEnglish ? 'Price-volume confirmed' : '价量确认';
   if (signal === 'price_above_trend_volume_soft') return isEnglish ? 'Price above trend' : '价在趋势上方';
   if (signal === 'price above trend volume soft') return isEnglish ? 'Price above trend, soft volume' : '价格位于趋势上方但量能偏弱';
   if (signal === 'volume_expanded_price_below_trend') return isEnglish ? 'Volume expanded' : '放量但价弱';
@@ -3470,13 +3470,19 @@ const HomePage: React.FC = () => {
       ? (isEnglish ? 'Live fetch' : '实时获取')
       : cacheModes.some((value) => value === 'hit')
         ? (isEnglish ? 'Cache hit' : '缓存命中')
-        : localizeRuntimeLabel(cacheModes.join(' / ') || 'unavailable', uiLanguage);
+        : cacheModes.map((value) => localizeRuntimeLabel(value, uiLanguage)).join(' / ')
+          || localizeRuntimeLabel('unavailable', uiLanguage);
     const sourceHealthItems = Object.values(basicSnapshot.diagnostics?.sourceHealth ?? {})
       .map((item) => localizeRuntimeLabel(item?.status || item?.source || '-', uiLanguage))
       .filter((value) => value && value !== '-');
     const sourceHealthValue = sourceHealthItems.length > 0
       ? Array.from(new Set(sourceHealthItems)).join(' / ')
       : localizeRuntimeLabel('unavailable', uiLanguage);
+    const canonicalData = basicSnapshot.canonicalData;
+    const canonicalSourceCount = Object.values(canonicalData?.selectedSources ?? {})
+      .filter((item) => item.source && item.source !== 'unavailable').length;
+    const canonicalConflictCount = canonicalData?.conflicts?.length ?? 0;
+    const canonicalDuplicatesRemoved = canonicalData?.deduplication?.removedCount ?? 0;
     const trustCards = [
       {
         label: isEnglish ? 'Quote source' : '行情源',
@@ -3506,6 +3512,15 @@ const HomePage: React.FC = () => {
           ? 'Treat degraded or stale sources as provisional until the next refresh.'
           : '来源降级或行情过期时，先当作临时参考，刷新后再解读。',
       },
+      ...(canonicalData ? [{
+        label: isEnglish ? 'Canonical fact snapshot' : '统一事实快照',
+        value: isEnglish
+          ? `${canonicalSourceCount} source types / ${canonicalConflictCount} observed conflicts`
+          : `${canonicalSourceCount} 类来源 / ${canonicalConflictCount} 项已发现冲突`,
+        detail: isEnglish
+          ? `${canonicalDuplicatesRemoved} duplicate records removed. Conflicting facts are never averaged.`
+          : `已去除 ${canonicalDuplicatesRemoved} 条重复记录；冲突数据不取平均值。`,
+      }] : []),
     ];
     const financialMetrics = [
       {

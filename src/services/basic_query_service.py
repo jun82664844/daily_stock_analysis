@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, Iterable, Optional
 from data_provider.base import normalize_stock_code
 from src.services.stock_code_utils import normalize_crypto_symbol
 from src.services.market_data_cache import CacheHit, MarketDataCache
+from src.services.market_data_contract import MarketDataContractService
 from src.services.market_source_health import MarketSourceHealthRegistry, default_market_source_health
 from src.services.persistent_market_data_cache import default_persistent_market_data_cache
 from src.services.a_share_enrichment_service import AShareEnrichmentService
@@ -70,12 +71,14 @@ class BasicQueryService:
         source_health: Optional[MarketSourceHealthRegistry] = None,
         a_share_enrichment_service: Optional[Any] = None,
         global_equity_enrichment_service: Optional[Any] = None,
+        market_data_contract_service: Optional[MarketDataContractService] = None,
     ):
         self.stock_service = stock_service or StockService()
         self.cache = cache or default_persistent_market_data_cache
         self.source_health = source_health or default_market_source_health
         self.a_share_enrichment_service = a_share_enrichment_service or AShareEnrichmentService()
         self.global_equity_enrichment_service = global_equity_enrichment_service
+        self.market_data_contract_service = market_data_contract_service or MarketDataContractService()
         self.fetch_timeout_seconds = (
             _DEFAULT_FETCH_TIMEOUT_SECONDS if fetch_timeout_seconds is None else max(0.001, float(fetch_timeout_seconds))
         )
@@ -197,6 +200,72 @@ class BasicQueryService:
             profile=profile_payload,
             force_refresh=force_refresh,
         )
+        intelligence, deduplication = self.market_data_contract_service.deduplicate_snapshot_intelligence(
+            self._intelligence_payload(
+                route=route,
+                quote=quote_payload,
+                profile=profile_payload,
+                indicators=indicators,
+                trend=trend,
+                warnings=warnings,
+                a_share_enrichment=a_share_enrichment,
+                global_equity_enrichment=global_equity_enrichment,
+            )
+        )
+        diagnostics = self._diagnostics_payload(
+            started=started,
+            route=route,
+            quote_elapsed_ms=quote_elapsed_ms,
+            history_elapsed_ms=history_elapsed_ms,
+            profile_elapsed_ms=profile_elapsed_ms,
+            quote_cache=quote_cache,
+            history_cache=history_cache,
+            profile_cache=profile_cache,
+            quote_source=quote_source,
+            history_source=history_source,
+            profile_source=profile_source,
+            quote_freshness=quote_freshness,
+            history_freshness=history_freshness,
+            profile_freshness=profile_freshness,
+            quote_timeout=quote_timeout,
+            history_timeout=history_timeout,
+            profile_timeout=profile_timeout,
+            quote_fallback=quote_fallback,
+            history_fallback=history_fallback,
+            profile_fallback=profile_fallback,
+            quote_error=quote_error,
+            history_error=history_error,
+            profile_error=profile_error,
+            quote_health=quote_health,
+            history_health=history_health,
+            profile_health=profile_health,
+            quote_cache_origin=quote_cache_origin,
+            history_cache_origin=history_cache_origin,
+            profile_cache_origin=profile_cache_origin,
+            force_refresh=force_refresh,
+        )
+        history_contract_payload = dict(history or {})
+        history_contract_payload.setdefault("source", history_source)
+        history_contract_payload["freshness"] = history_freshness
+        canonical_data = self.market_data_contract_service.build_snapshot_contract(
+            symbol=code,
+            market=route.market,
+            source_priority={
+                "quote": route.quote_sources,
+                "history": route.history_sources,
+                "profile": route.profile_sources,
+            },
+            quote=quote_payload,
+            history=history_contract_payload,
+            profile=profile_payload,
+            diagnostics=diagnostics,
+            deduplication=deduplication,
+        )
+        diagnostics["canonical_data"] = {
+            "contract_version": canonical_data["contract_version"],
+            "conflict_count": len(canonical_data["conflicts"]),
+            "duplicates_removed": canonical_data["deduplication"]["removed_count"],
+        }
 
         return {
             "stock_code": code,
@@ -206,51 +275,12 @@ class BasicQueryService:
             "profile": profile_payload,
             "indicators": indicators,
             "trend": trend,
-            "intelligence": self._intelligence_payload(
-                route=route,
-                quote=quote_payload,
-                profile=profile_payload,
-                indicators=indicators,
-                trend=trend,
-                warnings=warnings,
-                a_share_enrichment=a_share_enrichment,
-                global_equity_enrichment=global_equity_enrichment,
-            ),
+            "intelligence": intelligence,
             "route": route.to_payload(),
             "warnings": warnings,
             "degradation": self._degradation_payload(warnings),
-            "diagnostics": self._diagnostics_payload(
-                started=started,
-                route=route,
-                quote_elapsed_ms=quote_elapsed_ms,
-                history_elapsed_ms=history_elapsed_ms,
-                profile_elapsed_ms=profile_elapsed_ms,
-                quote_cache=quote_cache,
-                history_cache=history_cache,
-                profile_cache=profile_cache,
-                quote_source=quote_source,
-                history_source=history_source,
-                profile_source=profile_source,
-                quote_freshness=quote_freshness,
-                history_freshness=history_freshness,
-                profile_freshness=profile_freshness,
-                quote_timeout=quote_timeout,
-                history_timeout=history_timeout,
-                profile_timeout=profile_timeout,
-                quote_fallback=quote_fallback,
-                history_fallback=history_fallback,
-                profile_fallback=profile_fallback,
-                quote_error=quote_error,
-                history_error=history_error,
-                profile_error=profile_error,
-                quote_health=quote_health,
-                history_health=history_health,
-                profile_health=profile_health,
-                quote_cache_origin=quote_cache_origin,
-                history_cache_origin=history_cache_origin,
-                profile_cache_origin=profile_cache_origin,
-                force_refresh=force_refresh,
-            ),
+            "diagnostics": diagnostics,
+            "canonical_data": canonical_data,
             "ai_used": False,
         }
 

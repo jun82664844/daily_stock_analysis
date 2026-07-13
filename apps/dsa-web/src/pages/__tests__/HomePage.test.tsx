@@ -3514,6 +3514,29 @@ describe('HomePage', () => {
         routeLane: 'us_market_data',
         performance: { status: 'ok', slowThresholdMs: 3000 },
       },
+      canonicalData: {
+        contractVersion: 'v1',
+        symbol: 'AAPL',
+        market: 'us',
+        policy: {
+          strategy: 'freshness_then_priority_then_observed_at',
+          noAveraging: true,
+          factsAndModelsSeparated: true,
+        },
+        selectedSources: {
+          quote: { source: 'yahoo_chart', freshness: 'fresh', priority: 0, cacheState: 'miss' },
+          history: { source: 'yfinance', freshness: 'fresh', priority: 1, cacheState: 'miss' },
+          profile: { source: 'unit_profile', freshness: 'fresh', priority: null, cacheState: 'miss' },
+        },
+        fieldProvenance: {
+          'quote.current_price': 'yahoo_chart',
+          'profile.market_cap': 'unit_profile',
+        },
+        conflicts: [],
+        deduplication: { inputCount: 4, outputCount: 3, removedCount: 1 },
+        informationalOnly: true,
+        aiUsed: false,
+      },
       aiUsed: false,
     });
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(new Error('AI should not run for basic query'));
@@ -3782,6 +3805,9 @@ describe('HomePage', () => {
     expect(verifiedDataBoard).toHaveTextContent('缓存状态');
     expect(verifiedDataBoard).toHaveTextContent('实时获取');
     expect(verifiedDataBoard).toHaveTextContent('来源健康');
+    expect(verifiedDataBoard).toHaveTextContent('统一事实快照');
+    expect(verifiedDataBoard).toHaveTextContent('3 类来源 / 0 项已发现冲突');
+    expect(verifiedDataBoard).toHaveTextContent('已去除 1 条重复记录');
     expect(verifiedDataBoard).toHaveTextContent('同业/板块实况');
     expect(verifiedDataBoard).toHaveTextContent('QQQ');
     expect(verifiedDataBoard).toHaveTextContent('XLK');
@@ -3800,6 +3826,8 @@ describe('HomePage', () => {
     expect(verifiedDataBoard).toHaveTextContent('免费版使用公开/本地源');
     expect(verifiedDataBoard).toHaveTextContent('高级版使用 API 和原文链接');
     expect(verifiedDataBoard).toHaveTextContent('不构成投资建议');
+    expect(verifiedDataBoard).toHaveTextContent('量价信号为 价量确认');
+    expect(verifiedDataBoard).not.toHaveTextContent('price volume confirmed');
     const eventRadar = screen.getByTestId('basic-query-event-radar');
     expect(eventRadar).toHaveTextContent('事件雷达');
     expect(eventRadar).toHaveTextContent('为什么涨跌');

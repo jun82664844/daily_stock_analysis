@@ -1964,3 +1964,42 @@ Boundary: DSA-native local implementation only; no OpenStock AGPL code copied, n
 - `docs/superpowers/platform-review-slices.md`
 
 The ignored checkout under `external/ai-market-pulse` is local evidence only and is not part of the DSA release package. No upstream runtime is connected to DSA.
+
+## V115 Unified Market Data Contract Review Slice
+
+### Backend contract
+
+- `src/services/market_data_contract.py`
+- `src/services/basic_query_service.py`
+- `api/v1/schemas/basic_query.py`
+
+Review focus: freshness before source priority, deterministic tie-breaking, no averaging, field provenance, and URL/event deduplication.
+
+### Frontend diagnostics
+
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Review focus: Chinese/English parity, compact data-credibility presentation, no secret values, and preserved information-only boundary.
+
+### Tests, verifier, and docs
+
+- `tests/test_market_data_contract_v115.py`
+- `tests/test_platform_unified_market_data_v115_verifier.py`
+- `scripts/verify_platform_unified_market_data_v115.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `docs/superpowers/plans/2026-07-12-dsa-v115-unified-market-data-contract.md`
+- `docs/superpowers/github-feature-integrations-status.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `.gitignore`
+
+Review focus: stable marker, Git visibility, dirty-file classification, no production/payment claim, and no changes to installed external source checkouts.
+
+## Concurrent Hong Kong Market Research Review Slice
+
+- `docs/superpowers/plans/2026-07-12-dsa-hong-kong-market-competitive-research.md`
+- `docs/superpowers/plans/2026-07-12-dsa-hong-kong-market-simple-comparison.md`
+
+These concurrent documents are inventoried without modifying their content. Review them separately before accepting any pricing, legal, market-data licensing or launch decision.

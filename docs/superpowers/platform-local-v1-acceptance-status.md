@@ -589,3 +589,13 @@ git diff --check
 - 聚焦后端测试 13 项通过；前端 API/页面测试 7 项通过；lint 与生产构建通过。
 - `scripts/verify_platform_market_workspace_v113.py` 输出 `DSA_PLATFORM_MARKET_WORKSPACE_V113_OK markets=cn,hk,us guest=true watchlist=true alerts=true ai_required=false agpl_code_copied=false`。
 - OpenStock 仍为产品灵感来源，不作为代码、依赖或运行服务安装。V113 不批准真实支付、生产密钥、公开部署或市场数据授权，也不构成投资建议。
+
+## V115 统一数据中台与来源仲裁状态（2026-07-12）
+
+- 单股基础查询现在返回 `canonical_data`，记录行情、历史 K 线和公司资料的选中来源、新鲜度、观测时间、缓存状态和字段级来源。
+- 来源仲裁使用“新鲜度、市场来源优先级、观测时间”顺序；冲突价格不取平均值。
+- 资讯、公告和事件记录支持来源编号或规范化 URL 去重，并记录输入数、输出数和移除数。
+- 免费版“数据可信度”区域显示统一事实快照、来源类型、冲突数量和去重数量，中英文均有固定文案。
+- Kronos 和 AI 继续属于派生信息层，不得覆盖行情、财务或公告事实。
+- `scripts/verify_platform_unified_market_data_v115.py` 通过时输出 `DSA_PLATFORM_UNIFIED_MARKET_DATA_V115_OK canonical_snapshot=true source_arbitration=true deduplication=true no_averaging=true ai_required=false`。
+- V115 仍是本地功能闭环，不代表真实支付、公开部署、生产密钥或市场数据授权获批；所有内容仅为资讯和数据，不构成投资建议。
