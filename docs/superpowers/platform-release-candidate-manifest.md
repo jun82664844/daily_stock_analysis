@@ -2612,4 +2612,33 @@ Docs and packaging:
 
 Acceptance marker: `DSA_PLATFORM_FREE_DAILY_MARKET_WORKBENCH_V124_OK guest=true public_data=true ai_used=false market_clocks=true cross_market_timeline=true recent_research=true bilingual=true investment_advice=false`.
 
+## V125 Market Sessions And Home Performance
+
+Runtime and API:
+
+- `src/services/public_market_session_service.py`
+- `src/services/market_workspace_service.py`
+- `src/services/public_market_home_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_session_service.py`
+- `tests/test_market_workspace_v113.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketWorkbenchV124.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_market_sessions_home_performance_v125.py`
+- `tests/test_platform_market_sessions_home_performance_v125_verifier.py`
+- `docs/superpowers/plans/2026-07-14-dsa-v125-market-session-home-performance.md`
+
+Acceptance marker: `DSA_PLATFORM_MARKET_SESSIONS_HOME_PERFORMANCE_V125_OK`.
+
+Safety boundary: public market sessions use exchange calendars only, consume no AI quota, expose unknown on calendar failure, and remain information and data only rather than investment advice.
+
 Boundary: local guest public-data acceptance only. No new third-party source, automatic model call, production deployment, payment, production key, commercial market-data redistribution, forecast or investment-advice approval is claimed.

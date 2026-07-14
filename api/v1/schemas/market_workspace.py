@@ -9,6 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 SourceStatus = Literal["fresh", "cached", "stale", "unavailable"]
+MarketSessionPhase = Literal[
+    "premarket",
+    "intraday",
+    "lunch_break",
+    "closing_auction",
+    "postmarket",
+    "non_trading",
+    "unknown",
+]
 
 
 class StrictModel(BaseModel):
@@ -75,6 +84,12 @@ class MarketWorkspaceOverview(StrictModel):
     market: Literal["cn", "hk", "us"]
     as_of: str
     session_state: Literal["open", "closed", "unknown"] = "unknown"
+    session_phase: MarketSessionPhase = "unknown"
+    market_local_time: Optional[str] = None
+    minutes_to_open: Optional[int] = Field(default=None, ge=0)
+    minutes_to_close: Optional[int] = Field(default=None, ge=0)
+    session_source: Literal["exchange_calendar", "unavailable"] = "unavailable"
+    session_warning_codes: List[str] = Field(default_factory=list)
     indices: List[MarketSecurityItem] = Field(default_factory=list)
     breadth: MarketBreadth
     movers: List[MarketSecurityItem] = Field(default_factory=list)
@@ -90,6 +105,12 @@ class MarketWorkspaceOverview(StrictModel):
 class PublicMarketHomeSection(StrictModel):
     market: Literal["cn", "hk", "us"]
     session_state: Literal["open", "closed", "unknown"] = "unknown"
+    session_phase: MarketSessionPhase = "unknown"
+    market_local_time: Optional[str] = None
+    minutes_to_open: Optional[int] = Field(default=None, ge=0)
+    minutes_to_close: Optional[int] = Field(default=None, ge=0)
+    session_source: Literal["exchange_calendar", "unavailable"] = "unavailable"
+    session_warning_codes: List[str] = Field(default_factory=list)
     display_mode: Literal["latest_available", "delayed", "realtime"] = "latest_available"
     ranking_scope: Literal["configured_universe", "market_wide", "unavailable"] = "configured_universe"
     selection_basis: str

@@ -57,6 +57,12 @@ export type MarketWorkspaceOverview = {
   market: MarketCode;
   asOf: string;
   sessionState: 'open' | 'closed' | 'unknown';
+  sessionPhase?: MarketSessionPhase;
+  marketLocalTime?: string | null;
+  minutesToOpen?: number | null;
+  minutesToClose?: number | null;
+  sessionSource?: 'exchange_calendar' | 'unavailable';
+  sessionWarningCodes?: string[];
   indices: MarketSecurityItem[];
   breadth: { advancers: number; decliners: number; unchanged: number; unavailable: boolean };
   movers: MarketSecurityItem[];
@@ -72,6 +78,12 @@ export type MarketWorkspaceOverview = {
 export type PublicMarketHomeSection = {
   market: MarketCode;
   sessionState: 'open' | 'closed' | 'unknown';
+  sessionPhase?: MarketSessionPhase;
+  marketLocalTime?: string | null;
+  minutesToOpen?: number | null;
+  minutesToClose?: number | null;
+  sessionSource?: 'exchange_calendar' | 'unavailable';
+  sessionWarningCodes?: string[];
   displayMode: 'latest_available' | 'delayed' | 'realtime';
   rankingScope: 'configured_universe' | 'market_wide' | 'unavailable';
   selectionBasis: string;
@@ -86,6 +98,15 @@ export type PublicMarketHomeSection = {
   sources: DataSourceState[];
   warnings: string[];
 };
+
+export type MarketSessionPhase =
+  | 'premarket'
+  | 'intraday'
+  | 'lunch_break'
+  | 'closing_auction'
+  | 'postmarket'
+  | 'non_trading'
+  | 'unknown';
 
 export type PublicMarketHomeResponse = {
   asOf: string;
@@ -156,6 +177,9 @@ export const marketWorkspaceApi = {
       ...body,
       markets: Array.isArray(body.markets) ? body.markets.map((market) => ({
         ...market,
+        sessionPhase: market.sessionPhase ?? 'unknown',
+        sessionSource: market.sessionSource ?? 'unavailable',
+        sessionWarningCodes: Array.isArray(market.sessionWarningCodes) ? market.sessionWarningCodes : [],
         indices: Array.isArray(market.indices) ? market.indices : [],
         attention: Array.isArray(market.attention) ? market.attention : [],
         mostActive: Array.isArray(market.mostActive) ? market.mostActive : (Array.isArray(market.attention) ? market.attention : []),
@@ -174,6 +198,9 @@ export const marketWorkspaceApi = {
     const body = toCamelCase<MarketWorkspaceOverview>(response.data);
     return {
       ...body,
+      sessionPhase: body.sessionPhase ?? 'unknown',
+      sessionSource: body.sessionSource ?? 'unavailable',
+      sessionWarningCodes: Array.isArray(body.sessionWarningCodes) ? body.sessionWarningCodes : [],
       breadth: body.breadth ?? { advancers: 0, decliners: 0, unchanged: 0, unavailable: true },
       indices: Array.isArray(body.indices) ? body.indices : [],
       movers: Array.isArray(body.movers) ? body.movers : [],

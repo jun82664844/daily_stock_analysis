@@ -685,4 +685,12 @@ git diff --check
 - 榜单、指数、行业领涨、数据预览和最近查看继续进入现有免费查询，不要求登录，不自动运行 AI。
 - 中文和英文组件测试覆盖市场状态、时间线、来源时间、最近查看、清空隔离和资讯数据边界。
 - `scripts/verify_platform_free_daily_market_workbench_v124.py` 通过时输出 `DSA_PLATFORM_FREE_DAILY_MARKET_WORKBENCH_V124_OK guest=true public_data=true ai_used=false market_clocks=true cross_market_timeline=true recent_research=true bilingual=true investment_advice=false`。
+
+## V125 市场时段与首页性能状态（2026-07-14）
+
+- A 股、港股和美股首页时段统一复用 `exchange_calendars`，展示盘前、交易中、午间休市、收盘集合阶段、已收盘、今日休市或待确认。
+- 公开首页返回市场当地时间、距开盘/收盘分钟数、日历来源和警告码；日历不可用时只降级为待确认，不猜测开收盘状态。
+- 中文与英文界面分别展示完整阶段、倒计时和来源文案，继续保留“仅提供资讯和数据，不构成投资建议”边界。
+- 查询后才使用的研究、免费试用、雷达和全球增强组件改为动态加载；最新 `HomePage` 路由主包设定 `< 500,000 bytes` 硬门禁。
+- `scripts/verify_platform_market_sessions_home_performance_v125.py` 通过时输出 `DSA_PLATFORM_MARKET_SESSIONS_HOME_PERFORMANCE_V125_OK`。
 - 本状态仅代表本地免费公开数据体验，不代表生产部署、真实支付、生产密钥、市场数据商业授权或法律审批；所有内容只提供资讯和数据，不构成投资建议。

@@ -12,6 +12,10 @@ from threading import Lock
 from typing import Any, Callable, Dict, Optional
 
 from src.services.market_workspace_service import MarketWorkspaceService
+from src.services.public_market_session_service import (
+    PublicMarketSessionService,
+    unknown_market_session,
+)
 
 
 MARKETS = ("cn", "hk", "us")
@@ -33,6 +37,7 @@ class PublicMarketHomeService:
         clock: Callable[[], str] = _utc_now,
         executor: Optional[ThreadPoolExecutor] = None,
         ranking_loader: Optional[Callable[[str], Dict[str, Any]]] = None,
+        session_resolver: Optional[Callable[[str, str], Dict[str, Any]]] = None,
     ) -> None:
         self.workspace_service = workspace_service or MarketWorkspaceService()
         raw_timeout = timeout_seconds if timeout_seconds is not None else os.getenv("PLATFORM_PUBLIC_MARKET_HOME_TIMEOUT_SECONDS", "5.5")
@@ -42,6 +47,7 @@ class PublicMarketHomeService:
         self.clock = clock
         self.executor = executor or _HOME_EXECUTOR
         self.ranking_loader = ranking_loader
+        self.session_resolver = session_resolver or PublicMarketSessionService().resolve
         self._cache: Optional[tuple[float, Dict[str, Any]]] = None
         self._lock = Lock()
 
@@ -49,6 +55,8 @@ class PublicMarketHomeService:
         cached = self._read_cache()
         if cached is not None:
             return cached
+        as_of = self.clock()
+        sessions = {market: self._resolve_session(market, as_of) for market in MARKETS}
         futures = {market: self.executor.submit(self.workspace_service.get_overview, market) for market in MARKETS}
         ranking_futures = {
             market: self.executor.submit(self.ranking_loader, market)
@@ -63,18 +71,18 @@ class PublicMarketHomeService:
             overview = None if future not in completed or future.exception() is not None else future.result()
             if self.ranking_loader is None:
                 if overview is None:
-                    sections.append(self._unavailable_section(market))
+                    sections.append(self._unavailable_section(market, sessions[market]))
                 else:
-                    sections.append(self._section(market, overview))
+                    sections.append(self._section(market, overview, sessions[market]))
                 continue
             ranking_future = ranking_futures[market]
             rankings = None if ranking_future not in completed or ranking_future.exception() is not None else ranking_future.result()
             if overview is None and rankings is None:
-                sections.append(self._unavailable_section(market))
+                sections.append(self._unavailable_section(market, sessions[market]))
             else:
-                sections.append(self._dynamic_section(market, overview or {}, rankings))
+                sections.append(self._dynamic_section(market, overview or {}, rankings, sessions[market]))
         payload = {
-            "as_of": self.clock(),
+            "as_of": as_of,
             "markets": sections,
             "ai_used": False,
             "informational_only": True,
@@ -94,12 +102,12 @@ class PublicMarketHomeService:
             return None
         return copy.deepcopy(entry[1])
 
-    def _section(self, market: str, overview: Dict[str, Any]) -> Dict[str, Any]:
+    def _section(self, market: str, overview: Dict[str, Any], session: Dict[str, Any]) -> Dict[str, Any]:
         items = [dict(item) for item in overview.get("movers") or [] if isinstance(item, dict)]
         items.sort(key=self._attention_key)
         return {
             "market": market,
-            "session_state": overview.get("session_state") if overview.get("session_state") in {"open", "closed", "unknown"} else "unknown",
+            **session,
             "display_mode": self._display_mode(),
             "ranking_scope": "configured_universe",
             "selection_basis": "turnover_then_absolute_change",
@@ -107,23 +115,23 @@ class PublicMarketHomeService:
             "attention": items[: self.max_items_per_market],
             "headlines": list(overview.get("headlines") or [])[:10],
             "sources": list(overview.get("sources") or []),
-            "warnings": list(dict.fromkeys(overview.get("warnings") or [])),
+            "warnings": list(dict.fromkeys([*(overview.get("warnings") or []), *session.get("session_warning_codes", [])])),
         }
 
-    def _unavailable_section(self, market: str) -> Dict[str, Any]:
+    def _unavailable_section(self, market: str, session: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "market": market,
-            "session_state": "unknown",
+            **session,
             "display_mode": self._display_mode(),
             "ranking_scope": "unavailable" if self.ranking_loader is not None else "configured_universe",
             "selection_basis": "turnover_then_absolute_change",
             "indices": [], "attention": [], "most_active": [], "gainers": [], "losers": [],
             "sector_highlights": [], "ranking_cache": {"hit": False, "age_seconds": 0, "ttl_seconds": 120},
             "headlines": [], "sources": [],
-            "warnings": ["market_home_unavailable"],
+            "warnings": list(dict.fromkeys(["market_home_unavailable", *session.get("session_warning_codes", [])])),
         }
 
-    def _dynamic_section(self, market: str, overview: Dict[str, Any], rankings: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _dynamic_section(self, market: str, overview: Dict[str, Any], rankings: Optional[Dict[str, Any]], session: Dict[str, Any]) -> Dict[str, Any]:
         ranking = rankings or {}
         most_active = list(ranking.get("most_active") or [])[: self.max_items_per_market]
         gainers = list(ranking.get("gainers") or [])[: self.max_items_per_market]
@@ -138,9 +146,10 @@ class PublicMarketHomeService:
         warnings.extend(ranking.get("warnings") or [])
         if rankings is None:
             warnings.append("market_rankings_unavailable")
+        warnings.extend(session.get("session_warning_codes", []))
         return {
             "market": market,
-            "session_state": overview.get("session_state") if overview.get("session_state") in {"open", "closed", "unknown"} else "unknown",
+            **session,
             "display_mode": self._display_mode(),
             "ranking_scope": "market_wide" if has_market_rankings else "unavailable",
             "selection_basis": "market_wide_public_rankings_with_liquidity_filter",
@@ -161,6 +170,18 @@ class PublicMarketHomeService:
             ],
             "warnings": list(dict.fromkeys(warnings)),
         }
+
+    def _resolve_session(self, market: str, as_of: str) -> Dict[str, Any]:
+        try:
+            payload = dict(self.session_resolver(market, as_of) or {})
+        except Exception:
+            return unknown_market_session("calendar_error")
+        if payload.get("session_phase") not in {
+            "premarket", "intraday", "lunch_break", "closing_auction",
+            "postmarket", "non_trading", "unknown",
+        }:
+            return unknown_market_session("calendar_error")
+        return payload
 
     @staticmethod
     def _attention_key(item: Dict[str, Any]) -> tuple[Any, ...]:

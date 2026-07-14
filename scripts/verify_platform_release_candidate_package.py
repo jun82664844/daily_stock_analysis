@@ -383,6 +383,11 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/market-home/marketRecentV124.ts",
     "apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx",
     "apps/dsa-web/src/components/market-home/__tests__/marketRecentV124.test.ts",
+    "docs/superpowers/plans/2026-07-14-dsa-v125-market-session-home-performance.md",
+    "scripts/verify_platform_market_sessions_home_performance_v125.py",
+    "tests/test_platform_market_sessions_home_performance_v125_verifier.py",
+    "tests/test_public_market_session_service.py",
+    "src/services/public_market_session_service.py",
 )
 
 VERIFIER_FILES = (
@@ -464,6 +469,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_market_stock_preview_v121.py",
     "scripts/verify_platform_support_notifications_v122.py",
     "scripts/verify_platform_free_daily_market_workbench_v124.py",
+    "scripts/verify_platform_market_sessions_home_performance_v125.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

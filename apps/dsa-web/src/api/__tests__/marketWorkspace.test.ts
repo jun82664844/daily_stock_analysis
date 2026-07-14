@@ -15,6 +15,12 @@ describe('marketWorkspaceApi', () => {
         market: 'us',
         as_of: '2026-07-12T09:30:00Z',
         session_state: 'open',
+        session_phase: 'intraday',
+        market_local_time: '2026-07-12T05:30:00-04:00',
+        minutes_to_open: null,
+        minutes_to_close: 390,
+        session_source: 'exchange_calendar',
+        session_warning_codes: [],
         indices: [],
         breadth: { advancers: 1, decliners: 0, unchanged: 0, unavailable: false },
         movers: [],
@@ -31,6 +37,10 @@ describe('marketWorkspaceApi', () => {
     const body = await marketWorkspaceApi.getOverview('us');
 
     expect(body.asOf).toBe('2026-07-12T09:30:00Z');
+    expect(body.sessionPhase).toBe('intraday');
+    expect(body.marketLocalTime).toBe('2026-07-12T05:30:00-04:00');
+    expect(body.minutesToClose).toBe(390);
+    expect(body.sessionSource).toBe('exchange_calendar');
     expect(body.cache.ttlSeconds).toBe(60);
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/market-workspace/overview', { params: { market: 'us' } });
   });
@@ -38,12 +48,14 @@ describe('marketWorkspaceApi', () => {
   it('loads the public three-market home contract as camelCase', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: {
       as_of: '2026-07-13T01:30:00Z', ai_used: false, informational_only: true,
-      markets: [{ market: 'us', session_state: 'open', display_mode: 'latest_available', ranking_scope: 'configured_universe', selection_basis: 'turnover_then_absolute_change', indices: [], attention: [], sources: [], warnings: [] }],
+      markets: [{ market: 'us', session_state: 'open', session_phase: 'intraday', market_local_time: '2026-07-13T10:30:00-04:00', minutes_to_close: 330, session_source: 'exchange_calendar', session_warning_codes: [], display_mode: 'latest_available', ranking_scope: 'configured_universe', selection_basis: 'turnover_then_absolute_change', indices: [], attention: [], sources: [], warnings: [] }],
     } });
     const body = await marketWorkspaceApi.getHome();
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/market-workspace/home');
     expect(body.asOf).toBe('2026-07-13T01:30:00Z');
     expect(body.markets[0].displayMode).toBe('latest_available');
+    expect(body.markets[0].sessionPhase).toBe('intraday');
+    expect(body.markets[0].minutesToClose).toBe(330);
   });
 
   it('defaults overview collection fields when an older cached response omits them', async () => {

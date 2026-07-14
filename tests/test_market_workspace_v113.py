@@ -3,6 +3,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from threading import Event
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -33,6 +34,18 @@ def _snapshot(symbol: str, *, market: str = "us", change: float = 1.25) -> dict:
         "warnings": [],
         "degradation": {"status": "ok"},
         "ai_used": False,
+    }
+
+
+def _session_payload(*_args) -> dict:
+    return {
+        "session_state": "open",
+        "session_phase": "intraday",
+        "market_local_time": "2026-07-12T09:30:00-04:00",
+        "minutes_to_open": None,
+        "minutes_to_close": 390,
+        "session_source": "exchange_calendar",
+        "session_warning_codes": [],
     }
 
 
@@ -144,6 +157,7 @@ class MarketWorkspaceServiceV113TestCase(unittest.TestCase):
         service = MarketWorkspaceService(
             snapshot_loader=delayed_loader,
             market_symbols={"cn": [], "hk": [], "us": ["AAPL", "MSFT", "NVDA", "TSLA"]},
+            session_resolver=_session_payload,
         )
 
         started = time.perf_counter()
@@ -152,6 +166,33 @@ class MarketWorkspaceServiceV113TestCase(unittest.TestCase):
 
         self.assertEqual(len(overview["movers"]), 4)
         self.assertLess(elapsed, 0.25)
+
+    def test_market_session_and_quotes_start_in_parallel(self) -> None:
+        from src.services.market_workspace_service import MarketWorkspaceService
+
+        session_started = Event()
+        quote_started = Event()
+
+        def session_resolver(*_args) -> dict:
+            session_started.set()
+            self.assertTrue(quote_started.wait(0.5))
+            return _session_payload()
+
+        def snapshot_loader(symbol: str) -> dict:
+            quote_started.set()
+            self.assertTrue(session_started.wait(0.5))
+            return _snapshot(symbol)
+
+        service = MarketWorkspaceService(
+            snapshot_loader=snapshot_loader,
+            market_symbols={"cn": [], "hk": [], "us": ["AAPL"]},
+            session_resolver=session_resolver,
+        )
+
+        overview = service.get_overview("us")
+
+        self.assertEqual(overview["session_phase"], "intraday")
+        self.assertEqual([item["symbol"] for item in overview["movers"]], ["AAPL"])
 
     def test_overview_returns_at_deadline_when_a_market_source_stalls(self) -> None:
         from src.services.market_workspace_service import MarketWorkspaceService

@@ -10,21 +10,21 @@ const data: PublicMarketHomeResponse = {
   informationalOnly: true,
   markets: [
     {
-      market: 'cn', sessionState: 'open', displayMode: 'latest_available', rankingScope: 'market_wide', selectionBasis: 'public',
+      market: 'cn', sessionState: 'closed', sessionPhase: 'premarket', marketLocalTime: '2026-07-14T09:00:00+08:00', minutesToOpen: 30, minutesToClose: null, sessionSource: 'exchange_calendar', sessionWarningCodes: [], displayMode: 'latest_available', rankingScope: 'market_wide', selectionBasis: 'public',
       indices: [{ symbol: '000001.SH', name: '上证指数', market: 'cn', currentPrice: 3250.12, changePercent: 0.62, sourceState: { source: 'cn_index', status: 'fresh' } }],
       attention: [{ symbol: '300308.SZ', name: '中际旭创', market: 'cn', currentPrice: 1131.53, changePercent: 2.12, sourceState: { source: 'cn_rank', status: 'fresh' } }],
       headlines: [{ title: 'A股成交活跃度回升', publisher: '测试财经', publishedAt: '2026-07-14T01:25:00Z', url: 'https://example.com/cn', sourceState: { source: 'cn_news', status: 'fresh' } }],
       sources: [], warnings: [],
     },
     {
-      market: 'hk', sessionState: 'closed', displayMode: 'delayed', rankingScope: 'market_wide', selectionBasis: 'public',
+      market: 'hk', sessionState: 'closed', sessionPhase: 'lunch_break', marketLocalTime: '2026-07-14T12:30:00+08:00', minutesToOpen: 30, minutesToClose: null, sessionSource: 'exchange_calendar', sessionWarningCodes: [], displayMode: 'delayed', rankingScope: 'market_wide', selectionBasis: 'public',
       indices: [{ symbol: '^HSI', name: 'Hang Seng Index', market: 'hk', currentPrice: 24100, changePercent: -0.2, sourceState: { source: 'hk_index', status: 'cached' } }],
       attention: [{ symbol: '0700.HK', name: 'Tencent', market: 'hk', currentPrice: 500, changePercent: 1.25, sourceState: { source: 'hk_rank', status: 'cached' } }],
       headlines: [{ title: '港股收市数据更新', publisher: '测试港股源', publishedAt: '2026-07-14T01:20:00Z', sourceState: { source: 'hk_news', status: 'cached' } }],
       sources: [], warnings: [],
     },
     {
-      market: 'us', sessionState: 'unknown', displayMode: 'delayed', rankingScope: 'market_wide', selectionBasis: 'public',
+      market: 'us', sessionState: 'open', sessionPhase: 'intraday', marketLocalTime: '2026-07-14T10:30:00-04:00', minutesToOpen: null, minutesToClose: 360, sessionSource: 'exchange_calendar', sessionWarningCodes: [], displayMode: 'delayed', rankingScope: 'market_wide', selectionBasis: 'public',
       indices: [], attention: [{ symbol: 'AAPL', name: 'Apple Inc.', market: 'us', currentPrice: 210, changePercent: 0.8, sourceState: { source: 'us_rank', status: 'fresh' } }],
       headlines: [{ title: '美股盘前关注科技股', publisher: '测试美股源', sourceState: { source: 'us_news', status: 'fresh', fetchedAt: '2026-07-14T01:15:00Z' } }],
       sources: [], warnings: ['us_index_unavailable'],
@@ -41,9 +41,12 @@ describe('DailyMarketWorkbenchV124', () => {
     render(<DailyMarketWorkbenchV124 language="zh" data={data} onOpenSymbol={vi.fn()} />);
 
     expect(screen.getByRole('heading', { name: '今日市场工作台' })).toBeInTheDocument();
-    expect(screen.getByText('A股交易中')).toBeInTheDocument();
-    expect(screen.getByText('港股已收市')).toBeInTheDocument();
-    expect(screen.getByText('美股时段待确认')).toBeInTheDocument();
+    expect(screen.getByText('A股 盘前')).toBeInTheDocument();
+    expect(screen.getByText('港股 午间休市')).toBeInTheDocument();
+    expect(screen.getByText('美股 交易中')).toBeInTheDocument();
+    expect(screen.getAllByText('距开盘 30 分钟')).toHaveLength(2);
+    expect(screen.getByText('距收盘 360 分钟')).toBeInTheDocument();
+    expect(screen.getAllByText('交易所日历')).toHaveLength(3);
     expect(screen.getByText('上证指数')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '跨市场今日时间线' })).toBeInTheDocument();
     expect(screen.getByText('A股成交活跃度回升')).toBeInTheDocument();
@@ -56,9 +59,12 @@ describe('DailyMarketWorkbenchV124', () => {
     render(<DailyMarketWorkbenchV124 language="en" data={data} onOpenSymbol={vi.fn()} />);
 
     expect(screen.getByRole('heading', { name: 'Daily market workbench' })).toBeInTheDocument();
-    expect(screen.getByText('A-shares open')).toBeInTheDocument();
-    expect(screen.getByText('Hong Kong closed')).toBeInTheDocument();
-    expect(screen.getByText('US session unconfirmed')).toBeInTheDocument();
+    expect(screen.getByText('A-shares pre-market')).toBeInTheDocument();
+    expect(screen.getByText('Hong Kong lunch break')).toBeInTheDocument();
+    expect(screen.getByText('US trading')).toBeInTheDocument();
+    expect(screen.getAllByText('Opens in 30 min')).toHaveLength(2);
+    expect(screen.getByText('Closes in 360 min')).toBeInTheDocument();
+    expect(screen.getAllByText('Exchange calendar')).toHaveLength(3);
     expect(screen.getByRole('heading', { name: 'Cross-market timeline' })).toBeInTheDocument();
     expect(screen.getByText('Information and data only; not investment advice.')).toBeInTheDocument();
   });

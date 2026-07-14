@@ -1,6 +1,6 @@
 import { CalendarClock, Clock3, ExternalLink, History, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import type { MarketCode, MarketHeadline, PublicMarketHomeResponse } from '../../api/marketWorkspace';
+import type { MarketCode, MarketHeadline, MarketSessionPhase, PublicMarketHomeResponse } from '../../api/marketWorkspace';
 import { formatMarketNumber, formatMarketTimestamp, formatSourceLabel } from '../market-workspace/marketWorkspaceFormat';
 import {
   clearRecentMarketSymbols,
@@ -35,8 +35,8 @@ type TimelineEntry = {
   timestampKind: 'published' | 'observed' | 'fetched' | 'missing';
 };
 
-function localMarketClock(asOf: string, market: MarketCode, language: 'zh' | 'en'): string {
-  const date = new Date(asOf);
+function localMarketClock(marketLocalTime: string | null | undefined, asOf: string, market: MarketCode, language: 'zh' | 'en'): string {
+  const date = new Date(marketLocalTime || asOf);
   if (Number.isNaN(date.getTime())) return '-';
   return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'zh-CN', {
     timeZone: MARKET_TIME_ZONES[market],
@@ -46,16 +46,37 @@ function localMarketClock(asOf: string, market: MarketCode, language: 'zh' | 'en
   }).format(date);
 }
 
-function sessionLabel(market: MarketCode, state: 'open' | 'closed' | 'unknown', language: 'zh' | 'en'): string {
+function sessionLabel(
+  market: MarketCode,
+  phase: MarketSessionPhase | undefined,
+  state: 'open' | 'closed' | 'unknown',
+  language: 'zh' | 'en',
+): string {
   const marketLabel = MARKET_LABELS[market][language];
-  if (language === 'en') {
-    if (state === 'open') return `${marketLabel} open`;
-    if (state === 'closed') return `${marketLabel} closed`;
-    return `${marketLabel} session unconfirmed`;
+  const resolvedPhase = phase || (state === 'open' ? 'intraday' : state === 'closed' ? 'postmarket' : 'unknown');
+  const phaseLabels: Record<MarketSessionPhase, { zh: string; en: string }> = {
+    premarket: { zh: '盘前', en: 'pre-market' },
+    intraday: { zh: '交易中', en: 'trading' },
+    lunch_break: { zh: '午间休市', en: 'lunch break' },
+    closing_auction: { zh: '收盘集合阶段', en: 'closing auction' },
+    postmarket: { zh: '已收盘', en: 'closed' },
+    non_trading: { zh: '今日休市', en: 'closed today' },
+    unknown: { zh: '时段待确认', en: 'session unconfirmed' },
+  };
+  return `${marketLabel} ${phaseLabels[resolvedPhase][language]}`;
+}
+
+function countdownLabel(minutesToOpen: number | null | undefined, minutesToClose: number | null | undefined, language: 'zh' | 'en'): string {
+  if (typeof minutesToOpen === 'number') {
+    return language === 'en' ? `Opens in ${minutesToOpen} min` : `距开盘 ${minutesToOpen} 分钟`;
   }
-  if (state === 'open') return `${marketLabel}交易中`;
-  if (state === 'closed') return `${marketLabel}已收市`;
-  return `${marketLabel}时段待确认`;
+  if (typeof minutesToClose === 'number') {
+    return language === 'en' ? `Closes in ${minutesToClose} min` : `距收盘 ${minutesToClose} 分钟`;
+  }
+  if (language === 'en') {
+    return 'Schedule unavailable';
+  }
+  return '时段信息暂不可用';
 }
 
 function timelineEntries(data: PublicMarketHomeResponse): TimelineEntry[] {
@@ -140,11 +161,17 @@ export default function DailyMarketWorkbenchV124({ language, data, onOpenSymbol 
           return (
             <div key={section.market} className="min-w-0 border-b border-border/60 px-3 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-foreground">{sessionLabel(section.market, section.sessionState, language)}</span>
+                <span className="text-sm font-semibold text-foreground">{sessionLabel(section.market, section.sessionPhase, section.sessionState, language)}</span>
                 <span className="flex items-center gap-1 text-xs text-secondary-text">
                   <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                  {localMarketClock(data.asOf, section.market, language)}
+                  {localMarketClock(section.marketLocalTime, data.asOf, section.market, language)}
                 </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-secondary-text">
+                <span>{countdownLabel(section.minutesToOpen, section.minutesToClose, language)}</span>
+                <span>{section.sessionSource === 'exchange_calendar'
+                  ? (en ? 'Exchange calendar' : '交易所日历')
+                  : (en ? 'Calendar unavailable' : '日历暂不可用')}</span>
               </div>
               <div className="mt-2 flex min-w-0 items-end justify-between gap-3 text-xs">
                 <span className="truncate text-secondary-text">{index?.name || (en ? 'Major index unavailable' : '主要指数暂不可用')}</span>

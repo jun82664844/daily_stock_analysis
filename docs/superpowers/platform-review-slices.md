@@ -2244,9 +2244,36 @@ Review focus: owner-scoped summaries, administrator authorization, redacted payl
 - `.gitignore`
 - `docs/CHANGELOG.md`
 - `docs/superpowers/plans/2026-07-14-dsa-v124-free-daily-market-workbench.md`
+
+## V125 Market Sessions And Home Performance
+
+Backend and contract:
+
+- `src/services/public_market_session_service.py`
+- `src/services/market_workspace_service.py`
+- `src/services/public_market_home_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_session_service.py`
+- `tests/test_market_workspace_v113.py`
+
+Frontend and performance:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketWorkbenchV124.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Verification and delivery:
+
+- `scripts/verify_platform_market_sessions_home_performance_v125.py`
+- `tests/test_platform_market_sessions_home_performance_v125_verifier.py`
+- `docs/superpowers/plans/2026-07-14-dsa-v125-market-session-home-performance.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
 - `docs/superpowers/platform-local-v1-acceptance-status.md`
-- `docs/superpowers/platform-product-rules.md`
 - `docs/superpowers/platform-release-candidate-manifest.md`
 - `docs/superpowers/platform-review-slices.md`
 
-Review focus: public-data reuse, no automatic model call, accurate published/observed/retrieved labels, browser-local recent research isolation, bilingual and mobile layout, click-through to the existing free query, and no investment-advice language.
+Review focus: exchange-calendar phase accuracy, truthful unknown degradation, bounded parallel loading, bilingual and mobile layout, lazy query-only chunks, HomePage bundle gate, no automatic model call, and no investment-advice language.

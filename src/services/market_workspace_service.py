@@ -14,6 +14,10 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from src.services.a_share_enrichment_service import AShareEnrichmentService
 from src.services.basic_query_service import BasicQueryService
+from src.services.public_market_session_service import (
+    PublicMarketSessionService,
+    unknown_market_session,
+)
 from src.platform_watchlist import PlatformWatchlistService
 
 
@@ -67,6 +71,7 @@ class MarketWorkspaceService:
         market_symbols: Optional[Mapping[str, Sequence[str]]] = None,
         cache_ttl_seconds: Optional[int] = None,
         overview_timeout_seconds: Optional[float] = None,
+        session_resolver: Optional[Callable[[str, str], Dict[str, Any]]] = None,
     ) -> None:
         if snapshot_loader is None:
             query_service = BasicQueryService(
@@ -96,6 +101,7 @@ class MarketWorkspaceService:
                 else os.getenv("PLATFORM_MARKET_WORKSPACE_OVERVIEW_TIMEOUT_SECONDS", "2.5")
             ),
         )
+        self.session_resolver = session_resolver or PublicMarketSessionService().resolve
         self._cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._lock = Lock()
 
@@ -109,12 +115,17 @@ class MarketWorkspaceService:
         items: List[Dict[str, Any]] = []
         warnings: List[str] = []
         symbols = tuple(self.market_symbols.get(normalized_market, ()))
+        session_future = _MARKET_OVERVIEW_EXECUTOR.submit(
+            self.session_resolver,
+            normalized_market,
+            fetched_at,
+        )
+        futures = [(symbol, _MARKET_OVERVIEW_EXECUTOR.submit(self.snapshot_loader, symbol)) for symbol in symbols]
+        _, pending = wait(
+            [session_future, *(future for _, future in futures)],
+            timeout=self.overview_timeout_seconds,
+        )
         if symbols:
-            futures = [(symbol, _MARKET_OVERVIEW_EXECUTOR.submit(self.snapshot_loader, symbol)) for symbol in symbols]
-            completed, pending = wait(
-                [future for _, future in futures],
-                timeout=self.overview_timeout_seconds,
-            )
             for symbol, future in futures:
                 if future in pending:
                     future.cancel()
@@ -189,10 +200,20 @@ class MarketWorkspaceService:
             items,
             key=lambda item: (item.get("change_percent") is None, -(float(item.get("change_percent") or 0))),
         )
+        if session_future in pending:
+            session_future.cancel()
+            session = unknown_market_session("calendar_timeout")
+        else:
+            try:
+                session = session_future.result()
+            except Exception:
+                session = unknown_market_session("calendar_error")
+        if not isinstance(session, dict):
+            session = unknown_market_session("calendar_error")
         payload = {
             "market": normalized_market,
             "as_of": fetched_at,
-            "session_state": "unknown",
+            **session,
             "indices": indices,
             "breadth": breadth,
             "movers": sorted_items,

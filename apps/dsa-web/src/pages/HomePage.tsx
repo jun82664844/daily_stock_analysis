@@ -15,17 +15,12 @@ import { stocksApi, type BasicSnapshotOptions, type BasicStockSnapshot, type Kro
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
-import { DecisionJourneyV91 } from '../components/analysis/DecisionJourneyV91';
 import { buildDecisionJourneyModel } from '../components/analysis/decisionJourneyModel';
-import { FreeApiTrialPanelV93 } from '../components/retention/FreeApiTrialPanelV93';
 import { FreeApiTrialConversionV96 } from '../components/retention/FreeApiTrialConversionV96';
 import { FreeApiTrialTaskStatusV95 } from '../components/retention/FreeApiTrialTaskStatusV95';
 import { QueryChangeSummaryV93 } from '../components/retention/QueryChangeSummaryV93';
 import { LocalModelStatusV107 } from '../components/retention/LocalModelStatusV107';
-import { WatchlistEventRadarV99 } from '../components/radar/WatchlistEventRadarV99';
 import { WatchlistAlertLoopV100 } from '../components/radar/WatchlistAlertLoopV100';
-import { DailyResearchCockpitV103 } from '../components/radar/DailyResearchCockpitV103';
-import { GlobalEquityEnrichmentCard } from '../components/research/GlobalEquityEnrichmentCard';
 import { findNewTrialHistoryItem } from '../components/retention/freeApiTrialReport';
 import { buildQueryObservation, compareQueryObservations, readPriorQueryObservation, storeQueryObservation, type QueryChangeSummary, type QueryObservation } from '../components/retention/queryChangeTracker';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -56,6 +51,16 @@ const LazyRunFlowPanel = lazy(() => import('../components/run-flow/RunFlowPanel'
   .then((module) => ({ default: module.RunFlowPanel })));
 const LazyFreeKlineResearchV101 = lazy(() => import('../components/research/FreeKlineResearchV101')
   .then((module) => ({ default: module.FreeKlineResearchV101 })));
+const DecisionJourneyV91 = lazy(() => import('../components/analysis/DecisionJourneyV91')
+  .then((module) => ({ default: module.DecisionJourneyV91 })));
+const FreeApiTrialPanelV93 = lazy(() => import('../components/retention/FreeApiTrialPanelV93')
+  .then((module) => ({ default: module.FreeApiTrialPanelV93 })));
+const WatchlistEventRadarV99 = lazy(() => import('../components/radar/WatchlistEventRadarV99')
+  .then((module) => ({ default: module.WatchlistEventRadarV99 })));
+const DailyResearchCockpitV103 = lazy(() => import('../components/radar/DailyResearchCockpitV103')
+  .then((module) => ({ default: module.DailyResearchCockpitV103 })));
+const GlobalEquityEnrichmentCard = lazy(() => import('../components/research/GlobalEquityEnrichmentCard')
+  .then((module) => ({ default: module.GlobalEquityEnrichmentCard })));
 
 const LazyFeatureFallback: React.FC<{ className?: string }> = ({ className = 'min-h-24' }) => (
   <div
@@ -6012,7 +6017,7 @@ const HomePage: React.FC = () => {
                       </div>
                     ) : null}
                     {platformWatchlistRadar ? (
-                      <>
+                      <Suspense fallback={<LazyFeatureFallback className="min-h-80" />}>
                         <DailyResearchCockpitV103
                           language={uiLanguage}
                           radar={platformWatchlistRadar}
@@ -6038,7 +6043,7 @@ const HomePage: React.FC = () => {
                           savedRuleKeys={new Set((platformAlertRules?.items ?? []).map((rule) => `${rule.stockCode}:${rule.ruleType}`))}
                           alertBusy={platformAlertBusy}
                         />
-                      </>
+                      </Suspense>
                     ) : null}
                     {platformWatchlistError ? (
                       <div className="text-xs text-danger" role="alert">{platformWatchlistError}</div>
@@ -6557,21 +6562,23 @@ const HomePage: React.FC = () => {
                   </section>
                 ) : null}
                 {platformEnabled ? (
-                  <FreeApiTrialPanelV93
-                    language={uiLanguage}
-                    signedIn={Boolean(platformSession)}
-                    plan={platformAccount?.user.plan || platformSession?.user.plan || 'free'}
-                    weeklyLimit={platformAiQuickQuota
-                      ? platformAiQuickQuota.weeklyLimit
-                      : baseQuota?.weeklyLimit ?? 5}
-                    remaining={platformAiQuickQuota
-                      ? platformAiQuickQuota.remaining
-                      : baseQuota?.remaining ?? 5}
-                    busy={isAnalyzing}
-                    status={basicRetentionStatus}
-                    error={basicRetentionError}
-                    onAction={() => void handlePlatformApiTrial()}
-                  />
+                  <Suspense fallback={<LazyFeatureFallback className="min-h-40" />}>
+                    <FreeApiTrialPanelV93
+                      language={uiLanguage}
+                      signedIn={Boolean(platformSession)}
+                      plan={platformAccount?.user.plan || platformSession?.user.plan || 'free'}
+                      weeklyLimit={platformAiQuickQuota
+                        ? platformAiQuickQuota.weeklyLimit
+                        : baseQuota?.weeklyLimit ?? 5}
+                      remaining={platformAiQuickQuota
+                        ? platformAiQuickQuota.remaining
+                        : baseQuota?.remaining ?? 5}
+                      busy={isAnalyzing}
+                      status={basicRetentionStatus}
+                      error={basicRetentionError}
+                      onAction={() => void handlePlatformApiTrial()}
+                    />
+                  </Suspense>
                 ) : null}
                 {platformEnabled && freeTrialTaskId && freeTrialTaskStatus ? (
                   <FreeApiTrialTaskStatusV95
@@ -6585,17 +6592,19 @@ const HomePage: React.FC = () => {
                   <QueryChangeSummaryV93 summary={basicQueryChange} language={uiLanguage} />
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicDecisionJourneyV91 ? (
-                  <DecisionJourneyV91
-                    model={basicDecisionJourneyV91}
-                    onJump={(target) => {
-                      const targetId = target === 'events'
-                        ? 'basic-query-news-center'
-                        : target === 'kline'
-                          ? 'basic-query-kline-forecast-lab'
-                          : 'basic-query-commercial-journey';
-                      handleBasicFeatureJump(targetId);
-                    }}
-                  />
+                  <Suspense fallback={<LazyFeatureFallback className="min-h-48" />}>
+                    <DecisionJourneyV91
+                      model={basicDecisionJourneyV91}
+                      onJump={(target) => {
+                        const targetId = target === 'events'
+                          ? 'basic-query-news-center'
+                          : target === 'kline'
+                            ? 'basic-query-kline-forecast-lab'
+                            : 'basic-query-commercial-journey';
+                        handleBasicFeatureJump(targetId);
+                      }}
+                    />
+                  </Suspense>
                 ) : null}
                 {basicSnapshotViewMode === 'quick' && basicNextActionsWorkflow ? (
                   <section
@@ -8577,10 +8586,12 @@ const HomePage: React.FC = () => {
                       </div>
                     ) : null}
                     {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.globalEquityEnrichment ? (
-                      <GlobalEquityEnrichmentCard
-                        payload={basicSnapshot.intelligence.globalEquityEnrichment}
-                        language={uiLanguage}
-                      />
+                      <Suspense fallback={<LazyFeatureFallback className="mb-3 min-h-64" />}>
+                        <GlobalEquityEnrichmentCard
+                          payload={basicSnapshot.intelligence.globalEquityEnrichment}
+                          language={uiLanguage}
+                        />
+                      </Suspense>
                     ) : null}
                     {basicSnapshotViewMode === 'quick' && basicSnapshot.intelligence?.aShareEnrichment ? (
                       <div

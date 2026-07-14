@@ -71,8 +71,9 @@ def _check_contract(root: Path) -> CheckResult:
             "openMarketItem(item)",
         ),
         "apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx": (
-            "A股交易中",
-            "US session unconfirmed",
+            "A股 盘前",
+            "US trading",
+            "Exchange calendar",
             "清空最近查看",
             "unrelated-setting",
         ),
