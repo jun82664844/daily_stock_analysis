@@ -2511,3 +2511,34 @@ Docs and packaging:
 Acceptance marker: `DSA_PLATFORM_SUPPORT_CENTER_V120_OK user_loop=true admin_queue=true ownership_isolated=true csrf=true rate_limit=true ai_reply=false attachments=false investment_advice=false`.
 
 Boundary: local text-only human support acceptance. No AI auto-reply, attachments, production deployment, real payment, production key, cross-product database sharing, or investment-advice approval is claimed.
+
+## V121 Free Market Stock Preview
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketStockPreviewV121.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketStockPreviewV121.test.tsx`
+- `scripts/verify_platform_free_market_stock_preview_v121.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_free_market_stock_preview_v121_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_market_workspace_v113.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v121-free-market-stock-preview.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_FREE_MARKET_STOCK_PREVIEW_V121_OK guest=true on_demand=true public_data=true ai_used=false bilingual=true mobile=true investment_advice=false`.
+
+Boundary: local guest public-data acceptance only. No production deployment, payment, production key, commercial market-data redistribution approval, AI auto-run, forecast or investment-advice approval is claimed.

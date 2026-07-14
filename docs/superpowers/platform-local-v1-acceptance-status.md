@@ -653,3 +653,17 @@ git diff --check
 - V120 不启用 AI 自动回复、知识库、附件、外部客服渠道或投资建议能力。
 - `scripts/verify_platform_support_center_v120.py` 通过时输出 `DSA_PLATFORM_SUPPORT_CENTER_V120_OK user_loop=true admin_queue=true ownership_isolated=true csrf=true rate_limit=true ai_reply=false attachments=false investment_advice=false`。
 - 本状态仅代表本地功能验收，不代表生产部署、真实支付、生产密钥、跨产品数据同步或法律审批。
+
+## V121 免费市场股票数据预览状态（2026-07-14）
+
+- 动态首页全市场榜单新增独立“数据详情”入口，游客点击后复用公开 `market-workspace/symbol` 数据，不要求登录。
+- 预览展示行情区间、成交量额、均线、近期变化、量能对比、公司行业、市值、历史收盘曲线、来源状态和更新时间。
+- 首页加载阶段不预取股票详情；请求失败时榜单保持可用，用户可重试或关闭；切换市场或榜单会清理旧详情。
+- 点击后立即呈现榜单现价、涨跌、成交额和来源，再异步补充均线、历史曲线与公司资料，降低公开详情冷请求的等待感。
+- 数据缺失统一显示“暂不可用”，不伪装为零；客观位置描述不推断未来方向。
+- 前端组件和首页集成测试覆盖中文、英文、缺失降级、错误重试、完整查询入口和请求次数。
+- 8018 真实浏览器覆盖 A 股中际旭创、港股中芯国际和美股 AAL：三市场均能显示未使用 AI、近期收盘曲线、数据来源和资讯边界；榜单价格与详情补充采用不同时间口径时，首要价格和涨跌仍以用户所见榜单为准。
+- `390x844` 手机视口中文和英文详情均无横向溢出；英文模式显示 `Public data preview`、`No AI used` 和 `Information and data only`。点击“进入完整查询”实际打开 `/market?symbol=0981.HK`。
+- 港股冷详情可能需要约 11 秒，但点击后立即显示榜单价格、涨跌、成交额和来源，不阻塞榜单浏览；错误重试和榜单保留由确定性集成测试覆盖。
+- `scripts/verify_platform_free_market_stock_preview_v121.py` 通过时输出 `DSA_PLATFORM_FREE_MARKET_STOCK_PREVIEW_V121_OK guest=true on_demand=true public_data=true ai_used=false bilingual=true mobile=true investment_advice=false`。
+- 本状态仅代表本地免费公开数据功能，不代表生产部署、真实支付、生产密钥、市场数据商业授权或法律审批；所有内容只提供资讯和数据，不构成投资建议。

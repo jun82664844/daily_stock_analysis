@@ -2155,3 +2155,31 @@ Review focus: market-wide source mapping, liquidity filtering, no fixed-symbol f
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: user ownership isolation, administrator authorization, CSRF and rate limiting, closed-ticket behavior, bilateral unread semantics, audit metadata without message bodies, responsive bilingual UI, and no AI reply, attachment or investment-advice capability.
+
+## V121 Free Market Stock Preview
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketStockPreviewV121.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketStockPreviewV121.test.tsx`
+- `scripts/verify_platform_free_market_stock_preview_v121.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_free_market_stock_preview_v121_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v121-free-market-stock-preview.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: guest access, explicit on-demand loading, stale-request cancellation, useful public data depth, missing-field honesty, retry behavior, bilingual and mobile layout, no AI or paid quota consumption, and no investment-advice language.

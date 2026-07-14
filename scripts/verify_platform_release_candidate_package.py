@@ -364,6 +364,11 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/pages/SupportPage.tsx",
     "apps/dsa-web/src/pages/__tests__/SupportPage.test.tsx",
     "apps/dsa-web/src/components/admin/SupportWorkbenchV120.tsx",
+    "docs/superpowers/plans/2026-07-14-dsa-v121-free-market-stock-preview.md",
+    "scripts/verify_platform_free_market_stock_preview_v121.py",
+    "tests/test_platform_free_market_stock_preview_v121_verifier.py",
+    "apps/dsa-web/src/components/market-home/PublicMarketStockPreviewV121.tsx",
+    "apps/dsa-web/src/components/market-home/__tests__/PublicMarketStockPreviewV121.test.tsx",
     "apps/dsa-web/src/components/admin/__tests__/SupportWorkbenchV120.test.tsx",
     "apps/dsa-web/e2e/platform-support-v120.spec.ts",
 )
@@ -444,6 +449,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_public_home_experience_v118.py",
     "scripts/verify_platform_dynamic_market_home_v119.py",
     "scripts/verify_platform_support_center_v120.py",
+    "scripts/verify_platform_free_market_stock_preview_v121.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

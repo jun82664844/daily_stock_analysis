@@ -1,6 +1,6 @@
-import { Activity, BellRing, Clock3, ExternalLink, Newspaper, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import type { MarketCode, MarketHeadline, MarketSecurityItem, PublicMarketHomeResponse } from '../../api/marketWorkspace';
+import { Activity, BellRing, ChartNoAxesCombined, Clock3, ExternalLink, Newspaper, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { marketWorkspaceApi, type MarketCode, type MarketHeadline, type MarketSecurityItem, type PublicMarketHomeResponse, type SymbolWorkspaceResponse } from '../../api/marketWorkspace';
 import PriceAlertFormV116, { type PriceAlertDraft } from '../alerts/PriceAlertFormV116';
 import {
   formatMarketNumber,
@@ -8,6 +8,7 @@ import {
   formatSourceLabel,
   formatSourceStatus,
 } from '../market-workspace/marketWorkspaceFormat';
+import PublicMarketStockPreviewV121 from './PublicMarketStockPreviewV121';
 
 type Props = {
   language: 'zh' | 'en';
@@ -183,6 +184,11 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
   const [activeMarket, setActiveMarket] = useState<MarketCode>('cn');
   const [rankingKey, setRankingKey] = useState<RankingKey>('mostActive');
   const [expandedSymbol, setExpandedSymbol] = useState('');
+  const [previewItem, setPreviewItem] = useState<MarketSecurityItem | null>(null);
+  const [previewDetail, setPreviewDetail] = useState<SymbolWorkspaceResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const previewRequestId = useRef(0);
   const sections = data?.markets ?? [];
   const activeSection = useMemo(
     () => sections.find((section) => section.market === activeMarket) || sections[0],
@@ -203,6 +209,33 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
     ];
     return candidates.find((item) => item.symbol === expandedSymbol);
   }, [activeSection, expandedSymbol]);
+
+  const clearPreview = () => {
+    previewRequestId.current += 1;
+    setPreviewItem(null);
+    setPreviewDetail(null);
+    setPreviewLoading(false);
+    setPreviewError('');
+  };
+
+  const loadPreview = async (item: MarketSecurityItem) => {
+    const requestId = previewRequestId.current + 1;
+    previewRequestId.current = requestId;
+    setPreviewItem(item);
+    setPreviewDetail(null);
+    setPreviewError('');
+    setPreviewLoading(true);
+    try {
+      const result = await marketWorkspaceApi.getSymbol(item.symbol);
+      if (previewRequestId.current !== requestId) return;
+      setPreviewDetail(result);
+      setPreviewLoading(false);
+    } catch {
+      if (previewRequestId.current !== requestId) return;
+      setPreviewError('public_data_unavailable');
+      setPreviewLoading(false);
+    }
+  };
 
   if (loading && !data) {
     return (
@@ -253,6 +286,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                   setActiveMarket(section.market);
                   setRankingKey('mostActive');
                   setExpandedSymbol('');
+                  clearPreview();
                 }}
                 className={`min-w-0 border-r border-border/70 px-3 py-2.5 text-left last:border-r-0 ${selected ? 'bg-primary/10 text-foreground' : 'text-secondary-text hover:bg-hover/60 hover:text-foreground'}`}
               >
@@ -320,6 +354,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                     onClick={() => {
                       setRankingKey(key);
                       setExpandedSymbol('');
+                      clearPreview();
                     }}
                     className={`inline-flex min-h-10 items-center justify-center gap-1.5 border-r border-border/70 px-2 text-sm last:border-r-0 ${selected ? 'bg-primary/10 font-semibold text-primary' : 'text-secondary-text hover:bg-hover/50 hover:text-foreground'}`}
                   >
@@ -363,15 +398,26 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                         <span className="block truncate text-xs text-secondary-text">{formatSourceLabel(item.sourceState.source, language)}</span>
                         <span className="block truncate text-[11px] text-secondary-text">{formatSourceStatus(item.sourceState.status, language)} · {formatMarketTimestamp(item.sourceState.observedAt ?? item.sourceState.fetchedAt, language)}</span>
                       </span>
-                      <button
-                        type="button"
-                        aria-label={en ? `Set price alert for ${name}` : `为 ${name} 设置到价提醒`}
-                        title={en ? 'Price alert' : '到价提醒'}
-                        onClick={() => setExpandedSymbol((value) => value === item.symbol ? '' : item.symbol)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-secondary-text hover:border-primary/60 hover:text-primary"
-                      >
-                        <BellRing className="h-4 w-4" aria-hidden="true" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label={en ? `View ${name} data preview` : `查看 ${name} 数据详情`}
+                          title={en ? 'Public data preview' : '公开数据预览'}
+                          onClick={() => void loadPreview(item)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-secondary-text hover:border-primary/60 hover:text-primary"
+                        >
+                          <ChartNoAxesCombined className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={en ? `Set price alert for ${name}` : `为 ${name} 设置到价提醒`}
+                          title={en ? 'Price alert' : '到价提醒'}
+                          onClick={() => setExpandedSymbol((value) => value === item.symbol ? '' : item.symbol)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-secondary-text hover:border-primary/60 hover:text-primary"
+                        >
+                          <BellRing className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   );
                 }) : (
@@ -381,6 +427,24 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                 )}
               </div>
             </div>
+
+            {previewItem ? (
+              <div className="mt-4">
+                <PublicMarketStockPreviewV121
+                  language={language}
+                  item={previewItem}
+                  detail={previewDetail}
+                  loading={previewLoading}
+                  error={previewError}
+                  onRetry={() => void loadPreview(previewItem)}
+                  onClose={clearPreview}
+                  onOpenFull={(symbol) => {
+                    clearPreview();
+                    onOpenSymbol(symbol);
+                  }}
+                />
+              </div>
+            ) : null}
 
             <section className="mt-4 border-y border-border/70 py-3" aria-label={en ? 'Sector highlights' : '行业热点'}>
               <div className="flex items-center justify-between gap-3">

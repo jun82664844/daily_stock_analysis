@@ -1,7 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import type { PublicMarketHomeResponse } from '../../../api/marketWorkspace';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { marketWorkspaceApi, type PublicMarketHomeResponse, type SymbolWorkspaceResponse } from '../../../api/marketWorkspace';
 import PublicMarketHomeV116 from '../PublicMarketHomeV116';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const data: PublicMarketHomeResponse = {
   asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
@@ -30,6 +34,34 @@ const data: PublicMarketHomeResponse = {
       mostActive: [{ symbol: 'AAPL', name: 'Apple Inc.', market: 'us', currency: 'USD', currentPrice: 210, changePercent: 0.8, tradingSession: 'pre', sourceState: { source: 'yahoo_public_us_screener', status: 'fresh' } }], gainers: [], losers: [], sectorHighlights: [],
     },
   ],
+};
+
+const previewDetail: SymbolWorkspaceResponse = {
+  symbol: '300308.SZ',
+  name: '中际旭创',
+  market: 'cn',
+  currency: 'CNY',
+  asOf: '2026-07-14T10:01:30+08:00',
+  quote: {
+    currentPrice: 1131.53,
+    changePercent: 2.12,
+    open: 1100,
+    high: 1140,
+    low: 1098,
+    prevClose: 1108,
+    volume: 18_000_000,
+    amount: 9_496_897_654,
+    freshness: 'fresh',
+    source: 'a_share_realtime',
+  },
+  history: [{ date: '2026-07-11', close: 1108 }, { date: '2026-07-14', close: 1131.53 }],
+  indicators: { ma5: 1090, ma10: 1070, ma20: 1050, priceChange5d: 4.2, priceChange20d: 9.1, volumeChangeVsMa5: 15 },
+  profile: { sector: '信息技术', industry: '通信设备', marketCap: 1_200_000_000_000 },
+  headlines: [],
+  sources: [{ source: 'a_share_realtime', status: 'fresh', observedAt: '2026-07-14T10:01:30+08:00' }],
+  warnings: [],
+  aiUsed: false,
+  informationalOnly: true,
 };
 
 describe('PublicMarketHomeV116', () => {
@@ -106,5 +138,38 @@ describe('PublicMarketHomeV116', () => {
     expect(screen.getByText('特锐德')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /美股/ }));
     expect(screen.getByText('盘前')).toBeInTheDocument();
+  });
+
+  it('loads public stock details only after an explicit preview click and keeps full query available', async () => {
+    const getSymbol = vi.spyOn(marketWorkspaceApi, 'getSymbol').mockResolvedValue(previewDetail);
+    const open = vi.fn();
+    render(<PublicMarketHomeV116 language="zh" data={data} loading={false} onOpenSymbol={open} onCreateAlert={vi.fn()} />);
+
+    expect(getSymbol).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '查看 中际旭创 数据详情' }));
+    expect(screen.getByRole('status')).toHaveTextContent('正在补充均线、历史曲线和公司资料');
+    expect(await screen.findByRole('heading', { name: '中际旭创 数据详情' })).toBeInTheDocument();
+    expect(getSymbol).toHaveBeenCalledTimes(1);
+    expect(getSymbol).toHaveBeenCalledWith('300308.SZ');
+
+    fireEvent.click(screen.getByRole('button', { name: '进入完整查询' }));
+    expect(open).toHaveBeenCalledWith('300308.SZ');
+
+    fireEvent.click(screen.getByRole('tab', { name: /港股/ }));
+    await waitFor(() => expect(screen.queryByTestId('public-market-stock-preview-v121')).not.toBeInTheDocument());
+  });
+
+  it('keeps the ranking usable when detail loading fails and supports retry', async () => {
+    const getSymbol = vi.spyOn(marketWorkspaceApi, 'getSymbol')
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce(previewDetail);
+    render(<PublicMarketHomeV116 language="zh" data={data} loading={false} onOpenSymbol={vi.fn()} onCreateAlert={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 中际旭创 数据详情' }));
+    expect(await screen.findByRole('heading', { name: '公开数据暂时不可用' })).toBeInTheDocument();
+    expect(screen.getAllByText('中际旭创').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: '重新加载数据详情' }));
+    expect(await screen.findByRole('heading', { name: '中际旭创 数据详情' })).toBeInTheDocument();
+    expect(getSymbol).toHaveBeenCalledTimes(2);
   });
 });
