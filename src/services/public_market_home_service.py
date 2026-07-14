@@ -12,6 +12,7 @@ from threading import Lock
 from typing import Any, Callable, Dict, Optional
 
 from src.services.market_workspace_service import MarketWorkspaceService
+from src.services.public_market_event_service import PublicMarketEventService
 from src.services.public_market_session_service import (
     PublicMarketSessionService,
     unknown_market_session,
@@ -38,6 +39,7 @@ class PublicMarketHomeService:
         executor: Optional[ThreadPoolExecutor] = None,
         ranking_loader: Optional[Callable[[str], Dict[str, Any]]] = None,
         session_resolver: Optional[Callable[[str, str], Dict[str, Any]]] = None,
+        event_builder: Optional[Callable[[list[Dict[str, Any]], str], list[Dict[str, Any]]]] = None,
     ) -> None:
         self.workspace_service = workspace_service or MarketWorkspaceService()
         raw_timeout = timeout_seconds if timeout_seconds is not None else os.getenv("PLATFORM_PUBLIC_MARKET_HOME_TIMEOUT_SECONDS", "5.5")
@@ -48,6 +50,7 @@ class PublicMarketHomeService:
         self.executor = executor or _HOME_EXECUTOR
         self.ranking_loader = ranking_loader
         self.session_resolver = session_resolver or PublicMarketSessionService().resolve
+        self.event_builder = event_builder or PublicMarketEventService().build
         self._cache: Optional[tuple[float, Dict[str, Any]]] = None
         self._lock = Lock()
 
@@ -81,9 +84,19 @@ class PublicMarketHomeService:
                 sections.append(self._unavailable_section(market, sessions[market]))
             else:
                 sections.append(self._dynamic_section(market, overview or {}, rankings, sessions[market]))
+        try:
+            events = list(self.event_builder(sections, as_of) or [])
+        except Exception:
+            events = []
+            for section in sections:
+                section["warnings"] = list(dict.fromkeys([
+                    *(section.get("warnings") or []),
+                    "market_events_unavailable",
+                ]))
         payload = {
             "as_of": as_of,
             "markets": sections,
+            "events": events,
             "ai_used": False,
             "informational_only": True,
         }

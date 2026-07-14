@@ -5849,6 +5849,7 @@ const HomePage: React.FC = () => {
                 language={uiLanguage}
                 data={publicMarketHome}
                 loading={publicMarketHomeLoading}
+                watchlistSymbols={platformWatchlistItems.map((item) => item.stockCode)}
                 onOpenSymbol={(symbol) => navigate(`/market?symbol=${encodeURIComponent(symbol)}`)}
                 onCreateAlert={handlePublicPriceAlert}
               />

@@ -210,6 +210,58 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
             service = PublicMarketHomeService(_Workspace(), ranking_loader=_Rankings().load)
         self.assertGreaterEqual(service.timeout_seconds, 5.5)
 
+    def test_v126_adds_structured_events_without_changing_ai_boundary(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        captured: dict = {}
+
+        def build_events(markets: list[dict], as_of: str) -> list[dict]:
+            captured["markets"] = markets
+            captured["as_of"] = as_of
+            return [{
+                "event_id": "event-1",
+                "market": "us",
+                "category": "earnings",
+                "title": "AAPL earnings results published",
+                "summary": "Objective public information.",
+                "symbol": None,
+                "name": None,
+                "event_time": as_of,
+                "time_kind": "retrieved",
+                "publisher": "Unit News",
+                "url": "https://example.com/event",
+                "source_state": {"source": "unit_news", "status": "fresh"},
+                "classification_source": "keyword_rules",
+            }]
+
+        body = PublicMarketHomeService(
+            _Workspace(),
+            timeout_seconds=1,
+            event_builder=build_events,
+        ).build()
+
+        self.assertEqual(body["events"][0]["category"], "earnings")
+        self.assertEqual([item["market"] for item in captured["markets"]], ["cn", "hk", "us"])
+        self.assertEqual(captured["as_of"], body["as_of"])
+        self.assertFalse(body["ai_used"])
+        self.assertTrue(body["informational_only"])
+
+    def test_v126_event_failure_is_fail_open_and_truthfully_warned(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        def fail_events(_markets: list[dict], _as_of: str) -> list[dict]:
+            raise RuntimeError("event normalization unavailable")
+
+        body = PublicMarketHomeService(
+            _Workspace(),
+            timeout_seconds=1,
+            event_builder=fail_events,
+        ).build()
+
+        self.assertEqual(body["events"], [])
+        self.assertTrue(all(item["attention"] for item in body["markets"]))
+        self.assertTrue(all("market_events_unavailable" in item["warnings"] for item in body["markets"]))
+
 
 class PublicMarketHomeEndpointV116TestCase(unittest.TestCase):
     def setUp(self) -> None:
@@ -241,6 +293,7 @@ class PublicMarketHomeEndpointV116TestCase(unittest.TestCase):
             response = client.get("/api/v1/market-workspace/home")
             client.close()
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["events"], [])
 
     def test_home_is_404_when_v116_is_disabled(self) -> None:
         with patch.dict(os.environ, {

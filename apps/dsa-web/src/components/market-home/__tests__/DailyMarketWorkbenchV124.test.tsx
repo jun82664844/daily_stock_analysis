@@ -6,6 +6,7 @@ import { rememberRecentMarketSymbol } from '../marketRecentV124';
 
 const data: PublicMarketHomeResponse = {
   asOf: '2026-07-14T01:30:00Z',
+  events: [],
   aiUsed: false,
   informationalOnly: true,
   markets: [

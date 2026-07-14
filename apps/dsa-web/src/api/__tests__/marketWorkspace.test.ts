@@ -49,6 +49,7 @@ describe('marketWorkspaceApi', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: {
       as_of: '2026-07-13T01:30:00Z', ai_used: false, informational_only: true,
       markets: [{ market: 'us', session_state: 'open', session_phase: 'intraday', market_local_time: '2026-07-13T10:30:00-04:00', minutes_to_close: 330, session_source: 'exchange_calendar', session_warning_codes: [], display_mode: 'latest_available', ranking_scope: 'configured_universe', selection_basis: 'turnover_then_absolute_change', indices: [], attention: [], sources: [], warnings: [] }],
+      events: [{ event_id: 'event-1', market: 'us', category: 'earnings', title: 'AAPL earnings results', summary: 'Public information.', symbol: 'AAPL', name: 'Apple Inc.', event_time: '2026-07-13T01:25:00Z', time_kind: 'published', publisher: 'Unit News', url: 'https://example.com/event', source_state: { source: 'unit_news', status: 'fresh', observed_at: '2026-07-13T01:25:00Z' }, classification_source: 'keyword_rules' }],
     } });
     const body = await marketWorkspaceApi.getHome();
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/market-workspace/home');
@@ -56,6 +57,22 @@ describe('marketWorkspaceApi', () => {
     expect(body.markets[0].displayMode).toBe('latest_available');
     expect(body.markets[0].sessionPhase).toBe('intraday');
     expect(body.markets[0].minutesToClose).toBe(330);
+    expect(body.events[0].eventId).toBe('event-1');
+    expect(body.events[0].eventTime).toBe('2026-07-13T01:25:00Z');
+    expect(body.events[0].sourceState.observedAt).toBe('2026-07-13T01:25:00Z');
+  });
+
+  it('defaults events for an older public-home response', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {
+      as_of: '2026-07-13T01:30:00Z',
+      markets: [],
+      ai_used: false,
+      informational_only: true,
+    } });
+
+    const body = await marketWorkspaceApi.getHome();
+
+    expect(body.events).toEqual([]);
   });
 
   it('defaults overview collection fields when an older cached response omits them', async () => {

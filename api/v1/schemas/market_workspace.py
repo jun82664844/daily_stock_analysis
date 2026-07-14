@@ -18,6 +18,16 @@ MarketSessionPhase = Literal[
     "non_trading",
     "unknown",
 ]
+MarketEventCategory = Literal[
+    "earnings",
+    "announcement",
+    "dividend",
+    "trading_status",
+    "macro",
+    "corporate",
+    "market",
+]
+MarketEventTimeKind = Literal["published", "observed", "retrieved", "unknown"]
 
 
 class StrictModel(BaseModel):
@@ -80,6 +90,22 @@ class MarketHeadline(StrictModel):
     source_state: DataSourceState
 
 
+class PublicMarketEvent(StrictModel):
+    event_id: str
+    market: Literal["cn", "hk", "us"]
+    category: MarketEventCategory
+    title: str
+    summary: Optional[str] = None
+    symbol: Optional[str] = None
+    name: Optional[str] = None
+    event_time: str
+    time_kind: MarketEventTimeKind
+    publisher: Optional[str] = None
+    url: Optional[str] = None
+    source_state: DataSourceState
+    classification_source: Literal["keyword_rules"] = "keyword_rules"
+
+
 class MarketWorkspaceOverview(StrictModel):
     market: Literal["cn", "hk", "us"]
     as_of: str
@@ -129,6 +155,7 @@ class PublicMarketHomeSection(StrictModel):
 class PublicMarketHomeResponse(StrictModel):
     as_of: str
     markets: List[PublicMarketHomeSection] = Field(default_factory=list)
+    events: List[PublicMarketEvent] = Field(default_factory=list)
     ai_used: bool = False
     informational_only: bool = True
 

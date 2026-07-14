@@ -2277,3 +2277,38 @@ Verification and delivery:
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: exchange-calendar phase accuracy, truthful unknown degradation, bounded parallel loading, bilingual and mobile layout, lazy query-only chunks, HomePage bundle gate, no automatic model call, and no investment-advice language.
+
+## V126 Free Daily Market Events
+
+Backend and contract:
+
+- `src/services/public_market_event_service.py`
+- `src/services/public_market_home_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_free_daily_market_events_v126.py`
+- `tests/test_platform_free_daily_market_events_v126_verifier.py`
+- `docs/superpowers/plans/2026-07-14-dsa-v126-free-daily-market-events.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: deterministic classification, exact-title symbol association, deduplication, truthful time semantics and source status, fail-open home behavior, lazy bundle isolation, client-only watchlist highlighting, bilingual/mobile layout, no automatic model call, and no investment-advice language.

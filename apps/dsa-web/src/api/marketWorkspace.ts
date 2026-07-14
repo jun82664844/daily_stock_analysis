@@ -53,6 +53,31 @@ export type MarketHeadline = {
   sourceState: DataSourceState;
 };
 
+export type MarketEventCategory =
+  | 'earnings'
+  | 'announcement'
+  | 'dividend'
+  | 'trading_status'
+  | 'macro'
+  | 'corporate'
+  | 'market';
+
+export type PublicMarketEvent = {
+  eventId: string;
+  market: MarketCode;
+  category: MarketEventCategory;
+  title: string;
+  summary?: string | null;
+  symbol?: string | null;
+  name?: string | null;
+  eventTime: string;
+  timeKind: 'published' | 'observed' | 'retrieved' | 'unknown';
+  publisher?: string | null;
+  url?: string | null;
+  sourceState: DataSourceState;
+  classificationSource: 'keyword_rules';
+};
+
 export type MarketWorkspaceOverview = {
   market: MarketCode;
   asOf: string;
@@ -111,6 +136,7 @@ export type MarketSessionPhase =
 export type PublicMarketHomeResponse = {
   asOf: string;
   markets: PublicMarketHomeSection[];
+  events: PublicMarketEvent[];
   aiUsed: boolean;
   informationalOnly: boolean;
 };
@@ -175,6 +201,7 @@ export const marketWorkspaceApi = {
     const body = toCamelCase<PublicMarketHomeResponse>(response.data);
     return {
       ...body,
+      events: Array.isArray(body.events) ? body.events : [],
       markets: Array.isArray(body.markets) ? body.markets.map((market) => ({
         ...market,
         sessionPhase: market.sessionPhase ?? 'unknown',

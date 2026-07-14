@@ -2642,3 +2642,41 @@ Acceptance marker: `DSA_PLATFORM_MARKET_SESSIONS_HOME_PERFORMANCE_V125_OK`.
 Safety boundary: public market sessions use exchange calendars only, consume no AI quota, expose unknown on calendar failure, and remain information and data only rather than investment advice.
 
 Boundary: local guest public-data acceptance only. No new third-party source, automatic model call, production deployment, payment, production key, commercial market-data redistribution, forecast or investment-advice approval is claimed.
+
+## V126 Free Daily Market Events
+
+Runtime and API:
+
+- `src/services/public_market_event_service.py`
+- `src/services/public_market_home_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_free_daily_market_events_v126.py`
+- `tests/test_platform_free_daily_market_events_v126_verifier.py`
+- `docs/superpowers/plans/2026-07-14-dsa-v126-free-daily-market-events.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_FREE_DAILY_MARKET_EVENTS_V126_OK`.
+
+Safety boundary: events reuse already loaded public headlines, use keyword rules rather than AI, add no network source, keep private watchlist state client-only, fail open without blanking market data, and provide information and data only rather than investment advice.

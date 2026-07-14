@@ -10,6 +10,7 @@ afterEach(() => {
 
 const data: PublicMarketHomeResponse = {
   asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
+  events: [{ eventId: 'event-aapl', market: 'us', category: 'earnings', title: 'AAPL earnings results published', symbol: 'AAPL', name: 'Apple Inc.', eventTime: '2026-07-13T01:25:00Z', timeKind: 'published', publisher: 'Unit News', sourceState: { source: 'unit_news', status: 'fresh' }, classificationSource: 'keyword_rules' }],
   markets: [
     {
       market: 'cn', sessionState: 'open', displayMode: 'latest_available', rankingScope: 'market_wide', selectionBasis: 'market_wide_public_rankings_with_liquidity_filter',
@@ -66,6 +67,22 @@ const previewDetail: SymbolWorkspaceResponse = {
 };
 
 describe('PublicMarketHomeV116', () => {
+  it('lazy-loads the V126 event center and forwards watchlist context', async () => {
+    render(
+      <PublicMarketHomeV116
+        language="zh"
+        data={data}
+        loading={false}
+        watchlistSymbols={['AAPL']}
+        onOpenSymbol={vi.fn()}
+        onCreateAlert={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByTestId('daily-market-event-center-v126')).toBeInTheDocument();
+    expect(screen.getByText('自选关注')).toBeInTheDocument();
+  });
+
   it('mounts the V124 workbench and remembers a ranking stock before opening the free query', () => {
     window.localStorage.clear();
     const open = vi.fn();

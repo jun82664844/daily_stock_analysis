@@ -1,5 +1,5 @@
 import { Activity, BellRing, ChartNoAxesCombined, Clock3, ExternalLink, Newspaper, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { marketWorkspaceApi, type MarketCode, type MarketHeadline, type MarketSecurityItem, type PublicMarketHomeResponse, type SymbolWorkspaceResponse } from '../../api/marketWorkspace';
 import PriceAlertFormV116, { type PriceAlertDraft } from '../alerts/PriceAlertFormV116';
 import {
@@ -12,12 +12,15 @@ import DailyMarketWorkbenchV124 from './DailyMarketWorkbenchV124';
 import { rememberRecentMarketSymbol } from './marketRecentV124';
 import PublicMarketStockPreviewV121 from './PublicMarketStockPreviewV121';
 
+const DailyMarketEventCenterV126 = lazy(() => import('./DailyMarketEventCenterV126'));
+
 type Props = {
   language: 'zh' | 'en';
   data: PublicMarketHomeResponse | null;
   loading: boolean;
   onOpenSymbol: (symbol: string) => void;
   onCreateAlert: (draft: PriceAlertDraft) => Promise<void>;
+  watchlistSymbols?: string[];
 };
 
 const MARKET_LABELS: Record<MarketCode, { zh: string; en: string }> = {
@@ -181,7 +184,7 @@ function MarketFeed({
   );
 }
 
-export default function PublicMarketHomeV116({ language, data, loading, onOpenSymbol, onCreateAlert }: Props) {
+export default function PublicMarketHomeV116({ language, data, loading, onOpenSymbol, onCreateAlert, watchlistSymbols = [] }: Props) {
   const en = language === 'en';
   const [activeMarket, setActiveMarket] = useState<MarketCode>('cn');
   const [rankingKey, setRankingKey] = useState<RankingKey>('mostActive');
@@ -281,6 +284,17 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
         </div>
 
         <DailyMarketWorkbenchV124 language={language} data={data} onOpenSymbol={onOpenSymbol} />
+
+        <Suspense fallback={<div className="mt-4 min-h-48 animate-pulse border-y border-border/60 bg-background/20" aria-label={en ? 'Loading daily market events' : '正在加载今日市场事件'} />}>
+          <div className="mt-4">
+            <DailyMarketEventCenterV126
+              language={language}
+              events={data.events}
+              watchlistSymbols={watchlistSymbols}
+              onOpenSymbol={onOpenSymbol}
+            />
+          </div>
+        </Suspense>
 
         <div className="mt-4 grid grid-cols-3 border-y border-border/70" role="tablist" aria-label={en ? 'Markets' : '市场'}>
           {sections.map((section) => {

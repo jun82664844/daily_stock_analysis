@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
@@ -17,6 +19,15 @@ import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import HomePage, { localizeGeneratedText } from '../HomePage';
 
 const navigateMock = vi.fn();
+
+describe('HomePage V126 source contract', () => {
+  it('forwards private watchlist symbols only as client-side event context', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/pages/HomePage.tsx'), 'utf8');
+    expect(source).toContain('watchlistSymbols={platformWatchlistItems.map((item) => item.stockCode)}');
+    expect(source).not.toContain('events: platformWatchlistItems');
+    expect(source).not.toContain('getHome(platformWatchlistItems');
+  });
+});
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -592,6 +603,7 @@ describe('HomePage', () => {
     vi.mocked(platformApi.current).mockResolvedValue(null);
     vi.mocked(marketWorkspaceApi.getHome).mockResolvedValue({
       asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
+      events: [],
       markets: [
         { market: 'cn', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [{ symbol: '600519.SH', name: '贵州茅台', market: 'cn', currentPrice: 1188.8, changePercent: -1.5, sourceState: { source: 'cn_quote', status: 'fresh' } }] },
         { market: 'hk', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [] },
@@ -1199,6 +1211,7 @@ describe('HomePage', () => {
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: true });
     vi.mocked(marketWorkspaceApi.getHome).mockResolvedValue({
       asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
+      events: [],
       markets: [
         { market: 'cn', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [{ symbol: '600519.SH', name: '贵州茅台', market: 'cn', currentPrice: 1188.8, changePercent: -1.5, sourceState: { source: 'cn_quote', status: 'fresh' } }] },
         { market: 'hk', sessionState: 'unknown', displayMode: 'latest_available', rankingScope: 'configured_universe', selectionBasis: 'turnover_then_absolute_change', indices: [], sources: [], warnings: [], attention: [] },
