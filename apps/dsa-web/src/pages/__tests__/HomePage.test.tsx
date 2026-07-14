@@ -4367,6 +4367,68 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-diagnostics')).toHaveTextContent('Q 刷新 / H 刷新');
   });
 
+  it('shows a retry countdown dialog and blocks repeated queries after a 429', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({ total: 0, page: 1, limit: 20, items: [] });
+    vi.mocked(stocksApi.snapshot).mockRejectedValue({
+      response: {
+        status: 429,
+        data: {
+          error: 'rate_limited',
+          message: 'Too many requests.',
+          retry_after_seconds: 37,
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: '查询' }));
+
+    const dialog = await screen.findByRole('alertdialog', { name: '查询暂时冷却中' });
+    expect(dialog).toHaveTextContent('37 秒后可重试');
+    expect(screen.getByRole('button', { name: '查询，冷却剩余 37 秒' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '查询，冷却剩余 37 秒' }));
+    expect(stocksApi.snapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses English for the query cooldown dialog in English mode', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(historyApi.getList).mockResolvedValue({ total: 0, page: 1, limit: 20, items: [] });
+    vi.mocked(stocksApi.snapshot).mockRejectedValue({
+      response: {
+        status: 429,
+        data: {
+          error: 'rate_limited',
+          message: 'Too many requests.',
+          retry_after_seconds: 9,
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider>
+          <HomePage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByPlaceholderText('Enter a stock code or name, e.g. 600519, Kweichow Moutai, AAPL');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Query' }));
+
+    const dialog = await screen.findByRole('alertdialog', { name: 'Query cooldown in progress' });
+    expect(dialog).toHaveTextContent('Retry in 9 seconds');
+    expect(screen.getByRole('button', { name: 'Query, cooldown 9 seconds remaining' })).toBeInTheDocument();
+  });
+
   it('explains stale data recovery and premium source gaps in quick mode', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,

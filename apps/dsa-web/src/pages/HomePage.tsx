@@ -1,6 +1,6 @@
 import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArchiveRestore, BarChart3, Check, ChevronDown, ChevronUp, Download, Eye, Flag, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound } from 'lucide-react';
+import { Archive, ArchiveRestore, BarChart3, Check, ChevronDown, ChevronUp, Clock3, Download, Eye, Flag, LogOut, MailCheck, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Star, UserRound, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
@@ -1313,6 +1313,9 @@ const HomePage: React.FC = () => {
   const [basicPremiumPreviewOpen, setBasicPremiumPreviewOpen] = useState(false);
   const [basicEventCenterActiveIndex, setBasicEventCenterActiveIndex] = useState(0);
   const [basicQueryError, setBasicQueryError] = useState<ParsedApiError | null>(null);
+  const [basicQueryCooldownSeconds, setBasicQueryCooldownSeconds] = useState(0);
+  const [basicQueryCooldownDialogOpen, setBasicQueryCooldownDialogOpen] = useState(false);
+  const basicQueryHadCooldownRef = useRef(false);
   const [kronosForecast, setKronosForecast] = useState<KronosForecastResponse | null>(null);
   const [isRunningKronosForecast, setIsRunningKronosForecast] = useState(false);
   const [kronosForecastError, setKronosForecastError] = useState('');
@@ -4519,6 +4522,23 @@ const HomePage: React.FC = () => {
 
   const watchlistState = useWatchlist();
 
+  useEffect(() => {
+    if (basicQueryCooldownSeconds <= 0) {
+      if (basicQueryHadCooldownRef.current) {
+        basicQueryHadCooldownRef.current = false;
+        setBasicQueryCooldownDialogOpen(false);
+        setBasicQueryError((current) => (current?.status === 429 ? null : current));
+      }
+      return undefined;
+    }
+
+    basicQueryHadCooldownRef.current = true;
+    const timer = window.setTimeout(() => {
+      setBasicQueryCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [basicQueryCooldownSeconds]);
+
   const clearMarketReviewState = useCallback(() => {
     stopMarketReviewPolling();
     setMarketReviewReport(null);
@@ -4536,6 +4556,10 @@ const HomePage: React.FC = () => {
   ) => {
     const target = (stockCode || query).trim();
     if (!target || isQueryingBasic) {
+      return null;
+    }
+    if (basicQueryCooldownSeconds > 0) {
+      setBasicQueryCooldownDialogOpen(true);
       return null;
     }
 
@@ -4590,12 +4614,17 @@ const HomePage: React.FC = () => {
       clearError();
       return snapshot;
     } catch (err: unknown) {
-      setBasicQueryError(getParsedApiError(err));
+      const parsed = getParsedApiError(err);
+      setBasicQueryError(parsed);
+      if (parsed.status === 429 && parsed.retryAfterSeconds) {
+        setBasicQueryCooldownSeconds(parsed.retryAfterSeconds);
+        setBasicQueryCooldownDialogOpen(true);
+      }
       return null;
     } finally {
       setIsQueryingBasic(false);
     }
-  }, [aShareSourceMode, clearError, clearMarketReviewState, isQueryingBasic, query, setQuery, trackRetentionEvent]);
+  }, [aShareSourceMode, basicQueryCooldownSeconds, clearError, clearMarketReviewState, isQueryingBasic, query, setQuery, trackRetentionEvent]);
 
   useEffect(() => {
     const snapshotSourceMode = basicSnapshot?.intelligence?.aShareEnrichment?.sourceMode;
@@ -5747,6 +5776,11 @@ const HomePage: React.FC = () => {
                 type="button"
                 onClick={() => void handleBasicQuery()}
                 disabled={!query || isQueryingBasic}
+                aria-label={basicQueryCooldownSeconds > 0
+                  ? (uiLanguage === 'en'
+                    ? `Query, cooldown ${basicQueryCooldownSeconds} seconds remaining`
+                    : `查询，冷却剩余 ${basicQueryCooldownSeconds} 秒`)
+                  : undefined}
                 className="btn-primary flex h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none"
               >
                 {isQueryingBasic ? (
@@ -5756,6 +5790,13 @@ const HomePage: React.FC = () => {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                     {t('home.querying')}
+                  </>
+                ) : basicQueryCooldownSeconds > 0 ? (
+                  <>
+                    <Clock3 className="h-4 w-4" aria-hidden="true" />
+                    {uiLanguage === 'en'
+                      ? `Retry in ${basicQueryCooldownSeconds}s`
+                      : `${basicQueryCooldownSeconds} 秒后重试`}
                   </>
                 ) : (
                   <>
@@ -10274,6 +10315,44 @@ const HomePage: React.FC = () => {
             />
           </Suspense>
         </Drawer>
+      ) : null}
+
+      {basicQueryCooldownDialogOpen && basicQueryCooldownSeconds > 0 ? (
+        <div
+          className="fixed inset-0 z-[160] flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="basic-query-cooldown-title"
+        >
+          <div className="w-full max-w-md rounded-lg border border-warning/45 bg-elevated p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 gap-3">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-warning/12 text-warning">
+                  <Clock3 className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="basic-query-cooldown-title" className="text-base font-semibold text-foreground">
+                    {uiLanguage === 'en' ? 'Query cooldown in progress' : '查询暂时冷却中'}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-secondary-text">
+                    {uiLanguage === 'en'
+                      ? `The service will recover automatically. Retry in ${basicQueryCooldownSeconds} seconds.`
+                      : `服务会自动恢复，${basicQueryCooldownSeconds} 秒后可重试。`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBasicQueryCooldownDialogOpen(false)}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-subtle text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                aria-label={uiLanguage === 'en' ? 'Close cooldown notice' : '关闭冷却提示'}
+                title={uiLanguage === 'en' ? 'Close cooldown notice' : '关闭冷却提示'}
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
     </div>

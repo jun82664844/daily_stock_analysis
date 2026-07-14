@@ -20,6 +20,7 @@ export interface ParsedApiError {
   message: string;
   rawMessage: string;
   status?: number;
+  retryAfterSeconds?: number;
   category: ApiErrorCategory;
 }
 
@@ -42,6 +43,7 @@ type CreateParsedApiErrorOptions = {
   message: string;
   rawMessage?: string;
   status?: number;
+  retryAfterSeconds?: number;
   category?: ApiErrorCategory;
 };
 
@@ -167,6 +169,20 @@ function extractErrorCode(data: unknown): string | null {
   return pickString(data.error, data.code);
 }
 
+function extractRetryAfterSeconds(data: unknown): number | undefined {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+
+  const raw = data.retry_after_seconds ?? data.retryAfterSeconds;
+  const parsed = typeof raw === 'number' ? raw : Number(raw);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.ceil(parsed);
+  }
+
+  return isRecord(data.detail) ? extractRetryAfterSeconds(data.detail) : undefined;
+}
+
 export function extractErrorPayloadText(data: unknown): string | null {
   if (typeof data === 'string') {
     return data.trim() || null;
@@ -210,6 +226,9 @@ export function createParsedApiError(options: CreateParsedApiErrorOptions): Pars
     message: options.message,
     rawMessage: options.rawMessage?.trim() || options.message,
     status: options.status,
+    ...(options.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: options.retryAfterSeconds }
+      : {}),
     category: options.category ?? 'unknown',
   };
 }
@@ -294,12 +313,26 @@ export function parseApiError(error: unknown): ParsedApiError {
   const status = response?.status;
   const payloadText = extractErrorPayloadText(response?.data);
   const errorCode = extractErrorCode(response?.data);
+  const retryAfterSeconds = extractRetryAfterSeconds(response?.data);
   const errorMessage = getErrorMessage(error);
   const causeMessage = getCauseMessage(error);
   const code = getErrorCode(error);
   const rawMessage = pickString(payloadText, response?.statusText, errorMessage, causeMessage, code)
     ?? '请求未成功完成，请稍后重试。';
   const matchText = buildMatchText([rawMessage, errorMessage, causeMessage, code, errorCode, response?.statusText]);
+
+  if (status === 429 || errorCode === 'rate_limited') {
+    return createParsedApiError({
+      title: '请求过于频繁',
+      message: retryAfterSeconds
+        ? `请等待 ${retryAfterSeconds} 秒后重试。`
+        : '请稍后重试。',
+      rawMessage,
+      status,
+      retryAfterSeconds,
+      category: 'http_error',
+    });
+  }
 
   if (includesAny(matchText, ['agent mode is not enabled', 'agent_mode'])) {
     return createParsedApiError({

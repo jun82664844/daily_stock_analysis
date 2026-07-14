@@ -60,6 +60,7 @@ from src.services.stock_code_utils import normalize_crypto_symbol
 from src.services.system_config_service import SystemConfigService
 from src.auth import COOKIE_NAME, verify_session
 from src.platform_accounts import PlatformIdentity, platform_identity_from_request
+from src.platform_rate_limit import check_platform_rate_limit
 from data_provider.base import normalize_stock_code
 
 logger = logging.getLogger(__name__)
@@ -646,6 +647,7 @@ def get_financial_research_workflows(
     responses={
         200: {"description": "No-AI stock snapshot"},
         400: {"description": "参数错误", "model": ErrorResponse},
+        429: {"description": "查询过于频繁，请按 retry_after_seconds 稍后重试"},
         404: {"description": "股票不存在", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
     },
@@ -653,6 +655,7 @@ def get_financial_research_workflows(
     description="返回行情、均线、成交量等基础数据，不调用 AI 模型。",
 )
 def get_basic_stock_snapshot(
+    request: Request,
     stock_code: str,
     refresh: bool = Query(False, description="Force a deterministic no-AI market data refresh and update local cache."),
     a_share_source_mode: str = Query(
@@ -663,6 +666,14 @@ def get_basic_stock_snapshot(
 ) -> BasicStockSnapshot:
     """Return a fast stock snapshot without invoking an AI model."""
     try:
+        identity = platform_identity_from_request(request)
+        limited = check_platform_rate_limit(
+            request,
+            "basic_snapshot",
+            user_id=int(identity.user_id) if identity and identity.user_id is not None else None,
+        )
+        if limited is not None:
+            return limited
         normalized = _validate_and_normalize_stock_code(stock_code)
         a_share_enrichment_service = AShareEnrichmentService(source_mode=a_share_source_mode)
         snapshot = BasicQueryService(
