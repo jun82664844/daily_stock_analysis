@@ -1,4 +1,4 @@
-import { BellRing, Clock3, ExternalLink, Newspaper, RefreshCw } from 'lucide-react';
+import { Activity, BellRing, Clock3, ExternalLink, Newspaper, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { MarketCode, MarketHeadline, MarketSecurityItem, PublicMarketHomeResponse } from '../../api/marketWorkspace';
 import PriceAlertFormV116, { type PriceAlertDraft } from '../alerts/PriceAlertFormV116';
@@ -53,6 +53,22 @@ const PUBLISHER_NAMES: Record<string, string> = {
   '\u91d1\u5341\u6570\u636e': 'Jin10',
 };
 
+type RankingKey = 'mostActive' | 'gainers' | 'losers';
+
+const RANKING_LABELS: Record<RankingKey, { zh: string; en: string }> = {
+  mostActive: { zh: '活跃榜', en: 'Most active' },
+  gainers: { zh: '涨幅榜', en: 'Gainers' },
+  losers: { zh: '跌幅榜', en: 'Losers' },
+};
+
+const SESSION_LABELS: Record<string, { zh: string; en: string }> = {
+  pre: { zh: '盘前', en: 'Pre-market' },
+  regular: { zh: '盘中', en: 'Regular' },
+  post: { zh: '盘后', en: 'Post-market' },
+  closed: { zh: '休市', en: 'Closed' },
+  unknown: { zh: '时段未知', en: 'Session unknown' },
+};
+
 const percent = (value: number | null | undefined) => value == null
   ? '-'
   : `${value > 0 ? '+' : ''}${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
@@ -69,6 +85,19 @@ function headlinePublisher(headline: MarketHeadline, language: 'zh' | 'en'): str
 function movementTone(value: number | null | undefined): string {
   if (value == null || value === 0) return 'text-secondary-text';
   return value > 0 ? 'text-success' : 'text-danger';
+}
+
+function formatTurnover(value: number | null | undefined, language: 'zh' | 'en'): string {
+  if (value == null || !Number.isFinite(value)) return '-';
+  const abs = Math.abs(value);
+  if (language === 'zh') {
+    if (abs >= 100_000_000) return `${(value / 100_000_000).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}亿`;
+    if (abs >= 10_000) return `${(value / 10_000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })}万`;
+    return value.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+  }
+  if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`;
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`;
+  return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function dataModeLabel(mode: 'latest_available' | 'delayed' | 'realtime', language: 'zh' | 'en'): string {
@@ -152,12 +181,28 @@ function MarketFeed({
 export default function PublicMarketHomeV116({ language, data, loading, onOpenSymbol, onCreateAlert }: Props) {
   const en = language === 'en';
   const [activeMarket, setActiveMarket] = useState<MarketCode>('cn');
+  const [rankingKey, setRankingKey] = useState<RankingKey>('mostActive');
   const [expandedSymbol, setExpandedSymbol] = useState('');
   const sections = data?.markets ?? [];
   const activeSection = useMemo(
     () => sections.find((section) => section.market === activeMarket) || sections[0],
     [activeMarket, sections],
   );
+  const activeItems = useMemo(() => {
+    if (!activeSection) return [];
+    if (rankingKey === 'gainers') return activeSection.gainers ?? [];
+    if (rankingKey === 'losers') return activeSection.losers ?? [];
+    return activeSection.mostActive ?? activeSection.attention ?? [];
+  }, [activeSection, rankingKey]);
+  const selectedAlertItem = useMemo(() => {
+    if (!activeSection || !expandedSymbol) return undefined;
+    const candidates = [
+      ...(activeSection.mostActive ?? activeSection.attention ?? []),
+      ...(activeSection.gainers ?? []),
+      ...(activeSection.losers ?? []),
+    ];
+    return candidates.find((item) => item.symbol === expandedSymbol);
+  }, [activeSection, expandedSymbol]);
 
   if (loading && !data) {
     return (
@@ -170,8 +215,9 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
     );
   }
   if (!data || !activeSection) return null;
-
-  const selectedAlertItem = activeSection.attention.find((item) => item.symbol === expandedSymbol);
+  const sectorHighlights = activeSection.sectorHighlights ?? [];
+  const rankingCache = activeSection.rankingCache ?? { hit: false, ageSeconds: 0, ttlSeconds: 120 };
+  const rankingIcons = { mostActive: Activity, gainers: TrendingUp, losers: TrendingDown };
 
   return (
     <section
@@ -179,11 +225,12 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
       data-testid="public-market-home-v116"
     >
       <div className="px-4 py-4 md:px-5" data-testid="public-home-market-dashboard-v118">
+        <span className="sr-only" data-testid="public-home-dynamic-v119">V119 dynamic market home</span>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-foreground">{en ? 'Market focus' : '市场焦点'}</h2>
             <p className="mt-1 text-xs text-secondary-text">
-              {en ? 'A-shares, Hong Kong and US market attention with source status.' : 'A股、港股、美股关注行情与来源状态。'}
+              {en ? 'Market-wide activity, movers, sectors and source-linked information.' : 'A股、港股、美股全市场活跃度、涨跌榜、行业热点与来源可追溯资讯。'}
             </p>
           </div>
           <p className="flex shrink-0 items-center gap-1.5 text-xs text-secondary-text">
@@ -194,7 +241,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
 
         <div className="mt-4 grid grid-cols-3 border-y border-border/70" role="tablist" aria-label={en ? 'Markets' : '市场'}>
           {sections.map((section) => {
-            const lead = section.attention[0];
+            const lead = section.mostActive?.[0] ?? section.attention[0];
             const selected = activeSection.market === section.market;
             return (
               <button
@@ -204,6 +251,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                 key={section.market}
                 onClick={() => {
                   setActiveMarket(section.market);
+                  setRankingKey('mostActive');
                   setExpandedSymbol('');
                 }}
                 className={`min-w-0 border-r border-border/70 px-3 py-2.5 text-left last:border-r-0 ${selected ? 'bg-primary/10 text-foreground' : 'text-secondary-text hover:bg-hover/60 hover:text-foreground'}`}
@@ -242,40 +290,75 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
         ) : null}
 
         <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.8fr)]">
-          <section className="min-w-0" aria-label={`${MARKET_LABELS[activeSection.market][language]} ${en ? 'attention list' : '关注行情'}`}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-foreground">{MARKET_LABELS[activeSection.market][language]} {en ? 'active stocks' : '热门关注'}</h3>
-                <p className="mt-0.5 text-xs text-secondary-text">{en ? 'Configured market universe, not a full-market ranking.' : '基于配置股票池，不代表全市场排名。'}</p>
+          <section className="min-w-0" aria-label={`${MARKET_LABELS[activeSection.market][language]} ${en ? 'market-wide rankings' : '全市场榜单'}`}>
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-foreground">{en ? 'Market-wide public rankings' : '全市场公开榜单'}</h3>
+                <p className="mt-0.5 text-xs leading-5 text-secondary-text">
+                  {en ? 'Public market sorting with liquidity filters; no fixed watchlist and no AI quota.' : '来自公开市场排序并过滤低流动性样本，不使用固定股票池，不消耗 AI 额度。'}
+                </p>
               </div>
-              <span className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-secondary-text">
-                {dataModeLabel(activeSection.displayMode, language)}
-              </span>
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-[11px] text-secondary-text">
+                <span className="rounded-md border border-border px-2 py-1">{dataModeLabel(activeSection.displayMode, language)}</span>
+                <span className="rounded-md border border-border px-2 py-1">
+                  {rankingCache.hit
+                    ? (en ? `Cache ${rankingCache.ageSeconds}s` : `缓存 ${rankingCache.ageSeconds}秒`)
+                    : (en ? 'Latest fetch' : '最新抓取')}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 border-y border-border/70" aria-label={en ? 'Ranking groups' : '榜单类型'}>
+              {(Object.keys(RANKING_LABELS) as RankingKey[]).map((key) => {
+                const Icon = rankingIcons[key];
+                const selected = rankingKey === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setRankingKey(key);
+                      setExpandedSymbol('');
+                    }}
+                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 border-r border-border/70 px-2 text-sm last:border-r-0 ${selected ? 'bg-primary/10 font-semibold text-primary' : 'text-secondary-text hover:bg-hover/50 hover:text-foreground'}`}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    {RANKING_LABELS[key][language]}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="mt-3 overflow-hidden border-y border-border/70" role="table">
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,.65fr)_minmax(3.5rem,.5fr)_auto] gap-2 bg-background/35 px-2 py-2 text-[11px] text-secondary-text lg:grid-cols-[minmax(0,1.25fr)_minmax(5rem,.65fr)_minmax(4rem,.55fr)_minmax(8rem,1fr)_auto]" role="row">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,.65fr)_minmax(3.5rem,.5fr)_auto] gap-2 bg-background/35 px-2 py-2 text-[11px] text-secondary-text lg:grid-cols-[minmax(0,1.15fr)_minmax(5rem,.55fr)_minmax(4rem,.5fr)_minmax(5rem,.55fr)_minmax(8rem,.8fr)_auto]" role="row">
                 <span>{en ? 'Stock' : '股票'}</span>
                 <span className="text-right">{en ? 'Price' : '价格'}</span>
                 <span className="text-right">{en ? 'Change' : '涨跌'}</span>
+                <span className="hidden text-right lg:block">{en ? 'Turnover' : '成交额'}</span>
                 <span className="hidden lg:block">{en ? 'Source' : '来源'}</span>
                 <span className="sr-only">{en ? 'Actions' : '操作'}</span>
               </div>
               <div className="divide-y divide-border/60">
-                {activeSection.attention.length ? activeSection.attention.map((item) => {
+                {activeItems.length ? activeItems.map((item) => {
                   const name = securityName(item, language);
+                  const sessionLabel = item.tradingSession ? SESSION_LABELS[item.tradingSession]?.[language] : null;
                   return (
                     <div
                       key={item.symbol}
-                      className="grid min-h-14 grid-cols-[minmax(0,1fr)_minmax(4.5rem,.65fr)_minmax(3.5rem,.5fr)_auto] items-center gap-2 px-2 py-2 hover:bg-hover/45 lg:grid-cols-[minmax(0,1.25fr)_minmax(5rem,.65fr)_minmax(4rem,.55fr)_minmax(8rem,1fr)_auto]"
+                      className="grid min-h-14 grid-cols-[minmax(0,1fr)_minmax(4.5rem,.65fr)_minmax(3.5rem,.5fr)_auto] items-center gap-2 px-2 py-2 hover:bg-hover/45 lg:grid-cols-[minmax(0,1.15fr)_minmax(5rem,.55fr)_minmax(4rem,.5fr)_minmax(5rem,.55fr)_minmax(8rem,.8fr)_auto]"
                       role="row"
                     >
                       <button type="button" aria-label={en ? `View ${name}` : `查看 ${name}`} onClick={() => onOpenSymbol(item.symbol)} className="min-w-0 text-left">
                         <span className="block truncate text-sm font-medium text-foreground hover:text-primary">{name}</span>
-                        <span className="block truncate text-[11px] text-secondary-text">{item.symbol} · {item.currency ?? '-'}</span>
+                        <span className="flex min-w-0 items-center gap-1.5 truncate text-[11px] text-secondary-text">
+                          <span className="truncate">{item.symbol} · {item.currency ?? '-'}</span>
+                          {sessionLabel ? <span className="shrink-0 rounded border border-border px-1">{sessionLabel}</span> : null}
+                        </span>
                       </button>
                       <span className="text-right text-sm font-semibold text-foreground">{formatMarketNumber(item.currentPrice, language)}</span>
                       <span className={`text-right text-xs font-semibold ${movementTone(item.changePercent)}`}>{percent(item.changePercent)}</span>
+                      <span className="hidden text-right text-xs text-secondary-text lg:block">{formatTurnover(item.turnover, language)}</span>
                       <span className="hidden min-w-0 lg:block">
                         <span className="block truncate text-xs text-secondary-text">{formatSourceLabel(item.sourceState.source, language)}</span>
                         <span className="block truncate text-[11px] text-secondary-text">{formatSourceStatus(item.sourceState.status, language)} · {formatMarketTimestamp(item.sourceState.observedAt ?? item.sourceState.fetchedAt, language)}</span>
@@ -292,10 +375,40 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                     </div>
                   );
                 }) : (
-                  <p className="py-10 text-center text-sm text-secondary-text">{en ? 'This market is temporarily unavailable' : '该市场暂时不可用'}</p>
+                  <p className="py-10 text-center text-sm text-secondary-text">
+                    {en ? 'This ranking is temporarily unavailable; no fixed stocks are substituted.' : '该榜单数据暂不可用，未使用固定股票代替。'}
+                  </p>
                 )}
               </div>
             </div>
+
+            <section className="mt-4 border-y border-border/70 py-3" aria-label={en ? 'Sector highlights' : '行业热点'}>
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold text-foreground">{en ? 'Sector highlights' : '行业热点'}</h4>
+                <span className="text-[11px] text-secondary-text">{en ? 'Public sector data' : '公开行业数据'}</span>
+              </div>
+              {sectorHighlights.length ? (
+                <div className="mt-2 grid divide-y divide-border/60 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-3">
+                  {sectorHighlights.slice(0, 6).map((sector) => (
+                    <div key={sector.name} className="min-w-0 px-2 py-2 first:pl-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">{sector.name}</span>
+                        <span className={`shrink-0 text-xs font-semibold ${movementTone(sector.changePercent)}`}>{percent(sector.changePercent)}</span>
+                      </div>
+                      {sector.leadingSymbol ? (
+                        <button type="button" onClick={() => onOpenSymbol(sector.leadingSymbol!)} className="mt-1 max-w-full truncate text-left text-xs text-secondary-text hover:text-primary">
+                          {en ? 'Leader' : '领涨'} {sector.leadingName || sector.leadingSymbol} {percent(sector.leadingChangePercent)}
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs leading-5 text-secondary-text">
+                  {en ? 'A reliable public sector source is not available for this market yet.' : '该市场暂未接入可靠的公开行业热点源。'}
+                </p>
+              )}
+            </section>
 
             {selectedAlertItem ? (
               <div className="mt-3 border-t border-border/70 pt-3">
@@ -314,7 +427,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
           <MarketFeed
             language={language}
             headlines={activeSection.headlines ?? []}
-            items={activeSection.attention}
+            items={activeItems}
           />
         </div>
 

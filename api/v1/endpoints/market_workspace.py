@@ -23,6 +23,7 @@ from src.services.public_market_index_service import PublicMarketIndexService
 from src.services.public_market_news_service import PublicMarketNewsService
 from src.services.market_workspace_service import MarketWorkspaceService
 from src.services.public_market_home_service import PublicMarketHomeService
+from src.services.public_market_ranking_service import PublicMarketRankingService
 
 
 router = APIRouter()
@@ -32,8 +33,17 @@ _workspace_service = MarketWorkspaceService(
     news_loader=_public_market_news_service.load,
     index_loader=_public_market_index_service.load,
 )
+_public_home_workspace_service = MarketWorkspaceService(
+    news_loader=_public_market_news_service.load,
+    index_loader=_public_market_index_service.load,
+    market_symbols={"cn": (), "hk": (), "us": ()},
+)
 _search_service = MarketSearchService()
-_public_home_service = PublicMarketHomeService(_workspace_service)
+_public_market_ranking_service = PublicMarketRankingService()
+_public_home_service = PublicMarketHomeService(
+    _public_home_workspace_service,
+    ranking_loader=_public_market_ranking_service.load,
+)
 
 
 def _enabled() -> bool:

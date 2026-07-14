@@ -24,7 +24,24 @@ export type MarketSecurityItem = {
   turnover?: number | null;
   marketCap?: number | null;
   sector?: string | null;
+  tradingSession?: 'pre' | 'regular' | 'post' | 'closed' | 'unknown' | null;
   sourceState: DataSourceState;
+};
+
+export type MarketSectorItem = {
+  name: string;
+  market: MarketCode;
+  changePercent?: number | null;
+  leadingSymbol?: string | null;
+  leadingName?: string | null;
+  leadingChangePercent?: number | null;
+  sourceState: DataSourceState;
+};
+
+export type MarketCacheState = {
+  hit: boolean;
+  ageSeconds: number;
+  ttlSeconds: number;
 };
 
 export type MarketHeadline = {
@@ -56,10 +73,15 @@ export type PublicMarketHomeSection = {
   market: MarketCode;
   sessionState: 'open' | 'closed' | 'unknown';
   displayMode: 'latest_available' | 'delayed' | 'realtime';
-  rankingScope: 'configured_universe' | 'market_wide';
+  rankingScope: 'configured_universe' | 'market_wide' | 'unavailable';
   selectionBasis: string;
   indices: MarketSecurityItem[];
   attention: MarketSecurityItem[];
+  mostActive?: MarketSecurityItem[];
+  gainers?: MarketSecurityItem[];
+  losers?: MarketSecurityItem[];
+  sectorHighlights?: MarketSectorItem[];
+  rankingCache?: MarketCacheState;
   headlines?: MarketHeadline[];
   sources: DataSourceState[];
   warnings: string[];
@@ -136,6 +158,11 @@ export const marketWorkspaceApi = {
         ...market,
         indices: Array.isArray(market.indices) ? market.indices : [],
         attention: Array.isArray(market.attention) ? market.attention : [],
+        mostActive: Array.isArray(market.mostActive) ? market.mostActive : (Array.isArray(market.attention) ? market.attention : []),
+        gainers: Array.isArray(market.gainers) ? market.gainers : [],
+        losers: Array.isArray(market.losers) ? market.losers : [],
+        sectorHighlights: Array.isArray(market.sectorHighlights) ? market.sectorHighlights : [],
+        rankingCache: market.rankingCache ?? { hit: false, ageSeconds: 0, ttlSeconds: 120 },
         headlines: Array.isArray(market.headlines) ? market.headlines : [],
         sources: Array.isArray(market.sources) ? market.sources : [],
         warnings: Array.isArray(market.warnings) ? market.warnings : [],

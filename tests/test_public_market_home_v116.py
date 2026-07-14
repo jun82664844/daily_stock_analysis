@@ -60,6 +60,56 @@ class _Workspace:
         return _overview(market)
 
 
+class _HomeContextWorkspace(_Workspace):
+    def get_overview(self, market: str) -> dict:
+        body = super().get_overview(market)
+        body["warnings"] = [*body.get("warnings", []), "market_quotes_unavailable"]
+        body["sources"] = [
+            *body.get("sources", []),
+            {"source": f"{market}_market_snapshot", "status": "unavailable"},
+        ]
+        return body
+
+
+class _Rankings:
+    def __init__(self, *, failed: str | None = None) -> None:
+        self.failed = failed
+
+    def load(self, market: str) -> dict:
+        if market == self.failed:
+            raise RuntimeError("ranking provider unavailable")
+        active = _security(f"{market}-ACTIVE", 100, 2)
+        gainer = _security(f"{market}-GAIN", 80, 8)
+        loser = _security(f"{market}-LOSS", 70, -7)
+        for item in (active, gainer, loser):
+            item["market"] = market
+        return {
+            "market": market,
+            "as_of": "2026-07-14T02:02:00Z",
+            "most_active": [active],
+            "gainers": [gainer],
+            "losers": [loser],
+            "sector_highlights": [],
+            "sources": [{"source": f"{market}_public_ranking", "status": "fresh"}],
+            "warnings": [],
+            "cache": {"hit": False, "age_seconds": 0, "ttl_seconds": 120},
+            "ai_used": False,
+            "informational_only": True,
+        }
+
+
+class _FlakyRankings(_Rankings):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: dict[str, int] = {}
+
+    def load(self, market: str) -> dict:
+        self.calls[market] = self.calls.get(market, 0) + 1
+        if market == "hk" and self.calls[market] == 1:
+            raise RuntimeError("temporary ranking provider failure")
+        return super().load(market)
+
+
 class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
     def test_workspace_attention_symbols_are_configurable_and_deduplicated(self) -> None:
         from src.services.market_workspace_service import MarketWorkspaceService
@@ -101,6 +151,64 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         elapsed = time.perf_counter() - started
         self.assertLess(elapsed, 0.24)
         self.assertTrue(all(item["attention"] for item in body["markets"]))
+
+    def test_dynamic_rankings_replace_configured_attention_and_keep_market_groups(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        body = PublicMarketHomeService(
+            _HomeContextWorkspace(),
+            ranking_loader=_Rankings().load,
+            timeout_seconds=1,
+        ).build()
+        cn = body["markets"][0]
+
+        self.assertEqual(cn["ranking_scope"], "market_wide")
+        self.assertEqual([item["symbol"] for item in cn["most_active"]], ["cn-ACTIVE"])
+        self.assertEqual([item["symbol"] for item in cn["gainers"]], ["cn-GAIN"])
+        self.assertEqual([item["symbol"] for item in cn["losers"]], ["cn-LOSS"])
+        self.assertEqual(cn["attention"], cn["most_active"])
+        self.assertNotIn("cn-HIGH", {item["symbol"] for item in cn["attention"]})
+        self.assertNotIn("market_quotes_unavailable", cn["warnings"])
+        self.assertFalse(any(str(item.get("source", "")).endswith("_market_snapshot") for item in cn["sources"]))
+
+    def test_dynamic_ranking_failure_never_falls_back_to_fixed_pool(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        body = PublicMarketHomeService(
+            _Workspace(),
+            ranking_loader=_Rankings(failed="hk").load,
+            timeout_seconds=1,
+        ).build()
+        hk = body["markets"][1]
+
+        self.assertEqual(hk["attention"], [])
+        self.assertEqual(hk["most_active"], [])
+        self.assertIn("market_rankings_unavailable", hk["warnings"])
+        self.assertTrue(hk["headlines"])
+
+    def test_partial_dynamic_failure_is_not_cached_as_a_complete_home(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        rankings = _FlakyRankings()
+        service = PublicMarketHomeService(
+            _Workspace(),
+            ranking_loader=rankings.load,
+            timeout_seconds=1,
+            cache_ttl_seconds=60,
+        )
+        first = service.build()
+        second = service.build()
+
+        self.assertEqual(first["markets"][1]["ranking_scope"], "unavailable")
+        self.assertEqual(second["markets"][1]["ranking_scope"], "market_wide")
+        self.assertEqual(rankings.calls["hk"], 2)
+
+    def test_v119_default_deadline_allows_dynamic_ranking_deadline(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        with patch.dict(os.environ, {}, clear=True):
+            service = PublicMarketHomeService(_Workspace(), ranking_loader=_Rankings().load)
+        self.assertGreaterEqual(service.timeout_seconds, 5.5)
 
 
 class PublicMarketHomeEndpointV116TestCase(unittest.TestCase):

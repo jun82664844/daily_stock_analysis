@@ -2069,3 +2069,40 @@ Review focus: six product capabilities are not six installed upstream runtimes, 
 - `.gitignore`
 
 Review focus: allowlisted public web data may load automatically with bounded timeout and cache, model/API analysis must remain user-triggered, headline links retain attribution, account/model details stay off the default home, and no investment-advice or production claim is introduced.
+
+## V119 Dynamic Market Home
+
+### backend-platform-foundation
+
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `src/services/public_market_home_service.py`
+- `src/services/public_market_ranking_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `scripts/verify_platform_dynamic_market_home_v119.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_dynamic_market_home_v119_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_public_market_home_v116.py`
+- `tests/test_public_market_ranking_service_v119.py`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v119-dynamic-market-home.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: market-wide source mapping, liquidity filtering, no fixed-symbol fallback, bounded concurrency/cache, source freshness, bilingual labels, click-through query, no AI quota use, and no investment-advice claim.

@@ -15,7 +15,7 @@ from src.services.market_workspace_service import MarketWorkspaceService
 
 
 MARKETS = ("cn", "hk", "us")
-_HOME_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="public-market-home")
+_HOME_EXECUTOR = ThreadPoolExecutor(max_workers=6, thread_name_prefix="public-market-home")
 
 
 def _utc_now() -> str:
@@ -32,14 +32,16 @@ class PublicMarketHomeService:
         max_items_per_market: Optional[int] = None,
         clock: Callable[[], str] = _utc_now,
         executor: Optional[ThreadPoolExecutor] = None,
+        ranking_loader: Optional[Callable[[str], Dict[str, Any]]] = None,
     ) -> None:
         self.workspace_service = workspace_service or MarketWorkspaceService()
-        raw_timeout = timeout_seconds if timeout_seconds is not None else os.getenv("PLATFORM_PUBLIC_MARKET_HOME_TIMEOUT_SECONDS", "3.5")
+        raw_timeout = timeout_seconds if timeout_seconds is not None else os.getenv("PLATFORM_PUBLIC_MARKET_HOME_TIMEOUT_SECONDS", "5.5")
         self.timeout_seconds = max(0.05, min(float(raw_timeout), 10.0))
         self.cache_ttl_seconds = max(1, int(cache_ttl_seconds or os.getenv("PLATFORM_PUBLIC_MARKET_HOME_CACHE_TTL_SECONDS", "60")))
         self.max_items_per_market = max(1, min(int(max_items_per_market or os.getenv("PLATFORM_PUBLIC_MARKET_HOME_MAX_ITEMS_PER_MARKET", "6")), 20))
         self.clock = clock
         self.executor = executor or _HOME_EXECUTOR
+        self.ranking_loader = ranking_loader
         self._cache: Optional[tuple[float, Dict[str, Any]]] = None
         self._lock = Lock()
 
@@ -48,24 +50,41 @@ class PublicMarketHomeService:
         if cached is not None:
             return cached
         futures = {market: self.executor.submit(self.workspace_service.get_overview, market) for market in MARKETS}
-        completed, pending = wait(futures.values(), timeout=self.timeout_seconds)
+        ranking_futures = {
+            market: self.executor.submit(self.ranking_loader, market)
+            for market in MARKETS
+        } if self.ranking_loader is not None else {}
+        completed, pending = wait([*futures.values(), *ranking_futures.values()], timeout=self.timeout_seconds)
         for future in pending:
             future.cancel()
         sections = []
         for market in MARKETS:
             future = futures[market]
-            if future not in completed or future.exception() is not None:
+            overview = None if future not in completed or future.exception() is not None else future.result()
+            if self.ranking_loader is None:
+                if overview is None:
+                    sections.append(self._unavailable_section(market))
+                else:
+                    sections.append(self._section(market, overview))
+                continue
+            ranking_future = ranking_futures[market]
+            rankings = None if ranking_future not in completed or ranking_future.exception() is not None else ranking_future.result()
+            if overview is None and rankings is None:
                 sections.append(self._unavailable_section(market))
             else:
-                sections.append(self._section(market, future.result()))
+                sections.append(self._dynamic_section(market, overview or {}, rankings))
         payload = {
             "as_of": self.clock(),
             "markets": sections,
             "ai_used": False,
             "informational_only": True,
         }
-        with self._lock:
-            self._cache = (time.monotonic(), copy.deepcopy(payload))
+        cacheable = self.ranking_loader is None or all(
+            section.get("ranking_scope") == "market_wide" for section in sections
+        )
+        if cacheable:
+            with self._lock:
+                self._cache = (time.monotonic(), copy.deepcopy(payload))
         return payload
 
     def _read_cache(self) -> Optional[Dict[str, Any]]:
@@ -96,10 +115,51 @@ class PublicMarketHomeService:
             "market": market,
             "session_state": "unknown",
             "display_mode": self._display_mode(),
-            "ranking_scope": "configured_universe",
+            "ranking_scope": "unavailable" if self.ranking_loader is not None else "configured_universe",
             "selection_basis": "turnover_then_absolute_change",
-            "indices": [], "attention": [], "headlines": [], "sources": [],
+            "indices": [], "attention": [], "most_active": [], "gainers": [], "losers": [],
+            "sector_highlights": [], "ranking_cache": {"hit": False, "age_seconds": 0, "ttl_seconds": 120},
+            "headlines": [], "sources": [],
             "warnings": ["market_home_unavailable"],
+        }
+
+    def _dynamic_section(self, market: str, overview: Dict[str, Any], rankings: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        ranking = rankings or {}
+        most_active = list(ranking.get("most_active") or [])[: self.max_items_per_market]
+        gainers = list(ranking.get("gainers") or [])[: self.max_items_per_market]
+        losers = list(ranking.get("losers") or [])[: self.max_items_per_market]
+        has_market_rankings = bool(most_active or gainers or losers)
+        warnings = [
+            warning for warning in (overview.get("warnings") or [])
+            if warning != "market_quotes_unavailable"
+        ]
+        if not overview:
+            warnings.append("market_context_unavailable")
+        warnings.extend(ranking.get("warnings") or [])
+        if rankings is None:
+            warnings.append("market_rankings_unavailable")
+        return {
+            "market": market,
+            "session_state": overview.get("session_state") if overview.get("session_state") in {"open", "closed", "unknown"} else "unknown",
+            "display_mode": self._display_mode(),
+            "ranking_scope": "market_wide" if has_market_rankings else "unavailable",
+            "selection_basis": "market_wide_public_rankings_with_liquidity_filter",
+            "indices": list(overview.get("indices") or []),
+            "attention": most_active,
+            "most_active": most_active,
+            "gainers": gainers,
+            "losers": losers,
+            "sector_highlights": list(ranking.get("sector_highlights") or [])[: self.max_items_per_market],
+            "ranking_cache": dict(ranking.get("cache") or {"hit": False, "age_seconds": 0, "ttl_seconds": 120}),
+            "headlines": list(overview.get("headlines") or [])[:10],
+            "sources": [
+                *[
+                    state for state in (overview.get("sources") or [])
+                    if not str(state.get("source") if isinstance(state, dict) else "").endswith("_market_snapshot")
+                ],
+                *list(ranking.get("sources") or []),
+            ],
+            "warnings": list(dict.fromkeys(warnings)),
         }
 
     @staticmethod

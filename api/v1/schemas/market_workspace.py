@@ -48,6 +48,17 @@ class MarketSecurityItem(StrictModel):
     turnover: Optional[float] = None
     market_cap: Optional[float] = None
     sector: Optional[str] = None
+    trading_session: Optional[Literal["pre", "regular", "post", "closed", "unknown"]] = None
+    source_state: DataSourceState
+
+
+class MarketSectorItem(StrictModel):
+    name: str
+    market: Literal["cn", "hk", "us"]
+    change_percent: Optional[float] = None
+    leading_symbol: Optional[str] = None
+    leading_name: Optional[str] = None
+    leading_change_percent: Optional[float] = None
     source_state: DataSourceState
 
 
@@ -80,10 +91,15 @@ class PublicMarketHomeSection(StrictModel):
     market: Literal["cn", "hk", "us"]
     session_state: Literal["open", "closed", "unknown"] = "unknown"
     display_mode: Literal["latest_available", "delayed", "realtime"] = "latest_available"
-    ranking_scope: Literal["configured_universe", "market_wide"] = "configured_universe"
+    ranking_scope: Literal["configured_universe", "market_wide", "unavailable"] = "configured_universe"
     selection_basis: str
     indices: List[MarketSecurityItem] = Field(default_factory=list)
     attention: List[MarketSecurityItem] = Field(default_factory=list)
+    most_active: List[MarketSecurityItem] = Field(default_factory=list)
+    gainers: List[MarketSecurityItem] = Field(default_factory=list)
+    losers: List[MarketSecurityItem] = Field(default_factory=list)
+    sector_highlights: List[MarketSectorItem] = Field(default_factory=list)
+    ranking_cache: MarketCacheState = Field(default_factory=MarketCacheState)
     headlines: List[MarketHeadline] = Field(default_factory=list)
     sources: List[DataSourceState] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)

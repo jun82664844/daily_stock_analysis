@@ -631,3 +631,14 @@ git diff --check
 - 本状态仅代表本地功能验收，不代表生产部署、支付、市场数据商业授权或法律审批；所有页面仅提供资讯和数据，不构成投资建议。
 - 浏览器实测覆盖桌面和 390x844 手机视口：A股、港股、美股分别显示公开基准指数、关注行情和 5 条来源可追溯资讯，手机无横向溢出，控制台无警告或错误。
 - 首次 `/api/v1/market-workspace/home` 实测约 2.48 秒，三地各返回 6 条公开资讯且 `ai_used=false`；主动查询 AAPL 后才进入个股工作区，首页自动加载未运行平台 API、BYOK、Ollama 或 Kronos。
+
+## V119 动态市场首页状态（2026-07-14）
+
+- 首页固定股票池已从公开热门区域移除，A 股、港股、美股分别返回全市场活跃榜、涨幅榜和跌幅榜；`attention` 仅作为活跃榜兼容别名。
+- A 股新增公开行业热点及领涨标的；港股和美股行业热点在没有可靠公开源时明确降级，不构造假数据。
+- A 股和港股榜单来自新浪财经公开排序接口，美股来自 Yahoo Finance 公共 screener；来源状态、观察时间、交易阶段与缓存状态随数据返回。
+- 榜单服务使用有界并发、网络硬超时、120 秒热缓存和 30 分钟最近成功缓存；源失败时展示 stale 或 unavailable，禁止回退固定股票。
+- 本地公开网络探针：三市场冷加载约 1.82 秒，热缓存约 0.0004 秒；三市场均返回活跃、涨幅和跌幅数据，A 股同时返回行业热点。
+- 首页自动加载保持 `ai_used=false`、`informational_only=true`，不消耗平台 API、BYOK、Ollama 或 Kronos 额度；点击股票后进入现有免费查询。
+- `scripts/verify_platform_dynamic_market_home_v119.py` 通过时输出 `DSA_PLATFORM_DYNAMIC_MARKET_HOME_V119_OK markets=cn,hk,us rankings=active,gainers,losers sectors=cn public_data=true ai_used=false fixed_pool=false investment_advice=false`。
+- 本状态仅代表本地功能验收，不代表生产部署、支付、市场数据商业授权或法律审批；所有页面只提供资讯和数据，不构成投资建议。

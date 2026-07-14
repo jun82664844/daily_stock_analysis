@@ -20,6 +20,10 @@ const SOURCE_LABELS: Record<string, { zh: string; en: string }> = {
   hk_market_snapshot: { zh: '港股市场快照', en: 'Hong Kong market snapshot' },
   us_market_snapshot: { zh: '美股市场快照', en: 'US market snapshot' },
   market_news_pool: { zh: '市场资讯源', en: 'Market news' },
+  sina_public_cn_ranking: { zh: '新浪 A 股公开榜单', en: 'Sina A-share rankings' },
+  sina_public_hk_ranking: { zh: '新浪港股公开榜单', en: 'Sina Hong Kong rankings' },
+  sina_public_cn_sector: { zh: '新浪 A 股行业', en: 'Sina A-share sectors' },
+  yahoo_public_us_screener: { zh: 'Yahoo 美股公开榜单', en: 'Yahoo US screeners' },
 };
 
 export const formatSourceStatus = (status: string | null | undefined, language: 'zh' | 'en') => {
@@ -40,6 +44,14 @@ const WARNING_LABELS: Record<string, { zh: string; en: string }> = {
   market_quotes_unavailable: {
     zh: '\u884c\u60c5\u6570\u636e\u6682\u4e0d\u53ef\u7528',
     en: 'Market quote data unavailable',
+  },
+  market_rankings_unavailable: {
+    zh: '全市场榜单源暂不可用',
+    en: 'Market-wide ranking source unavailable',
+  },
+  market_ranking_stale_cache: {
+    zh: '当前展示最近成功缓存，等待数据源恢复',
+    en: 'Showing the latest successful cache while the source recovers',
   },
 };
 

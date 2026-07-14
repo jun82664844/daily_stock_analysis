@@ -346,6 +346,11 @@ REQUIRED_FILES = (
     "src/services/public_market_news_service.py",
     "tests/test_public_market_index_service_v118.py",
     "tests/test_public_market_news_service_v118.py",
+    "docs/superpowers/plans/2026-07-14-dsa-v119-dynamic-market-home.md",
+    "scripts/verify_platform_dynamic_market_home_v119.py",
+    "tests/test_platform_dynamic_market_home_v119_verifier.py",
+    "tests/test_public_market_ranking_service_v119.py",
+    "src/services/public_market_ranking_service.py",
 )
 
 VERIFIER_FILES = (
@@ -422,6 +427,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_public_market_price_alerts_v116.py",
     "scripts/verify_platform_six_feature_experience_v117.py",
     "scripts/verify_platform_public_home_experience_v118.py",
+    "scripts/verify_platform_dynamic_market_home_v119.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 
@@ -613,7 +619,6 @@ def classify_dirty_path(path: str) -> str | None:
         return "build-and-ignore-impact"
     if normalized == "requirements.txt":
         return "manual-confirmation"
-    if normalized.startswith("docs/superpowers/") or normalized in {"docs/CHANGELOG.md", "docs/alerts.md", ".env.example"}:
         return "docs-and-config"
     if normalized in {"apps/dsa-web/playwright.config.ts"} or normalized.startswith("apps/dsa-web/e2e/"):
         return "tests-and-verifiers"

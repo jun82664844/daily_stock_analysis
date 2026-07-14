@@ -2421,3 +2421,42 @@ Docs and packaging:
 Acceptance marker: `DSA_PLATFORM_PUBLIC_HOME_EXPERIENCE_V118_OK markets=cn,hk,us public_news=true account_clickthrough=true mobile=true api_auto_run=false investment_advice=false`.
 
 Boundary: local information-and-data experience only. Allowlisted public market and headline sources may load without a model API and use bounded timeout/cache degradation; platform API, BYOK, Ollama and Kronos remain explicit user actions. No production deployment, payment, market-data redistribution license or investment-advice approval is claimed.
+
+## V119 Dynamic Market Home
+
+Backend:
+
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `src/services/public_market_home_service.py`
+- `src/services/public_market_ranking_service.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts`
+
+Tests and verifiers:
+
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `scripts/verify_platform_dynamic_market_home_v119.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_dynamic_market_home_v119_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_public_market_home_v116.py`
+- `tests/test_public_market_ranking_service_v119.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v119-dynamic-market-home.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_DYNAMIC_MARKET_HOME_V119_OK markets=cn,hk,us rankings=active,gainers,losers sectors=cn public_data=true ai_used=false fixed_pool=false investment_advice=false`.
+
+Boundary: local dynamic public-data acceptance only. No production deployment, payment, production key, commercial market-data redistribution approval, or investment-advice approval is claimed. Customer-service integration is outside V119 ownership.
