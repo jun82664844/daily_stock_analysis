@@ -27,6 +27,7 @@ const AccountPage = lazy(() => import('./pages/AccountPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const ResearchWorkflowsPage = lazy(() => import('./pages/ResearchWorkflowsPage'));
 const MarketWorkspacePage = lazy(() => import('./pages/MarketWorkspacePage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
 
 const ADMIN_ONLY_ROUTE_PREFIXES = ['/admin', '/settings'];
 
@@ -103,6 +104,7 @@ const AppContent: React.FC = () => {
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/usage" element={<TokenUsagePage />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/support" element={<SupportPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

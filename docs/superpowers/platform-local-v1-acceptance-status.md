@@ -642,3 +642,14 @@ git diff --check
 - 首页自动加载保持 `ai_used=false`、`informational_only=true`，不消耗平台 API、BYOK、Ollama 或 Kronos 额度；点击股票后进入现有免费查询。
 - `scripts/verify_platform_dynamic_market_home_v119.py` 通过时输出 `DSA_PLATFORM_DYNAMIC_MARKET_HOME_V119_OK markets=cn,hk,us rankings=active,gainers,losers sectors=cn public_data=true ai_used=false fixed_pool=false investment_advice=false`。
 - 本状态仅代表本地功能验收，不代表生产部署、支付、市场数据商业授权或法律审批；所有页面只提供资讯和数据，不构成投资建议。
+
+## V120 平台客服中心状态（2026-07-14）
+
+- 新增独立文本工单与消息表，不与 LukaAI 共享数据库、会话或后台账号。
+- 注册用户可在 `/support` 创建、查看、回复和关闭自己的工单；跨用户访问统一返回不存在。
+- 管理员可在 `/admin` 查看客服队列、读取详情、人工回复和切换待处理、处理中、已关闭状态。
+- 用户与管理员未读状态独立维护；审计只记录工单 ID、分类和状态，不记录消息正文。
+- 所有写接口复用平台 CSRF 和独立限流桶；关闭工单禁止继续回复，管理员可显式重新打开。
+- V120 不启用 AI 自动回复、知识库、附件、外部客服渠道或投资建议能力。
+- `scripts/verify_platform_support_center_v120.py` 通过时输出 `DSA_PLATFORM_SUPPORT_CENTER_V120_OK user_loop=true admin_queue=true ownership_isolated=true csrf=true rate_limit=true ai_reply=false attachments=false investment_advice=false`。
+- 本状态仅代表本地功能验收，不代表生产部署、真实支付、生产密钥、跨产品数据同步或法律审批。

@@ -351,6 +351,21 @@ REQUIRED_FILES = (
     "tests/test_platform_dynamic_market_home_v119_verifier.py",
     "tests/test_public_market_ranking_service_v119.py",
     "src/services/public_market_ranking_service.py",
+    "docs/superpowers/plans/2026-07-14-dsa-v120-platform-support-center.md",
+    "docs/platform-support-center.md",
+    "scripts/verify_platform_support_center_v120.py",
+    "tests/test_platform_support_center_v120_verifier.py",
+    "tests/test_platform_support_api_v120.py",
+    "api/v1/endpoints/support.py",
+    "api/v1/schemas/support.py",
+    "src/services/platform_support_service.py",
+    "apps/dsa-web/src/api/support.ts",
+    "apps/dsa-web/src/api/__tests__/support.test.ts",
+    "apps/dsa-web/src/pages/SupportPage.tsx",
+    "apps/dsa-web/src/pages/__tests__/SupportPage.test.tsx",
+    "apps/dsa-web/src/components/admin/SupportWorkbenchV120.tsx",
+    "apps/dsa-web/src/components/admin/__tests__/SupportWorkbenchV120.test.tsx",
+    "apps/dsa-web/e2e/platform-support-v120.spec.ts",
 )
 
 VERIFIER_FILES = (
@@ -428,6 +443,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_six_feature_experience_v117.py",
     "scripts/verify_platform_public_home_experience_v118.py",
     "scripts/verify_platform_dynamic_market_home_v119.py",
+    "scripts/verify_platform_support_center_v120.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 
@@ -619,6 +635,7 @@ def classify_dirty_path(path: str) -> str | None:
         return "build-and-ignore-impact"
     if normalized == "requirements.txt":
         return "manual-confirmation"
+    if normalized.startswith("docs/superpowers/") or normalized in {"docs/CHANGELOG.md", "docs/alerts.md", "docs/platform-support-center.md", ".env.example"}:
         return "docs-and-config"
     if normalized in {"apps/dsa-web/playwright.config.ts"} or normalized.startswith("apps/dsa-web/e2e/"):
         return "tests-and-verifiers"

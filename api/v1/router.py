@@ -28,6 +28,7 @@ from api.v1.endpoints import (
     platform,
     portfolio,
     stocks,
+    support,
     system_config,
     usage,
 )
@@ -46,6 +47,12 @@ router.include_router(
     platform.router,
     prefix="/platform",
     tags=["Platform"]
+)
+
+router.include_router(
+    support.router,
+    prefix="/support",
+    tags=["Support"]
 )
 
 router.include_router(

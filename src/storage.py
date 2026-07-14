@@ -170,6 +170,44 @@ class PlatformAuditEvent(Base):
     )
 
 
+class PlatformSupportTicket(Base):
+    """User-owned support request for the DSA platform."""
+
+    __tablename__ = 'platform_support_tickets'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('platform_users.id'), nullable=False, index=True)
+    category = Column(String(32), nullable=False, index=True)
+    subject = Column(String(120), nullable=False)
+    status = Column(String(32), nullable=False, default='open', index=True)
+    unread_by_user = Column(Boolean, nullable=False, default=False, index=True)
+    unread_by_admin = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, nullable=False, index=True)
+    closed_at = Column(DateTime)
+
+    __table_args__ = (
+        Index('ix_platform_support_user_status_time', 'user_id', 'status', 'updated_at'),
+        Index('ix_platform_support_admin_status_time', 'status', 'unread_by_admin', 'updated_at'),
+    )
+
+
+class PlatformSupportMessage(Base):
+    """Text message belonging to one platform support ticket."""
+
+    __tablename__ = 'platform_support_messages'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticket_id = Column(Integer, ForeignKey('platform_support_tickets.id'), nullable=False, index=True)
+    author_role = Column(String(16), nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index('ix_platform_support_message_ticket_time', 'ticket_id', 'created_at'),
+    )
+
+
 class PlatformBillingCheckoutSession(Base):
     """Local sandbox checkout session ledger."""
 

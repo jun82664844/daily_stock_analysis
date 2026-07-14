@@ -170,6 +170,18 @@ describe('SidebarNav', () => {
     });
   });
 
+  it('keeps the support center visible for platform users and guests', () => {
+    render(
+      <MemoryRouter initialEntries={['/support']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    const supportLink = screen.getByRole('link', { name: '客服' });
+    expect(supportLink).toHaveAttribute('href', '/support');
+    expect(supportLink).toHaveClass('font-medium');
+  });
+
   it('shows the public research center directly after market screening', async () => {
     render(
       <MemoryRouter initialEntries={['/research']}>

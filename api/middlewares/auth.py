@@ -48,6 +48,7 @@ PLATFORM_USER_PATH_PREFIXES = (
     "/api/v1/stocks/",
     "/api/v1/billing/",
     "/api/v1/history",
+    "/api/v1/support/",
 )
 
 

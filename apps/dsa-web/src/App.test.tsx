@@ -68,6 +68,10 @@ vi.mock('./pages/AdminPage', () => ({
   default: () => <div data-testid="admin-page">Admin</div>,
 }));
 
+vi.mock('./pages/SupportPage', () => ({
+  default: () => <div data-testid="support-page">Support</div>,
+}));
+
 vi.mock('./pages/SettingsPage', () => ({
   default: () => <div data-testid="settings-page">Settings</div>,
 }));
@@ -183,6 +187,15 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenCalledWith('/decision-signals');
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('routes /support to the platform support center', async () => {
+    window.history.pushState({}, '', '/support');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('support-page')).toBeInTheDocument();
+    expect(setCurrentRoute).toHaveBeenCalledWith('/support');
   });
 
   it('routes /research to the public financial research center', async () => {

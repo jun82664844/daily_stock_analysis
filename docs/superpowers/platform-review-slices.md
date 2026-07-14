@@ -2106,3 +2106,52 @@ Review focus: allowlisted public web data may load automatically with bounded ti
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: market-wide source mapping, liquidity filtering, no fixed-symbol fallback, bounded concurrency/cache, source freshness, bilingual labels, click-through query, no AI quota use, and no investment-advice claim.
+
+## V120 Platform Support Center
+
+### backend-platform-foundation
+
+- `api/middlewares/auth.py`
+- `api/v1/router.py`
+- `api/v1/endpoints/support.py`
+- `api/v1/schemas/support.py`
+- `src/storage.py`
+- `src/services/platform_support_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/App.tsx`
+- `apps/dsa-web/src/api/support.ts`
+- `apps/dsa-web/src/components/admin/SupportWorkbenchV120.tsx`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/SupportPage.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/e2e/platform-support-v120.spec.ts`
+- `apps/dsa-web/src/App.test.tsx`
+- `apps/dsa-web/src/api/__tests__/support.test.ts`
+- `apps/dsa-web/src/components/admin/__tests__/SupportWorkbenchV120.test.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/SupportPage.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `scripts/verify_platform_support_center_v120.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_support_api_v120.py`
+- `tests/test_platform_support_center_v120_verifier.py`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/platform-support-center.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v120-platform-support-center.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: user ownership isolation, administrator authorization, CSRF and rate limiting, closed-ticket behavior, bilateral unread semantics, audit metadata without message bodies, responsive bilingual UI, and no AI reply, attachment or investment-advice capability.

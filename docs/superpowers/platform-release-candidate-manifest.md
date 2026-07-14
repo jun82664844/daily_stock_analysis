@@ -2460,3 +2460,54 @@ Docs and packaging:
 Acceptance marker: `DSA_PLATFORM_DYNAMIC_MARKET_HOME_V119_OK markets=cn,hk,us rankings=active,gainers,losers sectors=cn public_data=true ai_used=false fixed_pool=false investment_advice=false`.
 
 Boundary: local dynamic public-data acceptance only. No production deployment, payment, production key, commercial market-data redistribution approval, or investment-advice approval is claimed. Customer-service integration is outside V119 ownership.
+
+## V120 Platform Support Center
+
+Backend:
+
+- `api/middlewares/auth.py`
+- `api/v1/router.py`
+- `api/v1/endpoints/support.py`
+- `api/v1/schemas/support.py`
+- `src/storage.py`
+- `src/services/platform_support_service.py`
+
+Frontend:
+
+- `apps/dsa-web/src/App.tsx`
+- `apps/dsa-web/src/api/support.ts`
+- `apps/dsa-web/src/components/admin/SupportWorkbenchV120.tsx`
+- `apps/dsa-web/src/components/layout/ShellHeader.tsx`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+- `apps/dsa-web/src/i18n/uiText.ts`
+- `apps/dsa-web/src/pages/AdminPage.tsx`
+- `apps/dsa-web/src/pages/SupportPage.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/e2e/platform-support-v120.spec.ts`
+- `apps/dsa-web/src/App.test.tsx`
+- `apps/dsa-web/src/api/__tests__/support.test.ts`
+- `apps/dsa-web/src/components/admin/__tests__/SupportWorkbenchV120.test.tsx`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/SupportPage.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `scripts/verify_platform_support_center_v120.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_support_api_v120.py`
+- `tests/test_platform_support_center_v120_verifier.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/platform-support-center.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v120-platform-support-center.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_SUPPORT_CENTER_V120_OK user_loop=true admin_queue=true ownership_isolated=true csrf=true rate_limit=true ai_reply=false attachments=false investment_advice=false`.
+
+Boundary: local text-only human support acceptance. No AI auto-reply, attachments, production deployment, real payment, production key, cross-product database sharing, or investment-advice approval is claimed.

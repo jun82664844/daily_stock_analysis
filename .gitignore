@@ -154,6 +154,7 @@ verify_*.py
 !scripts/verify_platform_six_feature_experience_v117.py
 !scripts/verify_platform_public_home_experience_v118.py
 !scripts/verify_platform_dynamic_market_home_v119.py
+!scripts/verify_platform_support_center_v120.py
 
 # Local third-party source checkouts are installed for inspection only.
 /external/

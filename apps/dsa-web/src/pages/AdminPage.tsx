@@ -5,6 +5,7 @@ import { stocksApi, type BasicPrewarmResponse, type MarketSourceHealthResponse, 
 import type { ParsedApiError } from '../api/error';
 import { ApiErrorAlert, AppPage, Card, EmptyState, PageHeader, StatCard } from '../components/common';
 import { RetentionFunnelPanelV97 } from '../components/admin/RetentionFunnelPanelV97';
+import SupportWorkbenchV120 from '../components/admin/SupportWorkbenchV120';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { cn } from '../utils/cn';
@@ -294,6 +295,8 @@ const AdminPage: React.FC = () => {
           <StatCard label={t('admin.auditEvents')} value={formatNumber(auditEvents.length, language)} hint={t('admin.auditEventsHint')} icon={<Activity className="h-5 w-5" />} />
           <StatCard label="Billing events" value={formatNumber(billingEvents.length, language)} hint="Local sandbox event ledger only" icon={<CreditCard className="h-5 w-5" />} tone="warning" />
         </div>
+
+        <SupportWorkbenchV120 />
 
         {loading && !retentionFunnel ? (
           <div className="h-40 animate-pulse border-y border-subtle bg-hover/35" />

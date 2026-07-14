@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, BarChart3, Bell, BookOpenText, BriefcaseBusiness, Gauge, Globe2, Home, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
+import { Activity, BarChart3, Bell, BookOpenText, BriefcaseBusiness, Gauge, Globe2, Home, LifeBuoy, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { PLATFORM_SESSION_CHANGED_EVENT, platformApi } from '../../api/platform';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'alerts', labelKey: 'layout.nav.alerts', to: '/alerts', icon: Bell },
   { key: 'usage', labelKey: 'layout.nav.usage', to: '/usage', icon: Gauge },
   { key: 'account', labelKey: 'layout.nav.account', to: '/account', icon: UserRound },
+  { key: 'support', labelKey: 'layout.nav.support', to: '/support', icon: LifeBuoy },
   { key: 'admin', labelKey: 'layout.nav.admin', to: '/admin', icon: ShieldCheck },
   { key: 'settings', labelKey: 'layout.nav.settings', to: '/settings', icon: Settings2 },
 ];
