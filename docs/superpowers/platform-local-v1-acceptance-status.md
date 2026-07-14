@@ -667,3 +667,12 @@ git diff --check
 - 港股冷详情可能需要约 11 秒，但点击后立即显示榜单价格、涨跌、成交额和来源，不阻塞榜单浏览；错误重试和榜单保留由确定性集成测试覆盖。
 - `scripts/verify_platform_free_market_stock_preview_v121.py` 通过时输出 `DSA_PLATFORM_FREE_MARKET_STOCK_PREVIEW_V121_OK guest=true on_demand=true public_data=true ai_used=false bilingual=true mobile=true investment_advice=false`。
 - 本状态仅代表本地免费公开数据功能，不代表生产部署、真实支付、生产密钥、市场数据商业授权或法律审批；所有内容只提供资讯和数据，不构成投资建议。
+
+## V122 客服站内通知状态（2026-07-14）
+
+- 用户侧“客服”角标显示未读客服回复数，管理员侧“运营”角标显示未关闭工单数。
+- 摘要 API 已覆盖用户隔离、管理员权限、未读计数、待处理计数和最早等待时间，不返回主题或消息正文。
+- 游客不调用客服私有摘要；页面隐藏时不轮询，恢复可见、会话变化或工单操作后立即刷新。
+- 桌面和 `390x844` 移动视口浏览器回归覆盖角标显示、读取清除、关闭工单清除和无横向溢出。
+- `scripts/verify_platform_support_notifications_v122.py` 通过时输出 `DSA_PLATFORM_SUPPORT_NOTIFICATIONS_V122_OK user_badge=true admin_badge=true polling=visible_only summary_redacted=true ai_reply=false external_notifications=false`。
+- 本状态仅代表本地人工客服站内通知验收，不代表 AI 回复、外部通知、生产部署、真实支付或生产密钥已批准。

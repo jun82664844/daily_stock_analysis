@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import apiClient from '../index';
-import { supportApi } from '../support';
+import { SUPPORT_INBOX_CHANGED_EVENT, supportApi } from '../support';
 
 vi.mock('../index', () => ({
   default: {
@@ -77,5 +77,35 @@ describe('supportApi', () => {
     expect(apiClient.patch).toHaveBeenCalledWith('/api/v1/support/admin/tickets/12/status', { status: 'closed' });
     expect(queue.tickets[0].requesterEmail).toBe('user@example.com');
     expect(updated.status).toBe('closed');
+  });
+
+  it('loads redacted user and administrator summaries', async () => {
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: { unread_count: 3, active_count: 2 } })
+      .mockResolvedValueOnce({ data: { unread_count: 4, pending_count: 5, oldest_pending_at: '2026-07-14T08:00:00+00:00' } });
+
+    const user = await supportApi.getSummary();
+    const admin = await supportApi.adminGetSummary();
+
+    expect(apiClient.get).toHaveBeenNthCalledWith(1, '/api/v1/support/summary');
+    expect(apiClient.get).toHaveBeenNthCalledWith(2, '/api/v1/support/admin/summary');
+    expect(user).toEqual({ unreadCount: 3, activeCount: 2 });
+    expect(admin.pendingCount).toBe(5);
+    expect(admin.oldestPendingAt).toBe('2026-07-14T08:00:00+00:00');
+  });
+
+  it('emits an inbox refresh event after ticket mutations', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ticket: ticketPayload } });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ticket: ticketPayload } });
+    const listener = vi.fn();
+    window.addEventListener(SUPPORT_INBOX_CHANGED_EVENT, listener);
+
+    await supportApi.createTicket({ category: 'bug', subject: 'Refresh issue', message: 'The page is stale.' });
+    await supportApi.addMessage(12, 'Still reproducible.');
+    await supportApi.adminAddMessage(12, 'We are checking it.');
+    await supportApi.adminUpdateStatus(12, 'closed');
+
+    expect(listener).toHaveBeenCalledTimes(4);
+    window.removeEventListener(SUPPORT_INBOX_CHANGED_EVENT, listener);
   });
 });

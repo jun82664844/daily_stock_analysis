@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, BarChart3, Bell, BookOpenText, BriefcaseBusiness, Gauge, Globe2, Home, LifeBuoy, LogOut, MessageSquareQuote, Search, Settings2, ShieldCheck, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { PLATFORM_SESSION_CHANGED_EVENT, platformApi } from '../../api/platform';
+import { SUPPORT_INBOX_CHANGED_EVENT, supportApi } from '../../api/support';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -46,35 +47,73 @@ const NAV_ITEMS: NavItem[] = [
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, variant = 'default' }) => {
   const { authEnabled, loggedIn, logout } = useAuth();
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [platformRole, setPlatformRole] = useState<string | null>('loading');
+  const [supportUnread, setSupportUnread] = useState(0);
+  const [adminPending, setAdminPending] = useState(0);
+  const supportRequestId = useRef(0);
+
+  const refreshSupportState = useCallback(async () => {
+    const requestId = ++supportRequestId.current;
+
+    try {
+      const payload = await platformApi.current();
+      if (requestId !== supportRequestId.current) return;
+
+      const role = payload?.user?.role ?? null;
+      const hasPlatformUser = Boolean(payload?.user?.id);
+      const canReadAdmin = role === 'admin' || (loggedIn && role !== 'user');
+      setPlatformRole(role);
+
+      if (hasPlatformUser) {
+        const userSummary = await supportApi.getSummary().catch(() => null);
+        if (requestId !== supportRequestId.current) return;
+        if (userSummary) setSupportUnread(userSummary.unreadCount);
+      } else {
+        setSupportUnread(0);
+      }
+
+      if (!canReadAdmin) {
+        setAdminPending(0);
+        return;
+      }
+
+      const adminSummary = await supportApi.adminGetSummary().catch(() => null);
+      if (requestId !== supportRequestId.current) return;
+      if (adminSummary) setAdminPending(adminSummary.pendingCount);
+    } catch {
+      if (requestId === supportRequestId.current) {
+        setPlatformRole(null);
+        setSupportUnread(0);
+        setAdminPending(0);
+      }
+    }
+  }, [loggedIn]);
 
   useEffect(() => {
-    let active = true;
-
-    const refreshPlatformUser = async () => {
-      try {
-        const payload = await platformApi.current();
-        if (active) {
-          setPlatformRole(payload?.user?.role ?? null);
-        }
-      } catch {
-        if (active) {
-          setPlatformRole(null);
-        }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshSupportState();
       }
     };
+    const initialRefreshId = window.setTimeout(() => void refreshSupportState(), 0);
+    const intervalId = window.setInterval(refreshWhenVisible, 60_000);
 
-    void refreshPlatformUser();
-    window.addEventListener(PLATFORM_SESSION_CHANGED_EVENT, refreshPlatformUser);
+    window.addEventListener(PLATFORM_SESSION_CHANGED_EVENT, refreshSupportState);
+    window.addEventListener(SUPPORT_INBOX_CHANGED_EVENT, refreshSupportState);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
     return () => {
-      active = false;
-      window.removeEventListener(PLATFORM_SESSION_CHANGED_EVENT, refreshPlatformUser);
+      supportRequestId.current += 1;
+      window.clearTimeout(initialRefreshId);
+      window.clearInterval(intervalId);
+      window.removeEventListener(PLATFORM_SESSION_CHANGED_EVENT, refreshSupportState);
+      window.removeEventListener(SUPPORT_INBOX_CHANGED_EVENT, refreshSupportState);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, []);
+  }, [refreshSupportState]);
 
   const showAdminOnlyNav = platformRole === 'admin' || (loggedIn && platformRole !== 'user');
   const navItems = NAV_ITEMS.filter((item) => !['admin', 'settings'].includes(item.key) || showAdminOnlyNav);
@@ -120,13 +159,20 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
       <nav className={cn('flex flex-col gap-1.5', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
         {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
+          const badgeCount = key === 'support' ? supportUnread : key === 'admin' ? adminPending : 0;
+          const badgeText = badgeCount > 99 ? '99+' : String(badgeCount);
+          const ariaLabel = key === 'support' && badgeCount > 0
+            ? language === 'en' ? `${label}, ${badgeCount} unread replies` : `${label}，${badgeCount} 条新回复`
+            : key === 'admin' && badgeCount > 0
+              ? language === 'en' ? `${label}, ${badgeCount} pending support tickets` : `${label}，${badgeCount} 张待处理客服工单`
+              : label;
           return (
           <NavLink
             key={key}
             to={to}
             end={exact}
             onClick={onNavigate}
-            aria-label={label}
+            aria-label={ariaLabel}
             className={({ isActive }) =>
               cn(
                 itemInteractiveClass,
@@ -148,6 +194,18 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
                     )}
                     aria-label={t('layout.newChatMessage')}
                   />
+                ) : null}
+                {badgeCount > 0 ? (
+                  <span
+                    data-testid={key === 'support' ? 'support-user-badge' : 'support-admin-badge'}
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[10px] font-semibold text-[hsl(var(--primary-foreground))]',
+                      collapsed ? 'right-1 top-1' : ''
+                    )}
+                  >
+                    {badgeText}
+                  </span>
                 ) : null}
               </>
             )}

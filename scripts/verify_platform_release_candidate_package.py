@@ -371,6 +371,11 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/market-home/__tests__/PublicMarketStockPreviewV121.test.tsx",
     "apps/dsa-web/src/components/admin/__tests__/SupportWorkbenchV120.test.tsx",
     "apps/dsa-web/e2e/platform-support-v120.spec.ts",
+    "docs/superpowers/plans/2026-07-14-dsa-v122-support-inbox-notifications.md",
+    "scripts/verify_platform_support_notifications_v122.py",
+    "tests/test_platform_support_notifications_v122_verifier.py",
+    "tests/test_platform_support_notifications_api_v122.py",
+    "apps/dsa-web/e2e/platform-support-notifications-v122.spec.ts",
 )
 
 VERIFIER_FILES = (
@@ -450,6 +455,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_dynamic_market_home_v119.py",
     "scripts/verify_platform_support_center_v120.py",
     "scripts/verify_platform_free_market_stock_preview_v121.py",
+    "scripts/verify_platform_support_notifications_v122.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

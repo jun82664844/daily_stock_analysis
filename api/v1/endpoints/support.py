@@ -8,12 +8,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from api.v1.schemas.support import (
+    SupportAdminSummaryResponse,
     SupportMessageCreateRequest,
     SupportStatus,
     SupportStatusUpdateRequest,
     SupportTicketCreateRequest,
     SupportTicketEnvelope,
     SupportTicketListResponse,
+    SupportUserSummaryResponse,
 )
 from src.auth import COOKIE_NAME, verify_session
 from src.csrf import require_csrf
@@ -100,6 +102,12 @@ async def list_support_tickets(request: Request, limit: int = Query(default=100,
     return {"tickets": tickets, "total": len(tickets)}
 
 
+@router.get("/summary", response_model=SupportUserSummaryResponse)
+async def get_support_summary(request: Request):
+    identity = _require_user(request)
+    return PlatformSupportService().user_summary(user_id=int(identity.user_id))
+
+
 @router.get("/tickets/{ticket_id}", response_model=SupportTicketEnvelope)
 async def get_support_ticket(request: Request, ticket_id: int):
     identity = _require_user(request)
@@ -166,6 +174,12 @@ async def list_admin_support_tickets(
     except SupportInvalidStatus as exc:
         raise _service_error(exc) from exc
     return {"tickets": tickets, "total": len(tickets)}
+
+
+@router.get("/admin/summary", response_model=SupportAdminSummaryResponse)
+async def get_admin_support_summary(request: Request):
+    _require_admin(request)
+    return PlatformSupportService().admin_summary()
 
 
 @router.get("/admin/tickets/{ticket_id}", response_model=SupportTicketEnvelope)

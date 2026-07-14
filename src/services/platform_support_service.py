@@ -162,6 +162,25 @@ class PlatformSupportService:
                 for ticket, email, count in rows
             ]
 
+    def user_summary(self, *, user_id: int) -> dict[str, int]:
+        with self.db.get_session() as session:
+            unread_count = session.execute(
+                select(func.count(PlatformSupportTicket.id)).where(
+                    PlatformSupportTicket.user_id == int(user_id),
+                    PlatformSupportTicket.unread_by_user.is_(True),
+                )
+            ).scalar_one()
+            active_count = session.execute(
+                select(func.count(PlatformSupportTicket.id)).where(
+                    PlatformSupportTicket.user_id == int(user_id),
+                    PlatformSupportTicket.status != "closed",
+                )
+            ).scalar_one()
+            return {
+                "unread_count": int(unread_count or 0),
+                "active_count": int(active_count or 0),
+            }
+
     def get_user_ticket(self, *, user_id: int, ticket_id: int) -> dict[str, Any]:
         with self.db.session_scope() as session:
             ticket = self._owned_ticket(session, user_id, ticket_id)
@@ -232,6 +251,29 @@ class PlatformSupportService:
                 self._ticket_payload(ticket, requester_email=email, message_count=count)
                 for ticket, email, count in rows
             ]
+
+    def admin_summary(self) -> dict[str, Any]:
+        with self.db.get_session() as session:
+            unread_count = session.execute(
+                select(func.count(PlatformSupportTicket.id)).where(
+                    PlatformSupportTicket.unread_by_admin.is_(True),
+                )
+            ).scalar_one()
+            pending_count = session.execute(
+                select(func.count(PlatformSupportTicket.id)).where(
+                    PlatformSupportTicket.status != "closed",
+                )
+            ).scalar_one()
+            oldest_pending_at = session.execute(
+                select(func.min(PlatformSupportTicket.created_at)).where(
+                    PlatformSupportTicket.status != "closed",
+                )
+            ).scalar_one_or_none()
+            return {
+                "unread_count": int(unread_count or 0),
+                "pending_count": int(pending_count or 0),
+                "oldest_pending_at": _utc_iso(oldest_pending_at),
+            }
 
     def get_admin_ticket(self, *, ticket_id: int) -> dict[str, Any]:
         with self.db.session_scope() as session:

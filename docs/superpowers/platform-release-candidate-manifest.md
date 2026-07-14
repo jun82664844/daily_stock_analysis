@@ -2542,3 +2542,42 @@ Docs and packaging:
 Acceptance marker: `DSA_PLATFORM_FREE_MARKET_STOCK_PREVIEW_V121_OK guest=true on_demand=true public_data=true ai_used=false bilingual=true mobile=true investment_advice=false`.
 
 Boundary: local guest public-data acceptance only. No production deployment, payment, production key, commercial market-data redistribution approval, AI auto-run, forecast or investment-advice approval is claimed.
+
+## V122 Support Inbox Notifications
+
+Backend:
+
+- `api/v1/endpoints/support.py`
+- `api/v1/schemas/support.py`
+- `src/services/platform_support_service.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/support.ts`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/e2e/platform-support-notifications-v122.spec.ts`
+- `apps/dsa-web/src/api/__tests__/support.test.ts`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `scripts/verify_platform_support_notifications_v122.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_support_notifications_api_v122.py`
+- `tests/test_platform_support_notifications_v122_verifier.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/platform-support-center.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v122-support-inbox-notifications.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_SUPPORT_NOTIFICATIONS_V122_OK user_badge=true admin_badge=true polling=visible_only summary_redacted=true ai_reply=false external_notifications=false`.
+
+Boundary: local human-support notification acceptance only. No AI auto-reply, WebSocket, email, SMS, Feishu, production deployment, real payment, production key, or investment-advice approval is claimed.

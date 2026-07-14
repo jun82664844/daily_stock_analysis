@@ -6,6 +6,8 @@ import { SidebarNav } from '../SidebarNav';
 const mockLogout = vi.fn().mockResolvedValue(undefined);
 const mockGetAlphaSiftStatus = vi.fn().mockResolvedValue({ enabled: false, available: false, installSpecIsDefault: false });
 const mockPlatformCurrent = vi.fn().mockResolvedValue(null);
+const mockSupportSummary = vi.fn().mockResolvedValue({ unreadCount: 0, activeCount: 0 });
+const mockAdminSupportSummary = vi.fn().mockResolvedValue({ unreadCount: 0, pendingCount: 0, oldestPendingAt: null });
 const mockThemeToggle = vi.fn(({ collapsed }: { collapsed?: boolean }) => (
   <button type="button">{collapsed ? '切换主题(折叠)' : '切换主题'}</button>
 ));
@@ -41,16 +43,30 @@ vi.mock('../../../api/platform', () => ({
   },
 }));
 
+vi.mock('../../../api/support', () => ({
+  SUPPORT_INBOX_CHANGED_EVENT: 'dsa-support-inbox-changed',
+  supportApi: {
+    getSummary: () => mockSupportSummary(),
+    adminGetSummary: () => mockAdminSupportSummary(),
+  },
+}));
+
 vi.mock('../../theme/ThemeToggle', () => ({
   ThemeToggle: (props: { collapsed?: boolean }) => mockThemeToggle(props),
 }));
 
 describe('SidebarNav', () => {
   beforeEach(() => {
+    mockPlatformCurrent.mockClear();
+    mockSupportSummary.mockClear();
+    mockAdminSupportSummary.mockClear();
     mockPlatformCurrent.mockResolvedValue(null);
+    mockSupportSummary.mockResolvedValue({ unreadCount: 0, activeCount: 0 });
+    mockAdminSupportSummary.mockResolvedValue({ unreadCount: 0, pendingCount: 0, oldestPendingAt: null });
     completionBadgeState.value = true;
     authState.authEnabled = true;
     authState.loggedIn = false;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
   });
 
   it('keeps market screening navigation visible while AlphaSift is disabled', async () => {
@@ -180,6 +196,92 @@ describe('SidebarNav', () => {
     const supportLink = screen.getByRole('link', { name: '客服' });
     expect(supportLink).toHaveAttribute('href', '/support');
     expect(supportLink).toHaveClass('font-medium');
+  });
+
+  it('shows unread support replies for a platform user', async () => {
+    mockPlatformCurrent.mockResolvedValue({
+      user: { id: 2, email: 'user@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 2, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-06-29' },
+    });
+    mockSupportSummary.mockResolvedValue({ unreadCount: 3, activeCount: 1 });
+
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+
+    expect(await screen.findByTestId('support-user-badge')).toHaveTextContent('3');
+    expect(screen.getByRole('link', { name: '客服，3 条新回复' })).toHaveAttribute('href', '/support');
+    expect(mockAdminSupportSummary).not.toHaveBeenCalled();
+  });
+
+  it('shows pending support work for an administrator', async () => {
+    authState.loggedIn = true;
+    mockPlatformCurrent.mockResolvedValue({
+      user: { id: 1, email: 'admin@example.com', role: 'admin', plan: 'enterprise', status: 'active' },
+      quota: { userId: 1, plan: 'enterprise', weeklyLimit: null, used: 0, remaining: null, periodStart: '2026-06-29' },
+    });
+    mockAdminSupportSummary.mockResolvedValue({ unreadCount: 2, pendingCount: 4, oldestPendingAt: '2026-07-14T08:00:00+00:00' });
+
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+
+    expect(await screen.findByTestId('support-admin-badge')).toHaveTextContent('4');
+    expect(screen.getByRole('link', { name: '运营，4 张待处理客服工单' })).toHaveAttribute('href', '/admin');
+  });
+
+  it('shows pending support work for a local administrator without a platform user', async () => {
+    authState.loggedIn = true;
+    mockPlatformCurrent.mockResolvedValue(null);
+    mockAdminSupportSummary.mockResolvedValue({ unreadCount: 1, pendingCount: 2, oldestPendingAt: '2026-07-14T08:00:00+00:00' });
+
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+
+    expect(await screen.findByTestId('support-admin-badge')).toHaveTextContent('2');
+    expect(mockSupportSummary).not.toHaveBeenCalled();
+    expect(mockAdminSupportSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not request support summaries for a guest', async () => {
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+
+    await waitFor(() => expect(mockPlatformCurrent).toHaveBeenCalled());
+    expect(mockSupportSummary).not.toHaveBeenCalled();
+    expect(mockAdminSupportSummary).not.toHaveBeenCalled();
+  });
+
+  it('refreshes support summaries when a hidden tab becomes visible', async () => {
+    mockPlatformCurrent.mockResolvedValue({
+      user: { id: 2, email: 'user@example.com', role: 'user', plan: 'free', status: 'active' },
+      quota: { userId: 2, plan: 'free', weeklyLimit: 5, used: 0, remaining: 5, periodStart: '2026-06-29' },
+    });
+
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+    await waitFor(() => expect(mockSupportSummary).toHaveBeenCalledTimes(1));
+    mockPlatformCurrent.mockClear();
+    mockSupportSummary.mockClear();
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(mockPlatformCurrent).not.toHaveBeenCalled();
+    expect(mockSupportSummary).not.toHaveBeenCalled();
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await waitFor(() => expect(mockSupportSummary).toHaveBeenCalledTimes(1));
+  });
+
+  it('caps large support badge values without losing the accessible count', async () => {
+    authState.loggedIn = true;
+    mockPlatformCurrent.mockResolvedValue({
+      user: { id: 1, email: 'admin@example.com', role: 'admin', plan: 'enterprise', status: 'active' },
+      quota: { userId: 1, plan: 'enterprise', weeklyLimit: null, used: 0, remaining: null, periodStart: '2026-06-29' },
+    });
+    mockSupportSummary.mockResolvedValue({ unreadCount: 120, activeCount: 120 });
+    mockAdminSupportSummary.mockResolvedValue({ unreadCount: 101, pendingCount: 140, oldestPendingAt: '2026-07-14T08:00:00+00:00' });
+
+    render(<MemoryRouter><SidebarNav /></MemoryRouter>);
+
+    expect(await screen.findByTestId('support-user-badge')).toHaveTextContent('99+');
+    expect(screen.getByTestId('support-admin-badge')).toHaveTextContent('99+');
+    expect(screen.getByRole('link', { name: '客服，120 条新回复' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '运营，140 张待处理客服工单' })).toBeInTheDocument();
   });
 
   it('shows the public research center directly after market screening', async () => {

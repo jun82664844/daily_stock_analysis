@@ -2183,3 +2183,40 @@ Review focus: user ownership isolation, administrator authorization, CSRF and ra
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: guest access, explicit on-demand loading, stale-request cancellation, useful public data depth, missing-field honesty, retry behavior, bilingual and mobile layout, no AI or paid quota consumption, and no investment-advice language.
+
+## V122 Support Inbox Notifications
+
+### backend-platform-foundation
+
+- `api/v1/endpoints/support.py`
+- `api/v1/schemas/support.py`
+- `src/services/platform_support_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/support.ts`
+- `apps/dsa-web/src/components/layout/SidebarNav.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/e2e/platform-support-notifications-v122.spec.ts`
+- `apps/dsa-web/src/api/__tests__/support.test.ts`
+- `apps/dsa-web/src/components/layout/__tests__/SidebarNav.test.tsx`
+- `scripts/verify_platform_release_candidate_package.py`
+- `scripts/verify_platform_support_notifications_v122.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_platform_support_notifications_api_v122.py`
+- `tests/test_platform_support_notifications_v122_verifier.py`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/platform-support-center.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v122-support-inbox-notifications.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: owner-scoped summaries, administrator authorization, redacted payloads, guest zero-request behavior, visible-only polling, immediate mutation refresh, accessible capped badges, desktop/mobile layout, and no AI or external notification channel.

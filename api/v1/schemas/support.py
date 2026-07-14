@@ -77,3 +77,14 @@ class SupportTicketEnvelope(BaseModel):
 class SupportTicketListResponse(BaseModel):
     tickets: list[SupportTicketSummaryResponse] = Field(default_factory=list)
     total: int
+
+
+class SupportUserSummaryResponse(BaseModel):
+    unread_count: int
+    active_count: int
+
+
+class SupportAdminSummaryResponse(BaseModel):
+    unread_count: int
+    pending_count: int
+    oldest_pending_at: str | None = None

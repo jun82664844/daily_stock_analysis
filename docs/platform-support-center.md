@@ -84,3 +84,20 @@ DSA_PLATFORM_SUPPORT_CENTER_V120_OK user_loop=true admin_queue=true ownership_is
 ## 回滚
 
 回滚前端入口时移除 `/support` 路由、导航项和管理员工作台。回滚 API 时移除 support router 注册；已有两张客服表可保留为只读历史，不需要删除真实数据或备份。
+
+## V122 站内通知
+
+- `GET /api/v1/support/summary` 只返回当前用户的未读回复数和未关闭工单数。
+- `GET /api/v1/support/admin/summary` 只返回管理员未读数、待处理数和最早等待时间。
+- 两个摘要都不包含工单主题、请求人邮箱或消息正文；游客不请求私有摘要。
+- 侧边栏的“客服”显示新回复数，“运营”显示待处理工单数；大于 99 时显示 `99+`，可访问名称保留真实数量。
+- 页面可见时每 60 秒轮询，页面隐藏时跳过；会话变化、工单操作和页面恢复可见时立即刷新。
+- V122 不启用 WebSocket、AI 自动回复、邮件、短信、飞书或其他外部通知。
+
+```powershell
+E:\DSA项目\dsa-venv\Scripts\python.exe scripts\verify_platform_support_notifications_v122.py
+```
+
+```text
+DSA_PLATFORM_SUPPORT_NOTIFICATIONS_V122_OK user_badge=true admin_badge=true polling=visible_only summary_redacted=true ai_reply=false external_notifications=false
+```
