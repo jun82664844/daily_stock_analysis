@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import AccountPage from '../AccountPage';
 
-const { account, billingAccount, saveApiKey, connectApiKey, createSandboxCheckout } = vi.hoisted(() => ({
+const { account, billingAccount, saveApiKey, connectApiKey, createSandboxCheckout, modelOptions } = vi.hoisted(() => ({
   account: vi.fn(),
   billingAccount: vi.fn(),
   saveApiKey: vi.fn(),
   connectApiKey: vi.fn(),
   createSandboxCheckout: vi.fn(),
+  modelOptions: vi.fn(),
 }));
 
 vi.mock('../../api/platform', () => ({
@@ -18,6 +19,7 @@ vi.mock('../../api/platform', () => ({
     saveApiKey,
     connectApiKey,
     createSandboxCheckout,
+    modelOptions,
   },
 }));
 
@@ -115,9 +117,28 @@ beforeEach(() => {
     plan: 'pro',
     mode: 'local_sandbox',
   });
+  modelOptions.mockResolvedValue({
+    selectedOptionId: 'platform_recommended',
+    realByokStatus: 'not_configured',
+    options: [
+      { optionId: 'platform_recommended', labelZh: '平台推荐', labelEn: 'Platform recommended', source: 'platform', providerLabel: 'DSA', speed: 'fast', purpose: 'Fast information analysis', purposeZh: '快速资讯分析', purposeEn: 'Fast information analysis', quotaType: 'flash', costUnits: 1, recommended: true },
+      { optionId: 'local_ollama', labelZh: '本地模型', labelEn: 'Local model', source: 'user_local', providerLabel: 'Ollama', speed: 'balanced', purpose: 'Local information analysis', purposeZh: '本地资讯分析', purposeEn: 'Local information analysis', quotaType: null, costUnits: 0, recommended: false },
+    ],
+  });
 });
 
 describe('AccountPage', () => {
+  it('keeps analysis model selection in the account page and persists the choice', async () => {
+    renderPage('zh');
+
+    expect(await screen.findByRole('heading', { name: '分析模型' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /平台推荐/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /本地模型/ }));
+
+    expect(window.localStorage.getItem('dsa.modelOptionId')).toBe('local_ollama');
+    expect(screen.getByRole('button', { name: /本地模型/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('localizes account and sandbox billing content in Chinese mode', async () => {
     billingAccount.mockResolvedValueOnce(billingPayload({
       mode: 'disabled',

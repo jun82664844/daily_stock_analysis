@@ -2377,3 +2377,47 @@ Docs and packaging:
 Acceptance marker: `DSA_PLATFORM_SIX_FEATURE_EXPERIENCE_V117_OK features=6 ollama=true markets=cn,hk,us guest_data=true investment_advice=false`.
 
 Boundary: six DSA product capabilities do not mean six complete upstream runtimes are installed. Local information-and-data acceptance only; no production, payment, market-data license or investment-advice approval.
+
+## V118 Public Home Information Architecture
+
+Backend:
+
+- `api/v1/schemas/market_workspace.py`
+- `api/v1/endpoints/market_workspace.py`
+- `src/services/public_market_index_service.py`
+- `src/services/public_market_news_service.py`
+- `src/services/public_market_home_service.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/pages/AccountPage.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/AccountPage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_public_home_experience_v118.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_public_home_experience_v118_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_public_market_index_service_v118.py`
+- `tests/test_public_market_news_service_v118.py`
+- `tests/test_public_market_home_v116.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-13-dsa-v118-public-home-information-architecture.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_PUBLIC_HOME_EXPERIENCE_V118_OK markets=cn,hk,us public_news=true account_clickthrough=true mobile=true api_auto_run=false investment_advice=false`.
+
+Boundary: local information-and-data experience only. Allowlisted public market and headline sources may load without a model API and use bounded timeout/cache degradation; platform API, BYOK, Ollama and Kronos remain explicit user actions. No production deployment, payment, market-data redistribution license or investment-advice approval is claimed.

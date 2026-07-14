@@ -29,6 +29,18 @@ def _overview(market: str) -> dict:
         item["market"] = market
     return {
         "market": market, "session_state": "unknown", "indices": items[:1], "movers": items,
+        "headlines": [{
+            "title": f"{market.upper()} market bulletin",
+            "summary": "Objective market information.",
+            "publisher": "Unit News",
+            "published_at": "2026-07-13T01:25:00Z",
+            "url": "https://example.com/market-bulletin",
+            "source_state": {
+                "source": "unit_news",
+                "status": "fresh",
+                "observed_at": "2026-07-13T01:25:00Z",
+            },
+        }],
         "sources": [{"source": f"{market}_snapshot", "status": "fresh"}], "warnings": [],
     }
 
@@ -70,6 +82,7 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         self.assertEqual(body["markets"][0]["ranking_scope"], "configured_universe")
         self.assertEqual(body["markets"][0]["display_mode"], "latest_available")
         self.assertEqual([item["symbol"] for item in body["markets"][0]["attention"]], ["cn-HIGH", "cn-LOW", "cn-NONE"])
+        self.assertEqual(body["markets"][0]["headlines"][0]["title"], "CN market bulletin")
 
     def test_one_market_failure_does_not_blank_other_markets(self) -> None:
         from src.services.public_market_home_service import PublicMarketHomeService
@@ -77,6 +90,7 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         body = PublicMarketHomeService(_Workspace(failed="hk"), timeout_seconds=1).build()
         self.assertTrue(body["markets"][0]["attention"])
         self.assertEqual(body["markets"][1]["warnings"], ["market_home_unavailable"])
+        self.assertEqual(body["markets"][1]["headlines"], [])
         self.assertTrue(body["markets"][2]["attention"])
 
     def test_three_markets_load_concurrently_under_one_deadline(self) -> None:

@@ -84,6 +84,7 @@ class PublicMarketHomeSection(StrictModel):
     selection_basis: str
     indices: List[MarketSecurityItem] = Field(default_factory=list)
     attention: List[MarketSecurityItem] = Field(default_factory=list)
+    headlines: List[MarketHeadline] = Field(default_factory=list)
     sources: List[DataSourceState] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
 

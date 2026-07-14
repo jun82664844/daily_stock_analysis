@@ -41,6 +41,18 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v118_public_home_experience_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_public_home_experience_v118.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_public_home_experience_v118.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_public_home_experience_v118_verifier.py", REQUIRED_FILES)
+        self.assertIn("src/services/public_market_index_service.py", REQUIRED_FILES)
+        self.assertIn("src/services/public_market_news_service.py", REQUIRED_FILES)
+        self.assertIn("tests/test_public_market_index_service_v118.py", REQUIRED_FILES)
+        self.assertIn("tests/test_public_market_news_service_v118.py", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-13-dsa-v118-public-home-information-architecture.md", REQUIRED_FILES)
+
     def test_v117_six_feature_experience_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

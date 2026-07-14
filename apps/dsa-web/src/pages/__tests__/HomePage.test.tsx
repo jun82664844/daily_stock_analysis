@@ -229,6 +229,10 @@ const historyReport = {
   },
 };
 
+const openHistoryRecord = async (recordId: number) => {
+  fireEvent.click(await screen.findByTestId(`history-center-item-${recordId}`));
+};
+
 const openQuickAnalysisFromCurrentSnapshot = async () => {
   await screen.findByTestId('basic-query-compact-overview');
   fireEvent.click(screen.getAllByRole('button', { name: /快速分析|Quick analysis|Open quick analysis/ })[0]);
@@ -596,10 +600,12 @@ describe('HomePage', () => {
     });
 
     render(<UiLanguageProvider><MemoryRouter><HomePage /></MemoryRouter></UiLanguageProvider>);
-    expect(await screen.findByRole('heading', { name: '三地市场速览' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '市场焦点' })).toBeInTheDocument();
     const queryToolbar = screen.getByTestId('home-query-toolbar');
     const marketHome = screen.getByTestId('public-market-home-v116');
     expect(queryToolbar.compareDocumentPosition(marketHome) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('home-analysis-workspace')).toHaveClass('hidden');
+    expect(screen.queryByTestId('guest-query-entry')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '为 贵州茅台 设置到价提醒' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: '到价阈值' }), { target: { value: '1200' } });
     fireEvent.click(screen.getByRole('button', { name: '保存到价提醒' }));
@@ -753,6 +759,7 @@ describe('HomePage', () => {
 
     expect(await screen.findByTestId('platform-signed-in-panel')).toHaveTextContent('owner-a@example.com');
     await new Promise((resolve) => window.setTimeout(resolve, 50));
+    fireEvent.click(screen.getByTestId('platform-personal-workspace-toggle'));
     expect(screen.getByTestId('platform-watchlist-panel')).not.toHaveTextContent('MSFT');
   });
 
@@ -1079,6 +1086,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    fireEvent.click(await screen.findByTestId('platform-auth-login-tab'));
     fireEvent.change(await screen.findByTestId('platform-auth-email'), { target: { value: 'login@example.com' } });
     fireEvent.change(screen.getByTestId('platform-auth-password'), { target: { value: 'bad-password' } });
     fireEvent.click(screen.getByTestId('platform-auth-submit'));
@@ -1129,8 +1137,10 @@ describe('HomePage', () => {
       </UiLanguageProvider>,
     );
 
-    expect(await screen.findByTestId('platform-auth-login-tab')).toHaveTextContent('Login');
+    const loginTab = await screen.findByTestId('platform-auth-login-tab');
+    expect(loginTab).toHaveTextContent('Login');
     expect(screen.getByTestId('platform-auth-register-tab')).toHaveTextContent('Register');
+    fireEvent.click(loginTab);
     expect(screen.getByTestId('platform-auth-email')).toHaveAttribute('placeholder', 'Email');
     expect(screen.getByTestId('platform-auth-password')).toHaveAttribute('placeholder', 'Password');
     expect(screen.getByTestId('platform-auth-submit')).toHaveTextContent('Login');
@@ -1147,7 +1157,7 @@ describe('HomePage', () => {
     expect(await screen.findByTestId('platform-auth-error')).toHaveTextContent('Invalid email or password.');
   });
 
-  it('renders the signed-in platform controls in English when UI language is English', async () => {
+  it('keeps signed-in model controls off the homepage and links to account settings', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     const session = {
       user: { id: 94, email: 'english-user@example.com', role: 'user', plan: 'pro', status: 'active' },
@@ -1177,12 +1187,11 @@ describe('HomePage', () => {
       </UiLanguageProvider>,
     );
 
-    const modePanel = await screen.findByTestId('platform-query-mode-panel');
-    expect(modePanel).toHaveTextContent('Choose analysis model');
-    expect(modePanel).toHaveTextContent('Platform recommended');
-    expect(modePanel).toHaveTextContent('Fast information analysis');
-    expect(modePanel).not.toHaveTextContent('模型名称');
-    expect(modePanel).not.toHaveTextContent('接口地址');
+    const panel = await screen.findByTestId('platform-signed-in-panel');
+    expect(panel).toHaveTextContent('english-user@example.com');
+    expect(screen.getByRole('button', { name: 'Account and models' })).toBeInTheDocument();
+    expect(screen.queryByTestId('platform-query-mode-panel')).not.toBeInTheDocument();
+    expect(panel).not.toHaveTextContent('Choose analysis model');
   });
 
   it('localizes structured no-AI query content when UI language is Chinese', async () => {
@@ -2113,7 +2122,7 @@ describe('HomePage', () => {
     expect(screen.getByTestId('basic-query-retention-status')).toHaveTextContent('Added to watchlist');
   });
 
-  it('renders the dashboard workspace and auto-loads the first report', async () => {
+  it('loads history without auto-opening an old report and opens it on explicit selection', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
       page: 1,
@@ -2140,6 +2149,11 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
+    expect(await screen.findByTestId('history-center-item-1')).toBeInTheDocument();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
+    expect(screen.queryByText('趋势维持强势')).not.toBeInTheDocument();
+
+    await openHistoryRecord(1);
     expect(await screen.findByText('趋势维持强势', undefined, { timeout: 3000 })).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -2165,6 +2179,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(1);
     const fullReportButton = await screen.findByRole('button', {
       name: getReportText(normalizeReportLanguage(historyReport.meta.reportLanguage)).fullReport,
     });
@@ -2220,6 +2235,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(1);
     const boundary = await screen.findByTestId('history-report-freshness-boundary');
     expect(boundary).toHaveTextContent('Historical AI report');
     expect(boundary).toHaveTextContent('not current quote');
@@ -2875,6 +2891,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(30);
     expect(await screen.findByText('Apple margin expansion remains visible')).toBeInTheDocument();
     expect(screen.getByTestId('history-report-tools')).toBeInTheDocument();
     expect(screen.getByTestId('history-report-stock-timeline')).toHaveTextContent('AAPL');
@@ -2975,6 +2992,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(1);
     fireEvent.click(await screen.findByText('运行状态'));
     fireEvent.click(screen.getByRole('button', { name: '查看历史记录 1 运行流' }));
 
@@ -5102,15 +5120,13 @@ describe('HomePage', () => {
     expect(platformStatus).toHaveTextContent('Signed in v15-user@example.com');
     expect(platformStatus).toHaveTextContent('Plan free');
     expect(platformStatus).toHaveTextContent('Weekly free 1/5 left');
-    expect(platformStatus).toHaveTextContent('No-AI quick 9/10 left');
-    expect(platformStatus).toHaveTextContent('BYOK ready sk-...live');
-    expect(platformStatus).toHaveTextContent('Recommended BYOK');
+    expect(platformStatus).not.toHaveTextContent('No-AI quick 9/10 left');
+    expect(platformStatus).not.toHaveTextContent('BYOK ready sk-...live');
+    expect(platformStatus).not.toHaveTextContent('Recommended BYOK');
     expect(platformStatus).not.toHaveTextContent('sk-live-secret');
     expect(screen.getByTestId('platform-status-plan')).toHaveClass('whitespace-nowrap');
     expect(screen.getByTestId('platform-status-weekly')).toHaveClass('whitespace-nowrap');
-    expect(screen.getByTestId('platform-status-basic-quota')).toHaveClass('whitespace-nowrap');
-    expect(screen.getByTestId('platform-status-byok')).toHaveClass('whitespace-nowrap');
-    expect(screen.getByTestId('platform-status-recommended')).toHaveClass('whitespace-nowrap');
+    fireEvent.click(screen.getByTestId('platform-personal-workspace-toggle'));
     expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('Quick snapshot stays no-AI');
     expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('Quick/Deep AI uses selected quota');
     expect(await screen.findByTestId('platform-watchlist-panel')).toHaveTextContent('Watchlist 4');
@@ -5215,17 +5231,15 @@ describe('HomePage', () => {
     expect(status).toHaveTextContent('已登录 zh-user@example.com');
     expect(status).toHaveTextContent('套餐 免费版');
     expect(status).toHaveTextContent('每周免费 剩余 5/5');
-    expect(status).toHaveTextContent('免费快照 已用 0/不限');
-    expect(status).toHaveTextContent('我的 API 未设置');
-    expect(status).toHaveTextContent('推荐 平台 API');
+    expect(status).not.toHaveTextContent('免费快照');
+    expect(status).not.toHaveTextContent('我的 API');
+    expect(status).not.toHaveTextContent('推荐 平台 API');
     expect(status).toHaveTextContent('退出');
-    expect(screen.getByTestId('platform-ai-cost-warning')).toHaveTextContent('平台 API、我的 API 或本地模型');
-    expect(screen.getByTestId('platform-ai-cost-warning')).not.toHaveTextContent('BYOK');
-    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('选择分析模型');
-    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('平台推荐');
-    expect(screen.getByTestId('platform-query-mode-panel')).toHaveTextContent('快速资讯分析');
-    expect(screen.getByTestId('platform-watchlist-panel')).toHaveTextContent('暂无');
-    expect(screen.getByTestId('platform-watchlist-add-current')).toHaveTextContent('加入当前');
+    expect(screen.getByRole('button', { name: '账户与模型' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '展开个人工作台' })).toBeInTheDocument();
+    expect(screen.queryByTestId('platform-ai-cost-warning')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('platform-query-mode-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('platform-watchlist-panel')).not.toBeInTheDocument();
     expect(panel.textContent?.match(/zh-user@example\.com/g)?.length ?? 0).toBe(1);
     expect(panel).not.toHaveTextContent('Signed in');
     expect(panel).not.toHaveTextContent('Plan free');
@@ -5477,6 +5491,8 @@ describe('HomePage', () => {
       </UiLanguageProvider>,
     );
 
+    await screen.findByTestId('platform-signed-in-panel');
+    fireEvent.click(screen.getByTestId('platform-personal-workspace-toggle'));
     await screen.findByTestId('platform-watchlist-panel');
     fireEvent.click(screen.getByTestId('platform-watchlist-refresh'));
 
@@ -5680,7 +5696,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('趋势维持强势');
+    await screen.findByTestId('history-center-item-1');
     const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
     const scrollToMock = vi.fn(function scrollTo(this: HTMLElement, options?: ScrollToOptions) {
       if (typeof options?.top === 'number') {
@@ -5853,6 +5869,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(1);
     const followUpButton = await screen.findByRole('button', { name: '追问 AI' });
     fireEvent.click(followUpButton);
 
@@ -5938,6 +5955,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(1);
     const historyTrendButton = await screen.findByRole('button', { name: '历史趋势' });
     fireEvent.click(historyTrendButton);
 
@@ -6020,7 +6038,8 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    // Wait for the report to load
+    await openHistoryRecord(1);
+    // Wait for the explicitly selected report to load
     await screen.findByText('趋势维持强势');
 
     // Type something else in the search box
@@ -6256,6 +6275,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
+    await openHistoryRecord(2);
     await screen.findByText('大盘复盘摘要');
     expect(screen.queryByRole('heading', { name: '大盘复盘详情' })).not.toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: '市场情绪与赚钱效应' })).toBeInTheDocument();
@@ -6341,7 +6361,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('趋势维持强势');
+    await screen.findByTestId('history-center-item-1');
 
     fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
 

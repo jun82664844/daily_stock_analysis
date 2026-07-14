@@ -108,7 +108,7 @@ describe('stockPoolStore', () => {
     vi.mocked(analysisApi.getTasks).mockResolvedValue(createTaskListResponse([]));
   });
 
-  it('loads initial history and auto-selects the first report', async () => {
+  it('loads initial history without auto-selecting an old report', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
       page: 1,
@@ -121,7 +121,8 @@ describe('stockPoolStore', () => {
 
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(1);
-    expect(state.selectedReport?.meta.stockCode).toBe('600519');
+    expect(state.selectedReport).toBeNull();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.isLoadingHistory).toBe(false);
     expect(state.isLoadingReport).toBe(false);
   });

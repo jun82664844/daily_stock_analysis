@@ -60,6 +60,7 @@ export type PublicMarketHomeSection = {
   selectionBasis: string;
   indices: MarketSecurityItem[];
   attention: MarketSecurityItem[];
+  headlines?: MarketHeadline[];
   sources: DataSourceState[];
   warnings: string[];
 };
@@ -135,6 +136,7 @@ export const marketWorkspaceApi = {
         ...market,
         indices: Array.isArray(market.indices) ? market.indices : [],
         attention: Array.isArray(market.attention) ? market.attention : [],
+        headlines: Array.isArray(market.headlines) ? market.headlines : [],
         sources: Array.isArray(market.sources) ? market.sources : [],
         warnings: Array.isArray(market.warnings) ? market.warnings : [],
       })) : [],

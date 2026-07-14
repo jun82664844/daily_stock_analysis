@@ -821,13 +821,6 @@ const platformPlanLabel = (plan?: string | null, language = 'en'): string => {
   return zh[value] || value;
 };
 
-const apiKeyModeLabel = (mode?: string | null, language = 'en'): string => {
-  const isEnglish = language === 'en';
-  if (mode === 'user') return isEnglish ? 'BYOK' : '我的 API';
-  if (mode === 'local') return isEnglish ? 'local model' : '本地模型';
-  return isEnglish ? 'platform API' : '平台 API';
-};
-
 const marketLaneLabel = (lane?: string | null, language = 'en'): string => {
   const isEnglish = language === 'en';
   if (lane === 'a_share_market_data') return isEnglish ? 'A-share market data' : 'A股行情数据';
@@ -1293,6 +1286,7 @@ const HomePage: React.FC = () => {
   const [publicMarketHomeLoading, setPublicMarketHomeLoading] = useState(true);
   const [publicMarketHomeExpanded, setPublicMarketHomeExpanded] = useState(false);
   const [platformAuthPanelExpanded, setPlatformAuthPanelExpanded] = useState(false);
+  const [platformPersonalWorkspaceOpen, setPlatformPersonalWorkspaceOpen] = useState(false);
   const [pendingPriceAlert, setPendingPriceAlert] = useState<PriceAlertDraft | null>(() => readPendingPriceAlert());
   const [priceAlertNotice, setPriceAlertNotice] = useState('');
   const [basicSnapshotViewMode, setBasicSnapshotViewMode] = useState<BasicSnapshotViewMode>('query');
@@ -1805,6 +1799,7 @@ const HomePage: React.FC = () => {
       setPlatformTriggeredAlerts([]);
       setPlatformWatchlistBusy(false);
       setPlatformAlertBusy(false);
+      setPlatformPersonalWorkspaceOpen(false);
       setBasicRetentionBusy(false);
       setPlatformWatchlistError('');
       setApiKeyMode('platform');
@@ -2187,9 +2182,6 @@ const HomePage: React.FC = () => {
   const byokStatusText = primaryApiKey
     ? (uiLanguage === 'en' ? `BYOK ready ${primaryApiKey.maskedKey}` : `我的 API 已就绪 ${primaryApiKey.maskedKey}`)
     : localizeRuntimeLabel('BYOK not set', uiLanguage);
-  const recommendedModeText = uiLanguage === 'en'
-    ? `Recommended ${apiKeyModeLabel(platformAccount?.recommendedQueryMode, uiLanguage)}`
-    : `推荐 ${apiKeyModeLabel(platformAccount?.recommendedQueryMode, uiLanguage)}`;
   const basicSnapshotLane = basicSnapshot?.route?.dataSourceLane || basicSnapshot?.diagnostics?.routeLane || null;
   const basicSnapshotCacheMode = basicSnapshot?.diagnostics?.persistentCache?.mode;
   const autocompleteInputKey = basicSnapshot
@@ -4390,6 +4382,7 @@ const HomePage: React.FC = () => {
     ? (uiLanguage === 'en' ? 'BYOK ready' : '我的 API 已就绪')
     : localizeRuntimeLabel('BYOK not set', uiLanguage);
   const showGuestQueryEntry = !platformSession
+    && !publicMarketHome
     && !basicSnapshot
     && !marketReviewReport
     && stockBarItems.length === 0
@@ -5616,7 +5609,7 @@ const HomePage: React.FC = () => {
   );
 
   const publicMarketHomeOpen = !basicSnapshot || publicMarketHomeExpanded || Boolean(pendingPriceAlert);
-  const platformAuthFormOpen = !basicSnapshot || platformAuthPanelExpanded || Boolean(authError);
+  const platformAuthFormOpen = platformAuthPanelExpanded || Boolean(authError);
 
   return (
     <div
@@ -5776,7 +5769,7 @@ const HomePage: React.FC = () => {
         </header>
 
         {publicMarketHome || publicMarketHomeLoading || pendingPriceAlert ? (
-          <div className={`${publicMarketHomeOpen ? 'max-h-[40vh] overflow-y-auto' : ''} shrink-0 border-b border-border/60`}>
+          <div className={`${basicSnapshot ? `${publicMarketHomeOpen ? 'max-h-[40vh] overflow-y-auto' : ''} shrink-0` : 'min-h-0 flex-1 overflow-y-auto'} border-b border-border/60`}>
             {basicSnapshot ? (
               <div
                 data-testid={publicMarketHomeOpen ? 'public-market-home-expanded' : 'public-market-home-collapsed'}
@@ -5784,7 +5777,7 @@ const HomePage: React.FC = () => {
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-foreground">
-                    {uiLanguage === 'en' ? 'Three-market overview' : '三地市场速览'}
+                    {uiLanguage === 'en' ? 'Market focus' : '市场焦点'}
                   </div>
                   <p className="truncate text-xs text-secondary-text">
                     {uiLanguage === 'en' ? 'Collapsed so the current symbol stays first.' : '已折叠，优先查看当前个股结果。'}
@@ -5860,11 +5853,31 @@ const HomePage: React.FC = () => {
                       <span data-testid="platform-status-weekly" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">
                         {uiLanguage === 'en' ? 'Weekly free' : '每周免费'} {accountQuotaText}
                       </span>
-                      <span data-testid="platform-status-basic-quota" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">
-                        {uiLanguage === 'en' ? 'No-AI quick' : '免费快照'} {basicQuotaText}
-                      </span>
-                      <span data-testid="platform-status-byok" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">{byokStatusText}</span>
-                      <span data-testid="platform-status-recommended" className="whitespace-nowrap rounded-md border border-subtle px-2 py-1">{recommendedModeText}</span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        data-testid="platform-personal-workspace-toggle"
+                        aria-label={platformPersonalWorkspaceOpen
+                          ? (uiLanguage === 'en' ? 'Collapse personal workspace' : '收起个人工作台')
+                          : (uiLanguage === 'en' ? 'Expand personal workspace' : '展开个人工作台')}
+                        onClick={() => setPlatformPersonalWorkspaceOpen((open) => !open)}
+                      >
+                        {platformPersonalWorkspaceOpen
+                          ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                          : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
+                        {uiLanguage === 'en' ? 'Personal workspace' : '个人工作台'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        aria-label={uiLanguage === 'en' ? 'Account and models' : '账户与模型'}
+                        onClick={() => navigate('/account')}
+                      >
+                        <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+                        {uiLanguage === 'en' ? 'Account and models' : '账户与模型'}
+                      </Button>
                       <Button
                         type="button"
                         variant="secondary"
@@ -5877,6 +5890,8 @@ const HomePage: React.FC = () => {
                         {uiLanguage === 'en' ? 'Sign out' : '退出'}
                       </Button>
                     </div>
+                    {platformPersonalWorkspaceOpen ? (
+                      <div data-testid="platform-personal-workspace" className="flex min-w-0 flex-col gap-2 border-t border-subtle/70 pt-2">
                     <div
                       data-testid="platform-ai-cost-warning"
                       className="text-xs text-secondary-text"
@@ -5987,12 +6002,8 @@ const HomePage: React.FC = () => {
                     {platformWatchlistError ? (
                       <div className="text-xs text-danger" role="alert">{platformWatchlistError}</div>
                     ) : null}
-                  </div>
-                  <div
-                    data-testid="platform-query-mode-panel"
-                    className="flex min-w-0 flex-wrap items-center gap-2 border-t border-subtle/70 pt-2"
-                  >
-                    <SimpleModelPickerV112 options={simpleModelOptions} value={modelOptionId} onChange={handleModelOptionChange} language={uiLanguage} />
+                      </div>
+                    ) : null}
                   </div>
                 </>
               ) : (
@@ -6244,7 +6255,7 @@ const HomePage: React.FC = () => {
           </div>
         ) : null}
 
-        <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div data-testid="home-analysis-workspace" className={`${!marketReviewReport && !basicSnapshot && !selectedReport && publicMarketHome ? 'hidden' : 'flex'} flex-1 min-h-0 overflow-hidden`}>
           <div className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden pl-4 pb-4 md:flex lg:w-72">
             {sidebarContent}
           </div>
@@ -10206,7 +10217,7 @@ const HomePage: React.FC = () => {
                   </Suspense>
                 )}
               </div>
-            ) : !marketReviewReport && !basicSnapshot ? (
+            ) : !marketReviewReport && !basicSnapshot && !publicMarketHome ? (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
                   title={t('home.startAnalysisTitle')}

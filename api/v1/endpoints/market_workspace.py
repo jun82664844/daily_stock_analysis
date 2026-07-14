@@ -19,12 +19,19 @@ from src.platform_accounts import platform_identity_from_request
 from src.platform_rate_limit import check_platform_rate_limit
 from src.services.market_daily_brief_service import MarketDailyBriefService
 from src.services.market_search_service import MarketSearchService
+from src.services.public_market_index_service import PublicMarketIndexService
+from src.services.public_market_news_service import PublicMarketNewsService
 from src.services.market_workspace_service import MarketWorkspaceService
 from src.services.public_market_home_service import PublicMarketHomeService
 
 
 router = APIRouter()
-_workspace_service = MarketWorkspaceService()
+_public_market_news_service = PublicMarketNewsService()
+_public_market_index_service = PublicMarketIndexService()
+_workspace_service = MarketWorkspaceService(
+    news_loader=_public_market_news_service.load,
+    index_loader=_public_market_index_service.load,
+)
 _search_service = MarketSearchService()
 _public_home_service = PublicMarketHomeService(_workspace_service)
 

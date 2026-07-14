@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CreditCard, Gauge, KeyRound, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
 import { platformApi, type BillingCheckoutSession, type PlatformAccountSummary, type PlatformBillingAccountResponse, type PlatformModelOption, type PlatformPlan, type PlatformQuotaBucket } from '../api/platform';
 import { AppPage, Card, PageHeader, StatCard } from '../components/common';
 import BoostPackCardV112 from '../components/platform/BoostPackCardV112';
 import ModelConnectionWizardV112 from '../components/platform/ModelConnectionWizardV112';
+import SimpleModelPickerV112, { type SimpleModelOption } from '../components/platform/SimpleModelPickerV112';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { cn } from '../utils/cn';
 
@@ -32,6 +33,8 @@ const ACCOUNT_TEXT = {
     usedOf: '已用 {used} / {limit}',
     recommended: '推荐模式',
     recommendedMode: '推荐模式：{mode}',
+    analysisModel: '分析模型',
+    analysisModelSubtitle: '主页保持简洁；在这里选择快速或深度分析使用的模型通道。',
     accountDetails: '账户详情',
     currentPlatformUser: '当前平台用户',
     noAccountData: '暂无账户数据。',
@@ -88,6 +91,8 @@ const ACCOUNT_TEXT = {
     usedOf: 'Used {used} of {limit}',
     recommended: 'Recommended',
     recommendedMode: 'Recommended mode: {mode}',
+    analysisModel: 'Analysis model',
+    analysisModelSubtitle: 'Keep the homepage focused; choose the model lane for quick or deep analysis here.',
     accountDetails: 'Account details',
     currentPlatformUser: 'Current platform user',
     noAccountData: 'No account data.',
@@ -257,6 +262,9 @@ const AccountPage: React.FC = () => {
   const [checkoutState, setCheckoutState] = useState<'idle' | 'creating'>('idle');
   const [checkoutSession, setCheckoutSession] = useState<BillingCheckoutSession | null>(null);
   const [modelOptions, setModelOptions] = useState<PlatformModelOption[]>([]);
+  const [selectedModelOptionId, setSelectedModelOptionId] = useState(
+    () => window.localStorage.getItem('dsa.modelOptionId') || 'platform_recommended',
+  );
   const requestSeqRef = useRef(0);
 
   const loadAccount = useCallback(async () => {
@@ -279,6 +287,11 @@ const AccountPage: React.FC = () => {
       setAccount(response);
       setBilling(billingResponse);
       setModelOptions(modelOptionsResponse.options);
+      const storedOptionId = window.localStorage.getItem('dsa.modelOptionId');
+      const nextOptionId = storedOptionId && modelOptionsResponse.options.some((item) => item.optionId === storedOptionId)
+        ? storedOptionId
+        : modelOptionsResponse.selectedOptionId;
+      setSelectedModelOptionId(nextOptionId || 'platform_recommended');
     } catch (err) {
       if (requestSeq !== requestSeqRef.current) {
         return;
@@ -344,6 +357,22 @@ const AccountPage: React.FC = () => {
   const enabledKeys = account?.apiKeys?.filter((item) => item.enabled) ?? [];
   const billingEvents = billing?.recentEvents ?? [];
   const billingSessions = billing?.checkoutSessions ?? [];
+  const simpleModelOptions = useMemo<SimpleModelOption[]>(() => modelOptions.map((option) => ({
+    optionId: option.optionId,
+    label: language === 'zh' ? option.labelZh : option.labelEn,
+    source: option.source,
+    providerLabel: option.providerLabel,
+    speed: option.speed,
+    purpose: language === 'zh' ? (option.purposeZh || option.purpose) : (option.purposeEn || option.purpose),
+    quotaType: option.quotaType,
+    costUnits: option.costUnits,
+    recommended: option.recommended,
+  })), [language, modelOptions]);
+
+  const handleModelOptionChange = (optionId: string) => {
+    setSelectedModelOptionId(optionId);
+    window.localStorage.setItem('dsa.modelOptionId', optionId);
+  };
 
   return (
     <AppPage>
@@ -432,6 +461,17 @@ const AccountPage: React.FC = () => {
             </div>
           </Card>
         </section>
+
+        {simpleModelOptions.length > 0 ? (
+          <Card title={text.analysisModel} subtitle={text.analysisModelSubtitle} className="rounded-lg">
+            <SimpleModelPickerV112
+              options={simpleModelOptions}
+              value={selectedModelOptionId}
+              onChange={handleModelOptionChange}
+              language={language}
+            />
+          </Card>
+        ) : null}
 
         <section className="grid gap-5 xl:grid-cols-2">
           <Card title={text.apiKeyCustody} subtitle={text.apiKeySubtitle} className="rounded-lg">

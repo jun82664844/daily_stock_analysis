@@ -339,6 +339,13 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts",
     "apps/dsa-web/src/hooks/useDashboardLifecycle.ts",
     "apps/dsa-web/src/hooks/__tests__/useDashboardLifecycle.test.tsx",
+    "docs/superpowers/plans/2026-07-13-dsa-v118-public-home-information-architecture.md",
+    "scripts/verify_platform_public_home_experience_v118.py",
+    "tests/test_platform_public_home_experience_v118_verifier.py",
+    "src/services/public_market_index_service.py",
+    "src/services/public_market_news_service.py",
+    "tests/test_public_market_index_service_v118.py",
+    "tests/test_public_market_news_service_v118.py",
 )
 
 VERIFIER_FILES = (
@@ -414,6 +421,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_unified_market_data_v115.py",
     "scripts/verify_platform_public_market_price_alerts_v116.py",
     "scripts/verify_platform_six_feature_experience_v117.py",
+    "scripts/verify_platform_public_home_experience_v118.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

@@ -619,3 +619,15 @@ git diff --check
 - 中文和英文页面统一格式化来源、状态、时间、数值和警告；游客首页不再建立需要登录的任务事件流。
 - `scripts/verify_platform_six_feature_experience_v117.py` 通过时输出 `DSA_PLATFORM_SIX_FEATURE_EXPERIENCE_V117_OK features=6 ollama=true markets=cn,hk,us guest_data=true investment_advice=false`。
 - 本状态仍是本地功能验收，不代表真实支付、生产密钥、公开部署、市场数据商业授权或法律审批。
+
+## V118 财经首页信息架构状态（2026-07-13）
+
+- 首页首屏改为公开 A股、港股、美股市场焦点，展示主要指数、关注股票、最新可用价格、涨跌、来源状态、更新时间和公开市场快讯。
+- 正式资讯存在时展示发布方、时间和原始链接；资讯源降级时只显示明确标注的行情动态，不伪造新闻。
+- 游客注册表单默认折叠；已登录用户只看到邮箱、套餐、每周额度、个人工作台、账户与模型入口和退出。
+- 自选、今日复盘和提醒保留在按需展开的个人工作台；模型选择迁入账户页并继续使用 `dsa.modelOptionId`。
+- 首页自动加载路径不运行平台 API、BYOK、Ollama 或 Kronos；这些能力只在用户主动查询后运行。
+- `scripts/verify_platform_public_home_experience_v118.py` 通过时输出 `DSA_PLATFORM_PUBLIC_HOME_EXPERIENCE_V118_OK markets=cn,hk,us public_news=true account_clickthrough=true mobile=true api_auto_run=false investment_advice=false`。
+- 本状态仅代表本地功能验收，不代表生产部署、支付、市场数据商业授权或法律审批；所有页面仅提供资讯和数据，不构成投资建议。
+- 浏览器实测覆盖桌面和 390x844 手机视口：A股、港股、美股分别显示公开基准指数、关注行情和 5 条来源可追溯资讯，手机无横向溢出，控制台无警告或错误。
+- 首次 `/api/v1/market-workspace/home` 实测约 2.48 秒，三地各返回 6 条公开资讯且 `ai_used=false`；主动查询 AAPL 后才进入个股工作区，首页自动加载未运行平台 API、BYOK、Ollama 或 Kronos。

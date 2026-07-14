@@ -86,6 +86,7 @@ class PublicMarketHomeService:
             "selection_basis": "turnover_then_absolute_change",
             "indices": list(overview.get("indices") or []),
             "attention": items[: self.max_items_per_market],
+            "headlines": list(overview.get("headlines") or [])[:10],
             "sources": list(overview.get("sources") or []),
             "warnings": list(dict.fromkeys(overview.get("warnings") or [])),
         }
@@ -97,7 +98,7 @@ class PublicMarketHomeService:
             "display_mode": self._display_mode(),
             "ranking_scope": "configured_universe",
             "selection_basis": "turnover_then_absolute_change",
-            "indices": [], "attention": [], "sources": [],
+            "indices": [], "attention": [], "headlines": [], "sources": [],
             "warnings": ["market_home_unavailable"],
         }
 

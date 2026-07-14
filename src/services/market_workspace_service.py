@@ -19,6 +19,7 @@ from src.platform_watchlist import PlatformWatchlistService
 
 SnapshotLoader = Callable[[str], Dict[str, Any]]
 NewsLoader = Callable[[str], List[Dict[str, Any]]]
+IndexLoader = Callable[[str], List[Dict[str, Any]]]
 
 _DEFAULT_MARKET_SYMBOLS: Mapping[str, Sequence[str]] = {
     "cn": ("601318.SH", "600519.SH", "000001.SZ", "300750.SZ"),
@@ -62,6 +63,7 @@ class MarketWorkspaceService:
         snapshot_loader: Optional[SnapshotLoader] = None,
         detail_loader: Optional[SnapshotLoader] = None,
         news_loader: Optional[NewsLoader] = None,
+        index_loader: Optional[IndexLoader] = None,
         market_symbols: Optional[Mapping[str, Sequence[str]]] = None,
         cache_ttl_seconds: Optional[int] = None,
         overview_timeout_seconds: Optional[float] = None,
@@ -80,6 +82,7 @@ class MarketWorkspaceService:
             self.snapshot_loader = snapshot_loader
             self.detail_loader = detail_loader or snapshot_loader
         self.news_loader = news_loader
+        self.index_loader = index_loader
         self.market_symbols = {key: tuple(value) for key, value in (market_symbols or _configured_market_symbols()).items()}
         self.cache_ttl_seconds = max(
             1,
@@ -147,6 +150,15 @@ class MarketWorkspaceService:
         if news_state["status"] == "unavailable":
             warnings.append("market_news_unavailable")
 
+        indices: List[Dict[str, Any]] = []
+        if self.index_loader is not None:
+            try:
+                indices = [dict(item) for item in self.index_loader(normalized_market) if isinstance(item, dict)]
+            except Exception:
+                indices = []
+        else:
+            indices = items[:1]
+
         valid_changes = [item.get("change_percent") for item in items if item.get("change_percent") is not None]
         breadth = {
             "advancers": sum(1 for value in valid_changes if float(value) > 0),
@@ -181,7 +193,7 @@ class MarketWorkspaceService:
             "market": normalized_market,
             "as_of": fetched_at,
             "session_state": "unknown",
-            "indices": items[:1],
+            "indices": indices,
             "breadth": breadth,
             "movers": sorted_items,
             "heatmap": items,

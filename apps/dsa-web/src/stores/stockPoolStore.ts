@@ -16,7 +16,6 @@ const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
 type SelectionSource = 'manual' | 'autocomplete' | 'import' | 'image';
 
 type FetchHistoryOptions = {
-  autoSelectFirst?: boolean;
   reset?: boolean;
   silent?: boolean;
 };
@@ -384,7 +383,7 @@ async function fetchHistory(
   set: (partial: Partial<StockPoolState>) => void,
   options: FetchHistoryOptions = {},
 ): Promise<HistoryListResponse | null> {
-  const { autoSelectFirst = false, reset = true, silent = false } = options;
+  const { reset = true, silent = false } = options;
   const currentState = get();
   const page = reset ? 1 : currentState.currentPage + 1;
   const requestId = ++historyRequestSeq;
@@ -452,10 +451,6 @@ async function fetchHistory(
 
     if (newestSameStockRecordId !== null) {
       await get().selectHistoryItem(newestSameStockRecordId);
-    }
-
-    if (autoSelectFirst && response.items.length > 0 && !get().selectedReport) {
-      await get().selectHistoryItem(response.items[0].id);
     }
 
     return response;
@@ -624,7 +619,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   },
 
   loadInitialHistory: async () => {
-    await fetchHistory(get, set, { autoSelectFirst: true, reset: true });
+    await fetchHistory(get, set, { reset: true });
   },
 
   refreshHistory: async (silent = false) => {

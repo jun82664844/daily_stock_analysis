@@ -2024,3 +2024,48 @@ Review focus: no realtime or market-wide claim without authorization, first obse
 - `build-and-ignore-impact`: `.gitignore` exposes only the V117 verifier; generated static assets remain ignored.
 
 Review focus: six product capabilities are not six installed upstream runtimes, latest market request wins, no raw internal warning codes, no secret exposure, no investment advice, and no production claim.
+
+## V118 Public Home Information Architecture
+
+### backend-platform-foundation
+
+- `api/v1/schemas/market_workspace.py`
+- `api/v1/endpoints/market_workspace.py`
+- `src/services/public_market_index_service.py`
+- `src/services/public_market_news_service.py`
+- `src/services/public_market_home_service.py`
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/pages/AccountPage.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/AccountPage.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `scripts/verify_platform_public_home_experience_v118.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_public_home_experience_v118_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+- `tests/test_public_market_index_service_v118.py`
+- `tests/test_public_market_news_service_v118.py`
+- `tests/test_public_market_home_v116.py`
+
+### docs-and-config
+
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-13-dsa-v118-public-home-information-architecture.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+### build-and-ignore-impact
+
+- `.gitignore`
+
+Review focus: allowlisted public web data may load automatically with bounded timeout and cache, model/API analysis must remain user-triggered, headline links retain attribution, account/model details stay off the default home, and no investment-advice or production claim is introduced.
