@@ -8,6 +8,8 @@ import {
   formatSourceLabel,
   formatSourceStatus,
 } from '../market-workspace/marketWorkspaceFormat';
+import DailyMarketWorkbenchV124 from './DailyMarketWorkbenchV124';
+import { rememberRecentMarketSymbol } from './marketRecentV124';
 import PublicMarketStockPreviewV121 from './PublicMarketStockPreviewV121';
 
 type Props = {
@@ -218,7 +220,13 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
     setPreviewError('');
   };
 
+  const openMarketItem = (item: Pick<MarketSecurityItem, 'symbol' | 'name' | 'market'>) => {
+    rememberRecentMarketSymbol(item);
+    onOpenSymbol(item.symbol);
+  };
+
   const loadPreview = async (item: MarketSecurityItem) => {
+    rememberRecentMarketSymbol(item);
     const requestId = previewRequestId.current + 1;
     previewRequestId.current = requestId;
     setPreviewItem(item);
@@ -272,6 +280,8 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
           </p>
         </div>
 
+        <DailyMarketWorkbenchV124 language={language} data={data} onOpenSymbol={onOpenSymbol} />
+
         <div className="mt-4 grid grid-cols-3 border-y border-border/70" role="tablist" aria-label={en ? 'Markets' : '市场'}>
           {sections.map((section) => {
             const lead = section.mostActive?.[0] ?? section.attention[0];
@@ -310,7 +320,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
               <button
                 key={index.symbol}
                 type="button"
-                onClick={() => onOpenSymbol(index.symbol)}
+                onClick={() => openMarketItem(index)}
                 className="flex min-w-0 items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5 text-left last:border-b-0 hover:bg-hover/45 sm:border-r sm:odd:border-l-0 xl:border-b-0"
               >
                 <span className="min-w-0">
@@ -384,7 +394,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                       className="grid min-h-14 grid-cols-[minmax(0,1fr)_minmax(4.5rem,.65fr)_minmax(3.5rem,.5fr)_auto] items-center gap-2 px-2 py-2 hover:bg-hover/45 lg:grid-cols-[minmax(0,1.15fr)_minmax(5rem,.55fr)_minmax(4rem,.5fr)_minmax(5rem,.55fr)_minmax(8rem,.8fr)_auto]"
                       role="row"
                     >
-                      <button type="button" aria-label={en ? `View ${name}` : `查看 ${name}`} onClick={() => onOpenSymbol(item.symbol)} className="min-w-0 text-left">
+                      <button type="button" aria-label={en ? `View ${name}` : `查看 ${name}`} onClick={() => openMarketItem(item)} className="min-w-0 text-left">
                         <span className="block truncate text-sm font-medium text-foreground hover:text-primary">{name}</span>
                         <span className="flex min-w-0 items-center gap-1.5 truncate text-[11px] text-secondary-text">
                           <span className="truncate">{item.symbol} · {item.currency ?? '-'}</span>
@@ -438,9 +448,9 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                   error={previewError}
                   onRetry={() => void loadPreview(previewItem)}
                   onClose={clearPreview}
-                  onOpenFull={(symbol) => {
+                  onOpenFull={() => {
                     clearPreview();
-                    onOpenSymbol(symbol);
+                    openMarketItem(previewItem);
                   }}
                 />
               </div>
@@ -460,7 +470,15 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                         <span className={`shrink-0 text-xs font-semibold ${movementTone(sector.changePercent)}`}>{percent(sector.changePercent)}</span>
                       </div>
                       {sector.leadingSymbol ? (
-                        <button type="button" onClick={() => onOpenSymbol(sector.leadingSymbol!)} className="mt-1 max-w-full truncate text-left text-xs text-secondary-text hover:text-primary">
+                        <button
+                          type="button"
+                          onClick={() => openMarketItem({
+                            symbol: sector.leadingSymbol!,
+                            name: sector.leadingName || sector.leadingSymbol!,
+                            market: sector.market,
+                          })}
+                          className="mt-1 max-w-full truncate text-left text-xs text-secondary-text hover:text-primary"
+                        >
                           {en ? 'Leader' : '领涨'} {sector.leadingName || sector.leadingSymbol} {percent(sector.leadingChangePercent)}
                         </button>
                       ) : null}

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { marketWorkspaceApi, type PublicMarketHomeResponse, type SymbolWorkspaceResponse } from '../../../api/marketWorkspace';
 import PublicMarketHomeV116 from '../PublicMarketHomeV116';
+import { readRecentMarketSymbols } from '../marketRecentV124';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -65,6 +66,23 @@ const previewDetail: SymbolWorkspaceResponse = {
 };
 
 describe('PublicMarketHomeV116', () => {
+  it('mounts the V124 workbench and remembers a ranking stock before opening the free query', () => {
+    window.localStorage.clear();
+    const open = vi.fn();
+    render(<PublicMarketHomeV116 language="zh" data={data} loading={false} onOpenSymbol={open} onCreateAlert={vi.fn()} />);
+
+    expect(screen.getByTestId('daily-market-workbench-v124')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看 中际旭创' }));
+
+    expect(open).toHaveBeenCalledWith('300308.SZ');
+    expect(readRecentMarketSymbols()[0]).toMatchObject({
+      symbol: '300308.SZ',
+      name: '中际旭创',
+      market: 'cn',
+    });
+    expect(screen.getByRole('button', { name: '继续查看 中际旭创 300308.SZ' })).toBeInTheDocument();
+  });
+
   it('labels the retrieval time when a public source omits publication time', () => {
     const withoutPublishedTime: PublicMarketHomeResponse = {
       ...data,
@@ -84,7 +102,7 @@ describe('PublicMarketHomeV116', () => {
     };
 
     render(<PublicMarketHomeV116 language="en" data={withoutPublishedTime} loading={false} onOpenSymbol={vi.fn()} onCreateAlert={vi.fn()} />);
-    expect(screen.getByText(/Retrieved/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Retrieved/).length).toBeGreaterThan(0);
     expect(screen.getByTestId('public-home-index-strip')).toHaveTextContent('SSE Composite');
     expect(screen.getByText('CLS')).toBeInTheDocument();
   });
@@ -107,8 +125,8 @@ describe('PublicMarketHomeV116', () => {
     expect(screen.getByRole('button', { name: '跌幅榜' })).toBeInTheDocument();
     expect(screen.getByText('家具行业')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '市场快讯' })).toBeInTheDocument();
-    expect(screen.getByText('沪深市场成交活跃度回升')).toBeInTheDocument();
-    expect(screen.getByText('测试资讯源')).toBeInTheDocument();
+    expect(screen.getAllByText('沪深市场成交活跃度回升').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('测试资讯源').length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('tab', { name: /港股/ }));
     expect(screen.getAllByText('腾讯控股').length).toBeGreaterThan(0);

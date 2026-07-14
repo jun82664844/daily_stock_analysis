@@ -2220,3 +2220,33 @@ Review focus: guest access, explicit on-demand loading, stale-request cancellati
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: owner-scoped summaries, administrator authorization, redacted payloads, guest zero-request behavior, visible-only polling, immediate mutation refresh, accessible capped badges, desktop/mobile layout, and no AI or external notification channel.
+
+## V124 Free Daily Market Workbench
+
+### frontend-platform-experience
+
+- `apps/dsa-web/src/components/market-home/DailyMarketWorkbenchV124.tsx`
+- `apps/dsa-web/src/components/market-home/marketRecentV124.ts`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+
+### tests-and-verifiers
+
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/marketRecentV124.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `scripts/verify_platform_free_daily_market_workbench_v124.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_free_daily_market_workbench_v124_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+
+### docs-and-config
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v124-free-daily-market-workbench.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: public-data reuse, no automatic model call, accurate published/observed/retrieved labels, browser-local recent research isolation, bilingual and mobile layout, click-through to the existing free query, and no investment-advice language.

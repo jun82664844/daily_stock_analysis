@@ -676,3 +676,13 @@ git diff --check
 - 桌面和 `390x844` 移动视口浏览器回归覆盖角标显示、读取清除、关闭工单清除和无横向溢出。
 - `scripts/verify_platform_support_notifications_v122.py` 通过时输出 `DSA_PLATFORM_SUPPORT_NOTIFICATIONS_V122_OK user_badge=true admin_badge=true polling=visible_only summary_redacted=true ai_reply=false external_notifications=false`。
 - 本状态仅代表本地人工客服站内通知验收，不代表 AI 回复、外部通知、生产部署、真实支付或生产密钥已批准。
+
+## V124 免费每日市场工作台状态（2026-07-14）
+
+- 首页市场焦点新增三地市场状态和当地时间，优先显示每个市场主要指数；指数缺失时明确标记暂不可用。
+- 跨市场时间线合并 A股、港股、美股可追溯资讯，按发布时间、观察时间或抓取时间排序，最多展示六条。
+- 浏览器本地最近查看按股票代码去重置顶并最多保存六条；清空操作不影响其他本地设置、账户、自选或历史报告。
+- 榜单、指数、行业领涨、数据预览和最近查看继续进入现有免费查询，不要求登录，不自动运行 AI。
+- 中文和英文组件测试覆盖市场状态、时间线、来源时间、最近查看、清空隔离和资讯数据边界。
+- `scripts/verify_platform_free_daily_market_workbench_v124.py` 通过时输出 `DSA_PLATFORM_FREE_DAILY_MARKET_WORKBENCH_V124_OK guest=true public_data=true ai_used=false market_clocks=true cross_market_timeline=true recent_research=true bilingual=true investment_advice=false`。
+- 本状态仅代表本地免费公开数据体验，不代表生产部署、真实支付、生产密钥、市场数据商业授权或法律审批；所有内容只提供资讯和数据，不构成投资建议。

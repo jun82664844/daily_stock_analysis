@@ -2581,3 +2581,35 @@ Docs and packaging:
 Acceptance marker: `DSA_PLATFORM_SUPPORT_NOTIFICATIONS_V122_OK user_badge=true admin_badge=true polling=visible_only summary_redacted=true ai_reply=false external_notifications=false`.
 
 Boundary: local human-support notification acceptance only. No AI auto-reply, WebSocket, email, SMS, Feishu, production deployment, real payment, production key, or investment-advice approval is claimed.
+
+## V124 Free Daily Market Workbench
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/DailyMarketWorkbenchV124.tsx`
+- `apps/dsa-web/src/components/market-home/marketRecentV124.ts`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+
+Tests and verifiers:
+
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketWorkbenchV124.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/marketRecentV124.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `scripts/verify_platform_free_daily_market_workbench_v124.py`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_free_daily_market_workbench_v124_verifier.py`
+- `tests/test_platform_release_candidate_package.py`
+
+Docs and packaging:
+
+- `.gitignore`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/plans/2026-07-14-dsa-v124-free-daily-market-workbench.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_FREE_DAILY_MARKET_WORKBENCH_V124_OK guest=true public_data=true ai_used=false market_clocks=true cross_market_timeline=true recent_research=true bilingual=true investment_advice=false`.
+
+Boundary: local guest public-data acceptance only. No new third-party source, automatic model call, production deployment, payment, production key, commercial market-data redistribution, forecast or investment-advice approval is claimed.

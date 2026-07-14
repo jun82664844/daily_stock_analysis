@@ -41,6 +41,16 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v124_free_daily_market_workbench_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_free_daily_market_workbench_v124.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_free_daily_market_workbench_v124.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_free_daily_market_workbench_v124_verifier.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/DailyMarketWorkbenchV124.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/marketRecentV124.ts", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-14-dsa-v124-free-daily-market-workbench.md", REQUIRED_FILES)
+
     def test_v122_support_notifications_are_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
