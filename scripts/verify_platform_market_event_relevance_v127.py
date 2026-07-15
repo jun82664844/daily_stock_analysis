@@ -65,13 +65,13 @@ def api_contract(schema_source: str, frontend_source: str) -> CheckResult:
     return CheckResult("backward_compatible_api", not missing, {"missing": missing})
 
 
-def frontend_contract(source: str) -> CheckResult:
+def frontend_contract(source: str, personalization_source: str = "") -> CheckResult:
+    combined_source = f"{source}\n{personalization_source}"
     required = (
         "const MARKET_FILTERS",
         "'all', 'cn', 'hk', 'us'",
         "setMarketFilter",
         "event.market === marketFilter",
-        "watchlist.has",
         "event.relevanceScore",
         "event.importance",
         "event.relevanceReasons",
@@ -92,8 +92,10 @@ def frontend_contract(source: str) -> CheckResult:
         "Public information and data only. Not investment advice.",
     )
     forbidden = ("买入", "卖出", "目标价", "收益预测", "target price", "return forecast", "trade instruction")
-    missing = [token for token in required if token not in source]
-    forbidden_hits = [token for token in forbidden if token in source.casefold()]
+    missing = [token for token in required if token not in combined_source]
+    if "watchlist.has" not in combined_source and "symbols.has" not in combined_source:
+        missing.append("watchlist_or_normalized_symbols.has")
+    forbidden_hits = [token for token in forbidden if token in combined_source.casefold()]
     return CheckResult(
         "focused_bilingual_frontend",
         not missing and not forbidden_hits,
@@ -133,11 +135,13 @@ def run_checks(repo_root: Path) -> Iterable[CheckResult]:
     schema_source = (repo_root / "api/v1/schemas/market_workspace.py").read_text(encoding="utf-8")
     api_source = (repo_root / "apps/dsa-web/src/api/marketWorkspace.ts").read_text(encoding="utf-8")
     component_source = (repo_root / "apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx").read_text(encoding="utf-8")
+    personalization_source_path = repo_root / "apps/dsa-web/src/components/market-home/marketEventPersonalizationV130.ts"
+    personalization_source = personalization_source_path.read_text(encoding="utf-8") if personalization_source_path.exists() else ""
     backend_tests = (repo_root / "tests/test_public_market_event_service.py").read_text(encoding="utf-8")
     frontend_tests = (repo_root / "apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx").read_text(encoding="utf-8")
     yield backend_relevance_contract(backend_source)
     yield api_contract(schema_source, api_source)
-    yield frontend_contract(component_source)
+    yield frontend_contract(component_source, personalization_source)
     yield regression_tests_contract(backend_tests, frontend_tests)
     yield homepage_bundle_check(repo_root / "static/assets")
 

@@ -406,6 +406,11 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-15-dsa-v129-event-source-evidence.md",
     "scripts/verify_platform_event_source_evidence_v129.py",
     "tests/test_platform_event_source_evidence_v129_verifier.py",
+    "docs/superpowers/plans/2026-07-15-dsa-v130-personalized-market-events.md",
+    "scripts/verify_platform_personalized_market_events_v130.py",
+    "tests/test_platform_personalized_market_events_v130_verifier.py",
+    "apps/dsa-web/src/components/market-home/marketEventPersonalizationV130.ts",
+    "apps/dsa-web/src/components/market-home/__tests__/marketEventPersonalizationV130.test.ts",
 )
 
 VERIFIER_FILES = (
@@ -492,6 +497,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_market_event_relevance_v127.py",
     "scripts/verify_platform_event_source_retention_v128.py",
     "scripts/verify_platform_event_source_evidence_v129.py",
+    "scripts/verify_platform_personalized_market_events_v130.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

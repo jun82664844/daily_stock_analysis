@@ -107,6 +107,7 @@ class PublicMarketEvent(StrictModel):
     summary: Optional[str] = None
     symbol: Optional[str] = None
     name: Optional[str] = None
+    sector: Optional[str] = None
     event_time: str
     time_kind: MarketEventTimeKind
     publisher: Optional[str] = None

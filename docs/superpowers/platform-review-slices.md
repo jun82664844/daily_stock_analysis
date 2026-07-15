@@ -32,6 +32,26 @@ V129 local addendum: event-source evidence details are included in the existing 
 
 Boundary: source comparison is public-record transparency, not independent fact verification. It adds no network or AI calls and accepts clickable HTTP/HTTPS links only.
 
+V130 local addendum: personalized public market-event ordering is included in the existing backend/frontend/tests/docs slices:
+
+- `src/services/public_market_event_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/marketEventPersonalizationV130.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/marketEventPersonalizationV130.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+- `scripts/verify_platform_personalized_market_events_v130.py`
+- `tests/test_platform_personalized_market_events_v130_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v130-personalized-market-events.md`
+
+Boundary: personalization is browser-side ordering only. The public endpoint receives no user identity or watchlist, no public event is hidden, and no network, AI, quota, payment or investment-advice behavior is added.
+
 ## Inventory
 
 Baseline before this review package, from `docs/superpowers/platform-v2-handoff-status.md`:

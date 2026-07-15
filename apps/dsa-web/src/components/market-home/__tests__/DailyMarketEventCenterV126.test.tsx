@@ -67,7 +67,7 @@ describe('DailyMarketEventCenterV126', () => {
 
     expect(screen.getByRole('heading', { name: '今日市场事件' })).toBeInTheDocument();
     expect(screen.getByText('重点事件 1')).toBeInTheDocument();
-    expect(screen.getByText('自选关注')).toBeInTheDocument();
+    expect(screen.getByText('自选相关')).toBeInTheDocument();
     expect(screen.getAllByText('财报业绩')).toHaveLength(2);
     expect(screen.getByText('宏观数据')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '查询 AAPL' }));
@@ -82,7 +82,7 @@ describe('DailyMarketEventCenterV126', () => {
       />,
     );
     expect(screen.getByRole('heading', { name: 'Daily market events' })).toBeInTheDocument();
-    expect(screen.getByText('Watchlist')).toBeInTheDocument();
+    expect(screen.getByText('Watchlist match')).toBeInTheDocument();
   });
 
   it('filters categories without hiding truthful source state', () => {
@@ -143,6 +143,73 @@ describe('DailyMarketEventCenterV126', () => {
 
     const articles = screen.getAllByRole('article');
     expect(within(articles[0]).getByText('AAPL earnings results published')).toBeInTheDocument();
+  });
+
+  it('defaults to explainable personalized priority and can return to relevance order', () => {
+    const personalizedEvents: Array<PublicMarketEvent & { sector?: string | null }> = [
+      { ...events[1], eventId: 'general-cn', relevanceScore: 99 },
+      {
+        ...events[0],
+        eventId: 'sector-us',
+        title: 'NVDA announces a new accelerator platform',
+        symbol: 'NVDA',
+        name: 'NVIDIA',
+        sector: 'Technology',
+        relevanceScore: 80,
+      },
+      {
+        ...events[0],
+        eventId: 'market-us',
+        title: 'US stock market closes higher',
+        symbol: null,
+        name: null,
+        sector: null,
+        relevanceScore: 70,
+      },
+      { ...events[0], eventId: 'watchlist-us', relevanceScore: 20 },
+    ];
+    render(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={personalizedEvents}
+        watchlistSymbols={['AAPL']}
+        watchlistSectors={['Technology']}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'For me first' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Watchlist match')).toBeInTheDocument();
+    expect(screen.getByText('Related industry')).toBeInTheDocument();
+    expect(screen.getByText('Followed market')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'China' }));
+    expect(screen.getByTestId('market-event-personalization-summary-v130')).toHaveTextContent(
+      'Prioritized from 1 watchlist symbols, 1 related industries and 1 followed markets.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'All markets' }));
+    let articles = screen.getAllByRole('article');
+    expect(within(articles[0]).getByText('AAPL earnings results published')).toBeInTheDocument();
+    expect(within(articles[1]).getByText('NVDA announces a new accelerator platform')).toBeInTheDocument();
+    expect(within(articles[2]).getByText('US stock market closes higher')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'All events' }));
+    articles = screen.getAllByRole('article');
+    expect(within(articles[0]).getByText(events[1].title)).toBeInTheDocument();
+  });
+
+  it('keeps the public event feed unpersonalized for visitors without a watchlist', () => {
+    render(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        watchlistSymbols={[]}
+        watchlistSectors={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'For me first' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Watchlist match')).not.toBeInTheDocument();
   });
 
   it('shows multi-source transparency and locally marks new events as read', () => {

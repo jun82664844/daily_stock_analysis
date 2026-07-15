@@ -49,7 +49,7 @@ describe('marketWorkspaceApi', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: {
       as_of: '2026-07-13T01:30:00Z', ai_used: false, informational_only: true,
       markets: [{ market: 'us', session_state: 'open', session_phase: 'intraday', market_local_time: '2026-07-13T10:30:00-04:00', minutes_to_close: 330, session_source: 'exchange_calendar', session_warning_codes: [], display_mode: 'latest_available', ranking_scope: 'configured_universe', selection_basis: 'turnover_then_absolute_change', indices: [], attention: [], sources: [], warnings: [] }],
-      events: [{ event_id: 'event-1', market: 'us', category: 'earnings', title: 'AAPL earnings results', summary: 'Public information.', symbol: 'AAPL', name: 'Apple Inc.', event_time: '2026-07-13T01:25:00Z', time_kind: 'published', publisher: 'Unit News', url: 'https://example.com/event', source_state: { source: 'unit_news', status: 'fresh', observed_at: '2026-07-13T01:25:00Z' }, classification_source: 'keyword_rules', relevance_score: 95, importance: 'high', relevance_reasons: ['linked_security', 'earnings_event'], source_count: 2, source_publishers: ['Unit News', 'Official Feed'], source_records: [{ publisher: 'Unit News', source: 'unit_news', url: 'https://example.com/event', event_time: '2026-07-13T01:25:00Z', time_kind: 'published' }, { publisher: 'Official Feed', source: 'official_feed', url: 'https://official.example/event', event_time: '2026-07-13T01:26:00Z', time_kind: 'published' }] }],
+      events: [{ event_id: 'event-1', market: 'us', category: 'earnings', title: 'AAPL earnings results', summary: 'Public information.', symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', event_time: '2026-07-13T01:25:00Z', time_kind: 'published', publisher: 'Unit News', url: 'https://example.com/event', source_state: { source: 'unit_news', status: 'fresh', observed_at: '2026-07-13T01:25:00Z' }, classification_source: 'keyword_rules', relevance_score: 95, importance: 'high', relevance_reasons: ['linked_security', 'earnings_event'], source_count: 2, source_publishers: ['Unit News', 'Official Feed'], source_records: [{ publisher: 'Unit News', source: 'unit_news', url: 'https://example.com/event', event_time: '2026-07-13T01:25:00Z', time_kind: 'published' }, { publisher: 'Official Feed', source: 'official_feed', url: 'https://official.example/event', event_time: '2026-07-13T01:26:00Z', time_kind: 'published' }] }],
     } });
     const body = await marketWorkspaceApi.getHome();
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/market-workspace/home');
@@ -59,6 +59,7 @@ describe('marketWorkspaceApi', () => {
     expect(body.markets[0].minutesToClose).toBe(330);
     expect(body.events[0].eventId).toBe('event-1');
     expect(body.events[0].eventTime).toBe('2026-07-13T01:25:00Z');
+    expect(body.events[0].sector).toBe('Technology');
     expect(body.events[0].sourceState.observedAt).toBe('2026-07-13T01:25:00Z');
     expect(body.events[0].relevanceScore).toBe(95);
     expect(body.events[0].importance).toBe('high');
@@ -106,6 +107,7 @@ describe('marketWorkspaceApi', () => {
     expect(body.events[0].relevanceReasons).toEqual([]);
     expect(body.events[0].sourceCount).toBe(1);
     expect(body.events[0].sourcePublishers).toEqual(['Legacy Publisher']);
+    expect(body.events[0].sector).toBeNull();
     expect(body.events[0].url).toBeNull();
     expect(body.events[0].sourceRecords).toEqual([{
       publisher: 'Legacy Publisher',

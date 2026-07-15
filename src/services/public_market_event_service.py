@@ -102,9 +102,10 @@ class PublicMarketEventService:
                 published_at = str(headline.get("published_at") or "").strip()
                 event_time = published_at or as_of
                 time_kind = "published" if published_at else "retrieved"
-                linked_symbol, linked_name = self._linked_security(title, securities)
+                linked_symbol, linked_name, linked_sector = self._linked_security(title, securities)
                 symbol = explicit_symbol or linked_symbol
                 name = linked_name if linked_symbol and (not explicit_symbol or linked_symbol.casefold() == explicit_symbol.casefold()) else None
+                sector = linked_sector if linked_symbol and (not explicit_symbol or linked_symbol.casefold() == explicit_symbol.casefold()) else None
                 category = self._category(title)
                 has_market_signal = self._has_finance_signal(title)
                 if category == "market" and not symbol and not has_market_signal:
@@ -124,6 +125,7 @@ class PublicMarketEventService:
                     "summary": self._optional_text(headline.get("summary")),
                     "symbol": symbol,
                     "name": name,
+                    "sector": sector,
                     "event_time": event_time,
                     "time_kind": time_kind,
                     "publisher": self._optional_text(headline.get("publisher")),
@@ -218,17 +220,24 @@ class PublicMarketEventService:
                 if not symbol or symbol.casefold() in seen:
                     continue
                 seen.add(symbol.casefold())
-                securities.append({"symbol": symbol, "name": name})
+                securities.append({
+                    "symbol": symbol,
+                    "name": name,
+                    "sector": str(item.get("sector") or "").strip(),
+                })
         return securities
 
     @staticmethod
-    def _linked_security(title: str, securities: Iterable[Dict[str, str]]) -> tuple[Optional[str], Optional[str]]:
+    def _linked_security(
+        title: str,
+        securities: Iterable[Dict[str, str]],
+    ) -> tuple[Optional[str], Optional[str], Optional[str]]:
         for security in securities:
             symbol = security["symbol"]
             name = security["name"]
             if PublicMarketEventService._symbol_in_title(title, symbol) or PublicMarketEventService._name_in_title(title, name):
-                return symbol, name or None
-        return None, None
+                return symbol, name or None, security.get("sector") or None
+        return None, None, None
 
     @staticmethod
     def _symbol_in_title(title: str, symbol: str) -> bool:

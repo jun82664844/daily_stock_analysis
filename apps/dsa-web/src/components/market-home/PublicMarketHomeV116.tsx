@@ -9,6 +9,7 @@ import {
   formatSourceStatus,
 } from '../market-workspace/marketWorkspaceFormat';
 import DailyMarketWorkbenchV124 from './DailyMarketWorkbenchV124';
+import { deriveWatchlistSectors } from './marketEventPersonalizationV130';
 import { rememberRecentMarketSymbol } from './marketRecentV124';
 import PublicMarketStockPreviewV121 from './PublicMarketStockPreviewV121';
 
@@ -194,7 +195,11 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
   const previewRequestId = useRef(0);
-  const sections = data?.markets ?? [];
+  const sections = useMemo(() => data?.markets ?? [], [data?.markets]);
+  const watchlistSectors = useMemo(
+    () => deriveWatchlistSectors(sections, watchlistSymbols),
+    [sections, watchlistSymbols],
+  );
   const activeSection = useMemo(
     () => sections.find((section) => section.market === activeMarket) || sections[0],
     [activeMarket, sections],
@@ -291,6 +296,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
               language={language}
               events={data.events}
               watchlistSymbols={watchlistSymbols}
+              watchlistSectors={watchlistSectors}
               onOpenSymbol={onOpenSymbol}
             />
           </div>

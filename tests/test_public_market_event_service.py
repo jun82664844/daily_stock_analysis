@@ -31,11 +31,12 @@ def _headline(
     }
 
 
-def _security(symbol: str, name: str, market: str) -> dict:
+def _security(symbol: str, name: str, market: str, *, sector: str | None = None) -> dict:
     return {
         "symbol": symbol,
         "name": name,
         "market": market,
+        "sector": sector,
         "source_state": _source(),
     }
 
@@ -190,6 +191,23 @@ class PublicMarketEventServiceTestCase(unittest.TestCase):
         self.assertEqual(events[0]["symbol"], "AAPL")
         self.assertEqual(events[1]["symbol"], "NVDA")
         self.assertIsNone(events[2]["symbol"])
+
+    def test_retains_existing_sector_for_linked_security_without_new_lookup(self) -> None:
+        markets = [{
+            "market": "us",
+            "attention": [_security("AAPL", "Apple Inc.", "us", sector="Technology")],
+            "headlines": [
+                _headline("AAPL earnings results published"),
+                _headline("US stock market closes higher"),
+            ],
+        }]
+
+        events = PublicMarketEventService().build(markets, "2026-07-14T03:00:00Z")
+
+        linked = next(event for event in events if event.get("symbol") == "AAPL")
+        general = next(event for event in events if not event.get("symbol"))
+        self.assertEqual(linked["sector"], "Technology")
+        self.assertIsNone(general["sector"])
 
     def test_classifies_chinese_net_profit_headlines_as_earnings(self) -> None:
         markets = [{

@@ -66,6 +66,26 @@ Public information and data only. Not investment advice.
         self.assertFalse(frontend_contract(valid.replace("watchlist.has", "watchlist.ignores")).ok)
         self.assertFalse(frontend_contract(valid + "\n目标价").ok)
 
+    def test_frontend_contract_accepts_v130_delegated_watchlist_and_relevance_sorting(self) -> None:
+        from scripts.verify_platform_market_event_relevance_v127 import frontend_contract
+
+        component = """
+const MARKET_FILTERS = ['all', 'cn', 'hk', 'us'];
+setMarketFilter(item)
+event.market === marketFilter
+event.importance event.relevanceReasons
+全部市场 A股 港股 美股 高重要度 中重要度 重点事件 关联证券
+All markets China Hong Kong US High importance Medium importance Priority events Linked security
+仅提供公开资讯和数据，不构成投资建议。
+Public information and data only. Not investment advice.
+"""
+        helper = """
+symbols.has(normalizeMarketEventSymbol(event.symbol))
+left.event.relevanceScore !== right.event.relevanceScore
+"""
+        self.assertTrue(frontend_contract(component, helper).ok)
+        self.assertFalse(frontend_contract(component, helper.replace("symbols.has", "symbols.ignores")).ok)
+
 
 if __name__ == "__main__":
     unittest.main()

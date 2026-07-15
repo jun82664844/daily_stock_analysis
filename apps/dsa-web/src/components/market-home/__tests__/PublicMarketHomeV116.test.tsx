@@ -10,7 +10,10 @@ afterEach(() => {
 
 const data: PublicMarketHomeResponse = {
   asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
-  events: [{ eventId: 'event-aapl', market: 'us', category: 'earnings', title: 'AAPL earnings results published', symbol: 'AAPL', name: 'Apple Inc.', eventTime: '2026-07-13T01:25:00Z', timeKind: 'published', publisher: 'Unit News', sourceState: { source: 'unit_news', status: 'fresh' }, classificationSource: 'keyword_rules', relevanceScore: 70, importance: 'high', relevanceReasons: ['linked_security', 'earnings_event'], sourceCount: 1, sourcePublishers: ['Unit News'], sourceRecords: [{ publisher: 'Unit News', source: 'unit_news', url: null, eventTime: '2026-07-13T01:25:00Z', timeKind: 'published' }] }],
+  events: [
+    { eventId: 'event-aapl', market: 'us', category: 'earnings', title: 'AAPL earnings results published', symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', eventTime: '2026-07-13T01:25:00Z', timeKind: 'published', publisher: 'Unit News', sourceState: { source: 'unit_news', status: 'fresh' }, classificationSource: 'keyword_rules', relevanceScore: 70, importance: 'high', relevanceReasons: ['linked_security', 'earnings_event'], sourceCount: 1, sourcePublishers: ['Unit News'], sourceRecords: [{ publisher: 'Unit News', source: 'unit_news', url: null, eventTime: '2026-07-13T01:25:00Z', timeKind: 'published' }] },
+    { eventId: 'event-nvda', market: 'us', category: 'corporate', title: 'NVDA announces a new platform', symbol: 'NVDA', name: 'NVIDIA', sector: 'Technology', eventTime: '2026-07-13T01:20:00Z', timeKind: 'published', publisher: 'Unit News', sourceState: { source: 'unit_news', status: 'fresh' }, classificationSource: 'keyword_rules', relevanceScore: 65, importance: 'high', relevanceReasons: ['linked_security', 'corporate_event'], sourceCount: 1, sourcePublishers: ['Unit News'], sourceRecords: [] },
+  ],
   markets: [
     {
       market: 'cn', sessionState: 'open', displayMode: 'latest_available', rankingScope: 'market_wide', selectionBasis: 'market_wide_public_rankings_with_liquidity_filter',
@@ -32,8 +35,8 @@ const data: PublicMarketHomeResponse = {
     {
       market: 'us', sessionState: 'closed', displayMode: 'delayed', rankingScope: 'market_wide', selectionBasis: 'market_wide_public_rankings_with_liquidity_filter', indices: [],
       sources: [], warnings: ['us_sector_highlights_unavailable'], rankingCache: { hit: false, ageSeconds: 0, ttlSeconds: 120 }, headlines: [],
-      attention: [{ symbol: 'AAPL', name: 'Apple Inc.', market: 'us', currency: 'USD', currentPrice: 210, changePercent: 0.8, tradingSession: 'pre', sourceState: { source: 'yahoo_public_us_screener', status: 'fresh' } }],
-      mostActive: [{ symbol: 'AAPL', name: 'Apple Inc.', market: 'us', currency: 'USD', currentPrice: 210, changePercent: 0.8, tradingSession: 'pre', sourceState: { source: 'yahoo_public_us_screener', status: 'fresh' } }], gainers: [], losers: [], sectorHighlights: [],
+      attention: [{ symbol: 'AAPL', name: 'Apple Inc.', market: 'us', currency: 'USD', currentPrice: 210, changePercent: 0.8, sector: 'Technology', tradingSession: 'pre', sourceState: { source: 'yahoo_public_us_screener', status: 'fresh' } }],
+      mostActive: [{ symbol: 'AAPL', name: 'Apple Inc.', market: 'us', currency: 'USD', currentPrice: 210, changePercent: 0.8, sector: 'Technology', tradingSession: 'pre', sourceState: { source: 'yahoo_public_us_screener', status: 'fresh' } }], gainers: [], losers: [], sectorHighlights: [],
     },
   ],
 };
@@ -80,7 +83,8 @@ describe('PublicMarketHomeV116', () => {
     );
 
     expect(await screen.findByTestId('daily-market-event-center-v126')).toBeInTheDocument();
-    expect(screen.getByText('自选关注')).toBeInTheDocument();
+    expect(screen.getByText('自选相关')).toBeInTheDocument();
+    expect(screen.getByText('相关行业')).toBeInTheDocument();
   });
 
   it('mounts the V124 workbench and remembers a ranking stock before opening the free query', () => {

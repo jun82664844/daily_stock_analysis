@@ -78,6 +78,7 @@ export type PublicMarketEvent = {
   summary?: string | null;
   symbol?: string | null;
   name?: string | null;
+  sector?: string | null;
   eventTime: string;
   timeKind: 'published' | 'observed' | 'retrieved' | 'unknown';
   publisher?: string | null;
@@ -259,6 +260,7 @@ export const marketWorkspaceApi = {
       ...body,
       events: Array.isArray(body.events) ? body.events.map((event) => ({
         ...event,
+        sector: String(event.sector ?? '').trim() || null,
         url: safeHttpUrl(event.url),
         relevanceScore: Number.isFinite(event.relevanceScore) ? event.relevanceScore : 0,
         importance: event.importance ?? 'low',

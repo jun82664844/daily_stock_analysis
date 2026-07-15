@@ -132,6 +132,7 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         self.assertEqual(event.source_count, 1)
         self.assertEqual(event.source_publishers, [])
         self.assertEqual(event.source_records, [])
+        self.assertIsNone(event.sector)
 
     def test_v129_event_contract_limits_source_records(self) -> None:
         from api.v1.schemas.market_workspace import PublicMarketEvent

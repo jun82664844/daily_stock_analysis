@@ -41,6 +41,25 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v130_personalized_market_events_are_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_personalized_market_events_v130.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_personalized_market_events_v130.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_personalized_market_events_v130_verifier.py", REQUIRED_FILES)
+        self.assertIn(
+            "apps/dsa-web/src/components/market-home/marketEventPersonalizationV130.ts",
+            REQUIRED_FILES,
+        )
+        self.assertIn(
+            "apps/dsa-web/src/components/market-home/__tests__/marketEventPersonalizationV130.test.ts",
+            REQUIRED_FILES,
+        )
+        self.assertIn(
+            "docs/superpowers/plans/2026-07-15-dsa-v130-personalized-market-events.md",
+            REQUIRED_FILES,
+        )
+
     def test_v129_event_source_evidence_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
