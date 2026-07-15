@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PublicMarketEvent } from '../../../api/marketWorkspace';
 import DailyMarketEventCenterV126 from '../DailyMarketEventCenterV126';
@@ -18,6 +18,9 @@ const events: PublicMarketEvent[] = [
     url: 'https://example.com/aapl',
     sourceState: { source: 'unit_news', status: 'fresh' },
     classificationSource: 'keyword_rules',
+    relevanceScore: 72,
+    importance: 'high',
+    relevanceReasons: ['linked_security', 'earnings_event', 'fresh_source'],
   },
   {
     eventId: 'event-2',
@@ -30,6 +33,9 @@ const events: PublicMarketEvent[] = [
     publisher: '测试资讯源',
     sourceState: { source: 'unit_news', status: 'cached' },
     classificationSource: 'keyword_rules',
+    relevanceScore: 50,
+    importance: 'medium',
+    relevanceReasons: ['macro_event', 'cached_source'],
   },
 ];
 
@@ -46,8 +52,9 @@ describe('DailyMarketEventCenterV126', () => {
     );
 
     expect(screen.getByRole('heading', { name: '今日市场事件' })).toBeInTheDocument();
+    expect(screen.getByText('重点事件 1')).toBeInTheDocument();
     expect(screen.getByText('自选关注')).toBeInTheDocument();
-    expect(screen.getByText('财报业绩')).toBeInTheDocument();
+    expect(screen.getAllByText('财报业绩')).toHaveLength(2);
     expect(screen.getByText('宏观数据')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '查询 AAPL' }));
     expect(open).toHaveBeenCalledWith('AAPL');
@@ -81,6 +88,49 @@ describe('DailyMarketEventCenterV126', () => {
     expect(screen.getByText('仅提供公开资讯和数据，不构成投资建议。')).toBeInTheDocument();
   });
 
+  it('filters by market and explains why retained events matter', () => {
+    const { rerender } = render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'A股' }));
+    expect(screen.getByText('央行公布最新利率信息')).toBeInTheDocument();
+    expect(screen.queryByText('AAPL earnings results published')).not.toBeInTheDocument();
+    expect(screen.getByText('中重要度')).toBeInTheDocument();
+    expect(screen.getByText('宏观事件')).toBeInTheDocument();
+    expect(screen.getByText('缓存来源')).toBeInTheDocument();
+
+    rerender(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Medium importance')).toBeInTheDocument();
+    expect(screen.getByText('Cached source')).toBeInTheDocument();
+  });
+
+  it('puts watchlist-linked events before higher-scored general events', () => {
+    render(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={[events[1], { ...events[0], relevanceScore: 20, importance: 'low' }]}
+        watchlistSymbols={['AAPL']}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    const articles = screen.getAllByRole('article');
+    expect(within(articles[0]).getByText('AAPL earnings results published')).toBeInTheDocument();
+  });
+
   it('offers a market-update filter and labels unlinked markets as source channels', () => {
     const marketEvent: PublicMarketEvent = {
       eventId: 'event-market',
@@ -92,6 +142,9 @@ describe('DailyMarketEventCenterV126', () => {
       publisher: 'Unit News',
       sourceState: { source: 'unit_news', status: 'fresh' },
       classificationSource: 'keyword_rules',
+      relevanceScore: 40,
+      importance: 'medium',
+      relevanceReasons: ['market_signal', 'fresh_source'],
     };
     render(
       <DailyMarketEventCenterV126

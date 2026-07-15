@@ -10,19 +10,32 @@ type Props = {
 };
 
 type Filter = 'all' | MarketEventCategory;
+type MarketFilter = 'all' | MarketCode;
 
 const FILTERS: Filter[] = ['all', 'earnings', 'announcement', 'dividend', 'trading_status', 'macro', 'corporate', 'market'];
+const MARKET_FILTERS: MarketFilter[] = ['all', 'cn', 'hk', 'us'];
 
 const copy = {
   zh: {
     eyebrow: '公开资讯 · 未用 AI',
     title: '今日市场事件',
+    priority: '重点事件',
     subtitle: '汇总 A 股、港股和美股公开事件，按类别快速浏览，并突出自选股相关信息。',
+    marketFilterLabel: '按市场筛选',
+    categoryFilterLabel: '按事件类型筛选',
+    marketFilters: { all: '全部市场', cn: 'A股', hk: '港股', us: '美股' },
     filters: { all: '全部', earnings: '财报', announcement: '公告', dividend: '分红回购', trading_status: '交易状态', macro: '宏观', corporate: '公司动态', market: '市场' },
     categories: { earnings: '财报业绩', announcement: '公司公告', dividend: '分红回购', trading_status: '交易状态', macro: '宏观数据', corporate: '公司动态', market: '市场动态' },
     markets: { cn: 'A股', hk: '港股', us: '美股' },
     sourceMarkets: { cn: 'A股资讯源', hk: '港股资讯源', us: '美股资讯源' },
     statuses: { fresh: '新鲜', cached: '缓存', stale: '过期', unavailable: '不可用' },
+    importance: { high: '高重要度', medium: '中重要度', low: '一般重要度' },
+    reasons: {
+      linked_security: '关联证券', earnings_event: '财报业绩', announcement_event: '公司公告',
+      dividend_event: '分红回购', trading_status_event: '交易状态', macro_event: '宏观事件',
+      corporate_event: '公司动态', market_signal: '市场关键词', fresh_source: '新鲜来源',
+      cached_source: '缓存来源', source_link: '可追溯原文',
+    },
     watchlist: '自选关注',
     query: '查询',
     source: '来源',
@@ -34,12 +47,23 @@ const copy = {
   en: {
     eyebrow: 'Public information · No AI',
     title: 'Daily market events',
+    priority: 'Priority events',
     subtitle: 'Public events across China, Hong Kong and US markets, grouped for quick review with watchlist matches highlighted.',
+    marketFilterLabel: 'Filter by market',
+    categoryFilterLabel: 'Filter by event type',
+    marketFilters: { all: 'All markets', cn: 'China', hk: 'Hong Kong', us: 'US' },
     filters: { all: 'All', earnings: 'Earnings', announcement: 'Filings', dividend: 'Dividends', trading_status: 'Trading status', macro: 'Macro', corporate: 'Corporate', market: 'Market' },
     categories: { earnings: 'Earnings', announcement: 'Announcement', dividend: 'Dividend / buyback', trading_status: 'Trading status', macro: 'Macro data', corporate: 'Corporate event', market: 'Market update' },
     markets: { cn: 'China', hk: 'Hong Kong', us: 'US' },
     sourceMarkets: { cn: 'China source', hk: 'Hong Kong source', us: 'US source' },
     statuses: { fresh: 'Fresh', cached: 'Cached', stale: 'Stale', unavailable: 'Unavailable' },
+    importance: { high: 'High importance', medium: 'Medium importance', low: 'General importance' },
+    reasons: {
+      linked_security: 'Linked security', earnings_event: 'Earnings event', announcement_event: 'Company filing',
+      dividend_event: 'Dividend / buyback', trading_status_event: 'Trading status', macro_event: 'Macro event',
+      corporate_event: 'Corporate event', market_signal: 'Market signal', fresh_source: 'Fresh source',
+      cached_source: 'Cached source', source_link: 'Traceable source',
+    },
     watchlist: 'Watchlist',
     query: 'Query',
     source: 'Source',
@@ -74,14 +98,28 @@ export default function DailyMarketEventCenterV126({
 }: Props) {
   const t = copy[language];
   const [filter, setFilter] = useState<Filter>('all');
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('all');
   const watchlist = useMemo(
     () => new Set(watchlistSymbols.map(normalizeSymbol)),
     [watchlistSymbols],
   );
-  const filtered = useMemo(
-    () => events.filter((event) => filter === 'all' || event.category === filter).slice(0, 12),
-    [events, filter],
-  );
+  const filtered = useMemo(() => events
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => (filter === 'all' || event.category === filter)
+      && (marketFilter === 'all' || event.market === marketFilter))
+    .sort((left, right) => {
+      const leftWatchlisted = Boolean(left.event.symbol && watchlist.has(normalizeSymbol(left.event.symbol)));
+      const rightWatchlisted = Boolean(right.event.symbol && watchlist.has(normalizeSymbol(right.event.symbol)));
+      if (leftWatchlisted !== rightWatchlisted) return rightWatchlisted ? 1 : -1;
+      if (left.event.relevanceScore !== right.event.relevanceScore) {
+        return right.event.relevanceScore - left.event.relevanceScore;
+      }
+      const timeDifference = new Date(right.event.eventTime).getTime() - new Date(left.event.eventTime).getTime();
+      if (Number.isFinite(timeDifference) && timeDifference !== 0) return timeDifference;
+      return left.index - right.index;
+    })
+    .slice(0, 12)
+    .map(({ event }) => event), [events, filter, marketFilter, watchlist]);
 
   return (
     <section data-testid="daily-market-event-center-v126" className="border-y border-white/10 bg-[#0a101b] py-6">
@@ -92,25 +130,47 @@ export default function DailyMarketEventCenterV126({
             <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-white">
               <CalendarDays className="h-5 w-5 text-cyan-400" aria-hidden="true" />
               {t.title}
+              <span aria-hidden="true" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-2 py-1 text-xs font-medium text-rose-300">
+                {t.priority} {filtered.filter((event) => event.importance === 'high').length}
+              </span>
             </h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-400">{t.subtitle}</p>
           </div>
-          <div className="flex flex-wrap gap-2" aria-label={t.title}>
-            {FILTERS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setFilter(item)}
-                aria-pressed={filter === item}
-                className={`min-h-9 rounded-lg border px-3 text-sm transition-colors ${
-                  filter === item
-                    ? 'border-cyan-400/70 bg-cyan-400/10 text-cyan-300'
-                    : 'border-white/10 bg-transparent text-slate-300 hover:border-white/25 hover:text-white'
-                }`}
-              >
-                {t.filters[item]}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2 lg:items-end">
+            <div className="flex flex-wrap gap-2" aria-label={t.marketFilterLabel}>
+              {MARKET_FILTERS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setMarketFilter(item)}
+                  aria-pressed={marketFilter === item}
+                  className={`min-h-9 rounded-lg border px-3 text-sm transition-colors ${
+                    marketFilter === item
+                      ? 'border-cyan-400/70 bg-cyan-400/10 text-cyan-300'
+                      : 'border-white/10 bg-transparent text-slate-300 hover:border-white/25 hover:text-white'
+                  }`}
+                >
+                  {t.marketFilters[item]}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2" aria-label={t.categoryFilterLabel}>
+              {FILTERS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setFilter(item)}
+                  aria-pressed={filter === item}
+                  className={`min-h-9 rounded-lg border px-3 text-sm transition-colors ${
+                    filter === item
+                      ? 'border-cyan-400/70 bg-cyan-400/10 text-cyan-300'
+                      : 'border-white/10 bg-transparent text-slate-300 hover:border-white/25 hover:text-white'
+                  }`}
+                >
+                  {t.filters[item]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -148,8 +208,26 @@ export default function DailyMarketEventCenterV126({
                           {t.watchlist}
                         </span>
                       ) : null}
+                      <span className={`rounded-lg border px-2 py-1 text-xs ${
+                        event.importance === 'high'
+                          ? 'border-rose-400/30 bg-rose-400/10 text-rose-300'
+                          : event.importance === 'medium'
+                            ? 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+                            : 'border-white/10 text-slate-400'
+                      }`}>
+                        {t.importance[event.importance]}
+                      </span>
                     </div>
                     {event.summary ? <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-400">{event.summary}</p> : null}
+                    {event.relevanceReasons.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {event.relevanceReasons.slice(0, 3).map((reason) => (
+                          <span key={reason} className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-slate-400">
+                            {t.reasons[reason as keyof typeof t.reasons] ?? reason}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     <p className="mt-1 text-xs text-slate-500">
                       {t.source}: {event.publisher || event.sourceState.source} · <span>{t.statuses[event.sourceState.status]}</span> · {event.timeKind === 'retrieved' ? t.retrieved : eventTime(event.eventTime, language)}
                     </p>

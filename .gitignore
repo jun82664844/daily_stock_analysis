@@ -160,6 +160,7 @@ verify_*.py
 !scripts/verify_platform_free_daily_market_workbench_v124.py
 !scripts/verify_platform_market_sessions_home_performance_v125.py
 !scripts/verify_platform_free_daily_market_events_v126.py
+!scripts/verify_platform_market_event_relevance_v127.py
 
 # Local third-party source checkouts are installed for inspection only.
 /external/

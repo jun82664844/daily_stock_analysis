@@ -28,6 +28,7 @@ MarketEventCategory = Literal[
     "market",
 ]
 MarketEventTimeKind = Literal["published", "observed", "retrieved", "unknown"]
+MarketEventImportance = Literal["high", "medium", "low"]
 
 
 class StrictModel(BaseModel):
@@ -104,6 +105,9 @@ class PublicMarketEvent(StrictModel):
     url: Optional[str] = None
     source_state: DataSourceState
     classification_source: Literal["keyword_rules"] = "keyword_rules"
+    relevance_score: int = Field(0, ge=0, le=100)
+    importance: MarketEventImportance = "low"
+    relevance_reasons: List[str] = Field(default_factory=list)
 
 
 class MarketWorkspaceOverview(StrictModel):

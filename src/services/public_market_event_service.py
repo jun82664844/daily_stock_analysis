@@ -24,6 +24,26 @@ CATEGORY_RULES = (
     ("corporate", ("收购", "并购", "订单", "合作", "融资", "merger", "acquisition", "contract", "partnership", "financing")),
 )
 
+FINANCE_SIGNAL_KEYWORDS = (
+    "a股", "港股", "美股", "股票", "股价", "指数", "大盘", "市场", "收盘", "开盘", "盘前", "盘后",
+    "上市", "证券", "基金", "债券", "期货", "外汇", "银行", "芯片", "半导体", "成交", "涨", "跌",
+    "stock", "stocks", "share", "shares", "market", "index", "nasdaq", "dow", "s&p", "wall street",
+    "premarket", "after-hours", "close", "trading", "ipo", "etf", "bond", "yield", "futures", "forex",
+)
+
+PROMOTIONAL_NOISE_KEYWORDS = (
+    "专属文章", "盯盘神器", "推广内容", "广告内容", "sponsored content", "advertisement",
+)
+
+CATEGORY_REASONS = {
+    "earnings": "earnings_event",
+    "announcement": "announcement_event",
+    "dividend": "dividend_event",
+    "trading_status": "trading_status_event",
+    "macro": "macro_event",
+    "corporate": "corporate_event",
+}
+
 
 class PublicMarketEventService:
     """Build structured events from data already loaded for the public home."""
@@ -34,7 +54,7 @@ class PublicMarketEventService:
 
     def build(self, markets: Sequence[Dict[str, Any]], as_of: str) -> List[Dict[str, Any]]:
         normalized: List[tuple[int, Dict[str, Any]]] = []
-        seen: set[tuple[str, str, str]] = set()
+        seen_titles: set[str] = set()
         market_counts = {market: 0 for market in MARKETS}
         ordinal = 0
 
@@ -54,6 +74,11 @@ class PublicMarketEventService:
                 title = str(headline.get("title") or "").strip()
                 if not title:
                     continue
+                if self._is_promotional_noise(title):
+                    continue
+                title_key = re.sub(r"\s+", " ", title).strip().casefold()
+                if title_key in seen_titles:
+                    continue
                 explicit_symbol, explicit_market = self._explicit_exchange_symbol(title)
                 event_market = explicit_market or market
                 if market_counts[event_market] >= self.max_events_per_market:
@@ -61,17 +86,25 @@ class PublicMarketEventService:
                 published_at = str(headline.get("published_at") or "").strip()
                 event_time = published_at or as_of
                 time_kind = "published" if published_at else "retrieved"
-                dedupe_key = (event_market, title.casefold(), event_time)
-                if dedupe_key in seen:
-                    continue
-                seen.add(dedupe_key)
                 linked_symbol, linked_name = self._linked_security(title, securities)
                 symbol = explicit_symbol or linked_symbol
                 name = linked_name if linked_symbol and (not explicit_symbol or linked_symbol.casefold() == explicit_symbol.casefold()) else None
+                category = self._category(title)
+                has_market_signal = self._has_finance_signal(title)
+                if category == "market" and not symbol and not has_market_signal:
+                    continue
+                source_state = self._source_state(headline.get("source_state"))
+                relevance_score, relevance_reasons = self._relevance(
+                    category=category,
+                    symbol=symbol,
+                    has_market_signal=has_market_signal,
+                    source_state=source_state,
+                    has_url=bool(self._optional_text(headline.get("url"))),
+                )
                 event = {
                     "event_id": self._event_id(event_market, title, event_time),
                     "market": event_market,
-                    "category": self._category(title),
+                    "category": category,
                     "title": title,
                     "summary": self._optional_text(headline.get("summary")),
                     "symbol": symbol,
@@ -80,11 +113,15 @@ class PublicMarketEventService:
                     "time_kind": time_kind,
                     "publisher": self._optional_text(headline.get("publisher")),
                     "url": self._optional_text(headline.get("url")),
-                    "source_state": self._source_state(headline.get("source_state")),
+                    "source_state": source_state,
                     "classification_source": "keyword_rules",
+                    "relevance_score": relevance_score,
+                    "importance": self._importance(relevance_score),
+                    "relevance_reasons": relevance_reasons,
                 }
                 normalized.append((ordinal, event))
                 ordinal += 1
+                seen_titles.add(title_key)
                 market_counts[event_market] += 1
 
         normalized.sort(key=self._sort_key, reverse=True)
@@ -97,6 +134,57 @@ class PublicMarketEventService:
             if any(keyword in lowered for keyword in keywords):
                 return category
         return "market"
+
+    @staticmethod
+    def _has_finance_signal(title: str) -> bool:
+        lowered = title.casefold()
+        return any(keyword in lowered for keyword in FINANCE_SIGNAL_KEYWORDS)
+
+    @staticmethod
+    def _is_promotional_noise(title: str) -> bool:
+        lowered = title.casefold()
+        return any(keyword in lowered for keyword in PROMOTIONAL_NOISE_KEYWORDS)
+
+    @staticmethod
+    def _relevance(
+        *,
+        category: str,
+        symbol: Optional[str],
+        has_market_signal: bool,
+        source_state: Dict[str, Any],
+        has_url: bool,
+    ) -> tuple[int, List[str]]:
+        score = 0
+        reasons: List[str] = []
+        category_reason = CATEGORY_REASONS.get(category)
+        if category_reason:
+            score += 30
+            reasons.append(category_reason)
+        if symbol:
+            score += 35
+            reasons.append("linked_security")
+        if has_market_signal:
+            score += 15
+            reasons.append("market_signal")
+        source_status = str(source_state.get("status") or "unavailable")
+        if source_status == "fresh":
+            score += 10
+            reasons.append("fresh_source")
+        elif source_status == "cached":
+            score += 5
+            reasons.append("cached_source")
+        if has_url:
+            score += 5
+            reasons.append("source_link")
+        return min(score, 100), reasons
+
+    @staticmethod
+    def _importance(score: int) -> str:
+        if score >= 60:
+            return "high"
+        if score >= 35:
+            return "medium"
+        return "low"
 
     @staticmethod
     def _securities(section: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -176,8 +264,9 @@ class PublicMarketEventService:
         return text or None
 
     @staticmethod
-    def _sort_key(item: tuple[int, Dict[str, Any]]) -> tuple[int, float, int]:
+    def _sort_key(item: tuple[int, Dict[str, Any]]) -> tuple[int, int, float, int]:
         ordinal, event = item
+        relevance_score = int(event.get("relevance_score") or 0)
         is_published = 1 if event["time_kind"] == "published" else 0
         raw_time = str(event.get("event_time") or "")
         try:
@@ -187,4 +276,4 @@ class PublicMarketEventService:
             timestamp = parsed.timestamp()
         except (TypeError, ValueError, OverflowError):
             timestamp = 0.0
-        return is_published, timestamp, -ordinal
+        return relevance_score, is_published, timestamp, -ordinal

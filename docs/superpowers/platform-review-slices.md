@@ -2312,3 +2312,35 @@ Verifier and documentation:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: deterministic classification, exact-title symbol association, deduplication, truthful time semantics and source status, fail-open home behavior, lazy bundle isolation, client-only watchlist highlighting, bilingual/mobile layout, no automatic model call, and no investment-advice language.
+
+## V127 Market Event Relevance
+
+Backend and API contract:
+
+- `src/services/public_market_event_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_market_event_relevance_v127.py`
+- `tests/test_platform_market_event_relevance_v127_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v127-market-event-relevance.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: low-relevance noise exclusion without deleting raw headlines, global title deduplication, bounded deterministic relevance fields, old-cache compatibility, market filters, client-only watchlist priority, bilingual explanations, no new network or model call, and no investment-advice language.

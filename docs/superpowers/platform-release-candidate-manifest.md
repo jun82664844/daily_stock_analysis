@@ -2680,3 +2680,36 @@ Verifier and documentation:
 Acceptance marker: `DSA_PLATFORM_FREE_DAILY_MARKET_EVENTS_V126_OK`.
 
 Safety boundary: events reuse already loaded public headlines, use keyword rules rather than AI, add no network source, keep private watchlist state client-only, fail open without blanking market data, and provide information and data only rather than investment advice.
+
+## V127 Market Event Relevance
+
+Runtime and API:
+
+- `src/services/public_market_event_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_market_event_relevance_v127.py`
+- `tests/test_platform_market_event_relevance_v127_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v127-market-event-relevance.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_MARKET_EVENT_RELEVANCE_V127_OK`.
+
+Safety boundary: V127 filters only the curated event-center view, preserves raw headline feeds, uses deterministic no-AI rules, adds no network source, keeps watchlist priority client-only, changes no user data, and provides information and data only rather than investment advice.

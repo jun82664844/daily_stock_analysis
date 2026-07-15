@@ -76,6 +76,9 @@ export type PublicMarketEvent = {
   url?: string | null;
   sourceState: DataSourceState;
   classificationSource: 'keyword_rules';
+  relevanceScore: number;
+  importance: 'high' | 'medium' | 'low';
+  relevanceReasons: string[];
 };
 
 export type MarketWorkspaceOverview = {
@@ -201,7 +204,12 @@ export const marketWorkspaceApi = {
     const body = toCamelCase<PublicMarketHomeResponse>(response.data);
     return {
       ...body,
-      events: Array.isArray(body.events) ? body.events : [],
+      events: Array.isArray(body.events) ? body.events.map((event) => ({
+        ...event,
+        relevanceScore: Number.isFinite(event.relevanceScore) ? event.relevanceScore : 0,
+        importance: event.importance ?? 'low',
+        relevanceReasons: Array.isArray(event.relevanceReasons) ? event.relevanceReasons : [],
+      })) : [],
       markets: Array.isArray(body.markets) ? body.markets.map((market) => ({
         ...market,
         sessionPhase: market.sessionPhase ?? 'unknown',

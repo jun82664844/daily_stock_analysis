@@ -111,6 +111,24 @@ class _FlakyRankings(_Rankings):
 
 
 class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
+    def test_v127_event_contract_keeps_safe_defaults_for_v126_payloads(self) -> None:
+        from api.v1.schemas.market_workspace import PublicMarketEvent
+
+        event = PublicMarketEvent.model_validate({
+            "event_id": "legacy-event",
+            "market": "cn",
+            "category": "market",
+            "title": "市场成交保持活跃",
+            "event_time": "2026-07-14T03:00:00Z",
+            "time_kind": "published",
+            "source_state": {"source": "unit_news", "status": "fresh"},
+            "classification_source": "keyword_rules",
+        })
+
+        self.assertEqual(event.relevance_score, 0)
+        self.assertEqual(event.importance, "low")
+        self.assertEqual(event.relevance_reasons, [])
+
     def test_workspace_attention_symbols_are_configurable_and_deduplicated(self) -> None:
         from src.services.market_workspace_service import MarketWorkspaceService
 

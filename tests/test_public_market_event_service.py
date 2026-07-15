@@ -35,6 +35,49 @@ def _security(symbol: str, name: str, market: str) -> dict:
 
 
 class PublicMarketEventServiceTestCase(unittest.TestCase):
+    def test_filters_low_relevance_noise_and_explains_retained_events(self) -> None:
+        markets = [{
+            "market": "us",
+            "attention": [_security("AAPL", "Apple Inc.", "us")],
+            "headlines": [
+                _headline("刚果（金）表示埃博拉确诊病例增加"),
+                _headline("期货盯盘神器专属文章"),
+                _headline("AAPL earnings results published"),
+                _headline("US stock market closes higher as Nasdaq gains"),
+            ],
+        }]
+
+        events = PublicMarketEventService().build(markets, "2026-07-14T03:00:00Z")
+
+        self.assertNotIn(
+            "刚果（金）表示埃博拉确诊病例增加",
+            [event["title"] for event in events],
+        )
+        self.assertNotIn("期货盯盘神器专属文章", [event["title"] for event in events])
+        self.assertEqual(len(events), 2)
+        linked = next(event for event in events if event.get("symbol") == "AAPL")
+        self.assertGreaterEqual(linked["relevance_score"], 60)
+        self.assertEqual(linked["importance"], "high")
+        self.assertIn("linked_security", linked["relevance_reasons"])
+        self.assertTrue(all(0 <= event["relevance_score"] <= 100 for event in events))
+        self.assertTrue(all(event["relevance_reasons"] for event in events))
+
+    def test_deduplicates_the_same_title_across_market_channels(self) -> None:
+        markets = [
+            {
+                "market": "cn",
+                "headlines": [_headline("Global stock market closes higher", "2026-07-14T01:00:00Z")],
+            },
+            {
+                "market": "us",
+                "headlines": [_headline("Global stock market closes higher", "2026-07-14T02:00:00Z")],
+            },
+        ]
+
+        events = PublicMarketEventService().build(markets, "2026-07-14T03:00:00Z")
+
+        self.assertEqual([event["title"] for event in events], ["Global stock market closes higher"])
+
     def test_classifies_public_headlines_without_ai(self) -> None:
         markets = [{
             "market": "cn",
@@ -111,8 +154,9 @@ class PublicMarketEventServiceTestCase(unittest.TestCase):
 
         events = PublicMarketEventService().build(markets, "2026-07-14T03:00:00Z")
 
-        self.assertIsNone(events[0]["symbol"])
-        self.assertEqual(events[1]["symbol"], "MU")
+        by_title = {event["title"]: event for event in events}
+        self.assertIsNone(by_title["A broad AI market update"]["symbol"])
+        self.assertEqual(by_title["$MU earnings results published"]["symbol"], "MU")
 
     def test_macro_rules_win_over_buyback_and_order_terms(self) -> None:
         markets = [{
