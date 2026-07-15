@@ -247,6 +247,79 @@ describe('DailyMarketEventCenterV126', () => {
     ]);
   });
 
+  it('lets returning visitors read only new events without changing read state', () => {
+    localStorage.setItem(MARKET_EVENT_SEEN_STORAGE_KEY, JSON.stringify(['event-2']));
+    const { rerender } = render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('market-event-inbox-summary-v131')).toHaveTextContent(
+      '共 2 条 · 新增 1 · 重点 1',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '只看新增' }));
+    expect(screen.getByText('AAPL earnings results published')).toBeInTheDocument();
+    expect(screen.queryByText('央行公布最新利率信息')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(MARKET_EVENT_SEEN_STORAGE_KEY) || '[]')).toEqual(['event-2']);
+
+    rerender(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'New only' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('market-event-inbox-summary-v131')).toHaveTextContent(
+      '2 total · 1 new · 1 priority',
+    );
+  });
+
+  it('keeps new-only results inside the selected market without changing inbox totals', () => {
+    localStorage.setItem(MARKET_EVENT_SEEN_STORAGE_KEY, JSON.stringify(['event-2']));
+    render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '只看新增' }));
+    fireEvent.click(screen.getByRole('button', { name: 'A股' }));
+    expect(screen.getByText('当前没有新增市场事件')).toBeInTheDocument();
+    expect(screen.queryByText('AAPL earnings results published')).not.toBeInTheDocument();
+    expect(screen.getByTestId('market-event-inbox-summary-v131')).toHaveTextContent(
+      '共 2 条 · 新增 1 · 重点 1',
+    );
+  });
+
+  it('shows an honest new-event empty state and can return to all events', () => {
+    localStorage.setItem(MARKET_EVENT_SEEN_STORAGE_KEY, JSON.stringify(['event-2']));
+    render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '只看新增' }));
+    fireEvent.click(screen.getByRole('button', { name: '全部标为已读' }));
+    expect(screen.getByText('当前没有新增市场事件')).toBeInTheDocument();
+    expect(screen.getByText('公开事件仍完整保留，可返回全部事件继续浏览。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看全部事件' }));
+    expect(screen.getByText('AAPL earnings results published')).toBeInTheDocument();
+    expect(screen.getByText('央行公布最新利率信息')).toBeInTheDocument();
+  });
+
   it('expands source evidence on demand with bilingual safe links', () => {
     const { rerender } = render(
       <DailyMarketEventCenterV126

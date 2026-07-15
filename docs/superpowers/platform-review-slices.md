@@ -52,6 +52,27 @@ V130 local addendum: personalized public market-event ordering is included in th
 
 Boundary: personalization is browser-side ordering only. The public endpoint receives no user identity or watchlist, no public event is hidden, and no network, AI, quota, payment or investment-advice behavior is added.
 
+V131 local addendum: the returning-user public event inbox is included in the existing frontend/tests/docs slices:
+
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/screening/ScreeningCompareTrayV104.tsx`
+- `apps/dsa-web/src/components/screening/ScreeningReminderPanelV104.tsx`
+- `apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx`
+- `scripts/verify_platform_returning_event_inbox_v131.py`
+- `tests/test_platform_returning_event_inbox_v131_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v131-returning-user-event-inbox.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Boundary: the new-only view filters already-loaded public events with bounded browser-local IDs. Acceptance-only repairs replace native button titles with accessible names and wait for the existing pairing countdown effect. They do not upload read state, watchlists, filters or identity, do not alter V100 private alerts, and add no network, AI, quota, payment or investment-advice behavior.
+
 ## Inventory
 
 Baseline before this review package, from `docs/superpowers/platform-v2-handoff-status.md`:

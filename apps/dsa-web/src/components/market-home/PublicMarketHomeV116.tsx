@@ -432,7 +432,6 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                         <button
                           type="button"
                           aria-label={en ? `View ${name} data preview` : `查看 ${name} 数据详情`}
-                          title={en ? 'Public data preview' : '公开数据预览'}
                           onClick={() => void loadPreview(item)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-secondary-text hover:border-primary/60 hover:text-primary"
                         >
@@ -441,7 +440,6 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
                         <button
                           type="button"
                           aria-label={en ? `Set price alert for ${name}` : `为 ${name} 设置到价提醒`}
-                          title={en ? 'Price alert' : '到价提醒'}
                           onClick={() => setExpandedSymbol((value) => value === item.symbol ? '' : item.symbol)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-secondary-text hover:border-primary/60 hover:text-primary"
                         >

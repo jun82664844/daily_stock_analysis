@@ -59,7 +59,7 @@ export default function ScreeningCompareTrayV104({
                 data-testid={`screening-compare-remove-${candidate.code}`}
                 className="grid h-8 w-8 place-items-center rounded-lg border border-border text-secondary-text"
                 type="button"
-                title={en ? 'Remove from comparison' : '移出比较'}
+                aria-label={en ? 'Remove from comparison' : '移出比较'}
                 onClick={() => onRemove(candidate.code)}
               >
                 <X className="h-4 w-4" />
@@ -88,8 +88,8 @@ export default function ScreeningCompareTrayV104({
                 <td className="px-2 py-3 text-secondary-text">{dataFreshnessLabel(candidate.screeningBrief?.dataFreshness || 'unavailable', language)}</td>
                 <td className="px-2 py-3">
                   <div className="flex gap-2">
-                    <button className="grid h-8 w-8 place-items-center rounded-lg border border-border" type="button" title={en ? 'Open data' : '打开数据'} onClick={() => onOpenData(candidate.code)}><ExternalLink className="h-4 w-4" /></button>
-                    <button className="grid h-8 w-8 place-items-center rounded-lg border border-border" type="button" title={en ? 'Remove' : '移出比较'} onClick={() => onRemove(candidate.code)}><X className="h-4 w-4" /></button>
+                    <button className="grid h-8 w-8 place-items-center rounded-lg border border-border" type="button" aria-label={en ? 'Open data' : '打开数据'} onClick={() => onOpenData(candidate.code)}><ExternalLink className="h-4 w-4" /></button>
+                    <button className="grid h-8 w-8 place-items-center rounded-lg border border-border" type="button" aria-label={en ? 'Remove' : '移出比较'} onClick={() => onRemove(candidate.code)}><X className="h-4 w-4" /></button>
                   </div>
                 </td>
               </tr>

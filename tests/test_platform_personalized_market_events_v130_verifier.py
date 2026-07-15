@@ -42,16 +42,16 @@ if (/^[A-Z0-9]{2,12}-(?:USD|USDT|USDC|BTC|ETH)$/.test(raw)) return null;
 
         valid = """
 const hasWatchlist = watchlist.size > 0;
-const personalized = hasWatchlist && viewMode !== 'all';
+const focusActive = hasWatchlist && (viewMode === 'auto' || viewMode === 'focus');
 personalizeMarketEvents(
-{hasWatchlist ? (<div aria-label={t.personalizationLabel}>controls</div>) : null}
+{hasWatchlist || unseenEventIds.size > 0 || unreadActive ? (<div aria-label={t.eventViewLabel}>{hasWatchlist ? (<button>focus</button>) : null}</div>) : null}
 focusFirst: '为我优先', allEvents: '全部事件', matchLabels: { watchlist: '自选相关', sector: '相关行业', market: '关注市场' },
 focusFirst: 'For me first', allEvents: 'All events', matchLabels: { watchlist: 'Watchlist match', sector: 'Related industry', market: 'Followed market' },
 仅提供公开资讯和数据，不构成投资建议。
 Public information and data only. Not investment advice.
 """
         self.assertTrue(frontend_contract(valid).ok)
-        self.assertFalse(frontend_contract(valid.replace("{hasWatchlist ?", "{true ?")).ok)
+        self.assertFalse(frontend_contract(valid.replace("const focusActive = hasWatchlist", "const focusActive = true")).ok)
         self.assertFalse(frontend_contract(valid.replace("allEvents: '全部事件'", "")).ok)
 
     def test_bundle_must_be_fresh_and_under_homepage_limit(self) -> None:

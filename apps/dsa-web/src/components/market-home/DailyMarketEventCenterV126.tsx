@@ -23,7 +23,7 @@ type Props = {
 
 type Filter = 'all' | MarketEventCategory;
 type MarketFilter = 'all' | MarketCode;
-type ViewMode = 'auto' | 'focus' | 'all';
+type ViewMode = 'auto' | 'focus' | 'unread' | 'all';
 
 const FILTERS: Filter[] = ['all', 'earnings', 'announcement', 'dividend', 'trading_status', 'macro', 'corporate', 'market'];
 const MARKET_FILTERS: MarketFilter[] = ['all', 'cn', 'hk', 'us'];
@@ -37,9 +37,14 @@ const copy = {
     newCount: (count: number) => `新增 ${count}`,
     markAllRead: '全部标为已读',
     focusFirst: '为我优先',
+    newOnly: '只看新增',
     allEvents: '全部事件',
-    personalizationLabel: '事件排序模式',
+    eventViewLabel: '事件查看模式',
     focusSummary: (symbols: number, sectors: number, markets: number) => `已按 ${symbols} 只自选、${sectors} 个关联行业和 ${markets} 个关注市场优先排序。`,
+    inboxSummary: (total: number, unread: number, priority: number, matched: number | null) => `共 ${total} 条 · 新增 ${unread} · 重点 ${priority}${matched === null ? '' : ` · 自选相关 ${matched}`}`,
+    noNewEvents: '当前没有新增市场事件',
+    noNewEventsHint: '公开事件仍完整保留，可返回全部事件继续浏览。',
+    viewAllEvents: '查看全部事件',
     matchLabels: { watchlist: '自选相关', sector: '相关行业', market: '关注市场' },
     sourceRecords: (count: number) => `${count} 条公开来源记录`,
     sourceRecordNote: '多条来源记录不代表事实已独立证实。',
@@ -82,9 +87,14 @@ const copy = {
     newCount: (count: number) => `${count} new`,
     markAllRead: 'Mark all as read',
     focusFirst: 'For me first',
+    newOnly: 'New only',
     allEvents: 'All events',
-    personalizationLabel: 'Event ordering mode',
+    eventViewLabel: 'Event view mode',
     focusSummary: (symbols: number, sectors: number, markets: number) => `Prioritized from ${symbols} watchlist symbols, ${sectors} related industries and ${markets} followed markets.`,
+    inboxSummary: (total: number, unread: number, priority: number, matched: number | null) => `${total} total · ${unread} new · ${priority} priority${matched === null ? '' : ` · ${matched} watchlist matches`}`,
+    noNewEvents: 'No new market events',
+    noNewEventsHint: 'The complete public event feed remains available in All events.',
+    viewAllEvents: 'View all events',
     matchLabels: { watchlist: 'Watchlist match', sector: 'Related industry', market: 'Followed market' },
     sourceRecords: (count: number) => `${count} public source ${count === 1 ? 'record' : 'records'}`,
     sourceRecordNote: 'Multiple source records do not mean the facts were independently verified.',
@@ -169,14 +179,28 @@ export default function DailyMarketEventCenterV126({
     [watchlistSymbols],
   );
   const hasWatchlist = watchlist.size > 0;
-  const personalized = hasWatchlist && viewMode !== 'all';
-  const filtered = useMemo(() => personalizeMarketEvents(
-    events.filter((event) => (filter === 'all' || event.category === filter)
-      && (marketFilter === 'all' || event.market === marketFilter)),
+  const focusActive = hasWatchlist && (viewMode === 'auto' || viewMode === 'focus');
+  const unreadActive = viewMode === 'unread';
+  const allActive = !focusActive && !unreadActive;
+  const personalizedEvents = useMemo(() => personalizeMarketEvents(
+    events,
     watchlistSymbols,
     watchlistSectors,
-    personalized,
-  ).slice(0, 12), [events, filter, marketFilter, personalized, watchlistSectors, watchlistSymbols]);
+    focusActive,
+  ), [events, focusActive, watchlistSectors, watchlistSymbols]);
+  const filtered = useMemo(() => personalizedEvents
+    .filter(({ event }) => (filter === 'all' || event.category === filter)
+      && (marketFilter === 'all' || event.market === marketFilter)
+      && (!unreadActive || unseenEventIds.has(event.eventId)))
+    .slice(0, 12), [filter, marketFilter, personalizedEvents, unreadActive, unseenEventIds]);
+  const priorityEventCount = useMemo(
+    () => events.filter((event) => event.importance === 'high').length,
+    [events],
+  );
+  const matchedEventCount = useMemo(
+    () => personalizedEvents.filter(({ match }) => match !== null).length,
+    [personalizedEvents],
+  );
   const followedMarketCount = useMemo(
     () => new Set(
       watchlistSymbols
@@ -210,6 +234,17 @@ export default function DailyMarketEventCenterV126({
               ) : null}
             </h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-400">{t.subtitle}</p>
+            <p
+              className="mt-2 text-xs font-medium text-slate-500"
+              data-testid="market-event-inbox-summary-v131"
+            >
+              {t.inboxSummary(
+                events.length,
+                unseenEventIds.size,
+                priorityEventCount,
+                hasWatchlist ? matchedEventCount : null,
+              )}
+            </p>
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
             {unseenEventIds.size > 0 ? (
@@ -223,33 +258,47 @@ export default function DailyMarketEventCenterV126({
                 {t.markAllRead}
               </button>
             ) : null}
-            {hasWatchlist ? (
+            {hasWatchlist || unseenEventIds.size > 0 || unreadActive ? (
               <div className="flex flex-col gap-1 lg:items-end">
-                <div className="flex flex-wrap gap-2" aria-label={t.personalizationLabel}>
+                <div className="flex flex-wrap gap-2" aria-label={t.eventViewLabel}>
+                  {hasWatchlist ? (
+                    <button
+                      type="button"
+                      aria-pressed={focusActive}
+                      onClick={() => setViewMode('focus')}
+                      className={`min-h-9 rounded-lg border px-3 text-sm ${focusActive ? 'border-amber-400/60 bg-amber-400/10 text-amber-200' : 'border-white/10 text-slate-300'}`}
+                    >
+                      {t.focusFirst}
+                    </button>
+                  ) : null}
+                  {unseenEventIds.size > 0 || unreadActive ? (
+                    <button
+                      type="button"
+                      aria-pressed={unreadActive}
+                      onClick={() => setViewMode('unread')}
+                      className={`min-h-9 rounded-lg border px-3 text-sm ${unreadActive ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-200' : 'border-white/10 text-slate-300'}`}
+                    >
+                      {t.newOnly}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    aria-pressed={personalized}
-                    onClick={() => setViewMode('focus')}
-                    className={`min-h-9 rounded-lg border px-3 text-sm ${personalized ? 'border-amber-400/60 bg-amber-400/10 text-amber-200' : 'border-white/10 text-slate-300'}`}
-                  >
-                    {t.focusFirst}
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={!personalized}
+                    aria-pressed={allActive}
                     onClick={() => setViewMode('all')}
-                    className={`min-h-9 rounded-lg border px-3 text-sm ${!personalized ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-200' : 'border-white/10 text-slate-300'}`}
+                    className={`min-h-9 rounded-lg border px-3 text-sm ${allActive ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-200' : 'border-white/10 text-slate-300'}`}
                   >
                     {t.allEvents}
                   </button>
                 </div>
-                <p className="max-w-2xl text-xs text-slate-500" data-testid="market-event-personalization-summary-v130">
-                  {t.focusSummary(
-                    watchlist.size,
-                    new Set(watchlistSectors.map((sector) => sector.trim()).filter(Boolean)).size,
-                    followedMarketCount,
-                  )}
-                </p>
+                {hasWatchlist ? (
+                  <p className="max-w-2xl text-xs text-slate-500" data-testid="market-event-personalization-summary-v130">
+                    {t.focusSummary(
+                      watchlist.size,
+                      new Set(watchlistSectors.map((sector) => sector.trim()).filter(Boolean)).size,
+                      followedMarketCount,
+                    )}
+                  </p>
+                ) : null}
               </div>
             ) : null}
             <div className="flex flex-wrap gap-2" aria-label={t.marketFilterLabel}>
@@ -289,7 +338,19 @@ export default function DailyMarketEventCenterV126({
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {unreadActive && filtered.length === 0 ? (
+          <div className="py-10 text-center">
+            <p className="font-medium text-slate-200">{t.noNewEvents}</p>
+            <p className="mt-1 text-sm text-slate-500">{t.noNewEventsHint}</p>
+            <button
+              type="button"
+              onClick={() => setViewMode('all')}
+              className="mt-4 min-h-10 rounded-lg border border-cyan-400/30 px-4 text-sm text-cyan-300 hover:bg-cyan-400/10"
+            >
+              {t.viewAllEvents}
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="py-10 text-center">
             <p className="font-medium text-slate-200">{t.empty}</p>
             <p className="mt-1 text-sm text-slate-500">{t.emptyHint}</p>

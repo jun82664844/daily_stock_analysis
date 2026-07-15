@@ -38,6 +38,6 @@ describe('ModelConnectionWizardV112', () => {
     expect(screen.getByRole('link', { name: 'Intel' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '生成配对码' }));
     expect(await screen.findByText('123456')).toBeInTheDocument();
-    expect(screen.getByText(/剩余 5:00|剩余 4:59/)).toBeInTheDocument();
+    expect(await screen.findByText(/剩余 5:00|剩余 4:59/)).toBeInTheDocument();
   });
 });

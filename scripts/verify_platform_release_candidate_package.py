@@ -288,6 +288,7 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/platform/BoostPackCardV112.tsx",
     "apps/dsa-web/src/components/platform/SimpleModelPickerV112.tsx",
     "apps/dsa-web/src/components/platform/ModelConnectionWizardV112.tsx",
+    "apps/dsa-web/src/components/platform/__tests__/ModelConnectionWizardV112.test.tsx",
     "apps/dsa-local-connector/app.py",
     "apps/dsa-local-connector/client.py",
     "apps/dsa-local-connector/ollama.py",
@@ -411,6 +412,9 @@ REQUIRED_FILES = (
     "tests/test_platform_personalized_market_events_v130_verifier.py",
     "apps/dsa-web/src/components/market-home/marketEventPersonalizationV130.ts",
     "apps/dsa-web/src/components/market-home/__tests__/marketEventPersonalizationV130.test.ts",
+    "docs/superpowers/plans/2026-07-15-dsa-v131-returning-user-event-inbox.md",
+    "scripts/verify_platform_returning_event_inbox_v131.py",
+    "tests/test_platform_returning_event_inbox_v131_verifier.py",
 )
 
 VERIFIER_FILES = (
@@ -498,6 +502,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_event_source_retention_v128.py",
     "scripts/verify_platform_event_source_evidence_v129.py",
     "scripts/verify_platform_personalized_market_events_v130.py",
+    "scripts/verify_platform_returning_event_inbox_v131.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

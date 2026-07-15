@@ -78,10 +78,10 @@ def personalization_contract(source: str) -> CheckResult:
 def frontend_contract(source: str) -> CheckResult:
     required = (
         "const hasWatchlist = watchlist.size > 0",
-        "const personalized = hasWatchlist && viewMode !== 'all'",
+        "const focusActive = hasWatchlist && (viewMode === 'auto' || viewMode === 'focus')",
         "personalizeMarketEvents(",
         "{hasWatchlist ? (",
-        "aria-label={t.personalizationLabel}",
+        "aria-label={t.eventViewLabel}",
         "focusFirst: '为我优先'",
         "allEvents: '全部事件'",
         "matchLabels: { watchlist: '自选相关', sector: '相关行业', market: '关注市场' }",

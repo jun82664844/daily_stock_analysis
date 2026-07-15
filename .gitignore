@@ -164,6 +164,7 @@ verify_*.py
 !scripts/verify_platform_event_source_retention_v128.py
 !scripts/verify_platform_event_source_evidence_v129.py
 !scripts/verify_platform_personalized_market_events_v130.py
+!scripts/verify_platform_returning_event_inbox_v131.py
 
 # Keep the V128 browser-local event read-state module versioned without
 # exposing other generic lib/ output covered by the repository-wide rule.

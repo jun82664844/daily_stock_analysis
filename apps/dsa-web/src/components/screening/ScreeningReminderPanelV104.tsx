@@ -43,7 +43,7 @@ export default function ScreeningReminderPanelV104({ stockCode, language, state,
           <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><Bell className="h-4 w-4 text-cyan" />{en ? 'Condition alert' : '条件提醒'}</h2>
           <p className="mt-1 text-sm text-secondary-text">{stockCode} · {en ? 'Notification only when the user-defined condition is met.' : '仅在用户设置的条件满足时通知。'}</p>
         </div>
-        <button className="grid h-9 w-9 place-items-center rounded-lg border border-border text-secondary-text" type="button" title={en ? 'Close' : '关闭'} onClick={onClose}><X className="h-4 w-4" /></button>
+        <button className="grid h-9 w-9 place-items-center rounded-lg border border-border text-secondary-text" type="button" aria-label={en ? 'Close' : '关闭'} onClick={onClose}><X className="h-4 w-4" /></button>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
