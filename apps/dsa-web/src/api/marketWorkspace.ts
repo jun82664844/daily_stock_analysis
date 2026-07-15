@@ -79,6 +79,8 @@ export type PublicMarketEvent = {
   relevanceScore: number;
   importance: 'high' | 'medium' | 'low';
   relevanceReasons: string[];
+  sourceCount: number;
+  sourcePublishers: string[];
 };
 
 export type MarketWorkspaceOverview = {
@@ -209,6 +211,14 @@ export const marketWorkspaceApi = {
         relevanceScore: Number.isFinite(event.relevanceScore) ? event.relevanceScore : 0,
         importance: event.importance ?? 'low',
         relevanceReasons: Array.isArray(event.relevanceReasons) ? event.relevanceReasons : [],
+        sourceCount: Number.isFinite(event.sourceCount) && event.sourceCount >= 1
+          ? Math.min(20, Math.floor(event.sourceCount))
+          : 1,
+        sourcePublishers: Array.from(new Set(
+          (Array.isArray(event.sourcePublishers) ? event.sourcePublishers : [event.publisher])
+            .map((publisher) => String(publisher ?? '').trim())
+            .filter(Boolean),
+        )).slice(0, 8),
       })) : [],
       markets: Array.isArray(body.markets) ? body.markets.map((market) => ({
         ...market,

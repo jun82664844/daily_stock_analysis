@@ -128,6 +128,8 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         self.assertEqual(event.relevance_score, 0)
         self.assertEqual(event.importance, "low")
         self.assertEqual(event.relevance_reasons, [])
+        self.assertEqual(event.source_count, 1)
+        self.assertEqual(event.source_publishers, [])
 
     def test_workspace_attention_symbols_are_configurable_and_deduplicated(self) -> None:
         from src.services.market_workspace_service import MarketWorkspaceService

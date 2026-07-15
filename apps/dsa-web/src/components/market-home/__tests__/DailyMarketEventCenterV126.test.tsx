@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicMarketEvent } from '../../../api/marketWorkspace';
+import { MARKET_EVENT_SEEN_STORAGE_KEY } from '../../../lib/marketEventReadState';
 import DailyMarketEventCenterV126 from '../DailyMarketEventCenterV126';
 
 const events: PublicMarketEvent[] = [
@@ -21,6 +22,8 @@ const events: PublicMarketEvent[] = [
     relevanceScore: 72,
     importance: 'high',
     relevanceReasons: ['linked_security', 'earnings_event', 'fresh_source'],
+    sourceCount: 2,
+    sourcePublishers: ['Unit News', 'Official Feed'],
   },
   {
     eventId: 'event-2',
@@ -36,10 +39,14 @@ const events: PublicMarketEvent[] = [
     relevanceScore: 50,
     importance: 'medium',
     relevanceReasons: ['macro_event', 'cached_source'],
+    sourceCount: 1,
+    sourcePublishers: ['测试资讯源'],
   },
 ];
 
 describe('DailyMarketEventCenterV126', () => {
+  beforeEach(() => localStorage.clear());
+
   it('shows bilingual structured events and highlights watchlist symbols', () => {
     const open = vi.fn();
     const { rerender } = render(
@@ -131,6 +138,41 @@ describe('DailyMarketEventCenterV126', () => {
     expect(within(articles[0]).getByText('AAPL earnings results published')).toBeInTheDocument();
   });
 
+  it('shows multi-source transparency and locally marks new events as read', () => {
+    localStorage.setItem(MARKET_EVENT_SEEN_STORAGE_KEY, JSON.stringify(['event-2']));
+    const { rerender } = render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('新增 1')).toBeInTheDocument();
+    expect(screen.getByText('新事件')).toBeInTheDocument();
+    expect(screen.getByText('2 条公开来源记录')).toBeInTheDocument();
+    expect(screen.getByText('Official Feed')).toBeInTheDocument();
+
+    rerender(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('1 new')).toBeInTheDocument();
+    expect(screen.getByText('2 public source records')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
+    expect(screen.queryByText('1 new')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(MARKET_EVENT_SEEN_STORAGE_KEY) || '[]')).toEqual([
+      'event-1',
+      'event-2',
+    ]);
+  });
+
   it('offers a market-update filter and labels unlinked markets as source channels', () => {
     const marketEvent: PublicMarketEvent = {
       eventId: 'event-market',
@@ -145,6 +187,8 @@ describe('DailyMarketEventCenterV126', () => {
       relevanceScore: 40,
       importance: 'medium',
       relevanceReasons: ['market_signal', 'fresh_source'],
+      sourceCount: 1,
+      sourcePublishers: ['Unit News'],
     };
     render(
       <DailyMarketEventCenterV126

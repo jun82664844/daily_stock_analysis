@@ -54,7 +54,8 @@ class PublicMarketEventService:
 
     def build(self, markets: Sequence[Dict[str, Any]], as_of: str) -> List[Dict[str, Any]]:
         normalized: List[tuple[int, Dict[str, Any]]] = []
-        seen_titles: set[str] = set()
+        events_by_title: Dict[str, Dict[str, Any]] = {}
+        source_refs_by_title: Dict[str, set[str]] = {}
         market_counts = {market: 0 for market in MARKETS}
         ordinal = 0
 
@@ -77,7 +78,17 @@ class PublicMarketEventService:
                 if self._is_promotional_noise(title):
                     continue
                 title_key = re.sub(r"\s+", " ", title).strip().casefold()
-                if title_key in seen_titles:
+                source_state = self._source_state(headline.get("source_state"))
+                source_ref, source_publisher = self._source_reference(headline, source_state)
+                existing = events_by_title.get(title_key)
+                if existing is not None:
+                    source_refs = source_refs_by_title[title_key]
+                    if source_ref not in source_refs and len(source_refs) < 20:
+                        source_refs.add(source_ref)
+                        existing["source_count"] = len(source_refs)
+                        publishers = existing["source_publishers"]
+                        if source_publisher and source_publisher not in publishers and len(publishers) < 8:
+                            publishers.append(source_publisher)
                     continue
                 explicit_symbol, explicit_market = self._explicit_exchange_symbol(title)
                 event_market = explicit_market or market
@@ -93,7 +104,6 @@ class PublicMarketEventService:
                 has_market_signal = self._has_finance_signal(title)
                 if category == "market" and not symbol and not has_market_signal:
                     continue
-                source_state = self._source_state(headline.get("source_state"))
                 relevance_score, relevance_reasons = self._relevance(
                     category=category,
                     symbol=symbol,
@@ -118,10 +128,13 @@ class PublicMarketEventService:
                     "relevance_score": relevance_score,
                     "importance": self._importance(relevance_score),
                     "relevance_reasons": relevance_reasons,
+                    "source_count": 1,
+                    "source_publishers": [source_publisher] if source_publisher else [],
                 }
                 normalized.append((ordinal, event))
                 ordinal += 1
-                seen_titles.add(title_key)
+                events_by_title[title_key] = event
+                source_refs_by_title[title_key] = {source_ref}
                 market_counts[event_market] += 1
 
         normalized.sort(key=self._sort_key, reverse=True)
@@ -262,6 +275,17 @@ class PublicMarketEventService:
     def _optional_text(value: Any) -> Optional[str]:
         text = str(value or "").strip()
         return text or None
+
+    @classmethod
+    def _source_reference(cls, headline: Dict[str, Any], source_state: Dict[str, Any]) -> tuple[str, Optional[str]]:
+        url = cls._optional_text(headline.get("url"))
+        publisher = cls._optional_text(headline.get("publisher"))
+        source = str(source_state.get("source") or "public_market_news").strip()
+        if url:
+            key = f"url:{url.casefold()}"
+        else:
+            key = f"publisher:{(publisher or '').casefold()}|source:{source.casefold()}"
+        return key, publisher or source or None
 
     @staticmethod
     def _sort_key(item: tuple[int, Dict[str, Any]]) -> tuple[int, int, float, int]:

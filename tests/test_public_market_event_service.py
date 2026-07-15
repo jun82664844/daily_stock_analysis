@@ -14,13 +14,19 @@ def _source(status: str = "fresh") -> dict:
     }
 
 
-def _headline(title: str, published_at: str | None = "2026-07-14T02:00:00Z") -> dict:
+def _headline(
+    title: str,
+    published_at: str | None = "2026-07-14T02:00:00Z",
+    *,
+    publisher: str = "Unit News",
+    url: str = "https://example.com/news",
+) -> dict:
     return {
         "title": title,
         "summary": f"{title} 的公开信息摘要。",
-        "publisher": "Unit News",
+        "publisher": publisher,
         "published_at": published_at,
-        "url": "https://example.com/news",
+        "url": url,
         "source_state": _source(),
     }
 
@@ -66,17 +72,43 @@ class PublicMarketEventServiceTestCase(unittest.TestCase):
         markets = [
             {
                 "market": "cn",
-                "headlines": [_headline("Global stock market closes higher", "2026-07-14T01:00:00Z")],
+                "headlines": [_headline(
+                    "Global stock market closes higher",
+                    "2026-07-14T01:00:00Z",
+                    publisher="Source A",
+                    url="https://source-a.example/market-close",
+                )],
             },
             {
                 "market": "us",
-                "headlines": [_headline("Global stock market closes higher", "2026-07-14T02:00:00Z")],
+                "headlines": [_headline(
+                    "Global stock market closes higher",
+                    "2026-07-14T02:00:00Z",
+                    publisher="Source B",
+                    url="https://source-b.example/market-close",
+                )],
             },
         ]
 
         events = PublicMarketEventService().build(markets, "2026-07-14T03:00:00Z")
 
         self.assertEqual([event["title"] for event in events], ["Global stock market closes higher"])
+        self.assertEqual(events[0]["source_count"], 2)
+        self.assertEqual(events[0]["source_publishers"], ["Source A", "Source B"])
+
+    def test_identical_duplicate_records_do_not_inflate_source_count(self) -> None:
+        duplicate = _headline("AAPL earnings results published")
+        markets = [{
+            "market": "us",
+            "attention": [_security("AAPL", "Apple Inc.", "us")],
+            "headlines": [duplicate, dict(duplicate)],
+        }]
+
+        events = PublicMarketEventService().build(markets, "2026-07-14T03:00:00Z")
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["source_count"], 1)
+        self.assertEqual(events[0]["source_publishers"], ["Unit News"])
 
     def test_classifies_public_headlines_without_ai(self) -> None:
         markets = [{

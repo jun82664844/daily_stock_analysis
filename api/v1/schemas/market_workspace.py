@@ -108,6 +108,8 @@ class PublicMarketEvent(StrictModel):
     relevance_score: int = Field(0, ge=0, le=100)
     importance: MarketEventImportance = "low"
     relevance_reasons: List[str] = Field(default_factory=list)
+    source_count: int = Field(1, ge=1, le=20)
+    source_publishers: List[str] = Field(default_factory=list, max_length=8)
 
 
 class MarketWorkspaceOverview(StrictModel):

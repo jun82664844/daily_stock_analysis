@@ -2713,3 +2713,37 @@ Verifier and documentation:
 Acceptance marker: `DSA_PLATFORM_MARKET_EVENT_RELEVANCE_V127_OK`.
 
 Safety boundary: V127 filters only the curated event-center view, preserves raw headline feeds, uses deterministic no-AI rules, adds no network source, keeps watchlist priority client-only, changes no user data, and provides information and data only rather than investment advice.
+
+## V128 Event Source Transparency And Return Retention
+
+Runtime and API:
+
+- `src/services/public_market_event_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend and local retention:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/lib/marketEventReadState.ts`
+- `apps/dsa-web/src/lib/__tests__/marketEventReadState.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_event_source_retention_v128.py`
+- `tests/test_platform_event_source_retention_v128_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v128-event-source-retention.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_EVENT_SOURCE_RETENTION_V128_OK`.
+
+Safety boundary: source counts describe distinct public records and do not claim independent verification; read state is capped at 200 event IDs and remains browser-local. V128 adds no network source or model call, consumes no AI quota, changes no user data, and provides information and data only rather than investment advice.

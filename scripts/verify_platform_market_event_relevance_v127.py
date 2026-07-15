@@ -23,7 +23,7 @@ def backend_relevance_contract(source: str) -> CheckResult:
         "FINANCE_SIGNAL_KEYWORDS",
         "PROMOTIONAL_NOISE_KEYWORDS",
         "CATEGORY_REASONS",
-        "title_key in seen_titles",
+        "events_by_title.get(title_key)",
         "not symbol and not has_market_signal",
         "relevance_score",
         "relevance_reasons",
@@ -33,8 +33,8 @@ def backend_relevance_contract(source: str) -> CheckResult:
     )
     forbidden = ("import requests", "import httpx", "openai", "litellm", "ollama")
     missing = [token for token in required if token not in source]
-    if not re.search(r"seen_titles(?:\s*:\s*[^=]+)?\s*=\s*set\(\)", source):
-        missing.append("global_seen_titles_set")
+    if not re.search(r"events_by_title(?:\s*:\s*[^=]+)?\s*=\s*\{\}", source):
+        missing.append("global_events_by_title_map")
     forbidden_hits = [token for token in forbidden if token in source.casefold()]
     return CheckResult(
         "backend_relevance",

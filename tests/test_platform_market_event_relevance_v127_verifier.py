@@ -11,8 +11,9 @@ class MarketEventRelevanceV127VerifierTestCase(unittest.TestCase):
 FINANCE_SIGNAL_KEYWORDS = ('stock', 'market')
 PROMOTIONAL_NOISE_KEYWORDS = ('sponsored content',)
 CATEGORY_REASONS = {'macro': 'macro_event'}
-seen_titles = set()
-if title_key in seen_titles:
+events_by_title = {}
+existing = events_by_title.get(title_key)
+if existing is not None:
     continue
 if category == 'market' and not symbol and not has_market_signal:
     continue
@@ -21,7 +22,7 @@ importance = self._importance(relevance_score)
 promotional = self._is_promotional_noise(title)
 """
         self.assertTrue(backend_relevance_contract(valid).ok)
-        self.assertFalse(backend_relevance_contract(valid.replace("seen_titles = set()", "seen_titles = []")).ok)
+        self.assertFalse(backend_relevance_contract(valid.replace("events_by_title = {}", "events_by_title = []")).ok)
         self.assertFalse(backend_relevance_contract(valid.replace("not has_market_signal", "has_market_signal")).ok)
         self.assertFalse(backend_relevance_contract(valid + "\nimport httpx").ok)
 

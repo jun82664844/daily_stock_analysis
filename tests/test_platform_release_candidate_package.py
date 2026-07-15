@@ -41,6 +41,16 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v128_event_source_retention_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_event_source_retention_v128.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_event_source_retention_v128.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_event_source_retention_v128_verifier.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/lib/marketEventReadState.ts", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/lib/__tests__/marketEventReadState.test.ts", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-15-dsa-v128-event-source-retention.md", REQUIRED_FILES)
+
     def test_v127_market_event_relevance_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

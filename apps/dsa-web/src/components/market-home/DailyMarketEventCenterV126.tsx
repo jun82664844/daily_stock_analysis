@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
-import { CalendarDays, ExternalLink, Search, Star } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, CheckCheck, ExternalLink, Search, Star } from 'lucide-react';
 import type { MarketCode, MarketEventCategory, PublicMarketEvent } from '../../api/marketWorkspace';
+import {
+  getUnseenMarketEventIds,
+  loadSeenMarketEventIds,
+  mergeSeenMarketEventIds,
+  saveSeenMarketEventIds,
+} from '../../lib/marketEventReadState';
 
 type Props = {
   language: 'zh' | 'en';
@@ -20,6 +26,11 @@ const copy = {
     eyebrow: '公开资讯 · 未用 AI',
     title: '今日市场事件',
     priority: '重点事件',
+    newEvent: '新事件',
+    newCount: (count: number) => `新增 ${count}`,
+    markAllRead: '全部标为已读',
+    sourceRecords: (count: number) => `${count} 条公开来源记录`,
+    sourceRecordNote: '多条来源记录不代表事实已独立证实。',
     subtitle: '汇总 A 股、港股和美股公开事件，按类别快速浏览，并突出自选股相关信息。',
     marketFilterLabel: '按市场筛选',
     categoryFilterLabel: '按事件类型筛选',
@@ -48,6 +59,11 @@ const copy = {
     eyebrow: 'Public information · No AI',
     title: 'Daily market events',
     priority: 'Priority events',
+    newEvent: 'New event',
+    newCount: (count: number) => `${count} new`,
+    markAllRead: 'Mark all as read',
+    sourceRecords: (count: number) => `${count} public source ${count === 1 ? 'record' : 'records'}`,
+    sourceRecordNote: 'Multiple source records do not mean the facts were independently verified.',
     subtitle: 'Public events across China, Hong Kong and US markets, grouped for quick review with watchlist matches highlighted.',
     marketFilterLabel: 'Filter by market',
     categoryFilterLabel: 'Filter by event type',
@@ -99,6 +115,12 @@ export default function DailyMarketEventCenterV126({
   const t = copy[language];
   const [filter, setFilter] = useState<Filter>('all');
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('all');
+  const [seenEventIds, setSeenEventIds] = useState<string[] | null>(() => loadSeenMarketEventIds());
+  const currentEventIds = useMemo(() => events.map((event) => event.eventId), [events]);
+  const unseenEventIds = useMemo(
+    () => new Set(getUnseenMarketEventIds(currentEventIds, seenEventIds)),
+    [currentEventIds, seenEventIds],
+  );
   const watchlist = useMemo(
     () => new Set(watchlistSymbols.map(normalizeSymbol)),
     [watchlistSymbols],
@@ -121,6 +143,16 @@ export default function DailyMarketEventCenterV126({
     .slice(0, 12)
     .map(({ event }) => event), [events, filter, marketFilter, watchlist]);
 
+  useEffect(() => {
+    if (seenEventIds !== null || currentEventIds.length === 0) return;
+    setSeenEventIds(saveSeenMarketEventIds(currentEventIds));
+  }, [currentEventIds, seenEventIds]);
+
+  const markAllRead = () => {
+    const merged = mergeSeenMarketEventIds(seenEventIds ?? [], currentEventIds);
+    setSeenEventIds(saveSeenMarketEventIds(merged));
+  };
+
   return (
     <section data-testid="daily-market-event-center-v126" className="border-y border-white/10 bg-[#0a101b] py-6">
       <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6">
@@ -133,10 +165,26 @@ export default function DailyMarketEventCenterV126({
               <span aria-hidden="true" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-2 py-1 text-xs font-medium text-rose-300">
                 {t.priority} {filtered.filter((event) => event.importance === 'high').length}
               </span>
+              {unseenEventIds.size > 0 ? (
+                <span aria-hidden="true" className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-300">
+                  {t.newCount(unseenEventIds.size)}
+                </span>
+              ) : null}
             </h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-400">{t.subtitle}</p>
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
+            {unseenEventIds.size > 0 ? (
+              <button
+                type="button"
+                onClick={markAllRead}
+                aria-label={t.markAllRead}
+                className="inline-flex min-h-9 items-center gap-2 self-start rounded-lg border border-white/10 px-3 text-sm text-slate-300 hover:border-cyan-400/40 hover:text-cyan-300 lg:self-auto"
+              >
+                <CheckCheck className="h-4 w-4" aria-hidden="true" />
+                {t.markAllRead}
+              </button>
+            ) : null}
             <div className="flex flex-wrap gap-2" aria-label={t.marketFilterLabel}>
               {MARKET_FILTERS.map((item) => (
                 <button
@@ -183,6 +231,15 @@ export default function DailyMarketEventCenterV126({
           <div className="divide-y divide-white/10">
             {filtered.map((event) => {
               const isWatchlisted = Boolean(event.symbol && watchlist.has(normalizeSymbol(event.symbol)));
+              const isNew = unseenEventIds.has(event.eventId);
+              const sourceCount = Number.isFinite(event.sourceCount) && event.sourceCount >= 1
+                ? Math.min(20, Math.floor(event.sourceCount))
+                : 1;
+              const sourcePublishers = Array.from(new Set(
+                (event.sourcePublishers?.length ? event.sourcePublishers : [event.publisher])
+                  .map((publisher) => String(publisher ?? '').trim())
+                  .filter(Boolean),
+              )).slice(0, 3);
               return (
                 <article key={event.eventId} className="grid gap-3 py-4 md:grid-cols-[150px_minmax(0,1fr)_auto] md:items-start">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -208,6 +265,11 @@ export default function DailyMarketEventCenterV126({
                           {t.watchlist}
                         </span>
                       ) : null}
+                      {isNew ? (
+                        <span className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-300">
+                          {t.newEvent}
+                        </span>
+                      ) : null}
                       <span className={`rounded-lg border px-2 py-1 text-xs ${
                         event.importance === 'high'
                           ? 'border-rose-400/30 bg-rose-400/10 text-rose-300'
@@ -228,6 +290,12 @@ export default function DailyMarketEventCenterV126({
                         ))}
                       </div>
                     ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                      <span className="rounded-md border border-white/10 px-2 py-1">{t.sourceRecords(sourceCount)}</span>
+                      {sourcePublishers.map((publisher) => (
+                        <span key={publisher} className="rounded-md bg-white/[0.04] px-2 py-1">{publisher}</span>
+                      ))}
+                    </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {t.source}: {event.publisher || event.sourceState.source} · <span>{t.statuses[event.sourceState.status]}</span> · {event.timeKind === 'retrieved' ? t.retrieved : eventTime(event.eventTime, language)}
                     </p>
@@ -248,7 +316,9 @@ export default function DailyMarketEventCenterV126({
             })}
           </div>
         )}
-        <p className="border-t border-white/10 pt-3 text-xs text-slate-500">{t.disclaimer}</p>
+        <p className="border-t border-white/10 pt-3 text-xs text-slate-500">
+          <span>{t.sourceRecordNote}</span> · <span>{t.disclaimer}</span>
+        </p>
       </div>
     </section>
   );

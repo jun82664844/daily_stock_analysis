@@ -2344,3 +2344,36 @@ Verifier and documentation:
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: low-relevance noise exclusion without deleting raw headlines, global title deduplication, bounded deterministic relevance fields, old-cache compatibility, market filters, client-only watchlist priority, bilingual explanations, no new network or model call, and no investment-advice language.
+
+## V128 Event Source Transparency And Return Retention
+
+Backend and API contract:
+
+- `src/services/public_market_event_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend and browser-local state:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/lib/marketEventReadState.ts`
+- `apps/dsa-web/src/lib/__tests__/marketEventReadState.test.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_event_source_retention_v128.py`
+- `tests/test_platform_event_source_retention_v128_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v128-event-source-retention.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: bounded distinct-source aggregation, old-cache defaults, first-visit baseline semantics, local-only and bounded event-ID storage, bilingual mark-read controls, source-record wording that avoids implying independent verification, no new request or model call, and no investment-advice language.

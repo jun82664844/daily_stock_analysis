@@ -161,6 +161,16 @@ verify_*.py
 !scripts/verify_platform_market_sessions_home_performance_v125.py
 !scripts/verify_platform_free_daily_market_events_v126.py
 !scripts/verify_platform_market_event_relevance_v127.py
+!scripts/verify_platform_event_source_retention_v128.py
+
+# Keep the V128 browser-local event read-state module versioned without
+# exposing other generic lib/ output covered by the repository-wide rule.
+!apps/dsa-web/src/lib/
+apps/dsa-web/src/lib/*
+!apps/dsa-web/src/lib/marketEventReadState.ts
+!apps/dsa-web/src/lib/__tests__/
+apps/dsa-web/src/lib/__tests__/*
+!apps/dsa-web/src/lib/__tests__/marketEventReadState.test.ts
 
 # Local third-party source checkouts are installed for inspection only.
 /external/
