@@ -29,6 +29,21 @@ def _analysis_service_result(stock_code: str = "AAPL"):
     )
 
 
+def _ready_local_runtime():
+    status = {
+        "enabled": True,
+        "reachable": True,
+        "ready": True,
+        "quick_ready": True,
+        "deep_ready": True,
+        "reason": "ready",
+    }
+    return SimpleNamespace(
+        get_status=lambda: status,
+        readiness_reason=lambda analysis_depth, *, status=None: "ready",
+    )
+
+
 class PlatformAiFeatureQuotaTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -43,6 +58,7 @@ class PlatformAiFeatureQuotaTestCase(unittest.TestCase):
             {
                 "DATABASE_PATH": self.db_path,
                 "PLATFORM_USER_AUTH_ENABLED": "true",
+                "PLATFORM_CSRF_ENABLED": "false",
             },
             clear=False,
         )
@@ -144,6 +160,7 @@ class PlatformAiFeatureQuotaTestCase(unittest.TestCase):
         user_id = reg.json()["user"]["id"]
 
         with patch("src.services.analysis_service.AnalysisService", return_value=_analysis_service_result()), \
+             patch("src.services.ollama_runtime_service.get_ollama_runtime_service", return_value=_ready_local_runtime()), \
              patch("api.v1.endpoints.analysis._load_sync_fundamental_sources", return_value=(None, None)):
             response = self.client.post(
                 "/api/v1/analysis/analyze",

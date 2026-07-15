@@ -59,6 +59,21 @@ def _analysis_result(stock_code: str, stock_name: str, summary: str):
     )
 
 
+def _ready_local_runtime():
+    status = {
+        "enabled": True,
+        "reachable": True,
+        "ready": True,
+        "quick_ready": True,
+        "deep_ready": True,
+        "reason": "ready",
+    }
+    return SimpleNamespace(
+        get_status=lambda: status,
+        readiness_reason=lambda analysis_depth, *, status=None: "ready",
+    )
+
+
 def _save_history_for_user(user_id: int, query_id: str, stock_code: str, stock_name: str) -> int:
     record_id = DatabaseManager.get_instance().save_analysis_history(
         result=_analysis_result(stock_code, stock_name, f"{stock_code} summary"),
@@ -89,6 +104,7 @@ class PlatformApiTestCase(unittest.TestCase):
                 "DATABASE_PATH": self.db_path,
                 "ADMIN_AUTH_ENABLED": "true",
                 "PLATFORM_USER_AUTH_ENABLED": "true",
+                "PLATFORM_CSRF_ENABLED": "false",
             },
             clear=False,
         )
@@ -326,7 +342,8 @@ class PlatformApiTestCase(unittest.TestCase):
         fake_queue = MagicMock()
         fake_queue.submit_tasks_batch.return_value = ([accepted_task], [])
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=fake_queue):
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=fake_queue), \
+             patch("src.services.ollama_runtime_service.get_ollama_runtime_service", return_value=_ready_local_runtime()):
             response = self.client.post(
                 "/api/v1/analysis/analyze",
                 json={"stock_code": "600519", "async_mode": True, "apiKeyMode": "local"},
