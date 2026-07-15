@@ -16,6 +16,22 @@ V94 local addendum: A-share history resilience files are included in the existin
 
 No-go: real payment disabled, no public deployment, no production secrets, no real API keys in code/docs/logs, and all analysis copy must keep "not investment advice" / "不构成投资建议". Do not commit real API Key.
 
+V129 local addendum: event-source evidence details are included in the existing backend/frontend/tests/docs slices:
+
+- `src/services/public_market_event_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `tests/test_public_market_event_service.py`
+- `tests/test_public_market_home_v116.py`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `scripts/verify_platform_event_source_evidence_v129.py`
+- `tests/test_platform_event_source_evidence_v129_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v129-event-source-evidence.md`
+
+Boundary: source comparison is public-record transparency, not independent fact verification. It adds no network or AI calls and accepts clickable HTTP/HTTPS links only.
+
 ## Inventory
 
 Baseline before this review package, from `docs/superpowers/platform-v2-handoff-status.md`:

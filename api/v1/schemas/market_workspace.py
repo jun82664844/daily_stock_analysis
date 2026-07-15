@@ -91,6 +91,14 @@ class MarketHeadline(StrictModel):
     source_state: DataSourceState
 
 
+class PublicMarketEventSourceRecord(StrictModel):
+    publisher: str
+    source: str
+    url: Optional[str] = None
+    event_time: str
+    time_kind: MarketEventTimeKind
+
+
 class PublicMarketEvent(StrictModel):
     event_id: str
     market: Literal["cn", "hk", "us"]
@@ -110,6 +118,7 @@ class PublicMarketEvent(StrictModel):
     relevance_reasons: List[str] = Field(default_factory=list)
     source_count: int = Field(1, ge=1, le=20)
     source_publishers: List[str] = Field(default_factory=list, max_length=8)
+    source_records: List[PublicMarketEventSourceRecord] = Field(default_factory=list, max_length=8)
 
 
 class MarketWorkspaceOverview(StrictModel):

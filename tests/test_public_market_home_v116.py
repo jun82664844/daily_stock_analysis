@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from api.app import create_app
 from src.config import Config
@@ -130,6 +131,34 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         self.assertEqual(event.relevance_reasons, [])
         self.assertEqual(event.source_count, 1)
         self.assertEqual(event.source_publishers, [])
+        self.assertEqual(event.source_records, [])
+
+    def test_v129_event_contract_limits_source_records(self) -> None:
+        from api.v1.schemas.market_workspace import PublicMarketEvent
+
+        payload = {
+            "event_id": "bounded-event",
+            "market": "us",
+            "category": "market",
+            "title": "US market update",
+            "event_time": "2026-07-14T03:00:00Z",
+            "time_kind": "published",
+            "source_state": {"source": "unit_news", "status": "fresh"},
+            "classification_source": "keyword_rules",
+            "source_records": [
+                {
+                    "publisher": f"Publisher {index}",
+                    "source": f"source_{index}",
+                    "url": f"https://example.com/{index}",
+                    "event_time": "2026-07-14T03:00:00Z",
+                    "time_kind": "published",
+                }
+                for index in range(9)
+            ],
+        }
+
+        with self.assertRaises(ValidationError):
+            PublicMarketEvent.model_validate(payload)
 
     def test_workspace_attention_symbols_are_configurable_and_deduplicated(self) -> None:
         from src.services.market_workspace_service import MarketWorkspaceService

@@ -24,6 +24,10 @@ const events: PublicMarketEvent[] = [
     relevanceReasons: ['linked_security', 'earnings_event', 'fresh_source'],
     sourceCount: 2,
     sourcePublishers: ['Unit News', 'Official Feed'],
+    sourceRecords: [
+      { publisher: 'Unit News', source: 'unit_news', url: 'https://example.com/aapl', eventTime: '2026-07-14T02:00:00Z', timeKind: 'published' },
+      { publisher: 'Official Feed', source: 'official_feed', url: 'https://official.example/aapl', eventTime: '2026-07-14T02:05:00Z', timeKind: 'published' },
+    ],
   },
   {
     eventId: 'event-2',
@@ -41,6 +45,9 @@ const events: PublicMarketEvent[] = [
     relevanceReasons: ['macro_event', 'cached_source'],
     sourceCount: 1,
     sourcePublishers: ['测试资讯源'],
+    sourceRecords: [
+      { publisher: '测试资讯源', source: 'unit_news', url: null, eventTime: '2026-07-14T01:00:00Z', timeKind: 'published' },
+    ],
   },
 ];
 
@@ -173,6 +180,35 @@ describe('DailyMarketEventCenterV126', () => {
     ]);
   });
 
+  it('expands source evidence on demand with bilingual safe links', () => {
+    const { rerender } = render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('已显示 2 / 共 2 条公开来源记录')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看 AAPL earnings results published 的来源' }));
+    expect(screen.getByText('已显示 2 / 共 2 条公开来源记录')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '打开 Unit News 原文' })).toHaveAttribute('href', 'https://example.com/aapl');
+    expect(screen.getByRole('link', { name: '打开 Official Feed 原文' })).toHaveAttribute('href', 'https://official.example/aapl');
+
+    rerender(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Showing 2 of 2 public source records')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide sources for AAPL earnings results published' }));
+    expect(screen.queryByText('Showing 2 of 2 public source records')).not.toBeInTheDocument();
+  });
+
   it('offers a market-update filter and labels unlinked markets as source channels', () => {
     const marketEvent: PublicMarketEvent = {
       eventId: 'event-market',
@@ -189,6 +225,13 @@ describe('DailyMarketEventCenterV126', () => {
       relevanceReasons: ['market_signal', 'fresh_source'],
       sourceCount: 1,
       sourcePublishers: ['Unit News'],
+      sourceRecords: [{
+        publisher: 'Unit News',
+        source: 'unit_news',
+        url: null,
+        eventTime: '2026-07-14T03:00:00Z',
+        timeKind: 'published',
+      }],
     };
     render(
       <DailyMarketEventCenterV126

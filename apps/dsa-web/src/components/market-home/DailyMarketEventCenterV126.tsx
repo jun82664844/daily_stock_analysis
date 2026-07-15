@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CheckCheck, ExternalLink, Search, Star } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CalendarDays, CheckCheck, ChevronDown, ChevronUp, ExternalLink, Search, Star } from 'lucide-react';
 import type { MarketCode, MarketEventCategory, PublicMarketEvent } from '../../api/marketWorkspace';
 import {
   getUnseenMarketEventIds,
@@ -31,6 +31,14 @@ const copy = {
     markAllRead: '全部标为已读',
     sourceRecords: (count: number) => `${count} 条公开来源记录`,
     sourceRecordNote: '多条来源记录不代表事实已独立证实。',
+    showSources: '查看来源',
+    hideSources: '收起来源',
+    sourceDetailsLabel: (title: string, expanded: boolean) => `${expanded ? '收起' : '查看'} ${title} 的来源`,
+    sourceProgress: (shown: number, total: number) => `已显示 ${shown} / 共 ${total} 条公开来源记录`,
+    sourceCode: '来源代码',
+    openOriginal: (publisher: string) => `打开 ${publisher} 原文`,
+    originalLink: '打开原文',
+    originalUnavailable: '原文链接不可用',
     subtitle: '汇总 A 股、港股和美股公开事件，按类别快速浏览，并突出自选股相关信息。',
     marketFilterLabel: '按市场筛选',
     categoryFilterLabel: '按事件类型筛选',
@@ -64,6 +72,14 @@ const copy = {
     markAllRead: 'Mark all as read',
     sourceRecords: (count: number) => `${count} public source ${count === 1 ? 'record' : 'records'}`,
     sourceRecordNote: 'Multiple source records do not mean the facts were independently verified.',
+    showSources: 'View sources',
+    hideSources: 'Hide sources',
+    sourceDetailsLabel: (title: string, expanded: boolean) => `${expanded ? 'Hide sources for' : 'View sources for'} ${title}`,
+    sourceProgress: (shown: number, total: number) => `Showing ${shown} of ${total} public source records`,
+    sourceCode: 'Source code',
+    openOriginal: (publisher: string) => `Open original from ${publisher}`,
+    originalLink: 'Open original',
+    originalUnavailable: 'Original link unavailable',
     subtitle: 'Public events across China, Hong Kong and US markets, grouped for quick review with watchlist matches highlighted.',
     marketFilterLabel: 'Filter by market',
     categoryFilterLabel: 'Filter by event type',
@@ -106,6 +122,17 @@ function eventTime(value: string, language: 'zh' | 'en'): string {
   }).format(parsed);
 }
 
+function safeSourceLink(value?: string | null): string | null {
+  const url = String(value ?? '').trim();
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DailyMarketEventCenterV126({
   language,
   events,
@@ -115,8 +142,11 @@ export default function DailyMarketEventCenterV126({
   const t = copy[language];
   const [filter, setFilter] = useState<Filter>('all');
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('all');
-  const [seenEventIds, setSeenEventIds] = useState<string[] | null>(() => loadSeenMarketEventIds());
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const currentEventIds = useMemo(() => events.map((event) => event.eventId), [events]);
+  const [seenEventIds, setSeenEventIds] = useState<string[]>(
+    () => loadSeenMarketEventIds() ?? saveSeenMarketEventIds(currentEventIds),
+  );
   const unseenEventIds = useMemo(
     () => new Set(getUnseenMarketEventIds(currentEventIds, seenEventIds)),
     [currentEventIds, seenEventIds],
@@ -143,13 +173,8 @@ export default function DailyMarketEventCenterV126({
     .slice(0, 12)
     .map(({ event }) => event), [events, filter, marketFilter, watchlist]);
 
-  useEffect(() => {
-    if (seenEventIds !== null || currentEventIds.length === 0) return;
-    setSeenEventIds(saveSeenMarketEventIds(currentEventIds));
-  }, [currentEventIds, seenEventIds]);
-
   const markAllRead = () => {
-    const merged = mergeSeenMarketEventIds(seenEventIds ?? [], currentEventIds);
+    const merged = mergeSeenMarketEventIds(seenEventIds, currentEventIds);
     setSeenEventIds(saveSeenMarketEventIds(merged));
   };
 
@@ -240,6 +265,9 @@ export default function DailyMarketEventCenterV126({
                   .map((publisher) => String(publisher ?? '').trim())
                   .filter(Boolean),
               )).slice(0, 3);
+              const sourceRecords = (Array.isArray(event.sourceRecords) ? event.sourceRecords : []).slice(0, 8);
+              const sourceDetailsOpen = expandedEventId === event.eventId;
+              const sourceDetailsId = `event-sources-${event.eventId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
               return (
                 <article key={event.eventId} className="grid gap-3 py-4 md:grid-cols-[150px_minmax(0,1fr)_auto] md:items-start">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -295,10 +323,60 @@ export default function DailyMarketEventCenterV126({
                       {sourcePublishers.map((publisher) => (
                         <span key={publisher} className="rounded-md bg-white/[0.04] px-2 py-1">{publisher}</span>
                       ))}
+                      {sourceRecords.length > 0 ? (
+                        <button
+                          type="button"
+                          aria-expanded={sourceDetailsOpen}
+                          aria-controls={sourceDetailsId}
+                          aria-label={t.sourceDetailsLabel(event.title, sourceDetailsOpen)}
+                          onClick={() => setExpandedEventId(sourceDetailsOpen ? null : event.eventId)}
+                          className="inline-flex min-h-7 items-center gap-1 rounded-md border border-cyan-400/25 px-2 text-cyan-300 hover:bg-cyan-400/10"
+                        >
+                          {sourceDetailsOpen ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
+                          {sourceDetailsOpen ? t.hideSources : t.showSources}
+                        </button>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {t.source}: {event.publisher || event.sourceState.source} · <span>{t.statuses[event.sourceState.status]}</span> · {event.timeKind === 'retrieved' ? t.retrieved : eventTime(event.eventTime, language)}
                     </p>
+                    {sourceDetailsOpen ? (
+                      <div id={sourceDetailsId} className="mt-3 border-t border-white/10 pt-3">
+                        <div className="flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                          <span>{t.sourceProgress(sourceRecords.length, sourceCount)}</span>
+                          <span>{t.sourceRecordNote}</span>
+                        </div>
+                        <div className="mt-2 divide-y divide-white/10 border-y border-white/10">
+                          {sourceRecords.map((record, index) => {
+                            const originalUrl = safeSourceLink(record.url);
+                            return (
+                              <div key={`${record.url || record.source}-${record.eventTime}-${index}`} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-slate-200">{record.publisher}</p>
+                                  <p className="mt-0.5 break-words text-xs text-slate-500">
+                                    {t.sourceCode}: {record.source} · {eventTime(record.eventTime, language)}
+                                  </p>
+                                </div>
+                                {originalUrl ? (
+                                  <a
+                                    href={originalUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label={t.openOriginal(record.publisher)}
+                                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start text-sm text-cyan-300 hover:text-cyan-200 sm:self-auto"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                                    {t.originalLink}
+                                  </a>
+                                ) : (
+                                  <span className="text-xs text-slate-500">{t.originalUnavailable}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                   {event.symbol ? (
                     <button

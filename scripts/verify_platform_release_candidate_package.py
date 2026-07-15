@@ -403,6 +403,9 @@ REQUIRED_FILES = (
     "tests/test_platform_event_source_retention_v128_verifier.py",
     "apps/dsa-web/src/lib/marketEventReadState.ts",
     "apps/dsa-web/src/lib/__tests__/marketEventReadState.test.ts",
+    "docs/superpowers/plans/2026-07-15-dsa-v129-event-source-evidence.md",
+    "scripts/verify_platform_event_source_evidence_v129.py",
+    "tests/test_platform_event_source_evidence_v129_verifier.py",
 )
 
 VERIFIER_FILES = (
@@ -488,6 +491,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_daily_market_events_v126.py",
     "scripts/verify_platform_market_event_relevance_v127.py",
     "scripts/verify_platform_event_source_retention_v128.py",
+    "scripts/verify_platform_event_source_evidence_v129.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

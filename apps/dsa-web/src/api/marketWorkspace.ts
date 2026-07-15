@@ -62,6 +62,14 @@ export type MarketEventCategory =
   | 'corporate'
   | 'market';
 
+export type PublicMarketEventSourceRecord = {
+  publisher: string;
+  source: string;
+  url?: string | null;
+  eventTime: string;
+  timeKind: 'published' | 'observed' | 'retrieved' | 'unknown';
+};
+
 export type PublicMarketEvent = {
   eventId: string;
   market: MarketCode;
@@ -81,6 +89,7 @@ export type PublicMarketEvent = {
   relevanceReasons: string[];
   sourceCount: number;
   sourcePublishers: string[];
+  sourceRecords: PublicMarketEventSourceRecord[];
 };
 
 export type MarketWorkspaceOverview = {
@@ -200,6 +209,48 @@ export type MarketDailyBriefResponse = {
   informationalOnly: boolean;
 };
 
+function safeHttpUrl(value: unknown): string | null {
+  const url = String(value ?? '').trim();
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEventSourceRecords(event: PublicMarketEvent): PublicMarketEventSourceRecord[] {
+  const rawRecords = Array.isArray(event.sourceRecords) && event.sourceRecords.length > 0
+    ? event.sourceRecords
+    : [{
+        publisher: event.publisher ?? event.sourceState?.source ?? 'public_market_news',
+        source: event.sourceState?.source ?? 'public_market_news',
+        url: event.url,
+        eventTime: event.eventTime,
+        timeKind: event.timeKind,
+      }];
+  const seen = new Set<string>();
+  const records: PublicMarketEventSourceRecord[] = [];
+  for (const record of rawRecords) {
+    const source = String(record?.source ?? 'public_market_news').trim() || 'public_market_news';
+    const publisher = String(record?.publisher ?? source).trim() || source;
+    const url = safeHttpUrl(record?.url);
+    const eventTime = String(record?.eventTime ?? event.eventTime ?? '').trim();
+    const timeKind = ['published', 'observed', 'retrieved'].includes(record?.timeKind)
+      ? record.timeKind
+      : 'unknown';
+    const key = url
+      ? `url:${url.toLowerCase()}`
+      : `source:${publisher.toLowerCase()}|${source.toLowerCase()}|${eventTime}|${timeKind}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    records.push({ publisher, source, url, eventTime, timeKind });
+    if (records.length >= 8) break;
+  }
+  return records;
+}
+
 export const marketWorkspaceApi = {
   async getHome(): Promise<PublicMarketHomeResponse> {
     const response = await apiClient.get('/api/v1/market-workspace/home');
@@ -208,6 +259,7 @@ export const marketWorkspaceApi = {
       ...body,
       events: Array.isArray(body.events) ? body.events.map((event) => ({
         ...event,
+        url: safeHttpUrl(event.url),
         relevanceScore: Number.isFinite(event.relevanceScore) ? event.relevanceScore : 0,
         importance: event.importance ?? 'low',
         relevanceReasons: Array.isArray(event.relevanceReasons) ? event.relevanceReasons : [],
@@ -219,6 +271,7 @@ export const marketWorkspaceApi = {
             .map((publisher) => String(publisher ?? '').trim())
             .filter(Boolean),
         )).slice(0, 8),
+        sourceRecords: normalizeEventSourceRecords(event),
       })) : [],
       markets: Array.isArray(body.markets) ? body.markets.map((market) => ({
         ...market,

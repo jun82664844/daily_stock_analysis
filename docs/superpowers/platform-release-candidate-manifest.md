@@ -16,6 +16,8 @@ V94 local addendum: the current release-candidate package also includes the boun
 
 No-go: real payment disabled, no production API keys, no public deployment, no HTTPS/domain/WAF claims, no legal/privacy finalization, and no investment advice. 不构成投资建议. Do not commit real API Key.
 
+V129 local addendum: the release candidate now retains bounded public event source records and exposes them through an on-demand bilingual disclosure. The backend keeps at most 8 source details while preserving a maximum 20-source count; the frontend supplies an old-cache fallback and rejects non-HTTP/HTTPS links. Multiple source records are not presented as independent fact verification. No new public feed request, AI call, quota use, payment, deployment or production secret is introduced.
+
 ## Summary
 
 Current expected package size after the local billing lifecycle gate, Query Quality V4 gate, Local Functional V5 gate, Local Usability V6 gate, Local Query Speed V7 gate, Local Query Resilience V8 gate, Local Market Source Health V9 gate, Local Persistent Market Cache V10 gate, Local Market Source Ops V11 gate, Local Market Prewarm Console V12 gate, Local Market Recovery Console V13 gate, Local Real Use Loop V14 gate, Local User Query Loop V15 gate, Local Browser User Loop V16 gate, Local Watchlist V17 gate, Local Watchlist Board V18 gate, Local Query Workspace V19 gate, Local Public Entry V20 gate, Local Public User Flow V21 gate, Local Market Refresh V22 gate, Local History Snapshot Boundary V23 gate, Local History Center V24/V25 gates, Local History Center Usability V26 gate, Local History Export V27 gate, Local History State V28 gate, Local History Operations V29 gate, and Local History Detail V30 gate are present:

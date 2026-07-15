@@ -10,7 +10,7 @@ afterEach(() => {
 
 const data: PublicMarketHomeResponse = {
   asOf: '2026-07-13T01:30:00Z', aiUsed: false, informationalOnly: true,
-  events: [{ eventId: 'event-aapl', market: 'us', category: 'earnings', title: 'AAPL earnings results published', symbol: 'AAPL', name: 'Apple Inc.', eventTime: '2026-07-13T01:25:00Z', timeKind: 'published', publisher: 'Unit News', sourceState: { source: 'unit_news', status: 'fresh' }, classificationSource: 'keyword_rules', relevanceScore: 70, importance: 'high', relevanceReasons: ['linked_security', 'earnings_event'], sourceCount: 1, sourcePublishers: ['Unit News'] }],
+  events: [{ eventId: 'event-aapl', market: 'us', category: 'earnings', title: 'AAPL earnings results published', symbol: 'AAPL', name: 'Apple Inc.', eventTime: '2026-07-13T01:25:00Z', timeKind: 'published', publisher: 'Unit News', sourceState: { source: 'unit_news', status: 'fresh' }, classificationSource: 'keyword_rules', relevanceScore: 70, importance: 'high', relevanceReasons: ['linked_security', 'earnings_event'], sourceCount: 1, sourcePublishers: ['Unit News'], sourceRecords: [{ publisher: 'Unit News', source: 'unit_news', url: null, eventTime: '2026-07-13T01:25:00Z', timeKind: 'published' }] }],
   markets: [
     {
       market: 'cn', sessionState: 'open', displayMode: 'latest_available', rankingScope: 'market_wide', selectionBasis: 'market_wide_public_rankings_with_liquidity_filter',

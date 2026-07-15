@@ -7,6 +7,7 @@ import hashlib
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence
+from urllib.parse import urlparse
 
 
 MARKETS = ("cn", "hk", "us")
@@ -80,6 +81,7 @@ class PublicMarketEventService:
                 title_key = re.sub(r"\s+", " ", title).strip().casefold()
                 source_state = self._source_state(headline.get("source_state"))
                 source_ref, source_publisher = self._source_reference(headline, source_state)
+                source_record = self._source_record(headline, source_state, as_of)
                 existing = events_by_title.get(title_key)
                 if existing is not None:
                     source_refs = source_refs_by_title[title_key]
@@ -89,6 +91,9 @@ class PublicMarketEventService:
                         publishers = existing["source_publishers"]
                         if source_publisher and source_publisher not in publishers and len(publishers) < 8:
                             publishers.append(source_publisher)
+                        source_records = existing["source_records"]
+                        if len(source_records) < 8:
+                            source_records.append(source_record)
                     continue
                 explicit_symbol, explicit_market = self._explicit_exchange_symbol(title)
                 event_market = explicit_market or market
@@ -109,7 +114,7 @@ class PublicMarketEventService:
                     symbol=symbol,
                     has_market_signal=has_market_signal,
                     source_state=source_state,
-                    has_url=bool(self._optional_text(headline.get("url"))),
+                    has_url=bool(source_record["url"]),
                 )
                 event = {
                     "event_id": self._event_id(event_market, title, event_time),
@@ -122,7 +127,7 @@ class PublicMarketEventService:
                     "event_time": event_time,
                     "time_kind": time_kind,
                     "publisher": self._optional_text(headline.get("publisher")),
-                    "url": self._optional_text(headline.get("url")),
+                    "url": source_record["url"],
                     "source_state": source_state,
                     "classification_source": "keyword_rules",
                     "relevance_score": relevance_score,
@@ -130,6 +135,7 @@ class PublicMarketEventService:
                     "relevance_reasons": relevance_reasons,
                     "source_count": 1,
                     "source_publishers": [source_publisher] if source_publisher else [],
+                    "source_records": [source_record],
                 }
                 normalized.append((ordinal, event))
                 ordinal += 1
@@ -277,8 +283,39 @@ class PublicMarketEventService:
         return text or None
 
     @classmethod
+    def _safe_http_url(cls, value: Any) -> Optional[str]:
+        url = cls._optional_text(value)
+        if not url:
+            return None
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return None
+        if parsed.scheme.casefold() not in {"http", "https"} or not parsed.netloc:
+            return None
+        return url
+
+    @classmethod
+    def _source_record(
+        cls,
+        headline: Dict[str, Any],
+        source_state: Dict[str, Any],
+        as_of: str,
+    ) -> Dict[str, Any]:
+        published_at = str(headline.get("published_at") or "").strip()
+        source = str(source_state.get("source") or "public_market_news").strip() or "public_market_news"
+        publisher = cls._optional_text(headline.get("publisher")) or source
+        return {
+            "publisher": publisher,
+            "source": source,
+            "url": cls._safe_http_url(headline.get("url")),
+            "event_time": published_at or as_of,
+            "time_kind": "published" if published_at else "retrieved",
+        }
+
+    @classmethod
     def _source_reference(cls, headline: Dict[str, Any], source_state: Dict[str, Any]) -> tuple[str, Optional[str]]:
-        url = cls._optional_text(headline.get("url"))
+        url = cls._safe_http_url(headline.get("url"))
         publisher = cls._optional_text(headline.get("publisher"))
         source = str(source_state.get("source") or "public_market_news").strip()
         if url:

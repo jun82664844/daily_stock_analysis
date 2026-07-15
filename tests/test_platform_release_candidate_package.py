@@ -41,6 +41,14 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v129_event_source_evidence_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("scripts/verify_platform_event_source_evidence_v129.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_event_source_evidence_v129.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_event_source_evidence_v129_verifier.py", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-15-dsa-v129-event-source-evidence.md", REQUIRED_FILES)
+
     def test_v128_event_source_retention_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
