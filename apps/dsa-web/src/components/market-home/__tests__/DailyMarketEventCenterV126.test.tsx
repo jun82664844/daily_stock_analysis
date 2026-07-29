@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MarketSecurityItem, PublicMarketEvent } from '../../../api/marketWorkspace';
 import { MARKET_EVENT_SEEN_STORAGE_KEY } from '../../../lib/marketEventReadState';
 import DailyMarketEventCenterV126 from '../DailyMarketEventCenterV126';
+import { marketEventFollowUpStorageKey } from '../marketEventFollowUpV133';
 
 const events: PublicMarketEvent[] = [
   {
@@ -497,5 +498,29 @@ describe('DailyMarketEventCenterV126', () => {
     expect(within(panel).getByText('Check the original source and event time')).toBeInTheDocument();
     expect(within(panel).getByText('Verify quote source and freshness')).toBeInTheDocument();
     expect(within(panel).getByText('Compare later price and volume changes')).toBeInTheDocument();
+  });
+
+  it('lets a guest follow and remove an event from the V132 research card', () => {
+    render(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        marketItems={marketItems}
+        watchlistSymbols={[]}
+        eventFollowUpScope="guest"
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Research event linked to AAPL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Follow AAPL' }));
+
+    const followUpPanel = screen.getByTestId('market-event-follow-up-panel-v133');
+    expect(followUpPanel).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(marketEventFollowUpStorageKey('guest')) ?? '[]')).toHaveLength(1);
+
+    fireEvent.click(within(followUpPanel).getByRole('button', { name: 'Stop following AAPL' }));
+    expect(screen.queryByTestId('market-event-follow-up-panel-v133')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(marketEventFollowUpStorageKey('guest')) ?? '[]')).toEqual([]);
   });
 });

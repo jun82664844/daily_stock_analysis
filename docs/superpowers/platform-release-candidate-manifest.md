@@ -2779,3 +2779,34 @@ Verifier and documentation:
 Acceptance marker: `DSA_PLATFORM_EVENT_DRIVEN_RESEARCH_V132_OK`.
 
 Safety boundary: V132 reuses already-loaded public event and ranking data, adds no model or network call, stores no user identifier, degrades honestly when quote context is unavailable, and does not infer that an event caused a price move. All content remains information and data only rather than investment advice.
+
+## V133 Market Event Follow-up
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/marketEventFollowUpV133.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventFollowUpPanelV133.tsx`
+- `apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/marketEventFollowUpV133.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventFollowUpPanelV133.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_market_event_follow_up_v133.py`
+- `tests/test_platform_market_event_follow_up_v133_verifier.py`
+- `docs/superpowers/plans/2026-07-29-dsa-v133-market-event-follow-up.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_MARKET_EVENT_FOLLOW_UP_V133_OK`.
+
+Safety boundary: V133 stores at most 12 followed events and 32 observations per event in browser-local storage, migrates guest data only into the current numeric platform-user scope, and never persists email addresses. It reuses already-loaded public event and quote data, adds no network, model, API-quota or database call, does not claim that an event caused a market move, and provides information and data only rather than investment advice.

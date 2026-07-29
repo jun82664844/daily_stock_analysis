@@ -2458,3 +2458,32 @@ Verifier and documentation:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: client-only matching across all three loaded market sections, exclusion of market indices from linked-security candidates, truthful missing-quote degradation, bilingual research actions, source freshness, explicit non-causality wording, no new request/model/user tracking, and information-only boundaries.
+
+## V133 Market Event Follow-up
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/marketEventFollowUpV133.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventFollowUpPanelV133.tsx`
+- `apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/marketEventFollowUpV133.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventFollowUpPanelV133.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_market_event_follow_up_v133.py`
+- `tests/test_platform_market_event_follow_up_v133_verifier.py`
+- `docs/superpowers/plans/2026-07-29-dsa-v133-market-event-follow-up.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: exact-symbol matching, truthful follow-time baseline, same-day observation replacement, 1/3/5/20 day missing-data states, bounded local storage, guest-to-current-user migration, numeric-ID scope with no email persistence, bilingual controls, no network/model/database call, non-causality language, and information-only boundaries.

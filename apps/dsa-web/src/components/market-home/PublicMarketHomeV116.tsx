@@ -22,6 +22,7 @@ type Props = {
   onOpenSymbol: (symbol: string) => void;
   onCreateAlert: (draft: PriceAlertDraft) => Promise<void>;
   watchlistSymbols?: string[];
+  eventFollowUpScope?: string;
 };
 
 const MARKET_LABELS: Record<MarketCode, { zh: string; en: string }> = {
@@ -185,7 +186,15 @@ function MarketFeed({
   );
 }
 
-export default function PublicMarketHomeV116({ language, data, loading, onOpenSymbol, onCreateAlert, watchlistSymbols = [] }: Props) {
+export default function PublicMarketHomeV116({
+  language,
+  data,
+  loading,
+  onOpenSymbol,
+  onCreateAlert,
+  watchlistSymbols = [],
+  eventFollowUpScope = 'guest',
+}: Props) {
   const en = language === 'en';
   const [activeMarket, setActiveMarket] = useState<MarketCode>('cn');
   const [rankingKey, setRankingKey] = useState<RankingKey>('mostActive');
@@ -313,6 +322,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
               marketItems={marketItems}
               watchlistSymbols={watchlistSymbols}
               watchlistSectors={watchlistSectors}
+              eventFollowUpScope={eventFollowUpScope}
               onOpenSymbol={onOpenSymbol}
             />
           </div>

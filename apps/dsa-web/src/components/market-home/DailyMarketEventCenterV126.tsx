@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BookOpenCheck, CalendarDays, CheckCheck, ChevronDown, ChevronUp, ExternalLink, Search, Star } from 'lucide-react';
 import type { MarketCode, MarketEventCategory, MarketSecurityItem, PublicMarketEvent } from '../../api/marketWorkspace';
 import {
@@ -13,6 +13,15 @@ import {
   personalizeMarketEvents,
 } from './marketEventPersonalizationV130';
 import MarketEventResearchPanelV132 from './MarketEventResearchPanelV132';
+import MarketEventFollowUpPanelV133 from './MarketEventFollowUpPanelV133';
+import {
+  adoptGuestFollowedMarketEvents,
+  followMarketEvent,
+  loadFollowedMarketEvents,
+  recordFollowedMarketEventObservations,
+  unfollowMarketEvent,
+  type FollowedMarketEventV133,
+} from './marketEventFollowUpV133';
 
 type Props = {
   language: 'zh' | 'en';
@@ -20,6 +29,7 @@ type Props = {
   marketItems?: MarketSecurityItem[];
   watchlistSymbols?: string[];
   watchlistSectors?: string[];
+  eventFollowUpScope?: string;
   onOpenSymbol: (symbol: string) => void;
 };
 
@@ -29,6 +39,7 @@ type ViewMode = 'auto' | 'focus' | 'unread' | 'all';
 
 const FILTERS: Filter[] = ['all', 'earnings', 'announcement', 'dividend', 'trading_status', 'macro', 'corporate', 'market'];
 const MARKET_FILTERS: MarketFilter[] = ['all', 'cn', 'hk', 'us'];
+const EMPTY_MARKET_ITEMS: MarketSecurityItem[] = [];
 
 const copy = {
   zh: {
@@ -163,9 +174,10 @@ function safeSourceLink(value?: string | null): string | null {
 export default function DailyMarketEventCenterV126({
   language,
   events,
-  marketItems = [],
+  marketItems = EMPTY_MARKET_ITEMS,
   watchlistSymbols = [],
   watchlistSectors = [],
+  eventFollowUpScope = 'guest',
   onOpenSymbol,
 }: Props) {
   const t = copy[language];
@@ -174,6 +186,9 @@ export default function DailyMarketEventCenterV126({
   const [viewMode, setViewMode] = useState<ViewMode>('auto');
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [researchEventId, setResearchEventId] = useState<string | null>(null);
+  const [followedEvents, setFollowedEvents] = useState<FollowedMarketEventV133[]>(
+    () => loadFollowedMarketEvents(eventFollowUpScope),
+  );
   const currentEventIds = useMemo(() => events.map((event) => event.eventId), [events]);
   const [seenEventIds, setSeenEventIds] = useState<string[]>(
     () => loadSeenMarketEventIds() ?? saveSeenMarketEventIds(currentEventIds),
@@ -225,10 +240,43 @@ export default function DailyMarketEventCenterV126({
     });
     return items;
   }, [marketItems]);
+  const followedEventIds = useMemo(
+    () => new Set(followedEvents.map((item) => item.eventId)),
+    [followedEvents],
+  );
+
+  useEffect(() => {
+    const syncTimer = window.setTimeout(() => {
+      const loaded = eventFollowUpScope === 'guest'
+        ? loadFollowedMarketEvents('guest')
+        : adoptGuestFollowedMarketEvents(eventFollowUpScope);
+      setFollowedEvents(
+        loaded.length > 0
+          ? recordFollowedMarketEventObservations(eventFollowUpScope, marketItems)
+          : loaded,
+      );
+    }, 0);
+    return () => window.clearTimeout(syncTimer);
+  }, [eventFollowUpScope, marketItems]);
 
   const markAllRead = () => {
     const merged = mergeSeenMarketEventIds(seenEventIds, currentEventIds);
     setSeenEventIds(saveSeenMarketEventIds(merged));
+  };
+
+  const toggleFollow = (
+    event: PublicMarketEvent,
+    marketItem?: MarketSecurityItem,
+  ) => {
+    setFollowedEvents(
+      followedEventIds.has(event.eventId)
+        ? unfollowMarketEvent(event.eventId, eventFollowUpScope)
+        : followMarketEvent(event, marketItem, eventFollowUpScope),
+    );
+  };
+
+  const removeFollow = (eventId: string) => {
+    setFollowedEvents(unfollowMarketEvent(eventId, eventFollowUpScope));
   };
 
   return (
@@ -353,6 +401,14 @@ export default function DailyMarketEventCenterV126({
             </div>
           </div>
         </div>
+
+        <MarketEventFollowUpPanelV133
+          language={language}
+          followedEvents={followedEvents}
+          publicEvents={events}
+          onOpenSymbol={onOpenSymbol}
+          onRemove={removeFollow}
+        />
 
         {unreadActive && filtered.length === 0 ? (
           <div className="py-10 text-center">
@@ -531,6 +587,8 @@ export default function DailyMarketEventCenterV126({
                         language={language}
                         event={event}
                         marketItem={linkedMarketItem}
+                        isFollowed={followedEventIds.has(event.eventId)}
+                        onToggleFollow={() => toggleFollow(event, linkedMarketItem)}
                         onOpenSymbol={onOpenSymbol}
                         onClose={() => {
                           setResearchEventId(null);

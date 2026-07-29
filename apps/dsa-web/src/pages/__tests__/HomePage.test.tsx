@@ -24,6 +24,7 @@ describe('HomePage V126 source contract', () => {
   it('forwards private watchlist symbols only as client-side event context', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/pages/HomePage.tsx'), 'utf8');
     expect(source).toContain('watchlistSymbols={platformWatchlistItems.map((item) => item.stockCode)}');
+    expect(source).toContain("eventFollowUpScope={platformSession ? `user-${platformSession.user.id}` : 'guest'}");
     expect(source).not.toContain('events: platformWatchlistItems');
     expect(source).not.toContain('getHome(platformWatchlistItems');
   });

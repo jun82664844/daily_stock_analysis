@@ -1,4 +1,4 @@
-import { Database, ListChecks, Search, X } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Database, ListChecks, Search, X } from 'lucide-react';
 import type { MarketSecurityItem, PublicMarketEvent } from '../../api/marketWorkspace';
 import {
   formatMarketNumber,
@@ -11,6 +11,8 @@ type Props = {
   language: 'zh' | 'en';
   event: PublicMarketEvent;
   marketItem?: MarketSecurityItem;
+  isFollowed?: boolean;
+  onToggleFollow?: () => void;
   onOpenSymbol: (symbol: string) => void;
   onClose: () => void;
 };
@@ -42,6 +44,8 @@ export default function MarketEventResearchPanelV132({
   language,
   event,
   marketItem,
+  isFollowed = false,
+  onToggleFollow,
   onOpenSymbol,
   onClose,
 }: Props) {
@@ -139,15 +143,38 @@ export default function MarketEventResearchPanelV132({
           <p>{en ? 'Price changes and the event are shown together; this does not mean the event caused the move.' : '价格变化与事件同时呈现，不代表事件导致涨跌。'}</p>
           <p>{en ? 'Public information and data only. Not investment advice.' : '仅提供公开资讯和数据，不构成投资建议。'}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => onOpenSymbol(symbol)}
-          aria-label={en ? `Query linked security ${symbol}` : `查询关联证券 ${symbol}`}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-cyan-400/30 px-3 text-sm text-cyan-300 hover:bg-cyan-400/10"
-        >
-          <Search className="h-4 w-4" aria-hidden="true" />
-          {en ? 'Query linked security' : '查询关联证券'}
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {onToggleFollow ? (
+            <button
+              type="button"
+              onClick={onToggleFollow}
+              aria-label={en
+                ? `${isFollowed ? 'Stop following' : 'Follow'} ${symbol}`
+                : `${isFollowed ? '取消关注' : '关注后续'} ${symbol}`}
+              className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm ${
+                isFollowed
+                  ? 'border-amber-400/30 text-amber-300 hover:bg-amber-400/10'
+                  : 'border-white/15 text-slate-300 hover:border-cyan-400/30 hover:text-cyan-300'
+              }`}
+            >
+              {isFollowed
+                ? <BookmarkCheck className="h-4 w-4" aria-hidden="true" />
+                : <BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+              {en
+                ? (isFollowed ? 'Following' : 'Follow updates')
+                : (isFollowed ? '已关注后续' : '关注后续')}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onOpenSymbol(symbol)}
+            aria-label={en ? `Query linked security ${symbol}` : `查询关联证券 ${symbol}`}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-cyan-400/30 px-3 text-sm text-cyan-300 hover:bg-cyan-400/10"
+          >
+            <Search className="h-4 w-4" aria-hidden="true" />
+            {en ? 'Query linked security' : '查询关联证券'}
+          </button>
+        </div>
       </div>
     </section>
   );

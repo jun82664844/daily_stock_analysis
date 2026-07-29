@@ -41,6 +41,18 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v133_market_event_follow_up_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("apps/dsa-web/src/components/market-home/marketEventFollowUpV133.ts", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/MarketEventFollowUpPanelV133.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/__tests__/marketEventFollowUpV133.test.ts", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/__tests__/MarketEventFollowUpPanelV133.test.tsx", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_market_event_follow_up_v133.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_market_event_follow_up_v133.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_market_event_follow_up_v133_verifier.py", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-29-dsa-v133-market-event-follow-up.md", REQUIRED_FILES)
+
     def test_v132_event_driven_research_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

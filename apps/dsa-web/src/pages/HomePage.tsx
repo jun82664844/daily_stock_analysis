@@ -5850,6 +5850,7 @@ const HomePage: React.FC = () => {
                 data={publicMarketHome}
                 loading={publicMarketHomeLoading}
                 watchlistSymbols={platformWatchlistItems.map((item) => item.stockCode)}
+                eventFollowUpScope={platformSession ? `user-${platformSession.user.id}` : 'guest'}
                 onOpenSymbol={(symbol) => navigate(`/market?symbol=${encodeURIComponent(symbol)}`)}
                 onCreateAlert={handlePublicPriceAlert}
               />
