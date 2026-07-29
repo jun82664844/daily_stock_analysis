@@ -415,6 +415,10 @@ REQUIRED_FILES = (
     "docs/superpowers/plans/2026-07-15-dsa-v131-returning-user-event-inbox.md",
     "scripts/verify_platform_returning_event_inbox_v131.py",
     "tests/test_platform_returning_event_inbox_v131_verifier.py",
+    "docs/superpowers/plans/2026-07-15-dsa-v132-event-driven-research-loop.md",
+    "scripts/verify_platform_event_driven_research_v132.py",
+    "tests/test_platform_event_driven_research_v132_verifier.py",
+    "apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx",
 )
 
 VERIFIER_FILES = (
@@ -503,6 +507,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_event_source_evidence_v129.py",
     "scripts/verify_platform_personalized_market_events_v130.py",
     "scripts/verify_platform_returning_event_inbox_v131.py",
+    "scripts/verify_platform_event_driven_research_v132.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

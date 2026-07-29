@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PublicMarketEvent } from '../../../api/marketWorkspace';
+import type { MarketSecurityItem, PublicMarketEvent } from '../../../api/marketWorkspace';
 import { MARKET_EVENT_SEEN_STORAGE_KEY } from '../../../lib/marketEventReadState';
 import DailyMarketEventCenterV126 from '../DailyMarketEventCenterV126';
 
@@ -50,6 +50,22 @@ const events: PublicMarketEvent[] = [
     ],
   },
 ];
+
+const marketItems: MarketSecurityItem[] = [{
+  symbol: 'AAPL',
+  name: 'Apple Inc.',
+  market: 'us',
+  currency: 'USD',
+  currentPrice: 212.45,
+  changePercent: 1.25,
+  volume: 45_600_000,
+  turnover: 9_680_000_000,
+  sourceState: {
+    source: 'public_us_ranking',
+    status: 'fresh',
+    observedAt: '2026-07-14T02:10:00Z',
+  },
+}];
 
 describe('DailyMarketEventCenterV126', () => {
   beforeEach(() => localStorage.clear());
@@ -400,5 +416,55 @@ describe('DailyMarketEventCenterV126', () => {
     );
 
     expect(screen.getByText('暂未取得可展示的公开市场事件')).toBeInTheDocument();
+  });
+
+  it('opens a no-AI event research card with linked public market context', () => {
+    const open = vi.fn();
+    render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        marketItems={marketItems}
+        watchlistSymbols={[]}
+        onOpenSymbol={open}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '研究 AAPL 关联事件' }));
+    const panel = screen.getByTestId('market-event-research-panel-v132');
+    expect(within(panel).getByText('事件研究卡')).toBeInTheDocument();
+    expect(within(panel).getByText('AAPL · Apple Inc.')).toBeInTheDocument();
+    expect(within(panel).getByText('212.45')).toBeInTheDocument();
+    expect(within(panel).getByText('+1.25%')).toBeInTheDocument();
+    expect(within(panel).getByText('4,560万')).toBeInTheDocument();
+    expect(within(panel).getByText('96.8亿')).toBeInTheDocument();
+    expect(within(panel).getByText('价格变化与事件同时呈现，不代表事件导致涨跌。')).toBeInTheDocument();
+    expect(within(panel).getByText('仅提供公开资讯和数据，不构成投资建议。')).toBeInTheDocument();
+
+    fireEvent.click(within(panel).getByRole('button', { name: '查询关联证券 AAPL' }));
+    expect(open).toHaveBeenCalledWith('AAPL');
+    fireEvent.click(within(panel).getByRole('button', { name: '关闭事件研究卡' }));
+    expect(screen.queryByTestId('market-event-research-panel-v132')).not.toBeInTheDocument();
+  });
+
+  it('degrades honestly when linked quote context is unavailable and shows a research checklist', () => {
+    render(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        marketItems={[]}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Research event linked to AAPL' }));
+    const panel = screen.getByTestId('market-event-research-panel-v132');
+    expect(within(panel).getByText('This security is not present in the loaded public rankings. Open the stock page to request the latest available data.')).toBeInTheDocument();
+    expect(within(panel).queryByTestId('market-event-public-quote-v132')).not.toBeInTheDocument();
+    expect(within(panel).getByText('Research checklist')).toBeInTheDocument();
+    expect(within(panel).getByText('Check the original source and event time')).toBeInTheDocument();
+    expect(within(panel).getByText('Verify quote source and freshness')).toBeInTheDocument();
+    expect(within(panel).getByText('Compare later price and volume changes')).toBeInTheDocument();
   });
 });

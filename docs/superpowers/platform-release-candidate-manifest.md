@@ -2753,3 +2753,28 @@ Verifier and documentation:
 Acceptance marker: `DSA_PLATFORM_EVENT_SOURCE_RETENTION_V128_OK`.
 
 Safety boundary: source counts describe distinct public records and do not claim independent verification; read state is capped at 200 event IDs and remains browser-local. V128 adds no network source or model call, consumes no AI quota, changes no user data, and provides information and data only rather than investment advice.
+
+## V132 Event-Driven Research Loop
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_event_driven_research_v132.py`
+- `tests/test_platform_event_driven_research_v132_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v132-event-driven-research-loop.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Acceptance marker: `DSA_PLATFORM_EVENT_DRIVEN_RESEARCH_V132_OK`.
+
+Safety boundary: V132 reuses already-loaded public event and ranking data, adds no model or network call, stores no user identifier, degrades honestly when quote context is unavailable, and does not infer that an event caused a price move. All content remains information and data only rather than investment advice.

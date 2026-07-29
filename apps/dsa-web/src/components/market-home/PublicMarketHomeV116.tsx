@@ -210,6 +210,21 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
     if (rankingKey === 'losers') return activeSection.losers ?? [];
     return activeSection.mostActive ?? activeSection.attention ?? [];
   }, [activeSection, rankingKey]);
+  const marketItems = useMemo(() => {
+    const unique = new Map<string, MarketSecurityItem>();
+    sections.forEach((section) => {
+      const candidates = [
+        ...section.attention,
+        ...(section.mostActive ?? []),
+        ...(section.gainers ?? []),
+        ...(section.losers ?? []),
+      ];
+      candidates.forEach((item) => {
+        if (!unique.has(item.symbol)) unique.set(item.symbol, item);
+      });
+    });
+    return Array.from(unique.values());
+  }, [sections]);
   const selectedAlertItem = useMemo(() => {
     if (!activeSection || !expandedSymbol) return undefined;
     const candidates = [
@@ -295,6 +310,7 @@ export default function PublicMarketHomeV116({ language, data, loading, onOpenSy
             <DailyMarketEventCenterV126
               language={language}
               events={data.events}
+              marketItems={marketItems}
               watchlistSymbols={watchlistSymbols}
               watchlistSectors={watchlistSectors}
               onOpenSymbol={onOpenSymbol}

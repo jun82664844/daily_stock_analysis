@@ -2434,3 +2434,26 @@ Verifier and documentation:
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: bounded distinct-source aggregation, old-cache defaults, first-visit baseline semantics, local-only and bounded event-ID storage, bilingual mark-read controls, source-record wording that avoids implying independent verification, no new request or model call, and no investment-advice language.
+
+## V132 Event-Driven Research Loop
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_event_driven_research_v132.py`
+- `tests/test_platform_event_driven_research_v132_verifier.py`
+- `docs/superpowers/plans/2026-07-15-dsa-v132-event-driven-research-loop.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: client-only matching across all three loaded market sections, truthful missing-quote degradation, bilingual research actions, source freshness, explicit non-causality wording, no new request/model/user tracking, and information-only boundaries.

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, CheckCheck, ChevronDown, ChevronUp, ExternalLink, Search, Star } from 'lucide-react';
-import type { MarketCode, MarketEventCategory, PublicMarketEvent } from '../../api/marketWorkspace';
+import { BookOpenCheck, CalendarDays, CheckCheck, ChevronDown, ChevronUp, ExternalLink, Search, Star } from 'lucide-react';
+import type { MarketCode, MarketEventCategory, MarketSecurityItem, PublicMarketEvent } from '../../api/marketWorkspace';
 import {
   getUnseenMarketEventIds,
   loadSeenMarketEventIds,
@@ -12,10 +12,12 @@ import {
   normalizeMarketEventSymbol,
   personalizeMarketEvents,
 } from './marketEventPersonalizationV130';
+import MarketEventResearchPanelV132 from './MarketEventResearchPanelV132';
 
 type Props = {
   language: 'zh' | 'en';
   events: PublicMarketEvent[];
+  marketItems?: MarketSecurityItem[];
   watchlistSymbols?: string[];
   watchlistSectors?: string[];
   onOpenSymbol: (symbol: string) => void;
@@ -73,6 +75,8 @@ const copy = {
       cached_source: '缓存来源', source_link: '可追溯原文',
     },
     query: '查询',
+    research: '研究事件',
+    researchLabel: (symbol: string) => `研究 ${symbol} 关联事件`,
     source: '来源',
     retrieved: '抓取',
     empty: '暂未取得可展示的公开市场事件',
@@ -123,6 +127,8 @@ const copy = {
       cached_source: 'Cached source', source_link: 'Traceable source',
     },
     query: 'Query',
+    research: 'Research event',
+    researchLabel: (symbol: string) => `Research event linked to ${symbol}`,
     source: 'Source',
     retrieved: 'Retrieved',
     empty: 'No public market events are available yet',
@@ -157,6 +163,7 @@ function safeSourceLink(value?: string | null): string | null {
 export default function DailyMarketEventCenterV126({
   language,
   events,
+  marketItems = [],
   watchlistSymbols = [],
   watchlistSectors = [],
   onOpenSymbol,
@@ -166,6 +173,7 @@ export default function DailyMarketEventCenterV126({
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('auto');
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [researchEventId, setResearchEventId] = useState<string | null>(null);
   const currentEventIds = useMemo(() => events.map((event) => event.eventId), [events]);
   const [seenEventIds, setSeenEventIds] = useState<string[]>(
     () => loadSeenMarketEventIds() ?? saveSeenMarketEventIds(currentEventIds),
@@ -209,6 +217,14 @@ export default function DailyMarketEventCenterV126({
     ).size,
     [watchlistSymbols],
   );
+  const marketItemBySymbol = useMemo(() => {
+    const items = new Map<string, MarketSecurityItem>();
+    marketItems.forEach((item) => {
+      const normalized = normalizeMarketEventSymbol(item.symbol);
+      if (normalized && !items.has(normalized)) items.set(normalized, item);
+    });
+    return items;
+  }, [marketItems]);
 
   const markAllRead = () => {
     const merged = mergeSeenMarketEventIds(seenEventIds, currentEventIds);
@@ -369,6 +385,10 @@ export default function DailyMarketEventCenterV126({
               )).slice(0, 3);
               const sourceRecords = (Array.isArray(event.sourceRecords) ? event.sourceRecords : []).slice(0, 8);
               const sourceDetailsOpen = expandedEventId === event.eventId;
+              const researchOpen = researchEventId === event.eventId;
+              const linkedMarketItem = event.symbol
+                ? marketItemBySymbol.get(normalizeMarketEventSymbol(event.symbol))
+                : undefined;
               const sourceDetailsId = `event-sources-${event.eventId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
               return (
                 <article key={event.eventId} className="grid gap-3 py-4 md:grid-cols-[150px_minmax(0,1fr)_auto] md:items-start">
@@ -481,15 +501,38 @@ export default function DailyMarketEventCenterV126({
                     ) : null}
                   </div>
                   {event.symbol ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenSymbol(event.symbol as string)}
-                      aria-label={`${t.query} ${event.symbol}`}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-cyan-400/30 px-3 text-sm text-cyan-300 hover:bg-cyan-400/10"
-                    >
-                      <Search className="h-4 w-4" aria-hidden="true" />
-                      {event.symbol}
-                    </button>
+                    <div className="flex flex-wrap gap-2 md:flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setResearchEventId(researchOpen ? null : event.eventId)}
+                        aria-expanded={researchOpen}
+                        aria-label={t.researchLabel(event.symbol)}
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-sm text-slate-300 hover:border-cyan-400/30 hover:text-cyan-300"
+                      >
+                        <BookOpenCheck className="h-4 w-4" aria-hidden="true" />
+                        {t.research}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSymbol(event.symbol as string)}
+                        aria-label={`${t.query} ${event.symbol}`}
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-cyan-400/30 px-3 text-sm text-cyan-300 hover:bg-cyan-400/10"
+                      >
+                        <Search className="h-4 w-4" aria-hidden="true" />
+                        {event.symbol}
+                      </button>
+                    </div>
+                  ) : null}
+                  {researchOpen && event.symbol ? (
+                    <div className="md:col-span-3">
+                      <MarketEventResearchPanelV132
+                        language={language}
+                        event={event}
+                        marketItem={linkedMarketItem}
+                        onOpenSymbol={onOpenSymbol}
+                        onClose={() => setResearchEventId(null)}
+                      />
+                    </div>
                   ) : null}
                 </article>
               );
