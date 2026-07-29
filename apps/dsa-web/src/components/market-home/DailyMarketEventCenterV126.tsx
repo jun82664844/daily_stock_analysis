@@ -390,6 +390,7 @@ export default function DailyMarketEventCenterV126({
                 ? marketItemBySymbol.get(normalizeMarketEventSymbol(event.symbol))
                 : undefined;
               const sourceDetailsId = `event-sources-${event.eventId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+              const researchTriggerId = `event-research-${event.eventId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
               return (
                 <article key={event.eventId} className="grid gap-3 py-4 md:grid-cols-[150px_minmax(0,1fr)_auto] md:items-start">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -503,6 +504,7 @@ export default function DailyMarketEventCenterV126({
                   {event.symbol ? (
                     <div className="flex flex-wrap gap-2 md:flex-col">
                       <button
+                        id={researchTriggerId}
                         type="button"
                         onClick={() => setResearchEventId(researchOpen ? null : event.eventId)}
                         aria-expanded={researchOpen}
@@ -530,7 +532,10 @@ export default function DailyMarketEventCenterV126({
                         event={event}
                         marketItem={linkedMarketItem}
                         onOpenSymbol={onOpenSymbol}
-                        onClose={() => setResearchEventId(null)}
+                        onClose={() => {
+                          setResearchEventId(null);
+                          document.getElementById(researchTriggerId)?.focus();
+                        }}
                       />
                     </div>
                   ) : null}

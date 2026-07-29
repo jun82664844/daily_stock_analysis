@@ -45,6 +45,7 @@ class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
         self.assertIn("apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx", REQUIRED_FILES)
         self.assertIn("scripts/verify_platform_event_driven_research_v132.py", REQUIRED_FILES)
         self.assertIn("scripts/verify_platform_event_driven_research_v132.py", VERIFIER_FILES)
         self.assertIn("tests/test_platform_event_driven_research_v132_verifier.py", REQUIRED_FILES)

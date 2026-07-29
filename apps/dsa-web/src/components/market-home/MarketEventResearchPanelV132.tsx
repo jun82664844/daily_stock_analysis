@@ -28,6 +28,11 @@ function compactNumber(value: number | null | undefined, language: 'zh' | 'en'):
   return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
+function marketNumber(value: number | null | undefined, language: 'zh' | 'en'): string {
+  if (value == null || !Number.isFinite(value)) return language === 'en' ? 'Unavailable' : '暂不可用';
+  return formatMarketNumber(value, language);
+}
+
 function percent(value: number | null | undefined, language: 'zh' | 'en'): string {
   if (value == null || !Number.isFinite(value)) return language === 'en' ? 'Unavailable' : '暂不可用';
   return `${value > 0 ? '+' : ''}${value.toLocaleString(language === 'en' ? 'en-US' : 'zh-CN', { maximumFractionDigits: 2 })}%`;
@@ -92,7 +97,7 @@ export default function MarketEventResearchPanelV132({
           </div>
           <div className="mt-2 grid gap-px overflow-hidden border-y border-white/10 bg-white/10 grid-cols-2 lg:grid-cols-4">
             {[
-              [en ? 'Latest' : '最新价', formatMarketNumber(marketItem.currentPrice, language)],
+              [en ? 'Latest' : '最新价', marketNumber(marketItem.currentPrice, language)],
               [en ? 'Change' : '涨跌幅', percent(marketItem.changePercent, language)],
               [en ? 'Volume' : '成交量', compactNumber(marketItem.volume, language)],
               [en ? 'Turnover' : '成交额', compactNumber(marketItem.turnover, language)],

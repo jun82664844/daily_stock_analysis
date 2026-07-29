@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable
@@ -56,10 +59,27 @@ def privacy_cost_contract(source: str) -> CheckResult:
     )
 
 
+def market_items_wiring_block(home_source: str) -> str:
+    start = "const marketItems = useMemo"
+    end = "const selectedAlertItem"
+    if start not in home_source:
+        return ""
+    block = home_source.split(start, 1)[1]
+    return block.split(end, 1)[0]
+
+
+def frontend_safety_contract(daily_source: str, panel_source: str, home_source: str) -> CheckResult:
+    return privacy_cost_contract(
+        f"{daily_source}\n{panel_source}\n{market_items_wiring_block(home_source)}"
+    )
+
+
 def regression_tests_contract(source: str) -> CheckResult:
     required = (
         "opens a no-AI event research card with linked public market context",
+        "shows localized unavailable text when a linked quote field is missing",
         "degrades honestly when linked quote context is unavailable and shows a research checklist",
+        "does not use a market index quote as linked-security research context",
         "getByRole('button', { name: '研究 AAPL 关联事件' })",
         "getByTestId('market-event-research-panel-v132')",
     )
@@ -73,7 +93,40 @@ def regression_tests_contract(source: str) -> CheckResult:
     )
     if not degraded_path_evidence:
         missing.append("degraded quote path assertion")
-    return CheckResult("v132_regression_tests", not missing, {"missing": missing})
+    return CheckResult("v132_regression_test_contract", not missing, {"missing": missing})
+
+
+def focused_vitest_check(repo_root: Path) -> CheckResult:
+    npm_executable = shutil.which("npm.cmd") or shutil.which("npm")
+    if npm_executable is None:
+        return CheckResult("v132_focused_vitest", False, {"reason": "npm_not_found"})
+    test_files = (
+        "src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx",
+        "src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx",
+    )
+    completed = subprocess.run(
+        [npm_executable, "test", "--", "--run", *test_files],
+        cwd=repo_root / "apps/dsa-web",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    output_lines = [
+        line.strip()
+        for line in f"{completed.stdout}\n{completed.stderr}".splitlines()
+        if line.strip()
+    ]
+    return CheckResult(
+        "v132_focused_vitest",
+        completed.returncode == 0,
+        {
+            "returncode": completed.returncode,
+            "test_files": list(test_files),
+            "summary": " | ".join(output_lines[-6:]),
+        },
+    )
 
 
 def wiring_contract(daily_source: str, home_source: str) -> CheckResult:
@@ -84,29 +137,69 @@ def wiring_contract(daily_source: str, home_source: str) -> CheckResult:
         "normalizeMarketEventSymbol(event.symbol)",
         "<MarketEventResearchPanelV132",
         "marketItems={marketItems}",
+        "...section.attention,",
         "...(section.mostActive ?? [])",
         "...(section.gainers ?? [])",
         "...(section.losers ?? [])",
     )
     combined = f"{daily_source}\n{home_source}"
     missing = [token for token in required if token not in combined]
-    return CheckResult("three_market_public_data_wiring", not missing, {"missing": missing})
+    market_items_block = market_items_wiring_block(home_source)
+    forbidden_hits = [
+        token for token in ("...section.indices",)
+        if token in market_items_block
+    ]
+    return CheckResult(
+        "three_market_public_data_wiring",
+        not missing and not forbidden_hits,
+        {"missing": missing, "forbidden_hits": forbidden_hits},
+    )
 
 
 def homepage_bundle_check(assets_dir: Path, *, source_paths: Iterable[Path] = ()) -> CheckResult:
-    chunks = list(assets_dir.glob("HomePage-*.js"))
-    if not chunks:
-        return CheckResult("homepage_bundle", False, {"reason": "homepage_chunk_missing"})
-    newest = max(chunks, key=lambda path: path.stat().st_mtime_ns)
+    index_html = assets_dir.parent / "index.html"
+    if not index_html.is_file():
+        return CheckResult("homepage_bundle", False, {"reason": "index_html_missing"})
+    entry_match = re.search(
+        r"/assets/(?P<entry>index-[A-Za-z0-9_-]+\.js)",
+        index_html.read_text(encoding="utf-8"),
+    )
+    if entry_match is None:
+        return CheckResult("homepage_bundle", False, {"reason": "current_entry_missing"})
+    entry_path = assets_dir / entry_match.group("entry")
+    if not entry_path.is_file():
+        return CheckResult(
+            "homepage_bundle",
+            False,
+            {"reason": "current_entry_asset_missing", "entry": entry_path.name},
+        )
+    home_match = re.search(
+        r"(?P<chunk>HomePage-[A-Za-z0-9_-]+\.js)",
+        entry_path.read_text(encoding="utf-8"),
+    )
+    if home_match is None:
+        return CheckResult(
+            "homepage_bundle",
+            False,
+            {"reason": "current_homepage_reference_missing", "entry": entry_path.name},
+        )
+    current = assets_dir / home_match.group("chunk")
+    if not current.is_file():
+        return CheckResult(
+            "homepage_bundle",
+            False,
+            {"reason": "current_homepage_chunk_missing", "filename": current.name},
+        )
     existing_sources = [path for path in source_paths if path.exists()]
     latest_source_mtime_ns = max((path.stat().st_mtime_ns for path in existing_sources), default=0)
-    size = newest.stat().st_size
-    bundle_fresh = newest.stat().st_mtime_ns >= latest_source_mtime_ns
+    size = current.stat().st_size
+    bundle_fresh = current.stat().st_mtime_ns >= latest_source_mtime_ns
     return CheckResult(
         "homepage_bundle",
         size < MAX_HOMEPAGE_BYTES and bundle_fresh,
         {
-            "filename": newest.name,
+            "filename": current.name,
+            "entry": entry_path.name,
             "size_bytes": size,
             "limit_bytes": MAX_HOMEPAGE_BYTES,
             "bundle_fresh": bundle_fresh,
@@ -119,18 +212,21 @@ def run_checks(repo_root: Path) -> Iterable[CheckResult]:
     panel_path = repo_root / "apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx"
     home_path = repo_root / "apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx"
     test_path = repo_root / "apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx"
+    home_test_path = repo_root / "apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx"
     daily_source = daily_path.read_text(encoding="utf-8")
     panel_source = panel_path.read_text(encoding="utf-8")
     home_source = home_path.read_text(encoding="utf-8")
     test_source = test_path.read_text(encoding="utf-8")
+    home_test_source = home_test_path.read_text(encoding="utf-8")
 
     yield frontend_contract(f"{daily_source}\n{panel_source}")
     yield wiring_contract(daily_source, home_source)
-    yield privacy_cost_contract(panel_source)
-    yield regression_tests_contract(test_source)
+    yield frontend_safety_contract(daily_source, panel_source, home_source)
+    yield regression_tests_contract(f"{test_source}\n{home_test_source}")
+    yield focused_vitest_check(repo_root)
     yield homepage_bundle_check(
         repo_root / "static/assets",
-        source_paths=(daily_path, panel_path, home_path, test_path),
+        source_paths=(daily_path, panel_path, home_path, test_path, home_test_path),
     )
 
 

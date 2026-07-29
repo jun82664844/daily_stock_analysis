@@ -2762,6 +2762,7 @@ Frontend:
 - `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
 - `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
 - `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
 
 Verifier and documentation:
 

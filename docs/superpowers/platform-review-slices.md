@@ -2443,6 +2443,7 @@ Frontend:
 - `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
 - `apps/dsa-web/src/components/market-home/PublicMarketHomeV116.tsx`
 - `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx`
 
 Verifier and documentation:
 
@@ -2456,4 +2457,4 @@ Verifier and documentation:
 - `docs/superpowers/platform-local-v1-acceptance-status.md`
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
-Review focus: client-only matching across all three loaded market sections, truthful missing-quote degradation, bilingual research actions, source freshness, explicit non-causality wording, no new request/model/user tracking, and information-only boundaries.
+Review focus: client-only matching across all three loaded market sections, exclusion of market indices from linked-security candidates, truthful missing-quote degradation, bilingual research actions, source freshness, explicit non-causality wording, no new request/model/user tracking, and information-only boundaries.

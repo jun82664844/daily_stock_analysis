@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { marketWorkspaceApi, type PublicMarketHomeResponse, type SymbolWorkspaceResponse } from '../../../api/marketWorkspace';
 import PublicMarketHomeV116 from '../PublicMarketHomeV116';
@@ -85,6 +85,44 @@ describe('PublicMarketHomeV116', () => {
     expect(await screen.findByTestId('daily-market-event-center-v126')).toBeInTheDocument();
     expect(screen.getByText('自选相关')).toBeInTheDocument();
     expect(screen.getByText('相关行业')).toBeInTheDocument();
+  });
+
+  it('does not use a market index quote as linked-security research context', async () => {
+    const indexCollisionData: PublicMarketHomeResponse = {
+      ...data,
+      events: [{
+        ...data.events[0],
+        eventId: 'event-000001-sz',
+        market: 'cn',
+        title: '平安银行发布公司公告',
+        symbol: '000001.SZ',
+        name: '平安银行',
+      }],
+      markets: data.markets.map((market) => market.market !== 'cn' ? market : {
+        ...market,
+        attention: [],
+        mostActive: [],
+        gainers: [],
+        losers: [],
+      }),
+    };
+
+    render(
+      <PublicMarketHomeV116
+        language="zh"
+        data={indexCollisionData}
+        loading={false}
+        onOpenSymbol={vi.fn()}
+        onCreateAlert={vi.fn()}
+      />,
+    );
+
+    const eventCenter = await screen.findByTestId('daily-market-event-center-v126');
+    fireEvent.click(within(eventCenter).getByRole('button', { name: '研究 000001.SZ 关联事件' }));
+    const panel = within(eventCenter).getByTestId('market-event-research-panel-v132');
+    expect(within(panel).getByTestId('market-event-quote-unavailable-v132')).toBeInTheDocument();
+    expect(within(panel).queryByTestId('market-event-public-quote-v132')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('3,250.12')).not.toBeInTheDocument();
   });
 
   it('mounts the V124 workbench and remembers a ranking stock before opening the free query', () => {

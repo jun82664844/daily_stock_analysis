@@ -419,6 +419,7 @@ REQUIRED_FILES = (
     "scripts/verify_platform_event_driven_research_v132.py",
     "tests/test_platform_event_driven_research_v132_verifier.py",
     "apps/dsa-web/src/components/market-home/MarketEventResearchPanelV132.tsx",
+    "apps/dsa-web/src/components/market-home/__tests__/PublicMarketHomeV116.test.tsx",
 )
 
 VERIFIER_FILES = (

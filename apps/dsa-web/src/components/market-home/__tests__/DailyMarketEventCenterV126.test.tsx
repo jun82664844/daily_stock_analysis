@@ -445,6 +445,37 @@ describe('DailyMarketEventCenterV126', () => {
     expect(open).toHaveBeenCalledWith('AAPL');
     fireEvent.click(within(panel).getByRole('button', { name: '关闭事件研究卡' }));
     expect(screen.queryByTestId('market-event-research-panel-v132')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '研究 AAPL 关联事件' })).toHaveFocus();
+  });
+
+  it('shows localized unavailable text when a linked quote field is missing', () => {
+    const partialItems: MarketSecurityItem[] = [{
+      ...marketItems[0],
+      currentPrice: null,
+    }];
+    const { rerender } = render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        marketItems={partialItems}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '研究 AAPL 关联事件' }));
+    expect(within(screen.getByTestId('market-event-research-panel-v132')).getByText('暂不可用')).toBeInTheDocument();
+
+    rerender(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        marketItems={partialItems}
+        watchlistSymbols={[]}
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+    expect(within(screen.getByTestId('market-event-research-panel-v132')).getByText('Unavailable')).toBeInTheDocument();
   });
 
   it('degrades honestly when linked quote context is unavailable and shows a research checklist', () => {
