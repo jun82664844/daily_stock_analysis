@@ -116,6 +116,31 @@ const response: PublicSymbolEventArchiveResponse = {
     benchmarkSourceState: null,
     warningCodes: ['event_price_observation_unavailable'],
   }],
+  comparisonSummaries: [{
+    eventType: 'earnings',
+    eventCount: 1,
+    observedEventCount: 1,
+    windows: [{
+      tradingDays: 1,
+      sampleSize: 1,
+      benchmarkSampleSize: 1,
+      relativeSampleSize: 1,
+      positiveCount: 1,
+      negativeCount: 0,
+      flatCount: 0,
+      symbolMedianReturnPercent: 2,
+      symbolMinReturnPercent: 2,
+      symbolMaxReturnPercent: 2,
+      benchmarkMedianReturnPercent: 1,
+      relativeMedianReturnPercent: 1,
+      completenessPercent: 100,
+    }],
+  }, {
+    eventType: 'dividend',
+    eventCount: 1,
+    observedEventCount: 0,
+    windows: [],
+  }],
   availableEventTypes: ['earnings', 'dividend'],
   warnings: [],
   aiUsed: false,
@@ -151,6 +176,57 @@ describe('SymbolEventArchiveV139', () => {
     fireEvent.click(within(panel).getByRole('button', { name: '分红除息' }));
     expect(within(panel).getByText('Apple Inc.（AAPL）分红除息')).toBeInTheDocument();
     expect(within(panel).queryByText('Apple Inc.（AAPL）财报披露')).not.toBeInTheDocument();
+  });
+
+  it('links a V141 historical sample selection back to the V140 timeline', async () => {
+    const olderEarnings = {
+      ...response.items[0],
+      eventId: 'earnings-aapl-older',
+      eventTime: '2026-06-20T00:00:00Z',
+      baselineDate: '2026-06-20',
+      windows: [{
+        ...response.items[0].windows[0],
+        observedDate: '2026-06-21',
+        symbolReturnPercent: 7,
+        benchmarkReturnPercent: 2,
+        relativeReturnPercent: 5,
+      }],
+    };
+    vi.mocked(marketWorkspaceApi.getSymbolEventArchive).mockResolvedValueOnce({
+      ...response,
+      items: [response.items[0], olderEarnings, response.items[1]],
+      comparisonSummaries: [{
+        ...response.comparisonSummaries[0],
+        eventCount: 2,
+        observedEventCount: 2,
+        windows: [{
+          ...response.comparisonSummaries[0].windows[0],
+          sampleSize: 2,
+          benchmarkSampleSize: 2,
+          relativeSampleSize: 2,
+          positiveCount: 2,
+          symbolMedianReturnPercent: 4.5,
+          symbolMinReturnPercent: 2,
+          symbolMaxReturnPercent: 7,
+          benchmarkMedianReturnPercent: 1.5,
+          relativeMedianReturnPercent: 3,
+          completenessPercent: 100,
+        }],
+      }, response.comparisonSummaries[1]],
+    });
+
+    render(<SymbolEventArchiveV139 language="zh" symbol="AAPL" />);
+
+    const comparison = await screen.findByRole('region', { name: '同类事件历史对比' });
+    fireEvent.click(
+      within(comparison).getByRole('button', { name: /06\/20.*财报披露/ }),
+    );
+
+    const timeline = screen.getByRole('region', { name: '事件与K线联动图' });
+    expect(within(timeline).getByText('+7.00%')).toBeInTheDocument();
+    expect(
+      within(timeline).getByRole('button', { name: /06\/20.*财报披露/ }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('reloads a bounded 24-month archive and renders English text', async () => {

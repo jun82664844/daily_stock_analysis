@@ -238,6 +238,32 @@ class PublicSymbolEventChart(StrictModel):
     warning_codes: List[str] = Field(default_factory=list, max_length=8)
 
 
+class PublicSymbolEventComparisonWindow(StrictModel):
+    trading_days: Literal[1, 3, 5, 20]
+    sample_size: int = Field(ge=0, le=24)
+    benchmark_sample_size: int = Field(ge=0, le=24)
+    relative_sample_size: int = Field(ge=0, le=24)
+    positive_count: int = Field(ge=0, le=24)
+    negative_count: int = Field(ge=0, le=24)
+    flat_count: int = Field(ge=0, le=24)
+    symbol_median_return_percent: Optional[float] = None
+    symbol_min_return_percent: Optional[float] = None
+    symbol_max_return_percent: Optional[float] = None
+    benchmark_median_return_percent: Optional[float] = None
+    relative_median_return_percent: Optional[float] = None
+    completeness_percent: float = Field(ge=0, le=100)
+
+
+class PublicSymbolEventComparisonSummary(StrictModel):
+    event_type: SymbolArchiveEventType
+    event_count: int = Field(ge=1, le=24)
+    observed_event_count: int = Field(ge=0, le=24)
+    windows: List[PublicSymbolEventComparisonWindow] = Field(
+        default_factory=list,
+        max_length=4,
+    )
+
+
 class PublicSymbolEventArchiveResponse(StrictModel):
     symbol: str
     name: str
@@ -249,6 +275,9 @@ class PublicSymbolEventArchiveResponse(StrictModel):
         max_length=24,
     )
     chart: PublicSymbolEventChart
+    comparison_summaries: List[
+        PublicSymbolEventComparisonSummary
+    ] = Field(default_factory=list, max_length=5)
     available_event_types: List[SymbolArchiveEventType] = Field(
         default_factory=list,
         max_length=5,

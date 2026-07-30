@@ -27,6 +27,8 @@ type Props = {
   chart: PublicSymbolEventChart;
   events: PublicSymbolEventArchiveItem[];
   windowDays: 1 | 3 | 5 | 20;
+  selectedEventId?: string;
+  onSelectEvent?: (eventId: string) => void;
 };
 
 const EVENT_LABELS: Record<SymbolArchiveEventType, { zh: string; en: string }> = {
@@ -62,12 +64,19 @@ export default function SymbolEventTimelineV140({
   chart,
   events,
   windowDays,
+  selectedEventId,
+  onSelectEvent,
 }: Props) {
   const en = language === 'en';
-  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [localSelectedEventId, setLocalSelectedEventId] = useState<string>('');
+  const effectiveSelectedEventId = selectedEventId ?? localSelectedEventId;
   const activeEvent = useMemo(
-    () => events.find((item) => item.eventId === selectedEventId) ?? events[0] ?? null,
-    [events, selectedEventId],
+    () => (
+      events.find((item) => item.eventId === effectiveSelectedEventId)
+      ?? events[0]
+      ?? null
+    ),
+    [effectiveSelectedEventId, events],
   );
   const activeObservation = activeEvent?.windows.find(
     (window) => window.tradingDays === windowDays,
@@ -238,7 +247,13 @@ export default function SymbolEventTimelineV140({
                 className={active ? 'btn-primary' : 'btn-secondary'}
                 aria-pressed={active}
                 aria-label={`${dateLabel} ${label}`}
-                onClick={() => setSelectedEventId(item.eventId)}
+                onClick={() => {
+                  if (onSelectEvent) {
+                    onSelectEvent(item.eventId);
+                  } else {
+                    setLocalSelectedEventId(item.eventId);
+                  }
+                }}
               >
                 {dateLabel} · {label}
               </button>

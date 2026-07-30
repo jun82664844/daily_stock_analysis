@@ -262,6 +262,29 @@ export type PublicSymbolEventChart = {
   warningCodes: string[];
 };
 
+export type PublicSymbolEventComparisonWindow = {
+  tradingDays: 1 | 3 | 5 | 20;
+  sampleSize: number;
+  benchmarkSampleSize: number;
+  relativeSampleSize: number;
+  positiveCount: number;
+  negativeCount: number;
+  flatCount: number;
+  symbolMedianReturnPercent?: number | null;
+  symbolMinReturnPercent?: number | null;
+  symbolMaxReturnPercent?: number | null;
+  benchmarkMedianReturnPercent?: number | null;
+  relativeMedianReturnPercent?: number | null;
+  completenessPercent: number;
+};
+
+export type PublicSymbolEventComparisonSummary = {
+  eventType: SymbolArchiveEventType;
+  eventCount: number;
+  observedEventCount: number;
+  windows: PublicSymbolEventComparisonWindow[];
+};
+
 export type PublicSymbolEventArchiveResponse = {
   symbol: string;
   name: string;
@@ -270,6 +293,7 @@ export type PublicSymbolEventArchiveResponse = {
   asOf: string;
   items: PublicSymbolEventArchiveItem[];
   chart: PublicSymbolEventChart;
+  comparisonSummaries: PublicSymbolEventComparisonSummary[];
   availableEventTypes: SymbolArchiveEventType[];
   warnings: string[];
   aiUsed: boolean;
@@ -488,6 +512,12 @@ export const marketWorkspaceApi = {
         windows: Array.isArray(item.windows) ? item.windows : [],
         warningCodes: Array.isArray(item.warningCodes) ? item.warningCodes : [],
       })) : [],
+      comparisonSummaries: Array.isArray(body.comparisonSummaries)
+        ? body.comparisonSummaries.map((summary) => ({
+          ...summary,
+          windows: Array.isArray(summary.windows) ? summary.windows : [],
+        }))
+        : [],
       availableEventTypes: Array.isArray(body.availableEventTypes)
         ? body.availableEventTypes
         : [],

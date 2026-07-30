@@ -479,6 +479,12 @@ REQUIRED_FILES = (
     "tests/test_public_symbol_event_timeline_v140.py",
     "apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.tsx",
     "apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.test.tsx",
+    "docs/superpowers/plans/2026-07-30-dsa-v141-symbol-event-comparison.md",
+    "scripts/verify_platform_symbol_event_comparison_v141.py",
+    "tests/test_platform_symbol_event_comparison_v141_verifier.py",
+    "tests/test_public_symbol_event_comparison_v141.py",
+    "apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.tsx",
+    "apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.test.tsx",
 )
 
 VERIFIER_FILES = (
@@ -576,6 +582,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_event_history_coverage_v138.py",
     "scripts/verify_platform_symbol_event_archive_v139.py",
     "scripts/verify_platform_event_kline_timeline_v140.py",
+    "scripts/verify_platform_symbol_event_comparison_v141.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

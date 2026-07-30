@@ -41,6 +41,23 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v141_symbol_event_comparison_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        for path in (
+            "tests/test_public_symbol_event_comparison_v141.py",
+            "apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.tsx",
+            "apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.test.tsx",
+            "scripts/verify_platform_symbol_event_comparison_v141.py",
+            "tests/test_platform_symbol_event_comparison_v141_verifier.py",
+            "docs/superpowers/plans/2026-07-30-dsa-v141-symbol-event-comparison.md",
+        ):
+            self.assertIn(path, REQUIRED_FILES)
+        self.assertIn(
+            "scripts/verify_platform_symbol_event_comparison_v141.py",
+            VERIFIER_FILES,
+        )
+
     def test_v140_event_kline_timeline_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

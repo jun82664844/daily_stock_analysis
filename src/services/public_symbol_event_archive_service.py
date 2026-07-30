@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import math
 import re
+from statistics import median
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence
 from urllib.parse import urlparse
@@ -19,6 +21,14 @@ _EVENT_TYPE_BY_SCHEDULE = {
     "share_buyback": "buyback",
     "important_announcement": "announcement",
 }
+_EVENT_TYPE_ORDER = (
+    "earnings",
+    "dividend",
+    "split",
+    "buyback",
+    "announcement",
+)
+_COMPARISON_WINDOWS = (1, 3, 5, 20)
 
 
 def _utc_now() -> str:
@@ -98,6 +108,11 @@ class PublicSymbolEventArchiveService:
             )
             for event in events
         ]
+        try:
+            comparison_summaries = self._comparison_summaries(items)
+        except Exception:
+            comparison_summaries = []
+            warnings.append("symbol_event_comparison_unavailable")
         chart = self._empty_chart(canonical, market, as_of)
         load_price_chart = getattr(self.reaction_service, "load_price_chart", None)
         if callable(load_price_chart):
@@ -130,6 +145,7 @@ class PublicSymbolEventArchiveService:
             "as_of": as_of,
             "items": items,
             "chart": chart,
+            "comparison_summaries": comparison_summaries,
             "available_event_types": list(dict.fromkeys(
                 item["event_type"] for item in items
             )),
@@ -138,6 +154,133 @@ class PublicSymbolEventArchiveService:
             "informational_only": True,
             "causality_disclaimer": True,
         }
+
+    @classmethod
+    def _comparison_summaries(
+        cls,
+        items: Sequence[Mapping[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        summaries: list[Dict[str, Any]] = []
+        for event_type in _EVENT_TYPE_ORDER:
+            group = [
+                item
+                for item in items
+                if str(item.get("event_type") or "") == event_type
+            ]
+            if not group:
+                continue
+            observed_event_count = sum(
+                1
+                for item in group
+                if any(
+                    str(window.get("status") or "") == "available"
+                    and cls._valid_number(
+                        window.get("symbol_return_percent")
+                    ) is not None
+                    for window in cls._windows(item)
+                )
+            )
+            windows = [
+                cls._comparison_window(group, trading_days)
+                for trading_days in _COMPARISON_WINDOWS
+            ]
+            summaries.append({
+                "event_type": event_type,
+                "event_count": len(group),
+                "observed_event_count": observed_event_count,
+                "windows": windows,
+            })
+        return summaries
+
+    @classmethod
+    def _comparison_window(
+        cls,
+        items: Sequence[Mapping[str, Any]],
+        trading_days: int,
+    ) -> Dict[str, Any]:
+        symbol_values: list[float] = []
+        benchmark_values: list[float] = []
+        relative_values: list[float] = []
+        for item in items:
+            window = next(
+                (
+                    candidate
+                    for candidate in cls._windows(item)
+                    if candidate.get("trading_days") == trading_days
+                    and str(candidate.get("status") or "") == "available"
+                ),
+                None,
+            )
+            if window is None:
+                continue
+            symbol_value = cls._valid_number(
+                window.get("symbol_return_percent")
+            )
+            benchmark_value = cls._valid_number(
+                window.get("benchmark_return_percent")
+            )
+            relative_value = cls._valid_number(
+                window.get("relative_return_percent")
+            )
+            if symbol_value is not None:
+                symbol_values.append(symbol_value)
+            if benchmark_value is not None:
+                benchmark_values.append(benchmark_value)
+            if relative_value is not None:
+                relative_values.append(relative_value)
+
+        event_count = len(items)
+        return {
+            "trading_days": trading_days,
+            "sample_size": len(symbol_values),
+            "benchmark_sample_size": len(benchmark_values),
+            "relative_sample_size": len(relative_values),
+            "positive_count": sum(value > 0 for value in symbol_values),
+            "negative_count": sum(value < 0 for value in symbol_values),
+            "flat_count": sum(value == 0 for value in symbol_values),
+            "symbol_median_return_percent": cls._median(symbol_values),
+            "symbol_min_return_percent": cls._minimum(symbol_values),
+            "symbol_max_return_percent": cls._maximum(symbol_values),
+            "benchmark_median_return_percent": cls._median(benchmark_values),
+            "relative_median_return_percent": cls._median(relative_values),
+            "completeness_percent": round(
+                len(symbol_values) * 100 / event_count,
+                4,
+            ) if event_count else 0.0,
+        }
+
+    @staticmethod
+    def _windows(item: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+        value = item.get("windows")
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            return []
+        return [
+            window
+            for window in value
+            if isinstance(window, Mapping)
+        ]
+
+    @staticmethod
+    def _valid_number(value: Any) -> Optional[float]:
+        if isinstance(value, bool):
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if math.isfinite(number) else None
+
+    @staticmethod
+    def _median(values: Sequence[float]) -> Optional[float]:
+        return round(float(median(values)), 4) if values else None
+
+    @staticmethod
+    def _minimum(values: Sequence[float]) -> Optional[float]:
+        return round(min(values), 4) if values else None
+
+    @staticmethod
+    def _maximum(values: Sequence[float]) -> Optional[float]:
+        return round(max(values), 4) if values else None
 
     @staticmethod
     def _empty_chart(symbol: str, market: str, as_of: str) -> Dict[str, Any]:

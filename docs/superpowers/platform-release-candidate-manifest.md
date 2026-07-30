@@ -3044,6 +3044,39 @@ Acceptance marker: `DSA_PLATFORM_SYMBOL_EVENT_ARCHIVE_V139_OK`.
 
 Safety boundary: V139 is an anonymous, read-only, no-AI event archive for one supported A-share, Hong Kong or US equity. It uses exact symbol filtering, safe source URLs, a 24-event cap, bounded two-year public history and an independent IP rate limit. Current real sources cover filing/earnings dates, dividends and splits; buybacks and important announcements remain empty until a traceable source is integrated. Missing observations stay unavailable. Same-period changes are objective data and do not establish event causality. The feature does not read identity or keys, write databases, send notifications, invoke payment, provide investment advice or approve public launch or data redistribution.
 
+## V141 同类事件历史对比
+
+Backend and public contract:
+
+- `src/services/public_symbol_event_archive_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_symbol_event_comparison_v141.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.test.tsx`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_symbol_event_comparison_v141.py`
+- `tests/test_platform_symbol_event_comparison_v141_verifier.py`
+- `tests/test_platform_observed_event_reactions_v136_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v141-symbol-event-comparison.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
 ## V140 事件与K线联动图
 
 Backend and contract:

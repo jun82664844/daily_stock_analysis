@@ -2709,6 +2709,39 @@ Verifier, configuration and documentation:
 
 Review focus: anonymous single-symbol access, 6/12/24-month bounded ranges, 24-event cap, two-year public history bounds, explicit event and price source states, safe source URLs, missing-value preservation, independent rate limiting, non-blocking frontend load, complete Chinese/English controls, no AI/key/user/database/notification use, and explicit non-causality/information-only wording.
 
+## V141 同类事件历史对比
+
+Backend and public contract:
+
+- `src/services/public_symbol_event_archive_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_symbol_event_comparison_v141.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.test.tsx`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_symbol_event_comparison_v141.py`
+- `tests/test_platform_symbol_event_comparison_v141_verifier.py`
+- `tests/test_platform_observed_event_reactions_v136_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v141-symbol-event-comparison.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
 ## V140 事件与K线联动图
 
 Backend and public contract:

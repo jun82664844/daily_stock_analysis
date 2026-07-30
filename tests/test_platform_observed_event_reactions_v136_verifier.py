@@ -52,7 +52,8 @@ and not events
 "market_workspace_event_reactions"
 PLATFORM_PUBLIC_EVENT_REACTIONS_V136_ENABLED
 enforce=True
-past_days=45
+def _event_history_past_days():
+    return 45
 future_days=0
 include_historical=True
 fail_on_source_unavailable=True

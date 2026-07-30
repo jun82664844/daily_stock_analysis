@@ -11,6 +11,7 @@ import {
   formatSourceLabel,
   formatSourceStatus,
 } from './marketWorkspaceFormat';
+import SymbolEventComparisonV141 from './SymbolEventComparisonV141';
 import SymbolEventTimelineV140 from './SymbolEventTimelineV140';
 
 type Props = {
@@ -82,6 +83,7 @@ export default function SymbolEventArchiveV139({ language, symbol }: Props) {
   const [months, setMonths] = useState<Months>(12);
   const [windowDays, setWindowDays] = useState<WindowDays>(1);
   const [eventFilter, setEventFilter] = useState<EventFilter>('all');
+  const [selectedEventId, setSelectedEventId] = useState('');
   const requestKey = `${symbol}:${months}`;
   const [requestState, setRequestState] = useState<ArchiveRequestState>({
     key: '',
@@ -113,6 +115,11 @@ export default function SymbolEventArchiveV139({ language, symbol }: Props) {
       (item) => eventFilter === 'all' || item.eventType === eventFilter,
     ),
     [data?.items, eventFilter],
+  );
+  const effectiveSelectedEventId = (
+    filtered.some((item) => item.eventId === selectedEventId)
+      ? selectedEventId
+      : filtered[0]?.eventId ?? ''
   );
 
   return (
@@ -198,6 +205,18 @@ export default function SymbolEventArchiveV139({ language, symbol }: Props) {
               chart={data.chart}
               events={filtered}
               windowDays={windowDays}
+              selectedEventId={effectiveSelectedEventId}
+              onSelectEvent={setSelectedEventId}
+            />
+          ) : null}
+          {data ? (
+            <SymbolEventComparisonV141
+              language={language}
+              events={filtered}
+              summaries={data.comparisonSummaries}
+              windowDays={windowDays}
+              selectedEventId={effectiveSelectedEventId}
+              onSelectEvent={setSelectedEventId}
             />
           ) : null}
           {filtered.length ? (

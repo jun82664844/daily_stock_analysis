@@ -110,6 +110,7 @@ describe('MarketWorkspacePage', () => {
       months: 12,
       asOf: '2026-07-30T00:00:00Z',
       items: [],
+      comparisonSummaries: [],
       availableEventTypes: [],
       chart: {
         status: 'unavailable',
