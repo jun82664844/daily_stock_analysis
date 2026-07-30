@@ -2514,3 +2514,44 @@ Verifier and documentation:
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: explicit-date parsing without inventing future events, published-time fallback, 7-day history and 30-day future windows, 48-entry and 128-acknowledgement caps, exact cross-exchange symbol matching, V133 follow/unfollow synchronization, numeric user scope, bilingual controls, local-only acknowledgement state, no network/model/database/notification call, non-causality language, and information-only boundaries.
+
+## V135 Real Market Calendar And Weekly Events
+
+Backend and contract:
+
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_home_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_calendar_service_v135.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/components/market-home/marketEventCalendarV134.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventCalendarPanelV135.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/hooks/useWatchlist.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/marketEventCalendarV134.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventCalendarPanelV135.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/hooks/__tests__/useWatchlist.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_real_market_calendar_v135.py`
+- `tests/test_platform_real_market_calendar_v135_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v135-real-market-calendar-weekly-events.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+- `docs/superpowers/platform-review-slices.md`
+
+Review focus: official CNInfo and Federal Reserve schedule parsing, no-key Yahoo/yfinance dates without official-license claims, latest CNInfo appointment selection, disclosed-row exclusion, date-only output with no forecasts, 4-second aggregate deadline, per-source cache and stale fallback, 36/48 caps, scheduled/provider contract, safe-default production flag, bilingual four-view UX, dormant private requests for unauthenticated platform visitors while the public home remains active, no AI/key/database/notification use, non-causality language, and information-only boundaries.

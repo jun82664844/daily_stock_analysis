@@ -87,12 +87,16 @@ def scope_wiring_contract(helper_source: str, daily_source: str, home_test_sourc
         r"/^user-\d+$/",
         "adoptGuestCalendarAcknowledgements",
         "marketEventCalendarStorageKey('guest')",
-        "<MarketEventCalendarPanelV134",
         "scope={eventFollowUpScope}",
         "eventFollowUpScope={platformSession ? `user-${platformSession.user.id}` : 'guest'}",
     )
     combined = f"{helper_source}\n{daily_source}\n{home_test_source}"
     missing = [token for token in required if token not in combined]
+    if not any(
+        token in combined
+        for token in ("<MarketEventCalendarPanelV134", "<MarketEventCalendarPanelV135")
+    ):
+        missing.append("<MarketEventCalendarPanelV134|V135")
     unsafe_identity = "user.email" in combined or "platform_user_id" in combined.casefold()
     return CheckResult(
         "v134_numeric_scope_and_home_wiring",
@@ -112,9 +116,16 @@ def regression_tests_contract(source: str) -> CheckResult:
         "renders an honest Chinese calendar with schedule, publication, and follow-up time bases",
         "filters due reviews and acknowledges them locally",
         "keeps followed checkpoints visible when the public event stream fills the display limit",
-        "adds and removes V134 follow-up calendar checkpoints with the V133 follow state",
     )
     missing = [token for token in required if token not in source]
+    if not any(
+        token in source
+        for token in (
+            "adds and removes V134 follow-up calendar checkpoints with the V133 follow state",
+            "adds and removes V135 follow-up calendar checkpoints with the V133 follow state",
+        )
+    ):
+        missing.append("adds and removes V134|V135 follow-up calendar checkpoints")
     return CheckResult("v134_regression_test_contract", not missing, {"missing": missing})
 
 

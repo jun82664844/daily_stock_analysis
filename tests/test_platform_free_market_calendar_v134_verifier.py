@@ -82,6 +82,24 @@ scope={eventFollowUpScope}
         self.assertTrue(scope_wiring_contract(helper, daily, home).ok)
         self.assertFalse(scope_wiring_contract(helper, daily, home.replace("user.id", "user.email")).ok)
 
+    def test_scope_contract_accepts_v135_successor_panel(self) -> None:
+        from scripts.verify_platform_free_market_calendar_v134 import scope_wiring_contract
+
+        helper = r"""
+/^user-\d+$/
+adoptGuestCalendarAcknowledgements
+marketEventCalendarStorageKey('guest')
+"""
+        daily = """
+<MarketEventCalendarPanelV135
+scope={eventFollowUpScope}
+"""
+        home = (
+            "eventFollowUpScope={platformSession ? "
+            "`user-${platformSession.user.id}` : 'guest'}"
+        )
+        self.assertTrue(scope_wiring_contract(helper, daily, home).ok)
+
     def test_regression_contract_requires_domain_panel_and_integration_paths(self) -> None:
         from scripts.verify_platform_free_market_calendar_v134 import regression_tests_contract
 
@@ -96,9 +114,26 @@ renders an honest Chinese calendar with schedule, publication, and follow-up tim
 filters due reviews and acknowledges them locally
 keeps followed checkpoints visible when the public event stream fills the display limit
 adds and removes V134 follow-up calendar checkpoints with the V133 follow state
-"""
+        """
         self.assertTrue(regression_tests_contract(valid).ok)
         self.assertFalse(regression_tests_contract(valid.replace("exactly", "loosely")).ok)
+
+    def test_regression_contract_accepts_v135_successor_integration_title(self) -> None:
+        from scripts.verify_platform_free_market_calendar_v134 import regression_tests_contract
+
+        valid = """
+extracts only explicit ISO, Chinese, or English schedule dates
+builds three-market public entries and 1/3/5/20 day follow-up checkpoints
+keeps only the seven-day history and thirty-day future window
+matches personalized symbols exactly instead of using substrings or cross-exchange codes
+tracks unseen due reminders and caps acknowledgement storage
+moves guest acknowledgement state only into a numeric signed-in scope
+renders an honest Chinese calendar with schedule, publication, and follow-up time bases
+filters due reviews and acknowledges them locally
+keeps followed checkpoints visible when the public event stream fills the display limit
+adds and removes V135 follow-up calendar checkpoints with the V133 follow state
+"""
+        self.assertTrue(regression_tests_contract(valid).ok)
 
     def test_focused_vitest_check_uses_real_test_process_exit_code(self) -> None:
         from scripts.verify_platform_free_market_calendar_v134 import focused_vitest_check

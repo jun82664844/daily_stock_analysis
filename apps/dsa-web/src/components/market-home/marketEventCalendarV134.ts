@@ -53,9 +53,11 @@ export type MarketEventCalendarEntryV134 = {
   market: MarketCode;
   symbol: string | null;
   title: string;
+  name: string | null;
   personalized: boolean;
   sourceStatus: SourceStatus;
   publisher: string;
+  scheduleType?: 'earnings_release' | 'ex_dividend' | 'macro_policy';
   checkpointDays?: 1 | 3 | 5 | 20;
 };
 
@@ -163,7 +165,9 @@ function publicEventEntry(
   watchlist: Set<string>,
   now: Date,
 ): MarketEventCalendarEntryV134 {
-  const explicitSchedule = extractExplicitScheduleAt(event, new Date(event.eventTime));
+  const providerSchedule = event.timeKind === 'scheduled' ? event.eventTime : null;
+  const explicitSchedule = providerSchedule
+    ?? extractExplicitScheduleAt(event, new Date(event.eventTime));
   const scheduledAt = explicitSchedule ?? event.eventTime;
   const normalizedSymbol = calendarSymbolKey(event.symbol ?? '');
   return {
@@ -175,9 +179,11 @@ function publicEventEntry(
     market: event.market,
     symbol: event.symbol?.trim() || null,
     title: event.title,
+    name: event.name?.trim() || null,
     personalized: Boolean(normalizedSymbol && watchlist.has(normalizedSymbol)),
     sourceStatus: event.sourceState.status,
     publisher: event.publisher?.trim() || event.sourceState.source,
+    scheduleType: event.scheduleType ?? undefined,
   };
 }
 
@@ -200,6 +206,7 @@ function followUpEntries(
     market: followed.market,
     symbol: followed.symbol,
     title: followed.title,
+    name: followed.name,
     personalized: true,
     sourceStatus: checkpoint.observation?.status ?? followed.baseline?.status ?? 'unavailable',
     publisher: followed.publisher,

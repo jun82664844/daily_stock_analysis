@@ -29,11 +29,24 @@ describe('HomePage V126 source contract', () => {
     );
     expect(source).toContain('watchlistSymbols={platformWatchlistItems.map((item) => item.stockCode)}');
     expect(source).toContain("eventFollowUpScope={platformSession ? `user-${platformSession.user.id}` : 'guest'}");
-    expect(dailyEventSource).toContain('<MarketEventCalendarPanelV134');
+    expect(dailyEventSource).toContain('<MarketEventCalendarPanelV135');
     expect(dailyEventSource).toContain('scope={eventFollowUpScope}');
     expect(source).not.toContain('events: platformWatchlistItems');
     expect(source).not.toContain('getHome(platformWatchlistItems');
     expect(source).not.toContain('calendarAcknowledgements:');
+  });
+
+  it('keeps private dashboard requests dormant for guests', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/pages/HomePage.tsx'), 'utf8');
+    expect(source).toContain('const privateWorkspaceEnabled = platformStatusLoaded');
+    expect(source).toContain('&& (!platformEnabled || Boolean(platformSession))');
+    expect(source).toContain('const legacyWorkspaceEnabled = platformStatusLoaded && !platformEnabled');
+    expect(source).toContain('enabled: privateWorkspaceEnabled');
+    expect(source).toContain('const watchlistState = useWatchlist(privateWorkspaceEnabled)');
+    expect(source).toContain('if (!privateWorkspaceEnabled) return undefined;');
+    expect(source).toContain('if (!privateWorkspaceEnabled) return;');
+    expect(source).toContain('if (!legacyWorkspaceEnabled) {');
+    expect(source).toContain('marketWorkspaceApi.getHome()');
   });
 });
 

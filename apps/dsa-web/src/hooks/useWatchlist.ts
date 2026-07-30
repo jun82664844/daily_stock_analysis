@@ -14,9 +14,9 @@ export interface UseWatchlistReturn {
   refresh: () => Promise<void>;
 }
 
-export function useWatchlist(): UseWatchlistReturn {
+export function useWatchlist(enabled = true): UseWatchlistReturn {
   const [codes, setCodes] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [isActioning, setIsActioning] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const messageTimerRef = useRef<number | null>(null);
@@ -33,6 +33,13 @@ export function useWatchlist(): UseWatchlistReturn {
   }, []);
 
   const refresh = useCallback(async () => {
+    if (!enabled) {
+      if (mountedRef.current) {
+        setCodes([]);
+        setIsLoading(false);
+      }
+      return;
+    }
     try {
       const result = await systemConfigApi.getWatchlist();
       if (mountedRef.current) {
@@ -41,16 +48,21 @@ export function useWatchlist(): UseWatchlistReturn {
     } catch {
       // keep existing codes
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setCodes([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     void refresh().finally(() => {
       if (mountedRef.current) {
         setIsLoading(false);
       }
     });
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   const showMessage = useCallback((msg: string) => {
     if (messageTimerRef.current !== null) {
@@ -70,7 +82,7 @@ export function useWatchlist(): UseWatchlistReturn {
   );
 
   const addToWatchlist = useCallback(async (stockCode: string) => {
-    if (!stockCode || isActioning) return;
+    if (!enabled || !stockCode || isActioning) return;
     setIsActioning(true);
     try {
       const result = await systemConfigApi.addToWatchlist(stockCode);
@@ -83,10 +95,10 @@ export function useWatchlist(): UseWatchlistReturn {
     } finally {
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, showMessage]);
+  }, [enabled, isActioning, showMessage]);
 
   const removeFromWatchlist = useCallback(async (stockCode: string) => {
-    if (!stockCode || isActioning) return;
+    if (!enabled || !stockCode || isActioning) return;
     setIsActioning(true);
     try {
       const result = await systemConfigApi.removeFromWatchlist(stockCode);
@@ -99,7 +111,7 @@ export function useWatchlist(): UseWatchlistReturn {
     } finally {
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, showMessage]);
+  }, [enabled, isActioning, showMessage]);
 
   const toggleWatchlist = useCallback(async (stockCode: string) => {
     const existingStockCode = findMatchingStockCode(codes, stockCode);

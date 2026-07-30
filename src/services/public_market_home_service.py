@@ -12,6 +12,7 @@ from threading import Lock
 from typing import Any, Callable, Dict, Optional
 
 from src.services.market_workspace_service import MarketWorkspaceService
+from src.services.public_market_calendar_service import PublicMarketCalendarService
 from src.services.public_market_event_service import PublicMarketEventService
 from src.services.public_market_session_service import (
     PublicMarketSessionService,
@@ -40,6 +41,7 @@ class PublicMarketHomeService:
         ranking_loader: Optional[Callable[[str], Dict[str, Any]]] = None,
         session_resolver: Optional[Callable[[str, str], Dict[str, Any]]] = None,
         event_builder: Optional[Callable[[list[Dict[str, Any]], str], list[Dict[str, Any]]]] = None,
+        calendar_loader: Optional[Callable[[list[Dict[str, Any]], str], list[Dict[str, Any]]]] = None,
     ) -> None:
         self.workspace_service = workspace_service or MarketWorkspaceService()
         raw_timeout = timeout_seconds if timeout_seconds is not None else os.getenv("PLATFORM_PUBLIC_MARKET_HOME_TIMEOUT_SECONDS", "5.5")
@@ -51,6 +53,7 @@ class PublicMarketHomeService:
         self.ranking_loader = ranking_loader
         self.session_resolver = session_resolver or PublicMarketSessionService().resolve
         self.event_builder = event_builder or PublicMarketEventService().build
+        self.calendar_loader = calendar_loader or PublicMarketCalendarService().load
         self._cache: Optional[tuple[float, Dict[str, Any]]] = None
         self._lock = Lock()
 
@@ -85,14 +88,25 @@ class PublicMarketHomeService:
             else:
                 sections.append(self._dynamic_section(market, overview or {}, rankings, sessions[market]))
         try:
-            events = list(self.event_builder(sections, as_of) or [])
+            news_events = list(self.event_builder(sections, as_of) or [])
         except Exception:
-            events = []
+            news_events = []
             for section in sections:
                 section["warnings"] = list(dict.fromkeys([
                     *(section.get("warnings") or []),
                     "market_events_unavailable",
                 ]))
+        scheduled_events: list[Dict[str, Any]] = []
+        if self._calendar_enabled():
+            try:
+                scheduled_events = list(self.calendar_loader(sections, as_of) or [])
+            except Exception:
+                for section in sections:
+                    section["warnings"] = list(dict.fromkeys([
+                        *(section.get("warnings") or []),
+                        "market_calendar_unavailable",
+                    ]))
+        events = self._merge_events(scheduled_events, news_events)
         payload = {
             "as_of": as_of,
             "markets": sections,
@@ -114,6 +128,32 @@ class PublicMarketHomeService:
         if entry is None or time.monotonic() - entry[0] >= self.cache_ttl_seconds:
             return None
         return copy.deepcopy(entry[1])
+
+    @staticmethod
+    def _calendar_enabled() -> bool:
+        return os.getenv(
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED",
+            "false",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _merge_events(
+        scheduled_events: list[Dict[str, Any]],
+        news_events: list[Dict[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        merged: list[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for event in [*scheduled_events, *news_events]:
+            if not isinstance(event, dict):
+                continue
+            event_id = str(event.get("event_id") or "").strip()
+            if not event_id or event_id in seen:
+                continue
+            seen.add(event_id)
+            merged.append(event)
+            if len(merged) >= 48:
+                break
+        return merged
 
     def _section(self, market: str, overview: Dict[str, Any], session: Dict[str, Any]) -> Dict[str, Any]:
         items = [dict(item) for item in overview.get("movers") or [] if isinstance(item, dict)]

@@ -2839,3 +2839,46 @@ Verifier and documentation:
 Acceptance marker: `DSA_PLATFORM_FREE_MARKET_CALENDAR_V134_OK`.
 
 Safety boundary: V134 only marks an item as scheduled when the public title or summary contains an explicit supported date; otherwise it preserves the publication-time basis. It reuses already-loaded three-market events and V133 follow-up checkpoints, keeps a bounded 7-day past and 30-day future view, stores at most 128 acknowledgement IDs in browser-local numeric-user scope, adds no network, model, API-quota, database or notification call, does not claim that an event caused a market move, and provides information and data only rather than investment advice.
+
+## V135 Real Market Calendar And Weekly Events
+
+Backend and contract:
+
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_home_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_calendar_service_v135.py`
+- `tests/test_public_market_home_v116.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/components/market-home/marketEventCalendarV134.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventCalendarPanelV135.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/hooks/useWatchlist.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/marketEventCalendarV134.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventCalendarPanelV135.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/hooks/__tests__/useWatchlist.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_real_market_calendar_v135.py`
+- `tests/test_platform_real_market_calendar_v135_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v135-real-market-calendar-weekly-events.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_REAL_MARKET_CALENDAR_V135_OK`.
+
+Safety boundary: V135 reads explicit dates from CNInfo public report appointments, Yahoo Finance through the no-key yfinance channel, and the official Federal Reserve FOMC page. It does not claim Yahoo/yfinance is an officially licensed feed, does not display provider forecast values, and does not call AI, read user API keys, write the database, or send notifications. Sources run behind a four-second aggregate deadline with isolated caches and bounded stale fallback. Scheduled events are capped at 36 and the merged home event stream at 48. Production templates remain disabled by default. When platform authentication is enabled, unauthenticated visitors do not prefetch private history, watchlist, setup, or skill resources; the public market home and guest query remain enabled. The UI states that event and market observations do not establish causality and provides information and data only rather than investment advice.

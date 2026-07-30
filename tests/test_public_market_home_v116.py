@@ -112,6 +112,35 @@ class _FlakyRankings(_Rankings):
 
 
 class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.calendar_env = patch.dict(os.environ, {
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED": "false",
+        }, clear=False)
+        self.calendar_env.start()
+
+    def tearDown(self) -> None:
+        self.calendar_env.stop()
+
+    def test_v135_event_contract_accepts_explicit_provider_schedule(self) -> None:
+        from api.v1.schemas.market_workspace import PublicMarketEvent
+
+        event = PublicMarketEvent.model_validate({
+            "event_id": "scheduled-aapl",
+            "market": "us",
+            "category": "earnings",
+            "title": "Apple earnings release",
+            "symbol": "AAPL",
+            "event_time": "2026-07-31T00:00:00Z",
+            "time_kind": "scheduled",
+            "source_state": {"source": "yfinance_public_calendar", "status": "fresh"},
+            "classification_source": "provider_schedule",
+            "schedule_type": "earnings_release",
+        })
+
+        self.assertEqual(event.time_kind, "scheduled")
+        self.assertEqual(event.classification_source, "provider_schedule")
+        self.assertEqual(event.schedule_type, "earnings_release")
+
     def test_v127_event_contract_keeps_safe_defaults_for_v126_payloads(self) -> None:
         from api.v1.schemas.market_workspace import PublicMarketEvent
 
@@ -312,9 +341,127 @@ class PublicMarketHomeServiceV116TestCase(unittest.TestCase):
         self.assertTrue(all(item["attention"] for item in body["markets"]))
         self.assertTrue(all("market_events_unavailable" in item["warnings"] for item in body["markets"]))
 
+    def test_v135_merges_scheduled_events_first_and_deduplicates_ids(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        news_events = [{
+            "event_id": "duplicate-event",
+            "market": "us",
+            "category": "market",
+            "title": "Published market update",
+            "event_time": "2026-07-30T00:00:00Z",
+            "time_kind": "published",
+            "source_state": {"source": "unit_news", "status": "fresh"},
+            "classification_source": "keyword_rules",
+        }]
+        scheduled_events = [{
+            "event_id": "duplicate-event",
+            "market": "us",
+            "category": "earnings",
+            "title": "Scheduled earnings event",
+            "event_time": "2026-07-31T00:00:00Z",
+            "time_kind": "scheduled",
+            "source_state": {"source": "unit_calendar", "status": "fresh"},
+            "classification_source": "provider_schedule",
+            "schedule_type": "earnings_release",
+        }]
+        with patch.dict(os.environ, {
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED": "true",
+        }, clear=False):
+            body = PublicMarketHomeService(
+                _Workspace(),
+                timeout_seconds=1,
+                event_builder=lambda _markets, _as_of: news_events,
+                calendar_loader=lambda _markets, _as_of: scheduled_events,
+            ).build()
+
+        self.assertEqual(len(body["events"]), 1)
+        self.assertEqual(body["events"][0]["time_kind"], "scheduled")
+        self.assertEqual(body["events"][0]["title"], "Scheduled earnings event")
+
+    def test_v135_disabled_does_not_call_calendar_loader(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        calls = {"count": 0}
+
+        def calendar_loader(_markets: list[dict], _as_of: str) -> list[dict]:
+            calls["count"] += 1
+            return []
+
+        with patch.dict(os.environ, {
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED": "false",
+        }, clear=False):
+            body = PublicMarketHomeService(
+                _Workspace(),
+                timeout_seconds=1,
+                event_builder=lambda _markets, _as_of: [],
+                calendar_loader=calendar_loader,
+            ).build()
+
+        self.assertEqual(calls["count"], 0)
+        self.assertEqual(body["events"], [])
+
+    def test_v135_calendar_failure_keeps_news_and_adds_truthful_warning(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        def fail_calendar(_markets: list[dict], _as_of: str) -> list[dict]:
+            raise RuntimeError("calendar unavailable")
+
+        with patch.dict(os.environ, {
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED": "true",
+        }, clear=False):
+            body = PublicMarketHomeService(
+                _Workspace(),
+                timeout_seconds=1,
+                event_builder=lambda _markets, as_of: [{
+                    "event_id": "news-event",
+                    "market": "cn",
+                    "category": "market",
+                    "title": "Published market update",
+                    "event_time": as_of,
+                    "time_kind": "published",
+                    "source_state": {"source": "unit_news", "status": "fresh"},
+                    "classification_source": "keyword_rules",
+                }],
+                calendar_loader=fail_calendar,
+            ).build()
+
+        self.assertEqual([event["event_id"] for event in body["events"]], ["news-event"])
+        self.assertTrue(all("market_calendar_unavailable" in item["warnings"] for item in body["markets"]))
+
+    def test_v135_home_event_merge_is_bounded_to_48(self) -> None:
+        from src.services.public_market_home_service import PublicMarketHomeService
+
+        scheduled_events = [{
+            "event_id": f"scheduled-{index}",
+            "market": "cn",
+            "category": "earnings",
+            "title": f"Scheduled event {index}",
+            "event_time": "2026-08-01T00:00:00Z",
+            "time_kind": "scheduled",
+            "source_state": {"source": "unit_calendar", "status": "fresh"},
+            "classification_source": "provider_schedule",
+            "schedule_type": "earnings_release",
+        } for index in range(60)]
+        with patch.dict(os.environ, {
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED": "true",
+        }, clear=False):
+            body = PublicMarketHomeService(
+                _Workspace(),
+                timeout_seconds=1,
+                event_builder=lambda _markets, _as_of: [],
+                calendar_loader=lambda _markets, _as_of: scheduled_events,
+            ).build()
+
+        self.assertEqual(len(body["events"]), 48)
+
 
 class PublicMarketHomeEndpointV116TestCase(unittest.TestCase):
     def setUp(self) -> None:
+        self.calendar_env = patch.dict(os.environ, {
+            "PLATFORM_PUBLIC_MARKET_CALENDAR_V135_ENABLED": "false",
+        }, clear=False)
+        self.calendar_env.start()
         self.temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.static_dir = Path(self.temp_dir.name) / "static"
         self.static_dir.mkdir()
@@ -326,6 +473,7 @@ class PublicMarketHomeEndpointV116TestCase(unittest.TestCase):
         DatabaseManager.reset_instance()
         Config.reset_instance()
         self.temp_dir.cleanup()
+        self.calendar_env.stop()
 
     def test_home_is_public_when_both_feature_flags_are_enabled(self) -> None:
         env = {

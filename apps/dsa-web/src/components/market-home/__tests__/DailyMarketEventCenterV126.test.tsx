@@ -524,7 +524,7 @@ describe('DailyMarketEventCenterV126', () => {
     expect(JSON.parse(localStorage.getItem(marketEventFollowUpStorageKey('guest')) ?? '[]')).toEqual([]);
   });
 
-  it('adds and removes V134 follow-up calendar checkpoints with the V133 follow state', () => {
+  it('adds and removes V135 follow-up calendar checkpoints with the V133 follow state', () => {
     const onOpenSymbol = vi.fn();
     render(
       <DailyMarketEventCenterV126
@@ -537,11 +537,12 @@ describe('DailyMarketEventCenterV126', () => {
       />,
     );
 
-    expect(screen.getByTestId('market-event-calendar-v134')).toBeInTheDocument();
+    expect(screen.getByTestId('market-event-calendar-v135')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Research event linked to AAPL' }));
     fireEvent.click(screen.getByRole('button', { name: 'Follow AAPL' }));
 
-    const calendar = screen.getByTestId('market-event-calendar-v134');
+    const calendar = screen.getByTestId('market-event-calendar-v135');
+    fireEvent.click(within(calendar).getByRole('button', { name: 'My calendar' }));
     expect(within(calendar).getByText('1-day follow-up')).toBeInTheDocument();
     expect(within(calendar).getByText('3-day follow-up')).toBeInTheDocument();
     expect(within(calendar).getByText('5-day follow-up')).toBeInTheDocument();

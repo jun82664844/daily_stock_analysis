@@ -1343,6 +1343,7 @@ const HomePage: React.FC = () => {
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
   const [runFlowDrawer, setRunFlowDrawer] = useState<RunFlowDrawerState>({ open: false });
   const [platformEnabled, setPlatformEnabled] = useState(false);
+  const [platformStatusLoaded, setPlatformStatusLoaded] = useState(false);
   const [platformSession, setPlatformSession] = useState<PlatformAuthPayload | null>(null);
   const [platformAccount, setPlatformAccount] = useState<PlatformAccountSummary | null>(null);
   const [localModelStatus, setLocalModelStatus] = useState<PlatformLocalModelStatus | null>(null);
@@ -1400,6 +1401,9 @@ const HomePage: React.FC = () => {
 
   useEffect(() => stopMarketReviewPolling, [stopMarketReviewPolling]);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const privateWorkspaceEnabled = platformStatusLoaded
+    && (!platformEnabled || Boolean(platformSession));
+  const legacyWorkspaceEnabled = platformStatusLoaded && !platformEnabled;
 
   const {
     query,
@@ -1463,21 +1467,24 @@ const HomePage: React.FC = () => {
   } = useHomeDashboardState();
 
   useEffect(() => {
+    if (!privateWorkspaceEnabled) return;
     if (appliedInitialHistoryCenterFiltersRef.current && !restoredHistoryCenterFiltersRef.current) {
       return;
     }
     appliedInitialHistoryCenterFiltersRef.current = true;
     restoredHistoryCenterFiltersRef.current = false;
     void setHistoryFilters(toHistoryCenterApiFilters(historyCenterFilters));
-  }, [historyCenterFilters, setHistoryFilters]);
+  }, [historyCenterFilters, privateWorkspaceEnabled, setHistoryFilters]);
 
   useEffect(() => {
     document.title = t('home.pageTitle');
   }, [t]);
 
   useEffect(() => {
+    if (!privateWorkspaceEnabled) return undefined;
     void stocksApi.prewarm(['600519', 'AAPL', 'HK00700', 'BTC-USD']).catch(() => undefined);
-  }, []);
+    return undefined;
+  }, [privateWorkspaceEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -1610,10 +1617,12 @@ const HomePage: React.FC = () => {
         if (status.platformAuthEnabled) {
           await refreshPlatformSession();
         }
+        if (active) setPlatformStatusLoaded(true);
       })
       .catch(() => {
         if (active) {
           setPlatformEnabled(false);
+          setPlatformStatusLoaded(true);
         }
       });
 
@@ -1972,6 +1981,10 @@ const HomePage: React.FC = () => {
   }, [platformAlertBusy, platformSession, uiLanguage]);
 
   useEffect(() => {
+    if (!legacyWorkspaceEnabled) {
+      setSetupStatus(null);
+      return undefined;
+    }
     let active = true;
     systemConfigApi.getSetupStatus()
       .then((status) => {
@@ -1988,9 +2001,13 @@ const HomePage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [legacyWorkspaceEnabled]);
 
   useEffect(() => {
+    if (!legacyWorkspaceEnabled) {
+      setAnalysisSkills([]);
+      return undefined;
+    }
     let active = true;
     agentApi.getSkills()
       .then((response) => {
@@ -2007,7 +2024,7 @@ const HomePage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [legacyWorkspaceEnabled]);
 
   useEffect(() => {
     if (!strategyMenuOpen) {
@@ -4511,6 +4528,7 @@ const HomePage: React.FC = () => {
   }, [setupStatus, uiLanguage]);
 
   useDashboardLifecycle({
+    enabled: privateWorkspaceEnabled,
     loadInitialHistory,
     refreshHistory,
     loadMarketReviewHistory,
@@ -4525,7 +4543,7 @@ const HomePage: React.FC = () => {
     streamEnabled: Boolean(platformSession),
   });
 
-  const watchlistState = useWatchlist();
+  const watchlistState = useWatchlist(privateWorkspaceEnabled);
 
   useEffect(() => {
     if (basicQueryCooldownSeconds <= 0) {

@@ -41,6 +41,22 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v135_real_market_calendar_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("src/services/public_market_calendar_service.py", REQUIRED_FILES)
+        self.assertIn("tests/test_public_market_calendar_service_v135.py", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/MarketEventCalendarPanelV135.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/__tests__/MarketEventCalendarPanelV135.test.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/hooks/useWatchlist.ts", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/hooks/__tests__/useWatchlist.test.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/pages/HomePage.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/pages/__tests__/HomePage.test.tsx", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_real_market_calendar_v135.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_real_market_calendar_v135.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_real_market_calendar_v135_verifier.py", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-30-dsa-v135-real-market-calendar-weekly-events.md", REQUIRED_FILES)
+
     def test_v134_free_market_calendar_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

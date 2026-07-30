@@ -43,6 +43,23 @@ describe('useWatchlist', () => {
     expect(result.current.isInWatchlist('HK01810')).toBe(false);
   });
 
+  it('stays local and empty while private watchlist loading is disabled', async () => {
+    const { result } = renderHook(() => useWatchlist(false));
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.watchlistCodes).toEqual([]);
+    expect(mockGetWatchlist).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.toggleWatchlist('AAPL');
+    });
+    expect(mockAddToWatchlist).not.toHaveBeenCalled();
+    expect(mockRemoveFromWatchlist).not.toHaveBeenCalled();
+  });
+
   it('removes the matched raw watchlist entry instead of adding a duplicate variant', async () => {
     mockGetWatchlist.mockResolvedValue(['00700']);
     mockRemoveFromWatchlist.mockResolvedValue([]);

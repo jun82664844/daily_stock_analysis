@@ -147,6 +147,33 @@ describe('marketEventCalendarV134', () => {
     ]));
   });
 
+  it('uses a provider scheduled timestamp directly without parsing the title', () => {
+    const entries = buildMarketEventCalendarV134(
+      [{
+        ...baseEvent,
+        eventId: 'provider-scheduled',
+        title: 'Apple public calendar entry',
+        eventTime: '2026-08-02T00:00:00.000Z',
+        timeKind: 'scheduled',
+        classificationSource: 'provider_schedule',
+        scheduleType: 'earnings_release',
+      }],
+      [],
+      [],
+      new Date('2026-07-30T12:00:00.000Z'),
+    );
+
+    expect(entries).toEqual([
+      expect.objectContaining({
+        id: 'event:provider-scheduled',
+        dateBasis: 'explicit_schedule',
+        scheduledAt: '2026-08-02T00:00:00.000Z',
+        scheduleType: 'earnings_release',
+        state: 'upcoming',
+      }),
+    ]);
+  });
+
   it('keeps only the seven-day history and thirty-day future window', () => {
     const entries = buildMarketEventCalendarV134(
       [

@@ -67,7 +67,7 @@ export type PublicMarketEventSourceRecord = {
   source: string;
   url?: string | null;
   eventTime: string;
-  timeKind: 'published' | 'observed' | 'retrieved' | 'unknown';
+  timeKind: 'published' | 'observed' | 'retrieved' | 'scheduled' | 'unknown';
 };
 
 export type PublicMarketEvent = {
@@ -80,11 +80,12 @@ export type PublicMarketEvent = {
   name?: string | null;
   sector?: string | null;
   eventTime: string;
-  timeKind: 'published' | 'observed' | 'retrieved' | 'unknown';
+  timeKind: 'published' | 'observed' | 'retrieved' | 'scheduled' | 'unknown';
   publisher?: string | null;
   url?: string | null;
   sourceState: DataSourceState;
-  classificationSource: 'keyword_rules';
+  classificationSource: 'keyword_rules' | 'provider_schedule';
+  scheduleType?: 'earnings_release' | 'ex_dividend' | 'macro_policy' | null;
   relevanceScore: number;
   importance: 'high' | 'medium' | 'low';
   relevanceReasons: string[];

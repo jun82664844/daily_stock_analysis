@@ -27,8 +27,9 @@ MarketEventCategory = Literal[
     "corporate",
     "market",
 ]
-MarketEventTimeKind = Literal["published", "observed", "retrieved", "unknown"]
+MarketEventTimeKind = Literal["published", "observed", "retrieved", "scheduled", "unknown"]
 MarketEventImportance = Literal["high", "medium", "low"]
+MarketScheduledEventType = Literal["earnings_release", "ex_dividend", "macro_policy"]
 
 
 class StrictModel(BaseModel):
@@ -113,7 +114,8 @@ class PublicMarketEvent(StrictModel):
     publisher: Optional[str] = None
     url: Optional[str] = None
     source_state: DataSourceState
-    classification_source: Literal["keyword_rules"] = "keyword_rules"
+    classification_source: Literal["keyword_rules", "provider_schedule"] = "keyword_rules"
+    schedule_type: Optional[MarketScheduledEventType] = None
     relevance_score: int = Field(0, ge=0, le=100)
     importance: MarketEventImportance = "low"
     relevance_reasons: List[str] = Field(default_factory=list)
