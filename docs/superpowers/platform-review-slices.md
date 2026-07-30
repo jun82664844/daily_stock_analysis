@@ -2668,3 +2668,43 @@ Verifier, configuration and documentation:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: exact visible-symbol filtering before truncation, CNInfo actual-disclosure history, isolated Yahoo public-chart corporate actions, `scheduled/provider_schedule` versus `observed/provider_event_history`, 180-day bounded lookback, one-year price history, three-market slot reservation, safe URL and response-size bounds, production defaults disabled, bilingual event-basis labels, no AI/key/database/notification use, and explicit non-causality/information-only wording.
+
+## V139 个股事件档案
+
+Backend and public contract:
+
+- `src/services/public_symbol_event_archive_service.py`
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_event_reaction_service.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_symbol_event_archive_v139.py`
+- `tests/test_public_event_history_coverage_v138.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/MarketWorkspacePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_symbol_event_archive_v139.py`
+- `tests/test_platform_symbol_event_archive_v139_verifier.py`
+- `scripts/verify_platform_event_history_coverage_v138.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v139-symbol-event-archive.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: anonymous single-symbol access, 6/12/24-month bounded ranges, 24-event cap, two-year public history bounds, explicit event and price source states, safe source URLs, missing-value preservation, independent rate limiting, non-blocking frontend load, complete Chinese/English controls, no AI/key/user/database/notification use, and explicit non-causality/information-only wording.

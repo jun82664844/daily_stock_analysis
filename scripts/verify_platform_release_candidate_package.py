@@ -466,6 +466,13 @@ REQUIRED_FILES = (
     "scripts/verify_platform_event_history_coverage_v138.py",
     "tests/test_platform_event_history_coverage_v138_verifier.py",
     "tests/test_public_event_history_coverage_v138.py",
+    "docs/superpowers/plans/2026-07-30-dsa-v139-symbol-event-archive.md",
+    "scripts/verify_platform_symbol_event_archive_v139.py",
+    "tests/test_platform_symbol_event_archive_v139_verifier.py",
+    "src/services/public_symbol_event_archive_service.py",
+    "tests/test_public_symbol_event_archive_v139.py",
+    "apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx",
+    "apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx",
 )
 
 VERIFIER_FILES = (
@@ -561,6 +568,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_observed_event_reactions_v136.py",
     "scripts/verify_platform_event_data_availability_v137.py",
     "scripts/verify_platform_event_history_coverage_v138.py",
+    "scripts/verify_platform_symbol_event_archive_v139.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

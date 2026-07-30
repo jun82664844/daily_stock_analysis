@@ -74,7 +74,7 @@ class PublicMarketEventReactionService:
             1,
             min(
                 int(max_events or os.getenv("PLATFORM_PUBLIC_EVENT_REACTIONS_V136_MAX_EVENTS", "6")),
-                6,
+                24,
             ),
         )
         self.timeout_seconds = max(
@@ -137,6 +137,28 @@ class PublicMarketEventReactionService:
         if cache_first:
             return self._build_cache_first()
         return self._build_uncached(allow_stale_fallback=True)
+
+    def observe_events(
+        self,
+        raw_events: Sequence[Mapping[str, Any]],
+        *,
+        max_events: int = 24,
+    ) -> list[Dict[str, Any]]:
+        """Observe one caller-supplied event set without changing response caches."""
+
+        as_of = self.clock()
+        now = self._parse_datetime(as_of) or datetime.now(timezone.utc)
+        selected = self._select_events(
+            raw_events,
+            now,
+            max_events=max_events,
+            balance_markets=False,
+        )
+        histories = self._load_histories(selected)
+        return [
+            self._build_item(event, subject, benchmark, histories, as_of, now)
+            for event, subject, benchmark in selected
+        ]
 
     def _build_uncached(self, *, allow_stale_fallback: bool) -> Dict[str, Any]:
         as_of = self.clock()
@@ -411,7 +433,11 @@ class PublicMarketEventReactionService:
         self,
         raw_events: Sequence[Mapping[str, Any]],
         now: datetime,
+        *,
+        max_events: Optional[int] = None,
+        balance_markets: bool = True,
     ) -> list[tuple[Dict[str, Any], str, Optional[str]]]:
+        result_limit = max(1, min(int(max_events or self.max_events), 24))
         selected: list[tuple[Dict[str, Any], str, Optional[str]]] = []
         seen: set[str] = set()
         for raw in raw_events:
@@ -467,6 +493,8 @@ class PublicMarketEventReactionService:
             ),
             reverse=True,
         )
+        if not balance_markets:
+            return selected[:result_limit]
         reserved = []
         reserved_ids: set[str] = set()
         for market in ("cn", "hk", "us"):
@@ -482,8 +510,8 @@ class PublicMarketEventReactionService:
                 continue
             reserved.append(candidate)
             reserved_ids.add(str(candidate[0].get("event_id") or ""))
-        if self.max_events < len(reserved):
-            return selected[: self.max_events]
+        if result_limit < len(reserved):
+            return selected[:result_limit]
         balanced = [
             *reserved,
             *[
@@ -491,7 +519,7 @@ class PublicMarketEventReactionService:
                 for item in selected
                 if str(item[0].get("event_id") or "") not in reserved_ids
             ],
-        ][: self.max_events]
+        ][:result_limit]
         balanced.sort(
             key=lambda item: (
                 self._parse_datetime(item[0].get("event_time"))
@@ -852,7 +880,7 @@ class PublicMarketEventReactionService:
                 "close": close,
                 "volume": cls._float(raw.get("volume")),
             }
-        rows = [rows_by_date[key] for key in sorted(rows_by_date)][-320:]
+        rows = [rows_by_date[key] for key in sorted(rows_by_date)][-560:]
         if not rows:
             return None
         return {
@@ -881,7 +909,7 @@ class PublicMarketEventReactionService:
             raise ValueError("unsupported event reaction symbol")
         response = requests.get(
             YAHOO_CHART_URL.format(symbol=quote(symbol, safe="")),
-            params={"interval": "1d", "range": "1y", "events": "history"},
+            params={"interval": "1d", "range": "2y", "events": "history"},
             headers={
                 "Accept": "application/json",
                 "User-Agent": (

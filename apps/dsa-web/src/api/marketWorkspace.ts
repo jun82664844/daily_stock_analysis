@@ -226,6 +226,35 @@ export type PublicMarketEventReactionResponse = {
   informationalOnly: boolean;
 };
 
+export type SymbolArchiveEventType =
+  | 'earnings'
+  | 'dividend'
+  | 'split'
+  | 'buyback'
+  | 'announcement';
+
+export type PublicSymbolEventArchiveItem = PublicMarketEventReaction & {
+  eventType: SymbolArchiveEventType;
+  summary?: string | null;
+  publisher: string;
+  sourceUrl?: string | null;
+  eventSourceState: DataSourceState;
+};
+
+export type PublicSymbolEventArchiveResponse = {
+  symbol: string;
+  name: string;
+  market: MarketCode;
+  months: 6 | 12 | 24;
+  asOf: string;
+  items: PublicSymbolEventArchiveItem[];
+  availableEventTypes: SymbolArchiveEventType[];
+  warnings: string[];
+  aiUsed: boolean;
+  informationalOnly: boolean;
+  causalityDisclaimer: boolean;
+};
+
 export type MarketSearchItem = {
   symbol: string;
   name: string;
@@ -419,6 +448,32 @@ export const marketWorkspaceApi = {
   async getSymbol(symbol: string): Promise<SymbolWorkspaceResponse> {
     const response = await apiClient.get(`/api/v1/market-workspace/symbol/${encodeURIComponent(symbol)}`);
     return toCamelCase<SymbolWorkspaceResponse>(response.data);
+  },
+  async getSymbolEventArchive(
+    symbol: string,
+    months: 6 | 12 | 24 = 12,
+  ): Promise<PublicSymbolEventArchiveResponse> {
+    const response = await apiClient.get(
+      `/api/v1/market-workspace/symbol/${encodeURIComponent(symbol)}/event-archive`,
+      { params: { months }, withCredentials: false },
+    );
+    const body = toCamelCase<PublicSymbolEventArchiveResponse>(response.data);
+    return {
+      ...body,
+      items: Array.isArray(body.items) ? body.items.map((item) => ({
+        ...item,
+        sourceUrl: safeHttpUrl(item.sourceUrl),
+        windows: Array.isArray(item.windows) ? item.windows : [],
+        warningCodes: Array.isArray(item.warningCodes) ? item.warningCodes : [],
+      })) : [],
+      availableEventTypes: Array.isArray(body.availableEventTypes)
+        ? body.availableEventTypes
+        : [],
+      warnings: Array.isArray(body.warnings) ? body.warnings : [],
+      aiUsed: Boolean(body.aiUsed),
+      informationalOnly: body.informationalOnly !== false,
+      causalityDisclaimer: body.causalityDisclaimer !== false,
+    };
   },
   async getDailyBrief(): Promise<MarketDailyBriefResponse> {
     const response = await apiClient.get('/api/v1/market-workspace/daily-brief');

@@ -10,6 +10,11 @@ const STATUS_LABELS: Record<SourceStatus, { zh: string; en: string }> = {
 const SOURCE_LABELS: Record<string, { zh: string; en: string }> = {
   yahoo_chart_reference: { zh: 'Yahoo 图表', en: 'Yahoo Chart' },
   yahoo_chart_history: { zh: 'Yahoo 历史行情', en: 'Yahoo History' },
+  yahoo_chart_public: { zh: 'Yahoo 公开行情', en: 'Yahoo Public Chart' },
+  yfinance_public_calendar: { zh: 'Yahoo 公开日历', en: 'Yahoo Public Calendar' },
+  yahoo_earnings_history: { zh: 'Yahoo 历史财报日历', en: 'Yahoo Earnings History' },
+  yahoo_chart_corporate_actions: { zh: 'Yahoo 公司行动记录', en: 'Yahoo Corporate Actions' },
+  cninfo_report_history: { zh: '巨潮资讯历史披露', en: 'CNInfo Filing History' },
   cn_quote: { zh: 'A股行情', en: 'A-share quote' },
   hk_quote: { zh: '港股行情', en: 'Hong Kong quote' },
   us_quote: { zh: '美股行情', en: 'US quote' },

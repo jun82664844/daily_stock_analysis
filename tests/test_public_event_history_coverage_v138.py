@@ -258,7 +258,7 @@ class PublicEventHistoryCoverageV138TestCase(unittest.TestCase):
             )
 
         self.assertEqual({action["kind"] for action in actions}, {"dividend", "split"})
-        self.assertEqual(get.call_args.kwargs["params"]["range"], "1y")
+        self.assertEqual(get.call_args.kwargs["params"]["range"], "2y")
         self.assertNotIn("api_key", get.call_args.kwargs["params"])
 
     def test_reaction_service_accepts_history_events_and_reserves_each_market(self) -> None:
@@ -346,7 +346,7 @@ class PublicEventHistoryCoverageV138TestCase(unittest.TestCase):
             )
             service._fetch_yahoo_history("9988.HK")
 
-        self.assertEqual(get.call_args.kwargs["params"]["range"], "1y")
+        self.assertEqual(get.call_args.kwargs["params"]["range"], "2y")
 
 
 if __name__ == "__main__":

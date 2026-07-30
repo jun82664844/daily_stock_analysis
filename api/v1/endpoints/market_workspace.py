@@ -16,6 +16,7 @@ from api.v1.schemas.market_workspace import (
     MarketWorkspaceOverview,
     PublicMarketEventReactionResponse,
     PublicMarketHomeResponse,
+    PublicSymbolEventArchiveResponse,
     SymbolWorkspaceResponse,
 )
 from src.platform_accounts import platform_identity_from_request
@@ -34,6 +35,9 @@ from src.services.public_market_calendar_service import PublicMarketCalendarServ
 from src.services.market_workspace_service import MarketWorkspaceService
 from src.services.public_market_home_service import PublicMarketHomeService
 from src.services.public_market_ranking_service import PublicMarketRankingService
+from src.services.public_symbol_event_archive_service import (
+    PublicSymbolEventArchiveService,
+)
 
 
 router = APIRouter()
@@ -209,6 +213,10 @@ _public_event_reaction_service = PublicMarketEventReactionService(
         ),
     ),
 )
+_public_symbol_event_archive_service = PublicSymbolEventArchiveService(
+    calendar_loader=_public_market_calendar_service.load,
+    reaction_service=_public_event_reaction_service,
+)
 
 
 def _enabled() -> bool:
@@ -238,6 +246,18 @@ def _require_event_reactions_enabled() -> None:
                 "error": "public_event_reactions_disabled",
                 "message": "Public event-window observations are disabled.",
             },
+        )
+
+
+def _require_symbol_event_archive_enabled() -> None:
+    _require_enabled()
+    if os.getenv(
+        "PLATFORM_PUBLIC_SYMBOL_EVENT_ARCHIVE_V139_ENABLED",
+        "false",
+    ).strip().lower() not in {"1", "true", "yes", "on"}:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "symbol_event_archive_disabled"},
         )
 
 
@@ -355,6 +375,39 @@ def symbol_workspace(request: Request, symbol: str):
         return SymbolWorkspaceResponse.model_validate(payload)
     except Exception as exc:
         raise HTTPException(status_code=503, detail={"error": "symbol_data_unavailable"}) from exc
+
+
+@router.get(
+    "/symbol/{symbol}/event-archive",
+    response_model=PublicSymbolEventArchiveResponse,
+)
+def symbol_event_archive(
+    request: Request,
+    symbol: str,
+    months: int = Query(12),
+):
+    _require_symbol_event_archive_enabled()
+    limited = check_platform_rate_limit(
+        request,
+        "market_workspace_symbol_event_archive",
+        enforce=True,
+    )
+    if limited is not None:
+        return limited
+    try:
+        return PublicSymbolEventArchiveResponse.model_validate(
+            _public_symbol_event_archive_service.build(symbol, months=months)
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": str(exc)},
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "symbol_event_archive_unavailable"},
+        ) from exc
 
 
 @router.get("/daily-brief", response_model=MarketDailyBriefResponse)

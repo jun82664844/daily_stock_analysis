@@ -5,10 +5,11 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import MarketWorkspacePage from '../MarketWorkspacePage';
 
-const { getOverview, search, getSymbol, getDailyBrief, addWatchlistItem, saveWatchlistAlertRule } = vi.hoisted(() => ({
+const { getOverview, search, getSymbol, getSymbolEventArchive, getDailyBrief, addWatchlistItem, saveWatchlistAlertRule } = vi.hoisted(() => ({
   getOverview: vi.fn(),
   search: vi.fn(),
   getSymbol: vi.fn(),
+  getSymbolEventArchive: vi.fn(),
   getDailyBrief: vi.fn(),
   addWatchlistItem: vi.fn(),
   saveWatchlistAlertRule: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('../../api/marketWorkspace', () => ({
     getOverview: (market: string) => getOverview(market),
     search: (query: string, markets?: string[]) => search(query, markets),
     getSymbol: (symbol: string) => getSymbol(symbol),
+    getSymbolEventArchive: (symbol: string, months: number) => getSymbolEventArchive(symbol, months),
     getDailyBrief: () => getDailyBrief(),
   },
 }));
@@ -62,6 +64,7 @@ describe('MarketWorkspacePage', () => {
     getOverview.mockReset();
     search.mockReset();
     getSymbol.mockReset();
+    getSymbolEventArchive.mockReset();
     getDailyBrief.mockReset();
     addWatchlistItem.mockReset();
     saveWatchlistAlertRule.mockReset();
@@ -99,6 +102,19 @@ describe('MarketWorkspacePage', () => {
       personalization: null,
       aiUsed: false,
       informationalOnly: true,
+    });
+    getSymbolEventArchive.mockResolvedValue({
+      symbol: 'AAPL',
+      name: 'Apple Inc.',
+      market: 'us',
+      months: 12,
+      asOf: '2026-07-30T00:00:00Z',
+      items: [],
+      availableEventTypes: [],
+      warnings: [],
+      aiUsed: false,
+      informationalOnly: true,
+      causalityDisclaimer: true,
     });
   });
 
@@ -140,6 +156,7 @@ describe('MarketWorkspacePage', () => {
     expect(screen.getByText('MA20')).toBeInTheDocument();
     expect(screen.getByText('95')).toBeInTheDocument();
     expect(getSymbol).toHaveBeenCalledWith('AAPL');
+    expect(getSymbolEventArchive).toHaveBeenCalledWith('AAPL', 12);
   });
 
   it('renders the market workspace in English mode', async () => {

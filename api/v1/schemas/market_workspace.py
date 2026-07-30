@@ -197,6 +197,43 @@ class PublicMarketEventReactionResponse(StrictModel):
     informational_only: bool = True
 
 
+SymbolArchiveEventType = Literal[
+    "earnings",
+    "dividend",
+    "split",
+    "buyback",
+    "announcement",
+]
+
+
+class PublicSymbolEventArchiveItem(PublicMarketEventReaction):
+    event_type: SymbolArchiveEventType
+    summary: Optional[str] = None
+    publisher: str
+    source_url: Optional[str] = None
+    event_source_state: DataSourceState
+
+
+class PublicSymbolEventArchiveResponse(StrictModel):
+    symbol: str
+    name: str
+    market: Literal["cn", "hk", "us"]
+    months: Literal[6, 12, 24]
+    as_of: str
+    items: List[PublicSymbolEventArchiveItem] = Field(
+        default_factory=list,
+        max_length=24,
+    )
+    available_event_types: List[SymbolArchiveEventType] = Field(
+        default_factory=list,
+        max_length=5,
+    )
+    warnings: List[str] = Field(default_factory=list, max_length=12)
+    ai_used: bool = False
+    informational_only: bool = True
+    causality_disclaimer: bool = True
+
+
 class MarketWorkspaceOverview(StrictModel):
     market: Literal["cn", "hk", "us"]
     as_of: str

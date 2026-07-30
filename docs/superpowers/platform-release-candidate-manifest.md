@@ -3001,3 +3001,45 @@ Verifier and delivery:
 Acceptance marker: `DSA_PLATFORM_EVENT_HISTORY_COVERAGE_V138_OK`.
 
 Safety boundary: V138 uses only explicit dates from CNInfo report records, Yahoo public calendar data and Yahoo public chart corporate actions. News timestamps and model output are not eligible event dates. The feature keeps exact symbol filtering, bounded lookback, response-size limits, isolated market/source failures, no-AI and information-only flags, and production defaults disabled. It does not claim commercial market-data rights, event causality or investment suitability, and does not access user keys, user databases, payment, notifications or historical reports.
+
+## V139 个股事件档案
+
+Backend and contract:
+
+- `src/services/public_symbol_event_archive_service.py`
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_event_reaction_service.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_symbol_event_archive_v139.py`
+- `tests/test_public_event_history_coverage_v138.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/MarketWorkspacePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/marketWorkspaceFormat.ts`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_symbol_event_archive_v139.py`
+- `tests/test_platform_symbol_event_archive_v139_verifier.py`
+- `scripts/verify_platform_event_history_coverage_v138.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v139-symbol-event-archive.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_SYMBOL_EVENT_ARCHIVE_V139_OK`.
+
+Safety boundary: V139 is an anonymous, read-only, no-AI event archive for one supported A-share, Hong Kong or US equity. It uses exact symbol filtering, safe source URLs, a 24-event cap, bounded two-year public history and an independent IP rate limit. Current real sources cover filing/earnings dates, dividends and splits; buybacks and important announcements remain empty until a traceable source is integrated. Missing observations stay unavailable. Same-period changes are objective data and do not establish event causality. The feature does not read identity or keys, write databases, send notifications, invoke payment, provide investment advice or approve public launch or data redistribution.

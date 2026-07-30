@@ -31,7 +31,7 @@ DEFAULT_TIMEOUT_SECONDS = 4.0
 DEFAULT_MAX_CACHE_ENTRIES = 64
 MAX_SYMBOLS_PER_MARKET = 6
 MAX_SOURCE_CACHE_EVENTS = 72
-MAX_HISTORICAL_PAST_DAYS = 400
+MAX_HISTORICAL_PAST_DAYS = 760
 MAX_CORPORATE_ACTIONS_PER_SYMBOL = 24
 MAX_CORPORATE_ACTION_RESPONSE_BYTES = 512 * 1024
 
@@ -867,7 +867,7 @@ class PublicMarketCalendarService:
             YAHOO_CHART_URL.format(symbol=quote(normalized, safe="")),
             params={
                 "interval": "1d",
-                "range": "1y",
+                "range": "2y",
                 "events": "div,splits",
             },
             headers={
