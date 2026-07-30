@@ -2776,3 +2776,40 @@ Verifier and delivery:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: one bounded archive response, maximum 560 daily points, exact-date benchmark joins without forward fill, first-valid-close normalization, raw close and volume preservation, CN/HK/US benchmarks, event markers, 6/12/24-month and 1/3/5/20-session linkage, stable mobile dimensions, bilingual degradation states, no AI/key/user/database/payment use, and explicit historical-data/non-causality wording.
+
+## V142 个股研究总览与同业对比
+
+Backend and public contract:
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `src/services/public_stock_research_overview_service.py`
+- `tests/test_public_stock_research_overview_v142.py`
+- `tests/test_auth_api.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/components/research/StockResearchOverviewV142.tsx`
+- `apps/dsa-web/src/components/research/__tests__/StockResearchOverviewV142.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/index.css`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_stock_research_overview_v142.py`
+- `tests/test_platform_stock_research_overview_v142_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v142-stock-research-overview.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: anonymous no-AI access, A/HK/US symbol mapping, maximum five observed fiscal years, explicit historical P/E method, missing-value preservation, lazy financial loading, cache state, bilingual tabs and degradation states, condensed legacy modules with reversible expansion, no key/user/database/payment use, and information-only wording.

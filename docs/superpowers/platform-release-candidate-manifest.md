@@ -3113,3 +3113,42 @@ Verifier and delivery:
 Acceptance marker: `DSA_PLATFORM_EVENT_KLINE_TIMELINE_V140_OK`.
 
 Safety boundary: V140 is an anonymous, read-only visualization of public historical events and prices inside the existing V139 response. It returns at most 560 daily points for 6, 12 or 24 months, compares CN/HK/US securities with the Shanghai Composite, Hang Seng Index or S&P 500 by exact matching dates, and never forward-fills missing benchmark data. Missing benchmark history preserves the symbol line; missing symbol history preserves the event archive. The chart does not invoke AI, BYOK, Ollama or Kronos, read identity or keys, write databases, send notifications or invoke payment. Co-location of an event marker and price movement is not a causal claim, prediction, impact rating or investment advice.
+
+## V142 个股研究总览与同业对比
+
+Backend and public contract:
+
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/stocks.py`
+- `api/v1/schemas/basic_query.py`
+- `src/services/public_stock_research_overview_service.py`
+- `tests/test_public_stock_research_overview_v142.py`
+- `tests/test_auth_api.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/stocks.ts`
+- `apps/dsa-web/src/api/__tests__/stocks.test.ts`
+- `apps/dsa-web/src/components/research/StockResearchOverviewV142.tsx`
+- `apps/dsa-web/src/components/research/__tests__/StockResearchOverviewV142.test.tsx`
+- `apps/dsa-web/src/pages/HomePage.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+- `apps/dsa-web/src/index.css`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_stock_research_overview_v142.py`
+- `tests/test_platform_stock_research_overview_v142_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v142-stock-research-overview.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_STOCK_RESEARCH_OVERVIEW_V142_OK`.
+
+Safety boundary: V142 is an anonymous, read-only, no-AI stock research overview for supported A-share, Hong Kong and US equities. It lazily reads up to five observed fiscal years from a public source, preserves missing values, and labels historical P/E as fiscal-year-end price divided by annual diluted EPS rather than realtime, forecast or target valuation. Crypto financials are explicitly not applicable. Legacy detailed modules remain available behind an expand control. The feature does not invoke platform models, BYOK, Ollama, Kronos or public search, read user keys, write account databases, send notifications, use payment, provide trading instructions or approve production launch or market-data redistribution. All content is information and data only, not investment advice.

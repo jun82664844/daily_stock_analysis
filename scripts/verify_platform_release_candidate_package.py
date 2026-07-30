@@ -485,6 +485,15 @@ REQUIRED_FILES = (
     "tests/test_public_symbol_event_comparison_v141.py",
     "apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.tsx",
     "apps/dsa-web/src/components/market-workspace/SymbolEventComparisonV141.test.tsx",
+    "docs/superpowers/plans/2026-07-30-dsa-v142-stock-research-overview.md",
+    "scripts/verify_platform_stock_research_overview_v142.py",
+    "tests/test_platform_stock_research_overview_v142_verifier.py",
+    "src/services/public_stock_research_overview_service.py",
+    "tests/test_public_stock_research_overview_v142.py",
+    "apps/dsa-web/src/components/research/StockResearchOverviewV142.tsx",
+    "apps/dsa-web/src/components/research/__tests__/StockResearchOverviewV142.test.tsx",
+    "apps/dsa-web/src/api/__tests__/stocks.test.ts",
+    "apps/dsa-web/src/index.css",
 )
 
 VERIFIER_FILES = (
@@ -583,6 +592,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_symbol_event_archive_v139.py",
     "scripts/verify_platform_event_kline_timeline_v140.py",
     "scripts/verify_platform_symbol_event_comparison_v141.py",
+    "scripts/verify_platform_stock_research_overview_v142.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

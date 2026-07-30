@@ -76,7 +76,7 @@ def _public_no_ai_query_path(request: Request) -> bool:
         return False
     path = request.url.path.rstrip("/")
     return re.fullmatch(
-        r"/api/v1/stocks/[^/]+/(?:snapshot|history|kronos-forecast|research-workflows)",
+        r"/api/v1/stocks/[^/]+/(?:snapshot|history|kronos-forecast|research-workflows|research-overview)",
         path,
     ) is not None
 

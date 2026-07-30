@@ -614,6 +614,60 @@ class FinancialResearchWorkflowResponse(BaseModel):
     boundary_en: str
 
 
+class PublicStockFinancialYearPayload(BaseModel):
+    """One observed annual financial statement point from a public source."""
+
+    fiscal_year: int = Field(..., ge=1900, le=2200)
+    period_end: str
+    revenue: Optional[float] = None
+    revenue_growth: Optional[float] = None
+    net_income: Optional[float] = None
+    net_income_growth: Optional[float] = None
+    diluted_eps: Optional[float] = None
+    operating_cash_flow: Optional[float] = None
+    fiscal_year_end_price: Optional[float] = None
+    observed_pe: Optional[float] = None
+
+
+class PublicStockValuationPositionPayload(BaseModel):
+    """Observed historical valuation range, not a forecast or target price."""
+
+    metric: str = "observed_pe"
+    method: str = "fiscal_year_end_price_divided_by_diluted_eps"
+    current_value: Optional[float] = None
+    minimum: Optional[float] = None
+    median: Optional[float] = None
+    maximum: Optional[float] = None
+    percentile: Optional[float] = Field(None, ge=0, le=100)
+    observation_count: int = Field(0, ge=0)
+    position: str = Field(
+        "unavailable",
+        pattern="^(lower_range|middle_range|upper_range|unavailable)$",
+    )
+
+
+class PublicStockResearchOverviewResponse(BaseModel):
+    """Lazy no-AI financial trend payload for the V142 research overview."""
+
+    stock_code: str
+    public_symbol: Optional[str] = None
+    status: str = Field(
+        ...,
+        pattern="^(available|partial|unavailable|not_applicable)$",
+    )
+    source: str = "yfinance_public_financials"
+    source_url: Optional[str] = None
+    updated_at: str
+    cache_status: str = "miss"
+    financial_years: List[PublicStockFinancialYearPayload] = Field(default_factory=list)
+    valuation_position: Optional[PublicStockValuationPositionPayload] = None
+    warnings: List[str] = Field(default_factory=list)
+    ai_used: bool = False
+    public_search_used: bool = False
+    boundary_zh: str = "仅提供资讯和数据，不构成投资建议或交易指令。"
+    boundary_en: str = "Information and data only; not investment advice or a trading instruction."
+
+
 class BasicPrewarmRequest(BaseModel):
     """Local quick-query cache prewarm request."""
 

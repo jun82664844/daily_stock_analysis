@@ -29,6 +29,7 @@ from api.v1.schemas.basic_query import (
     BasicStockSnapshot,
     FinancialResearchWorkflowResponse,
     KronosForecastResponse,
+    PublicStockResearchOverviewResponse,
 )
 from api.v1.schemas.stocks import (
     ExtractFromImageResponse,
@@ -54,6 +55,7 @@ from src.services.basic_query_service import BasicQueryService
 from src.services.a_share_enrichment_service import AShareEnrichmentService
 from src.services.kronos_forecast_service import KronosForecastService
 from src.services.financial_research_workflow_service import FinancialResearchWorkflowService
+from src.services.public_stock_research_overview_service import PublicStockResearchOverviewService
 from src.services.global_equity_enrichment_service import GlobalEquityEnrichmentService
 from src.services.market_source_ops import build_market_source_ops_snapshot, recover_market_sources
 from src.services.stock_code_utils import normalize_crypto_symbol
@@ -66,6 +68,7 @@ from data_provider.base import normalize_stock_code
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+_public_stock_research_overview_service = PublicStockResearchOverviewService()
 
 # 须在 /{stock_code} 路由之前定义
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
@@ -638,6 +641,49 @@ def get_financial_research_workflows(
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Financial research workflow build failed."},
+        )
+
+
+@router.get(
+    "/{stock_code}/research-overview",
+    response_model=PublicStockResearchOverviewResponse,
+    responses={
+        200: {"description": "Lazy no-AI public financial trends and observed valuation range"},
+        400: {"description": "Invalid stock code", "model": ErrorResponse},
+        429: {"description": "Too many research overview requests"},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Get public stock research overview facts",
+    description=(
+        "Load observed public annual financial facts and an explicitly defined historical P/E sample. "
+        "The route is anonymous, cached, information-only, and does not invoke AI or public search."
+    ),
+)
+def get_public_stock_research_overview(
+    request: Request,
+    stock_code: str,
+) -> PublicStockResearchOverviewResponse:
+    """Return lazy financial trends without slowing the main quick-query route."""
+
+    try:
+        identity = platform_identity_from_request(request)
+        limited = check_platform_rate_limit(
+            request,
+            "stock_research_overview",
+            user_id=int(identity.user_id) if identity and identity.user_id is not None else None,
+        )
+        if limited is not None:
+            return limited
+        normalized = _validate_and_normalize_stock_code(stock_code)
+        payload = _public_stock_research_overview_service.get_overview(normalized)
+        return PublicStockResearchOverviewResponse.model_validate(payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Public stock research overview failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Public stock research overview failed."},
         )
 
 

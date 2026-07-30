@@ -2898,3 +2898,36 @@ textarea {
     text-align: left;
   }
 }
+
+/* V142 keeps the complete legacy research modules available behind one explicit control. */
+.v142-condensed [data-testid="basic-query-decision-journey-v91"],
+.v142-condensed [data-testid="basic-query-next-actions-v85"],
+.v142-condensed [data-testid="basic-query-free-analyst-workbench-v86"],
+.v142-condensed [data-testid="basic-query-visual-analyst-page-v87"],
+.v142-condensed [data-testid="basic-query-reading-roadmap-v88"],
+.v142-condensed [data-testid="basic-query-today-brief-card"],
+.v142-condensed [data-testid="basic-query-broker-three-step-card"],
+.v142-condensed [data-testid="basic-query-premium-preview-panel"],
+.v142-condensed [data-testid="basic-query-free-event-center-v82"],
+.v142-condensed [data-testid="basic-query-pro-decision-card"],
+.v142-condensed [data-testid="basic-query-quote-trust-panel"],
+.v142-condensed [data-testid="basic-query-source-recovery-panel"],
+.v142-condensed [data-testid="basic-query-verified-data-board"],
+.v142-condensed [data-testid="basic-query-event-radar"],
+.v142-condensed [data-testid="basic-query-broker-cockpit"],
+.v142-condensed [data-testid="basic-query-commercial-journey"],
+.v142-condensed [data-testid="basic-query-data-depth-board"],
+.v142-condensed [data-testid="basic-query-professional-overview"],
+.v142-condensed [data-testid="basic-query-free-research-board"],
+.v142-condensed [data-testid="basic-query-free-value-summary"],
+.v142-condensed [data-testid="basic-query-free-report"],
+.v142-condensed [data-testid="basic-query-company-profile"],
+.v142-condensed [data-testid="basic-query-quote-details"],
+.v142-condensed [data-testid="basic-query-technical-details"],
+.v142-condensed [data-testid="basic-query-user-guardrails"],
+.v142-condensed [data-testid="basic-query-workspace-lanes"],
+.v142-condensed [data-testid="basic-query-refresh-market"],
+.v142-condensed [data-testid="basic-query-diagnostics-details"],
+.v142-condensed [data-testid="basic-query-degradation"] {
+  display: none;
+}

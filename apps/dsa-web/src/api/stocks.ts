@@ -509,6 +509,48 @@ export type MarketSourceRecoveryResponse = {
   aiUsed: boolean;
 };
 
+export type PublicStockFinancialYear = {
+  fiscalYear: number;
+  periodEnd: string;
+  revenue?: number | null;
+  revenueGrowth?: number | null;
+  netIncome?: number | null;
+  netIncomeGrowth?: number | null;
+  dilutedEps?: number | null;
+  operatingCashFlow?: number | null;
+  fiscalYearEndPrice?: number | null;
+  observedPe?: number | null;
+};
+
+export type PublicStockValuationPosition = {
+  metric: string;
+  method: string;
+  currentValue?: number | null;
+  minimum?: number | null;
+  median?: number | null;
+  maximum?: number | null;
+  percentile?: number | null;
+  observationCount: number;
+  position: 'lower_range' | 'middle_range' | 'upper_range' | 'unavailable';
+};
+
+export type PublicStockResearchOverview = {
+  stockCode: string;
+  publicSymbol?: string | null;
+  status: 'available' | 'partial' | 'unavailable' | 'not_applicable';
+  source: string;
+  sourceUrl?: string | null;
+  updatedAt: string;
+  cacheStatus: string;
+  financialYears: PublicStockFinancialYear[];
+  valuationPosition?: PublicStockValuationPosition | null;
+  warnings: string[];
+  aiUsed: boolean;
+  publicSearchUsed: boolean;
+  boundaryZh: string;
+  boundaryEn: string;
+};
+
 export const stocksApi = {
   async history(code: string, days = 90): Promise<StockHistoryResponse> {
     const response = await apiClient.get<Record<string, unknown>>(
@@ -529,6 +571,13 @@ export const stocksApi = {
       `/api/v1/stocks/${encodeURIComponent(code)}/snapshot${query}`,
     );
     return toCamelCase<BasicStockSnapshot>(response.data);
+  },
+
+  async researchOverview(code: string): Promise<PublicStockResearchOverview> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/stocks/${encodeURIComponent(code)}/research-overview`,
+    );
+    return toCamelCase<PublicStockResearchOverview>(response.data);
   },
 
   async kronosForecast(code: string, options?: KronosForecastOptions): Promise<KronosForecastResponse> {

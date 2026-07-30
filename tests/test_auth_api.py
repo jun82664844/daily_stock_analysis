@@ -257,6 +257,30 @@ class AuthApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         call_next.assert_awaited_once()
 
+    def test_public_stock_research_overview_is_reachable_without_platform_session(self) -> None:
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/stocks/AAPL/research-overview",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 80),
+            "root_path": "",
+        }
+        request = Request(scope)
+        middleware = AuthMiddleware(app=MagicMock())
+        next_response = Response(status_code=200)
+        call_next = AsyncMock(return_value=next_response)
+
+        with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+             patch("api.middlewares.auth.is_platform_user_auth_enabled", return_value=True):
+            response = asyncio.run(middleware.dispatch(request, call_next))
+
+        self.assertEqual(response.status_code, 200)
+        call_next.assert_awaited_once()
+
     def test_public_market_screening_reads_and_task_submission_do_not_require_login(self) -> None:
         for method, path in (
             ("GET", "/api/v1/alphasift/status"),

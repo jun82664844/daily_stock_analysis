@@ -61,6 +61,8 @@ const DailyResearchCockpitV103 = lazy(() => import('../components/radar/DailyRes
   .then((module) => ({ default: module.DailyResearchCockpitV103 })));
 const GlobalEquityEnrichmentCard = lazy(() => import('../components/research/GlobalEquityEnrichmentCard')
   .then((module) => ({ default: module.GlobalEquityEnrichmentCard })));
+const StockResearchOverviewV142 = lazy(() => import('../components/research/StockResearchOverviewV142')
+  .then((module) => ({ default: module.StockResearchOverviewV142 })));
 
 const LazyFeatureFallback: React.FC<{ className?: string }> = ({ className = 'min-h-24' }) => (
   <div
@@ -294,6 +296,8 @@ const GENERATED_TEXT_ZH: Record<string, string> = {
   Technology: '科技',
   'Consumer Electronics': '消费电子',
   'Technology / Consumer Electronics': '科技 / 消费电子',
+  'Communication Services': '通信服务',
+  'Internet Content & Information': '互联网内容与信息服务',
   'United States': '美国',
   'price above trend volume soft': '价格位于趋势上方但量能偏弱',
   'Constructive quick signal': '快速信号偏积极',
@@ -378,6 +382,7 @@ const SOURCE_ZH: Record<string, string> = {
   a_share_history: 'A股历史行情',
   us_realtime: '美股实时行情',
   yahoo_chart: 'Yahoo行情',
+  yahoo_chart_reference: 'Yahoo参照行情',
   yfinance: 'Yahoo历史行情',
   us_history: '美股历史行情',
   unit_quote: '行情源',
@@ -391,6 +396,8 @@ const GENERATED_TERM_ZH: Record<string, string> = {
   'Technology / Consumer Electronics': '科技 / 消费电子',
   'Consumer Electronics': '消费电子',
   Technology: '科技',
+  'Communication Services': '通信服务',
+  'Internet Content & Information': '互联网内容与信息服务',
   'United States': '美国',
   'US growth and technology benchmark.': '美国成长与科技基准。',
   a_share: 'A股',
@@ -1317,6 +1324,7 @@ const HomePage: React.FC = () => {
   const [isQueryingBasic, setIsQueryingBasic] = useState(false);
   const [basicPremiumPreviewOpen, setBasicPremiumPreviewOpen] = useState(false);
   const [basicEventCenterActiveIndex, setBasicEventCenterActiveIndex] = useState(0);
+  const [v142DetailsExpanded, setV142DetailsExpanded] = useState(false);
   const [basicQueryError, setBasicQueryError] = useState<ParsedApiError | null>(null);
   const [basicQueryCooldownSeconds, setBasicQueryCooldownSeconds] = useState(0);
   const [basicQueryCooldownDialogOpen, setBasicQueryCooldownDialogOpen] = useState(false);
@@ -4598,6 +4606,7 @@ const HomePage: React.FC = () => {
     setKronosForecastError('');
     setBasicPremiumPreviewOpen(false);
     setBasicEventCenterActiveIndex(0);
+    setV142DetailsExpanded(false);
     if (!forceRefresh) {
       setBasicSnapshot(null);
       setKronosForecast(null);
@@ -6407,7 +6416,11 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {basicSnapshot && !marketReviewReport ? (
-              <div ref={basicSnapshotRef} data-testid="basic-query-snapshot" className="mb-4 max-w-4xl scroll-mt-4 rounded-xl border border-subtle bg-surface/75 p-4 shadow-soft-card">
+              <div
+                ref={basicSnapshotRef}
+                data-testid="basic-query-snapshot"
+                className={`${basicSnapshotViewMode === 'quick' && !v142DetailsExpanded ? 'v142-condensed' : ''} mb-4 max-w-4xl scroll-mt-4 rounded-xl border border-subtle bg-surface/75 p-4 shadow-soft-card`}
+              >
                 <div
                   data-testid="basic-query-primary-summary"
                   className="mb-4 flex flex-col gap-3 border-b border-subtle pb-4 lg:flex-row lg:items-end lg:justify-between"
@@ -6580,6 +6593,16 @@ const HomePage: React.FC = () => {
                       </div>
                     ) : null}
                   </section>
+                ) : null}
+                {basicSnapshotViewMode === 'quick' ? (
+                  <Suspense fallback={<LazyFeatureFallback className="min-h-72" />}>
+                    <StockResearchOverviewV142
+                      snapshot={basicSnapshot}
+                      language={uiLanguage}
+                      detailsExpanded={v142DetailsExpanded}
+                      onToggleDetails={() => setV142DetailsExpanded((current) => !current)}
+                    />
+                  </Suspense>
                 ) : null}
                 {platformEnabled ? (
                   <Suspense fallback={<LazyFeatureFallback className="min-h-40" />}>

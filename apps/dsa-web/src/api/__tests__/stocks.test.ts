@@ -168,6 +168,63 @@ describe('stocksApi', () => {
     expect(result.data[0]).toMatchObject({ close: 204, changePercent: 2 });
   });
 
+  it('loads the public no-AI stock research overview as camelCase data', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        stock_code: 'AAPL',
+        public_symbol: 'AAPL',
+        status: 'available',
+        source: 'yfinance_public_financials',
+        source_url: 'https://finance.yahoo.com/quote/AAPL/financials/',
+        updated_at: '2026-07-30T12:00:00',
+        cache_status: 'miss',
+        financial_years: [{
+          fiscal_year: 2025,
+          period_end: '2025-09-30',
+          revenue: 416161000000,
+          revenue_growth: 6.43,
+          net_income: 112010000000,
+          net_income_growth: 19.5,
+          diluted_eps: 7.46,
+          operating_cash_flow: 111482000000,
+          fiscal_year_end_price: 254.63,
+          observed_pe: 34.13,
+        }],
+        valuation_position: {
+          metric: 'observed_pe',
+          method: 'fiscal_year_end_price_divided_by_diluted_eps',
+          current_value: 34.13,
+          minimum: 22,
+          median: 29,
+          maximum: 36,
+          percentile: 80,
+          observation_count: 5,
+          position: 'upper_range',
+        },
+        warnings: [],
+        ai_used: false,
+        public_search_used: false,
+        boundary_zh: '仅提供资讯和数据，不构成投资建议或交易指令。',
+        boundary_en: 'Information and data only; not investment advice or a trading instruction.',
+      },
+    });
+
+    const result = await stocksApi.researchOverview('AAPL');
+
+    expect(get).toHaveBeenCalledWith('/api/v1/stocks/AAPL/research-overview');
+    expect(result.publicSymbol).toBe('AAPL');
+    expect(result.financialYears[0]).toMatchObject({
+      fiscalYear: 2025,
+      revenueGrowth: 6.43,
+      dilutedEps: 7.46,
+      observedPe: 34.13,
+    });
+    expect(result.valuationPosition?.observationCount).toBe(5);
+    expect(result.valuationPosition?.position).toBe('upper_range');
+    expect(result.aiUsed).toBe(false);
+    expect(result.publicSearchUsed).toBe(false);
+  });
+
   it('loads A-share enrichment channels as camelCase snapshot data', async () => {
     get.mockResolvedValueOnce({
       data: {

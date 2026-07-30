@@ -41,6 +41,24 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v142_stock_research_overview_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        for path in (
+            "src/services/public_stock_research_overview_service.py",
+            "tests/test_public_stock_research_overview_v142.py",
+            "apps/dsa-web/src/components/research/StockResearchOverviewV142.tsx",
+            "apps/dsa-web/src/components/research/__tests__/StockResearchOverviewV142.test.tsx",
+            "scripts/verify_platform_stock_research_overview_v142.py",
+            "tests/test_platform_stock_research_overview_v142_verifier.py",
+            "docs/superpowers/plans/2026-07-30-dsa-v142-stock-research-overview.md",
+        ):
+            self.assertIn(path, REQUIRED_FILES)
+        self.assertIn(
+            "scripts/verify_platform_stock_research_overview_v142.py",
+            VERIFIER_FILES,
+        )
+
     def test_v141_symbol_event_comparison_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

@@ -175,6 +175,7 @@ verify_*.py
 !scripts/verify_platform_symbol_event_archive_v139.py
 !scripts/verify_platform_event_kline_timeline_v140.py
 !scripts/verify_platform_symbol_event_comparison_v141.py
+!scripts/verify_platform_stock_research_overview_v142.py
 
 # Keep the V128 browser-local event read-state module versioned without
 # exposing other generic lib/ output covered by the repository-wide rule.

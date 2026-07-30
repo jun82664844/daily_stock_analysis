@@ -397,6 +397,9 @@ describe('HomePage', () => {
     expect(localizeGeneratedText('Range-watch preview', 'zh')).toBe('区间观察预览');
     expect(localizeGeneratedText('TencentFetcher', 'zh')).toBe('腾讯行情历史');
     expect(localizeGeneratedText('a_stock_data_skill_adapter', 'zh')).toBe('A股数据适配器');
+    expect(localizeGeneratedText('Communication Services', 'zh')).toBe('通信服务');
+    expect(localizeGeneratedText('Internet Content & Information', 'zh')).toBe('互联网内容与信息服务');
+    expect(localizeGeneratedText('yahoo_chart_reference', 'zh')).toBe('Yahoo参照行情');
   });
 
   beforeEach(() => {
@@ -3749,6 +3752,14 @@ describe('HomePage', () => {
       expect(stocksApi.snapshot).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('basic-query-mode-banner')).toHaveTextContent('快速分析模式');
+    const researchOverviewV142 = await screen.findByTestId('basic-query-research-overview-v142');
+    expect(researchOverviewV142).toHaveTextContent('个股研究总览');
+    expect(screen.getByTestId('basic-query-snapshot')).toHaveClass('v142-condensed');
+    expect(screen.getByRole('tab', { name: '研究总览' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '财务趋势' })).toBeInTheDocument();
+    fireEvent.click(within(researchOverviewV142).getByRole('button', { name: '展开全部详细模块' }));
+    expect(screen.getByTestId('basic-query-snapshot')).not.toHaveClass('v142-condensed');
+    expect(within(researchOverviewV142).getByRole('button', { name: '收起详细模块' })).toBeInTheDocument();
     const decisionJourney = screen.getByTestId('basic-query-decision-journey-v91');
     expect(
       screen.getByTestId('basic-query-mode-banner').compareDocumentPosition(decisionJourney)
