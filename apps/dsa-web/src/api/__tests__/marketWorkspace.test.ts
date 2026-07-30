@@ -115,8 +115,22 @@ describe('marketWorkspaceApi', () => {
         benchmark_source_state: { source: 'yahoo_chart_public', status: 'fresh' },
         warning_codes: ['observation_window_incomplete'],
       }],
+      market_sources: [{
+        market: 'us',
+        status: 'cached',
+        event_count: 1,
+        observed_at: '2026-07-20T00:00:00Z',
+        fetched_at: '2026-07-30T00:00:00Z',
+        warning_code: null,
+      }],
       warnings: [],
-      cache: { hit: false, age_seconds: 0, ttl_seconds: 900 },
+      cache: {
+        hit: true,
+        age_seconds: 12,
+        ttl_seconds: 900,
+        storage: 'disk',
+        refreshing: true,
+      },
       ai_used: false,
       informational_only: true,
     } });
@@ -130,6 +144,16 @@ describe('marketWorkspaceApi', () => {
     expect(body.items[0].eventId).toBe('event-aapl');
     expect(body.items[0].windows[0].tradingDays).toBe(1);
     expect(body.items[0].windows[0].relativeReturnPercent).toBe(1);
+    expect(body.marketSources[0]).toEqual({
+      market: 'us',
+      status: 'cached',
+      eventCount: 1,
+      observedAt: '2026-07-20T00:00:00Z',
+      fetchedAt: '2026-07-30T00:00:00Z',
+      warningCode: null,
+    });
+    expect(body.cache.storage).toBe('disk');
+    expect(body.cache.refreshing).toBe(true);
     expect(body.aiUsed).toBe(false);
   });
 

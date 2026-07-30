@@ -17,6 +17,10 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from src.services.public_event_reaction_cache import (
+    PublicEventReactionSnapshotStore,
+)
+
 
 REACTION_WINDOWS = (1, 3, 5, 20)
 MARKET_BENCHMARKS = {
@@ -58,6 +62,8 @@ class PublicMarketEventReactionService:
         stale_ttl_seconds: Optional[int] = None,
         max_history_cache_entries: Optional[int] = None,
         executor: Optional[ThreadPoolExecutor] = None,
+        snapshot_store: Optional[PublicEventReactionSnapshotStore] = None,
+        refresh_executor: Optional[ThreadPoolExecutor] = None,
     ) -> None:
         self.event_loader = event_loader
         self.history_loader = history_loader or self._fetch_yahoo_history
@@ -108,23 +114,40 @@ class PublicMarketEventReactionService:
             ),
         )
         self.executor = executor or _EXECUTOR
+        self.snapshot_store = snapshot_store
+        self.refresh_executor = refresh_executor or _EXECUTOR
         self._history_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._response_cache: Optional[tuple[float, Dict[str, Any]]] = None
+        self._refresh_future: Optional[Future[Dict[str, Any]]] = None
         self._lock = Lock()
 
-    def build(self) -> Dict[str, Any]:
+    def build(self, *, cache_first: bool = False) -> Dict[str, Any]:
         cached = self._read_response_cache(allow_stale=False)
         if cached is not None:
             return cached
+        if cache_first:
+            return self._build_cache_first()
+        return self._build_uncached(allow_stale_fallback=True)
 
+    def _build_uncached(self, *, allow_stale_fallback: bool) -> Dict[str, Any]:
         as_of = self.clock()
         now = self._parse_datetime(as_of) or datetime.now(timezone.utc)
         warnings: list[str] = []
+        market_sources: list[Dict[str, Any]] = []
         try:
             event_payload = self.event_loader()
             events = event_payload.get("events") if isinstance(event_payload, Mapping) else []
+            if isinstance(event_payload, Mapping):
+                market_sources = self._normalize_market_sources(
+                    event_payload.get("market_sources"),
+                    as_of,
+                )
         except Exception:
-            stale = self._read_response_cache(allow_stale=True)
+            stale = (
+                self._read_response_cache(allow_stale=True)
+                if allow_stale_fallback
+                else None
+            )
             if stale is not None:
                 stale["warnings"] = list(dict.fromkeys([
                     *(stale.get("warnings") or []),
@@ -138,6 +161,7 @@ class PublicMarketEventReactionService:
                     "event_reaction_events_unavailable",
                     "event_reaction_no_eligible_events",
                 ],
+                market_sources=market_sources,
             )
 
         selected = self._select_events(events or [], now)
@@ -150,15 +174,20 @@ class PublicMarketEventReactionService:
             warnings.append("event_reaction_source_unavailable")
         if not items:
             warnings.append("event_reaction_no_eligible_events")
+        if not market_sources:
+            market_sources = self._derive_market_sources(items, as_of)
 
         payload = {
             "as_of": as_of,
             "items": items[: self.max_events],
+            "market_sources": market_sources,
             "warnings": list(dict.fromkeys(warnings)),
             "cache": {
                 "hit": False,
                 "age_seconds": 0,
                 "ttl_seconds": self.cache_ttl_seconds,
+                "storage": "memory",
+                "refreshing": False,
             },
             "ai_used": False,
             "informational_only": True,
@@ -172,19 +201,98 @@ class PublicMarketEventReactionService:
         as_of: str,
         *,
         warnings: Sequence[str],
+        market_sources: Optional[Sequence[Mapping[str, Any]]] = None,
+        refreshing: bool = False,
     ) -> Dict[str, Any]:
         return {
             "as_of": as_of,
             "items": [],
+            "market_sources": list(market_sources or self._derive_market_sources([], as_of)),
             "warnings": list(dict.fromkeys(warnings)),
             "cache": {
                 "hit": False,
                 "age_seconds": 0,
                 "ttl_seconds": self.cache_ttl_seconds,
+                "storage": "none",
+                "refreshing": refreshing,
             },
             "ai_used": False,
             "informational_only": True,
         }
+
+    def _build_cache_first(self) -> Dict[str, Any]:
+        snapshot = self.snapshot_store.read() if self.snapshot_store else None
+        if snapshot is not None:
+            payload = copy.deepcopy(snapshot["payload"])
+            age = max(0, int(snapshot["age_seconds"]))
+            with self._lock:
+                self._response_cache = (
+                    self.monotonic_clock() - age,
+                    copy.deepcopy(payload),
+                )
+            if snapshot["stale"]:
+                self._start_background_refresh()
+                payload["warnings"] = list(dict.fromkeys([
+                    *(payload.get("warnings") or []),
+                    "event_reaction_response_stale",
+                ]))
+                payload["cache"]["refreshing"] = self._refresh_in_progress()
+            return payload
+
+        self._start_background_refresh()
+        return self._empty_payload(
+            self.clock(),
+            warnings=["event_reaction_refreshing"],
+            refreshing=self._refresh_in_progress(),
+        )
+
+    def prewarm(self) -> bool:
+        """Start one best-effort public refresh without blocking app startup."""
+        return self._start_background_refresh()
+
+    def wait_for_refresh(self, timeout: Optional[float] = None) -> bool:
+        with self._lock:
+            future = self._refresh_future
+        if future is None:
+            return True
+        try:
+            future.result(timeout=timeout)
+        except Exception:
+            return False
+        return True
+
+    def _start_background_refresh(self) -> bool:
+        with self._lock:
+            if self._refresh_future is not None and not self._refresh_future.done():
+                return False
+            self._refresh_future = self.refresh_executor.submit(
+                self._refresh_and_store
+            )
+        return True
+
+    def _refresh_in_progress(self) -> bool:
+        with self._lock:
+            return bool(
+                self._refresh_future is not None
+                and not self._refresh_future.done()
+            )
+
+    def _refresh_and_store(self) -> Dict[str, Any]:
+        payload = self._build_uncached(allow_stale_fallback=False)
+        market_sources = payload.get("market_sources")
+        if (
+            isinstance(market_sources, Sequence)
+            and market_sources
+            and not any(
+                isinstance(source, Mapping)
+                and source.get("status") in {"fresh", "cached", "stale"}
+                for source in market_sources
+            )
+        ):
+            raise RuntimeError("all event reaction market sources unavailable")
+        if self.snapshot_store is not None:
+            self.snapshot_store.write(payload)
+        return payload
 
     def _read_response_cache(
         self,
@@ -204,8 +312,91 @@ class PublicMarketEventReactionService:
             "hit": True,
             "age_seconds": age,
             "ttl_seconds": self.cache_ttl_seconds,
+            "storage": "memory",
+            "refreshing": self._refresh_in_progress(),
         }
         return payload
+
+    @staticmethod
+    def _normalize_market_sources(
+        value: Any,
+        as_of: str,
+    ) -> list[Dict[str, Any]]:
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            return []
+        by_market: Dict[str, Dict[str, Any]] = {}
+        for raw in value:
+            if not isinstance(raw, Mapping):
+                continue
+            market = str(raw.get("market") or "").strip().lower()
+            status = str(raw.get("status") or "").strip().lower()
+            if market not in MARKET_BENCHMARKS:
+                continue
+            if status not in {"fresh", "cached", "stale", "unavailable"}:
+                status = "unavailable"
+            try:
+                count = max(0, min(int(raw.get("event_count") or 0), 72))
+            except (TypeError, ValueError):
+                count = 0
+            by_market[market] = {
+                "market": market,
+                "status": status,
+                "event_count": count,
+                "observed_at": raw.get("observed_at"),
+                "fetched_at": str(raw.get("fetched_at") or as_of),
+                "warning_code": raw.get("warning_code"),
+            }
+        return [
+            by_market.get(
+                market,
+                {
+                    "market": market,
+                    "status": "unavailable",
+                    "event_count": 0,
+                    "observed_at": None,
+                    "fetched_at": as_of,
+                    "warning_code": "event_calendar_market_unavailable",
+                },
+            )
+            for market in ("cn", "hk", "us")
+        ]
+
+    @staticmethod
+    def _derive_market_sources(
+        items: Sequence[Mapping[str, Any]],
+        as_of: str,
+    ) -> list[Dict[str, Any]]:
+        priority = {"fresh": 3, "cached": 2, "stale": 1, "unavailable": 0}
+        result = []
+        for market in ("cn", "hk", "us"):
+            market_items = [
+                item
+                for item in items
+                if str(item.get("market") or "").lower() == market
+            ]
+            statuses = [
+                str((item.get("source_state") or {}).get("status") or "unavailable")
+                for item in market_items
+            ]
+            status = max(statuses, key=lambda item: priority.get(item, 0)) if statuses else "unavailable"
+            observed = [
+                str((item.get("source_state") or {}).get("observed_at") or "")
+                for item in market_items
+                if (item.get("source_state") or {}).get("observed_at")
+            ]
+            result.append({
+                "market": market,
+                "status": status,
+                "event_count": len(market_items),
+                "observed_at": max(observed) if observed else None,
+                "fetched_at": as_of,
+                "warning_code": (
+                    None
+                    if market_items
+                    else "event_calendar_market_unavailable"
+                ),
+            })
+        return result
 
     def _select_events(
         self,

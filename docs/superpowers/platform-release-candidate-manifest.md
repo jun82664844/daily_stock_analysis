@@ -2924,3 +2924,44 @@ Verifier, configuration and documentation:
 Acceptance marker: `DSA_PLATFORM_OBSERVED_EVENT_REACTIONS_V136_OK`.
 
 Safety boundary: V136 selects at most six already occurred source-scheduled events from a 45-day historical calendar, loads the previous CNInfo/FOMC period when the historical window crosses it, and reads HTTPS Yahoo Chart history as a no-key public channel. Because the calendar provides a date rather than an exact publication time, it uses the event-market date close as the conservative baseline and aligns 1/3/5/20-session observations to broad-market trading sessions; a suspended or missing security session remains unavailable instead of being replaced by a later date. The endpoint does not parse identity, the frontend does not upload user identity or cross-origin credentials, and same-origin session cookies do not participate in the result. It remains independently IP-rate-limited even when the global limiter is disabled, with a bounded in-process identity-bucket count that rejects new identities rather than evicting active buckets. All-source or empty-partial-source calendar failures are not cached as real empty results; stale timestamps are preserved, history cache keys are capped at 32, calendar cache keys at 64, and each source cache at 72 events. Partial source failures keep successful observations visible with a warning, while any AI-use or non-informational response fails closed in the UI. It does not call AI, read platform or user API keys, write the database, send notifications or upload local follow state. Production templates remain disabled. The UI explicitly states that same-period performance does not establish causality and provides information and data only rather than investment advice.
+
+## V137 Event Data Availability and Cold Start
+
+Backend and public contract:
+
+- `src/services/public_event_reaction_cache.py`
+- `src/services/public_market_event_reaction_service.py`
+- `src/services/public_market_calendar_service.py`
+- `api/app.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_event_reaction_cache_v137.py`
+- `tests/test_public_event_reaction_availability_v137.py`
+- `tests/test_public_event_reaction_startup_v137.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_event_data_availability_v137.py`
+- `tests/test_platform_event_data_availability_v137_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v137-event-data-availability-and-cold-start.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_EVENT_DATA_AVAILABILITY_V137_OK`.
+
+Safety boundary: V137 persists only the public V136 event-observation response in a versioned, one-megabyte, atomically replaced local snapshot. The store recursively rejects API-key, token, cookie, identity and email fields, requires `ai_used=false` and `informational_only=true`, and never replaces a valid snapshot when every market source is unavailable. CN, HK and US event candidates refresh independently, slow calendar Futures are reused, and event observations no longer synchronously build the complete public home. Local startup may schedule one keyless anonymous prewarm; example and production templates remain disabled. The frontend shows market availability and memory/disk/refresh status in both languages with finite polling and preserves partial successful results. The feature does not read user data or keys, call AI, write account databases, invoke payment, or send notifications. Event-window observations remain historical data rather than causal or investment-advice claims.

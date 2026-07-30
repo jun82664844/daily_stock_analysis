@@ -167,6 +167,20 @@ export type MarketEventReactionWindow = {
   volumeRatio?: number | null;
 };
 
+export type EventReactionMarketSource = {
+  market: MarketCode;
+  status: SourceStatus;
+  eventCount: number;
+  observedAt?: string | null;
+  fetchedAt?: string | null;
+  warningCode?: string | null;
+};
+
+export type EventReactionCacheState = MarketCacheState & {
+  storage: 'none' | 'memory' | 'disk';
+  refreshing: boolean;
+};
+
 export type PublicMarketEventReaction = {
   eventId: string;
   market: MarketCode;
@@ -190,8 +204,9 @@ export type PublicMarketEventReaction = {
 export type PublicMarketEventReactionResponse = {
   asOf: string;
   items: PublicMarketEventReaction[];
+  marketSources: EventReactionMarketSource[];
   warnings: string[];
-  cache: MarketCacheState;
+  cache: EventReactionCacheState;
   aiUsed: boolean;
   informationalOnly: boolean;
 };
@@ -363,10 +378,21 @@ export const marketWorkspaceApi = {
         windows: Array.isArray(item.windows) ? item.windows : [],
         warningCodes: Array.isArray(item.warningCodes) ? item.warningCodes : [],
       })) : [],
+      marketSources: Array.isArray(body.marketSources) ? body.marketSources : [],
       warnings: Array.isArray(body.warnings) ? body.warnings : [],
-      cache: body.cache ?? { hit: false, ageSeconds: 0, ttlSeconds: 900 },
+      cache: {
+        hit: Boolean(body.cache?.hit),
+        ageSeconds: Number.isFinite(body.cache?.ageSeconds) ? body.cache.ageSeconds : 0,
+        ttlSeconds: Number.isFinite(body.cache?.ttlSeconds) ? body.cache.ttlSeconds : 900,
+        storage: body.cache?.storage === 'memory'
+          || body.cache?.storage === 'disk'
+          || body.cache?.storage === 'none'
+          ? body.cache.storage
+          : 'none',
+        refreshing: Boolean(body.cache?.refreshing),
+      },
       aiUsed: Boolean(body.aiUsed),
-      informationalOnly: true,
+      informationalOnly: body.informationalOnly !== false,
     };
   },
   async search(query: string, markets: MarketCode[] = ['cn', 'hk', 'us'], limit = 8): Promise<MarketSearchResponse> {

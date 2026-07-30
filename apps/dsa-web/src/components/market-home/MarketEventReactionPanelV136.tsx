@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart3, Clock3, Database, RefreshCw, Search } from 'lucide-react';
 import {
   marketWorkspaceApi,
@@ -53,6 +53,14 @@ const copy = {
     cache: (minutes: number) => `缓存约 ${minutes} 分钟`,
     source: '来源',
     sourceProvider: 'Yahoo 公开图表',
+    availability: '三市场数据可用性',
+    eventCount: (count: number) => `${count} 个事件`,
+    refreshing: '正在后台刷新公开事件数据',
+    storage: {
+      none: '尚无持久快照',
+      memory: '进程内缓存',
+      disk: '磁盘快照',
+    },
     noCausality: '同期表现不代表事件导致行情变化。仅提供资讯和数据，不构成投资建议。',
   },
   en: {
@@ -90,6 +98,14 @@ const copy = {
     cache: (minutes: number) => `Cached for about ${minutes} min`,
     source: 'Source',
     sourceProvider: 'Yahoo public chart',
+    availability: 'Three-market data availability',
+    eventCount: (count: number) => `${count} ${count === 1 ? 'event' : 'events'}`,
+    refreshing: 'Refreshing public event data in the background',
+    storage: {
+      none: 'No persistent snapshot yet',
+      memory: 'In-memory cache',
+      disk: 'Disk snapshot',
+    },
     noCausality: 'Same-period performance does not establish that the event caused a market move. Information and data only. Not investment advice.',
   },
 } as const;
@@ -161,12 +177,16 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
   const [failed, setFailed] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
+  const pollAttempts = useRef(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setFailed(false);
-    setHidden(false);
-    setRetryAfterSeconds(null);
+  const load = useCallback(async (background = false) => {
+    if (!background) {
+      pollAttempts.current = 0;
+      setLoading(true);
+      setFailed(false);
+      setHidden(false);
+      setRetryAfterSeconds(null);
+    }
     try {
       setPayload(await marketWorkspaceApi.getEventReactions());
     } catch (error) {
@@ -176,7 +196,7 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
       setFailed(parsed.status !== 404);
       setRetryAfterSeconds(parsed.status === 429 ? parsed.retryAfterSeconds ?? null : null);
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, []);
 
@@ -184,13 +204,23 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!payload?.cache.refreshing || pollAttempts.current >= 6) return undefined;
+    const timer = window.setTimeout(() => {
+      pollAttempts.current += 1;
+      void load(true);
+    }, 2_000);
+    return () => window.clearTimeout(timer);
+  }, [load, payload]);
+
   if (hidden) return null;
 
   const sourceUnavailable = Boolean(
     payload?.warnings.some((warning) => (
       warning === 'event_reaction_events_unavailable'
       || warning === 'event_reaction_source_unavailable'
-    )),
+    ))
+    || payload?.marketSources?.some((source) => source.status === 'unavailable'),
   );
   const partialUnavailable = Boolean(sourceUnavailable && payload?.items.length);
   const boundaryViolation = Boolean(
@@ -235,6 +265,26 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
           </div>
         </div>
 
+        {payload?.marketSources?.length ? (
+          <div
+            data-testid="event-reaction-market-sources-v137"
+            className="grid gap-px overflow-hidden border-y border-white/10 bg-white/10 sm:grid-cols-3"
+            aria-label={t.availability}
+          >
+            {payload.marketSources.map((source) => (
+              <div
+                key={source.market}
+                className="flex min-h-12 items-center justify-between gap-3 bg-[#080e18] px-3 py-2 text-xs"
+              >
+                <span className="font-semibold text-slate-200">{t.markets[source.market]}</span>
+                <span className="text-right text-slate-400">
+                  {t.statuses[source.status]} · {t.eventCount(source.eventCount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="flex min-h-28 items-center justify-center gap-2 text-sm text-slate-400">
             <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -260,6 +310,14 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
             className="border-y border-rose-400/25 bg-rose-400/5 px-4 py-6 text-center text-sm text-rose-200"
           >
             {t.boundaryViolation}
+          </div>
+        ) : payload?.cache.refreshing && !payload.items.length ? (
+          <div
+            role="status"
+            className="flex min-h-28 items-center justify-center gap-2 border-y border-white/10 py-6 text-sm text-slate-400"
+          >
+            <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+            {t.refreshing}
           </div>
         ) : sourceUnavailable && !payload?.items.length ? (
           <div className="flex min-h-28 flex-col items-center justify-center gap-3 border-y border-white/10 py-6 text-center">
@@ -371,7 +429,7 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
         <div className="flex flex-col gap-1 text-xs leading-5 text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span className="inline-flex items-center gap-2">
             <Database className="h-4 w-4" aria-hidden="true" />
-            {t.source}: {t.sourceProvider} · {t.cache(Math.max(1, Math.round((payload?.cache.ttlSeconds ?? 900) / 60)))}
+            {t.source}: {t.sourceProvider} · {t.cache(Math.max(1, Math.round((payload?.cache.ttlSeconds ?? 900) / 60)))} · {t.storage[payload?.cache.storage ?? 'none']}
           </span>
           <span>{t.noCausality}</span>
         </div>

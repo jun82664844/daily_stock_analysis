@@ -454,6 +454,14 @@ REQUIRED_FILES = (
     "api/middlewares/auth.py",
     "apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx",
     "apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx",
+    "docs/superpowers/plans/2026-07-30-dsa-v137-event-data-availability-and-cold-start.md",
+    "scripts/verify_platform_event_data_availability_v137.py",
+    "tests/test_platform_event_data_availability_v137_verifier.py",
+    "src/services/public_event_reaction_cache.py",
+    "tests/test_public_event_reaction_cache_v137.py",
+    "tests/test_public_event_reaction_availability_v137.py",
+    "tests/test_public_event_reaction_startup_v137.py",
+    "api/app.py",
 )
 
 VERIFIER_FILES = (
@@ -547,6 +555,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_free_market_calendar_v134.py",
     "scripts/verify_platform_real_market_calendar_v135.py",
     "scripts/verify_platform_observed_event_reactions_v136.py",
+    "scripts/verify_platform_event_data_availability_v137.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

@@ -53,6 +53,20 @@ class MarketCacheState(StrictModel):
     ttl_seconds: int = Field(60, ge=1)
 
 
+class EventReactionCacheState(MarketCacheState):
+    storage: Literal["none", "memory", "disk"] = "none"
+    refreshing: bool = False
+
+
+class EventReactionMarketSource(StrictModel):
+    market: Literal["cn", "hk", "us"]
+    status: SourceStatus
+    event_count: int = Field(0, ge=0, le=72)
+    observed_at: Optional[str] = None
+    fetched_at: Optional[str] = None
+    warning_code: Optional[str] = None
+
+
 class MarketBreadth(StrictModel):
     advancers: int = Field(0, ge=0)
     decliners: int = Field(0, ge=0)
@@ -159,8 +173,12 @@ class PublicMarketEventReaction(StrictModel):
 class PublicMarketEventReactionResponse(StrictModel):
     as_of: str
     items: List[PublicMarketEventReaction] = Field(default_factory=list, max_length=6)
+    market_sources: List[EventReactionMarketSource] = Field(
+        default_factory=list,
+        max_length=3,
+    )
     warnings: List[str] = Field(default_factory=list, max_length=12)
-    cache: MarketCacheState
+    cache: EventReactionCacheState
     ai_used: bool = False
     informational_only: bool = True
 

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor, wait
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -24,6 +26,9 @@ from src.services.public_market_index_service import PublicMarketIndexService
 from src.services.public_market_news_service import PublicMarketNewsService
 from src.services.public_market_event_reaction_service import (
     PublicMarketEventReactionService,
+)
+from src.services.public_event_reaction_cache import (
+    PublicEventReactionSnapshotStore,
 )
 from src.services.public_market_calendar_service import PublicMarketCalendarService
 from src.services.market_workspace_service import MarketWorkspaceService
@@ -52,29 +57,134 @@ _public_home_service = PublicMarketHomeService(
     calendar_loader=_public_market_calendar_service.load,
 )
 
+_EVENT_REACTION_LOADER_EXECUTOR = ThreadPoolExecutor(
+    max_workers=3,
+    thread_name_prefix="event-reaction-market",
+)
+_EVENT_REACTION_DEFAULT_SECTIONS = {
+    "cn": {
+        "market": "cn",
+        "attention": [
+            {"symbol": "600519.SH", "name": "贵州茅台", "market": "cn"},
+            {"symbol": "000001.SZ", "name": "平安银行", "market": "cn"},
+            {"symbol": "300750.SZ", "name": "宁德时代", "market": "cn"},
+            {"symbol": "601318.SH", "name": "中国平安", "market": "cn"},
+        ],
+    },
+    "hk": {
+        "market": "hk",
+        "attention": [
+            {"symbol": "0700.HK", "name": "腾讯控股", "market": "hk"},
+            {"symbol": "9988.HK", "name": "阿里巴巴-W", "market": "hk"},
+            {"symbol": "3690.HK", "name": "美团-W", "market": "hk"},
+            {"symbol": "1810.HK", "name": "小米集团-W", "market": "hk"},
+        ],
+    },
+    "us": {
+        "market": "us",
+        "attention": [
+            {"symbol": "AAPL", "name": "Apple Inc.", "market": "us"},
+            {"symbol": "MSFT", "name": "Microsoft", "market": "us"},
+            {"symbol": "NVDA", "name": "NVIDIA", "market": "us"},
+            {"symbol": "AMZN", "name": "Amazon", "market": "us"},
+        ],
+    },
+}
+
 
 def _load_event_reaction_events():
-    home = _public_home_service.build()
-    sections = home.get("markets") if isinstance(home, dict) else []
-    as_of = home.get("as_of") if isinstance(home, dict) else None
-    if not isinstance(sections, list) or not as_of:
-        raise RuntimeError("public market home unavailable")
-    return {
-        "events": _public_market_calendar_service.load(
-            sections,
-            str(as_of),
+    as_of = datetime.now(timezone.utc).isoformat()
+    jobs = {
+        market: _EVENT_REACTION_LOADER_EXECUTOR.submit(
+            _public_market_calendar_service.load,
+            [section],
+            as_of,
             past_days=45,
             future_days=0,
-            max_events=36,
+            max_events=24,
             newest_first=True,
             include_historical=True,
             fail_on_source_unavailable=True,
         )
+        for market, section in _EVENT_REACTION_DEFAULT_SECTIONS.items()
+    }
+    completed, _ = wait(
+        tuple(jobs.values()),
+        timeout=max(0.5, _public_market_calendar_service.timeout_seconds + 0.5),
+    )
+    events = []
+    market_sources = []
+    status_priority = {"fresh": 3, "cached": 2, "stale": 1, "unavailable": 0}
+    for market in ("cn", "hk", "us"):
+        future = jobs[market]
+        loaded = None
+        if future in completed:
+            try:
+                loaded = list(future.result() or [])
+            except Exception:
+                loaded = None
+        if loaded is None:
+            market_sources.append({
+                "market": market,
+                "status": "unavailable",
+                "event_count": 0,
+                "observed_at": None,
+                "fetched_at": as_of,
+                "warning_code": "event_calendar_market_unavailable",
+            })
+            continue
+        events.extend(loaded)
+        statuses = [
+            str((event.get("source_state") or {}).get("status") or "unavailable")
+            for event in loaded
+            if isinstance(event, dict)
+        ]
+        status = (
+            max(statuses, key=lambda item: status_priority.get(item, 0))
+            if statuses
+            else "fresh"
+        )
+        observed = [
+            str(event.get("event_time") or "")
+            for event in loaded
+            if isinstance(event, dict) and event.get("event_time")
+        ]
+        market_sources.append({
+            "market": market,
+            "status": status,
+            "event_count": len(loaded),
+            "observed_at": max(observed) if observed else None,
+            "fetched_at": as_of,
+            "warning_code": None,
+        })
+    return {
+        "events": sorted(
+            events,
+            key=lambda event: str(event.get("event_time") or ""),
+            reverse=True,
+        )[:72],
+        "market_sources": market_sources,
     }
 
 
 _public_event_reaction_service = PublicMarketEventReactionService(
     event_loader=_load_event_reaction_events,
+    snapshot_store=PublicEventReactionSnapshotStore(
+        cache_ttl_seconds=max(
+            1,
+            int(os.getenv(
+                "PLATFORM_PUBLIC_EVENT_REACTIONS_V136_CACHE_TTL_SECONDS",
+                "900",
+            )),
+        ),
+        stale_ttl_seconds=max(
+            900,
+            int(os.getenv(
+                "PLATFORM_PUBLIC_EVENT_REACTIONS_V137_DISK_STALE_TTL_SECONDS",
+                "86400",
+            )),
+        ),
+    ),
 )
 
 
@@ -108,6 +218,31 @@ def _require_event_reactions_enabled() -> None:
         )
 
 
+def _event_reaction_cache_first_enabled() -> bool:
+    return os.getenv(
+        "PLATFORM_PUBLIC_EVENT_REACTIONS_V137_CACHE_FIRST_ENABLED",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def prewarm_public_event_reactions() -> bool:
+    if not _enabled():
+        return False
+    if os.getenv(
+        "PLATFORM_PUBLIC_MARKET_HOME_V116_ENABLED",
+        "false",
+    ).strip().lower() not in {"1", "true", "yes", "on"}:
+        return False
+    if os.getenv(
+        "PLATFORM_PUBLIC_EVENT_REACTIONS_V136_ENABLED",
+        "false",
+    ).strip().lower() not in {"1", "true", "yes", "on"}:
+        return False
+    if not _event_reaction_cache_first_enabled():
+        return False
+    return _public_event_reaction_service.prewarm()
+
+
 @router.get("/home", response_model=PublicMarketHomeResponse)
 def market_home(request: Request):
     _require_home_enabled()
@@ -129,7 +264,9 @@ def market_event_reactions(request: Request):
     if limited is not None:
         return limited
     try:
-        payload = _public_event_reaction_service.build()
+        payload = _public_event_reaction_service.build(
+            cache_first=_event_reaction_cache_first_enabled(),
+        )
         return PublicMarketEventReactionResponse.model_validate(payload)
     except Exception as exc:
         raise HTTPException(

@@ -30,7 +30,7 @@ DEFAULT_MAX_CACHE_ENTRIES = 64
 MAX_SYMBOLS_PER_MARKET = 6
 MAX_SOURCE_CACHE_EVENTS = 72
 
-_CALENDAR_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="public-market-calendar")
+_CALENDAR_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="public-market-calendar")
 _MONTHS = {
     "january": 1,
     "february": 2,
@@ -115,6 +115,7 @@ class PublicMarketCalendarService:
         )
         self.fomc_loader = fomc_loader or self._fetch_fomc_meetings
         self._cache: Dict[str, tuple[float, List[Dict[str, Any]]]] = {}
+        self._inflight: Dict[str, Future[List[Dict[str, Any]]]] = {}
         self._lock = Lock()
 
     def load(
@@ -157,13 +158,17 @@ class PublicMarketCalendarService:
                     )
                 )
         if yahoo_securities:
-            yahoo_key = ",".join(sorted(item["symbol"] for item in yahoo_securities))
             suffix = ":history" if include_historical else ""
-            jobs[f"yahoo:{yahoo_key}{suffix}"] = lambda: self._build_yahoo_events(
-                yahoo_securities,
-                as_of,
-                include_historical=include_historical,
-            )
+            for security in yahoo_securities:
+                symbol = security["symbol"]
+                market = security["market"]
+                jobs[f"yahoo:{market}:{symbol}{suffix}"] = (
+                    lambda security=security: self._build_yahoo_events(
+                        [security],
+                        as_of,
+                        include_historical=include_historical,
+                    )
+                )
         if "us" in markets:
             start_date = as_of_datetime.date() - timedelta(
                 days=past_days if include_historical else 0
@@ -187,16 +192,21 @@ class PublicMarketCalendarService:
                 available_sources += 1
                 events.extend(self._with_status(cached, "cached", "calendar_source_cached"))
 
-        futures: Dict[str, Future[List[Dict[str, Any]]]] = {
-            key: self.executor.submit(job)
-            for key, job in pending_jobs.items()
-        }
+        futures: Dict[str, Future[List[Dict[str, Any]]]] = {}
+        for key, job in pending_jobs.items():
+            with self._lock:
+                future = self._inflight.get(key)
+                if future is None:
+                    future = self.executor.submit(job)
+                    self._inflight[key] = future
+            futures[key] = future
         if futures:
             completed, pending = wait(list(futures.values()), timeout=self.timeout_seconds)
-            for future in pending:
-                future.cancel()
             for key, future in futures.items():
                 if future in completed:
+                    with self._lock:
+                        if self._inflight.get(key) is future:
+                            self._inflight.pop(key, None)
                     try:
                         loaded = list(future.result() or [])
                     except Exception:

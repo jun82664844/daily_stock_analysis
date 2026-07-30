@@ -2595,3 +2595,42 @@ Verifier, configuration and documentation:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: 45-day source-scheduled past-event selection plus previous CNInfo/FOMC period coverage, event-market date guard and conservative event-date-close baseline, safe three-market symbol normalization, 1/3/5/20 market-session alignment that does not skip suspended-security dates, broad-market benchmark alignment, volume against the five sessions before the event date, six-event cap, concurrent bounded public-history reads, preserved stale timestamps, 32-symbol history-cache cap, 64-key calendar-cache cap, 72-event per-source cache cap, all-source or empty-partial-source failure, forced anonymous IP rate limiting, 4096 active identity-bucket cap without eviction, no backend identity parsing, no frontend identity or cross-origin credential upload, safe production defaults, bilingual missing-data/partial-source-failure states, fail-closed no-AI/information-only response checks, calendar/reaction/follow-up ordering, failure isolation, no AI/key/database/notification use, explicit non-causality wording, and information-only boundaries.
+
+## V137 Event Data Availability and Cold Start
+
+Backend and public contract:
+
+- `src/services/public_event_reaction_cache.py`
+- `src/services/public_market_event_reaction_service.py`
+- `src/services/public_market_calendar_service.py`
+- `api/app.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_event_reaction_cache_v137.py`
+- `tests/test_public_event_reaction_availability_v137.py`
+- `tests/test_public_event_reaction_startup_v137.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_event_data_availability_v137.py`
+- `tests/test_platform_event_data_availability_v137_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v137-event-data-availability-and-cold-start.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: versioned and size-bounded public-only disk snapshots, recursive secret and identity rejection, atomic replacement, no overwrite on all-market failure, cache-first immediate response, one in-flight refresh, independent CN/HK/US availability, calendar Future reuse, no synchronous full-home dependency, safe startup prewarm, production defaults disabled, bilingual market/cache status, finite polling, partial-result preservation, fail-closed AI/information-only contract, no user/key/database/payment/notification data, and non-causality/information-only wording.

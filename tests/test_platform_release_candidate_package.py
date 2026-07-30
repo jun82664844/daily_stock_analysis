@@ -41,6 +41,25 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v137_event_data_availability_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        for path in (
+            "src/services/public_event_reaction_cache.py",
+            "tests/test_public_event_reaction_cache_v137.py",
+            "tests/test_public_event_reaction_availability_v137.py",
+            "tests/test_public_event_reaction_startup_v137.py",
+            "scripts/verify_platform_event_data_availability_v137.py",
+            "tests/test_platform_event_data_availability_v137_verifier.py",
+            "docs/superpowers/plans/2026-07-30-dsa-v137-event-data-availability-and-cold-start.md",
+            "api/app.py",
+        ):
+            self.assertIn(path, REQUIRED_FILES)
+        self.assertIn(
+            "scripts/verify_platform_event_data_availability_v137.py",
+            VERIFIER_FILES,
+        )
+
     def test_v136_observed_event_reactions_are_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 

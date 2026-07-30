@@ -12,6 +12,13 @@
 - Local model mode uses the `ai_local` abuse-control bucket and does not consume platform model cost units.
 - Market review is a separate manual operation and uses the `market_review` bucket.
 
+## Public Event Snapshot Boundary
+
+- The event-reaction disk snapshot contains public event and historical market observations only. It must not contain account, quota, watchlist, history-note, API-key, token, cookie, email, user-id, payment, or notification data.
+- Snapshot writes require `ai_used=false` and `informational_only=true`, enforce a bounded versioned schema and file size, and use atomic replacement.
+- A refresh where every configured market source is unavailable must not replace the last valid snapshot.
+- Persistent snapshots improve local restart availability only. They do not establish real-time, exchange-authorized, causal, predictive, or investment-advice claims.
+
 ## Plans
 
 - Anonymous and free users can run the public no-AI lookup and quick-research lane without consuming model quota.

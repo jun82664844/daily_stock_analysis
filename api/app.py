@@ -228,11 +228,24 @@ def _schedule_stock_index_background_refresh(app: FastAPI, reason: str) -> None:
     )
 
 
+def _schedule_public_event_reaction_prewarm() -> None:
+    """Start the bounded public V137 refresh without delaying API startup."""
+    try:
+        from api.v1.endpoints.market_workspace import (
+            prewarm_public_event_reactions,
+        )
+
+        prewarm_public_event_reactions()
+    except Exception as exc:  # noqa: BLE001 - prewarm is best-effort only.
+        logger.warning("[event-reactions] startup prewarm failed: %s", exc)
+
+
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
     """Initialize and release shared services for the app lifecycle."""
     app.state.system_config_service = SystemConfigService()
     _schedule_stock_index_background_refresh(app, "startup")
+    _schedule_public_event_reaction_prewarm()
     try:
         yield
     finally:

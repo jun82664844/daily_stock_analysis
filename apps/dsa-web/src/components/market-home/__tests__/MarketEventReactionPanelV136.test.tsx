@@ -68,7 +68,39 @@ const response: PublicMarketEventReactionResponse = {
     warningCodes: ['observation_window_incomplete'],
   }],
   warnings: [],
-  cache: { hit: false, ageSeconds: 0, ttlSeconds: 900 },
+  marketSources: [
+    {
+      market: 'cn',
+      status: 'cached',
+      eventCount: 1,
+      observedAt: '2026-07-20T00:00:00Z',
+      fetchedAt: '2026-07-30T01:00:00Z',
+      warningCode: null,
+    },
+    {
+      market: 'hk',
+      status: 'unavailable',
+      eventCount: 0,
+      observedAt: null,
+      fetchedAt: '2026-07-30T01:00:00Z',
+      warningCode: 'event_calendar_market_unavailable',
+    },
+    {
+      market: 'us',
+      status: 'fresh',
+      eventCount: 1,
+      observedAt: '2026-07-20T00:00:00Z',
+      fetchedAt: '2026-07-30T01:00:00Z',
+      warningCode: null,
+    },
+  ],
+  cache: {
+    hit: true,
+    ageSeconds: 12,
+    ttlSeconds: 900,
+    storage: 'disk',
+    refreshing: false,
+  },
   aiUsed: false,
   informationalOnly: true,
 };
@@ -118,6 +150,63 @@ describe('MarketEventReactionPanelV136', () => {
     expect(within(panel).getByText('Awaiting enough trading sessions')).toBeInTheDocument();
     expect(within(panel).getByText('Same-period performance does not establish that the event caused a market move. Information and data only. Not investment advice.')).toBeInTheDocument();
   });
+
+  it('shows independent market availability and the persistent cache origin', async () => {
+    render(
+      <MarketEventReactionPanelV136
+        language="en"
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    const panel = await screen.findByTestId('market-event-reactions-v136');
+    const availability = within(panel).getByTestId('event-reaction-market-sources-v137');
+    expect(availability).toHaveTextContent('China');
+    expect(availability).toHaveTextContent('Cached');
+    expect(availability).toHaveTextContent('Hong Kong');
+    expect(availability).toHaveTextContent('Unavailable');
+    expect(availability).toHaveTextContent('US');
+    expect(availability).toHaveTextContent('Fresh');
+    expect(within(panel).getByText(/Disk snapshot/)).toBeInTheDocument();
+  });
+
+  it('polls a bounded background refresh and fills observations when ready', async () => {
+    vi.mocked(marketWorkspaceApi.getEventReactions)
+      .mockResolvedValueOnce({
+        ...response,
+        items: [],
+        marketSources: response.marketSources.map((source) => ({
+          ...source,
+          status: 'unavailable',
+          eventCount: 0,
+        })),
+        warnings: ['event_reaction_refreshing'],
+        cache: {
+          hit: false,
+          ageSeconds: 0,
+          ttlSeconds: 900,
+          storage: 'none',
+          refreshing: true,
+        },
+      })
+      .mockResolvedValueOnce(response);
+
+    render(
+      <MarketEventReactionPanelV136
+        language="en"
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(marketWorkspaceApi.getEventReactions).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText('Refreshing public event data in the background')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(marketWorkspaceApi.getEventReactions).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
+    }, { timeout: 3_500 });
+  }, 5_000);
 
   it('degrades honestly when the public endpoint is unavailable', async () => {
     vi.mocked(marketWorkspaceApi.getEventReactions).mockRejectedValue(new Error('offline'));
@@ -187,6 +276,23 @@ describe('MarketEventReactionPanelV136', () => {
     const panel = await screen.findByTestId('market-event-reactions-v136');
     expect(within(panel).getByRole('heading', { level: 4, name: /Apple Inc\./ })).toBeInTheDocument();
     expect(within(panel).getByText('+2.00%')).toBeInTheDocument();
+  });
+
+  it('keeps rendering legacy V136 responses without market source metadata', async () => {
+    vi.mocked(marketWorkspaceApi.getEventReactions).mockResolvedValue({
+      ...response,
+      marketSources: undefined,
+    } as unknown as typeof response);
+    render(
+      <MarketEventReactionPanelV136
+        language="zh"
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    const panel = await screen.findByTestId('market-event-reactions-v136');
+    expect(within(panel).getByRole('heading', { level: 4, name: /Apple Inc\./ })).toBeInTheDocument();
+    expect(within(panel).queryByTestId('event-reaction-market-sources-v137')).not.toBeInTheDocument();
   });
 
   it('does not claim no-AI output when the server reports AI use', async () => {

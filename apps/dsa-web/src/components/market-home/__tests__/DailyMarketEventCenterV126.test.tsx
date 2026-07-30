@@ -74,8 +74,15 @@ describe('DailyMarketEventCenterV126', () => {
     vi.spyOn(marketWorkspaceApi, 'getEventReactions').mockResolvedValue({
       asOf: '2026-07-30T00:00:00Z',
       items: [],
+      marketSources: [],
       warnings: [],
-      cache: { hit: true, ageSeconds: 0, ttlSeconds: 900 },
+      cache: {
+        hit: true,
+        ageSeconds: 0,
+        ttlSeconds: 900,
+        storage: 'memory',
+        refreshing: false,
+      },
       aiUsed: false,
       informationalOnly: true,
     });
