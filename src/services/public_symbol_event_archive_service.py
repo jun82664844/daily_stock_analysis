@@ -98,6 +98,20 @@ class PublicSymbolEventArchiveService:
             )
             for event in events
         ]
+        chart = self._empty_chart(canonical, market, as_of)
+        load_price_chart = getattr(self.reaction_service, "load_price_chart", None)
+        if callable(load_price_chart):
+            try:
+                chart = dict(load_price_chart(
+                    market,
+                    canonical,
+                    days=_MONTH_TO_DAYS[months],
+                    max_points=560,
+                ))
+            except Exception:
+                warnings.append("symbol_event_timeline_unavailable")
+        else:
+            warnings.append("symbol_event_timeline_unavailable")
         if not items and "symbol_event_archive_source_unavailable" not in warnings:
             warnings.append("symbol_event_archive_empty")
         name = next(
@@ -115,6 +129,7 @@ class PublicSymbolEventArchiveService:
             "months": months,
             "as_of": as_of,
             "items": items,
+            "chart": chart,
             "available_event_types": list(dict.fromkeys(
                 item["event_type"] for item in items
             )),
@@ -122,6 +137,38 @@ class PublicSymbolEventArchiveService:
             "ai_used": False,
             "informational_only": True,
             "causality_disclaimer": True,
+        }
+
+    @staticmethod
+    def _empty_chart(symbol: str, market: str, as_of: str) -> Dict[str, Any]:
+        benchmark_by_market = {
+            "cn": ("000001.SS", "上证指数"),
+            "hk": ("^HSI", "恒生指数"),
+            "us": ("^GSPC", "标普500指数"),
+        }
+        history_symbol = (
+            symbol.replace(".SH", ".SS")
+            if market == "cn"
+            else symbol
+        )
+        benchmark_symbol, benchmark_name = benchmark_by_market[market]
+        unavailable_source = {
+            "source": "yahoo_chart_public",
+            "status": "unavailable",
+            "observed_at": None,
+            "fetched_at": as_of,
+            "delay_seconds": None,
+            "warning_code": "event_reaction_history_unavailable",
+        }
+        return {
+            "status": "unavailable",
+            "history_symbol": history_symbol,
+            "benchmark_symbol": benchmark_symbol,
+            "benchmark_name": benchmark_name,
+            "points": [],
+            "source_state": dict(unavailable_source),
+            "benchmark_source_state": dict(unavailable_source),
+            "warning_codes": ["subject_history_unavailable"],
         }
 
     @classmethod

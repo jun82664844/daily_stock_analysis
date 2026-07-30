@@ -11,6 +11,7 @@ import {
   formatSourceLabel,
   formatSourceStatus,
 } from './marketWorkspaceFormat';
+import SymbolEventTimelineV140 from './SymbolEventTimelineV140';
 
 type Props = {
   language: 'zh' | 'en';
@@ -189,8 +190,18 @@ export default function SymbolEventArchiveV139({ language, symbol }: Props) {
             ? 'The public event archive is temporarily unavailable. The quote workspace remains usable.'
             : '公开事件档案暂不可用，个股行情工作区仍可继续使用。'}
         </p>
-      ) : filtered.length ? (
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+      ) : (
+        <>
+          {data ? (
+            <SymbolEventTimelineV140
+              language={language}
+              chart={data.chart}
+              events={filtered}
+              windowDays={windowDays}
+            />
+          ) : null}
+          {filtered.length ? (
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
           {filtered.map((item) => {
             const observation = item.windows.find(
               (window) => window.tradingDays === windowDays,
@@ -244,13 +255,15 @@ export default function SymbolEventArchiveV139({ language, symbol }: Props) {
               </article>
             );
           })}
-        </div>
-      ) : (
-        <p className="py-8 text-sm text-secondary-text">
-          {en
-            ? 'No matching public events are available for this symbol and range.'
-            : '当前证券在所选时间和类型下暂无可用公开事件。'}
-        </p>
+            </div>
+          ) : (
+            <p className="py-8 text-sm text-secondary-text">
+              {en
+                ? 'No matching public events are available for this symbol and range.'
+                : '当前证券在所选时间和类型下暂无可用公开事件。'}
+            </p>
+          )}
+        </>
       )}
 
       <p className="mt-5 border-t border-border/70 pt-4 text-sm text-secondary-text">

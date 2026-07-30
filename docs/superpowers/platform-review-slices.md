@@ -2708,3 +2708,38 @@ Verifier, configuration and documentation:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: anonymous single-symbol access, 6/12/24-month bounded ranges, 24-event cap, two-year public history bounds, explicit event and price source states, safe source URLs, missing-value preservation, independent rate limiting, non-blocking frontend load, complete Chinese/English controls, no AI/key/user/database/notification use, and explicit non-causality/information-only wording.
+
+## V140 事件与K线联动图
+
+Backend and public contract:
+
+- `src/services/public_market_event_reaction_service.py`
+- `src/services/public_symbol_event_archive_service.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_symbol_event_timeline_v140.py`
+- `tests/test_public_symbol_event_archive_v139.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/pages/__tests__/MarketWorkspacePage.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.tsx`
+- `apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.test.tsx`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_event_kline_timeline_v140.py`
+- `tests/test_platform_event_kline_timeline_v140_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v140-event-kline-timeline.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: one bounded archive response, maximum 560 daily points, exact-date benchmark joins without forward fill, first-valid-close normalization, raw close and volume preservation, CN/HK/US benchmarks, event markers, 6/12/24-month and 1/3/5/20-session linkage, stable mobile dimensions, bilingual degradation states, no AI/key/user/database/payment use, and explicit historical-data/non-causality wording.

@@ -9,7 +9,7 @@ import os
 import re
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, wait
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence
 from urllib.parse import quote
@@ -159,6 +159,162 @@ class PublicMarketEventReactionService:
             self._build_item(event, subject, benchmark, histories, as_of, now)
             for event, subject, benchmark in selected
         ]
+
+    def load_price_chart(
+        self,
+        market: str,
+        symbol: str,
+        *,
+        days: int,
+        max_points: int = 560,
+    ) -> Dict[str, Any]:
+        """Load a bounded no-AI price series for one security and its benchmark."""
+
+        market_key = str(market or "").strip().lower()
+        benchmark = MARKET_BENCHMARKS.get(market_key)
+        history_symbol = self._history_symbol(market_key, symbol)
+        if history_symbol is None or benchmark is None:
+            raise ValueError("unsupported event chart symbol")
+        bounded_days = max(1, min(int(days), 760))
+        bounded_points = max(2, min(int(max_points), 560))
+        histories = self._load_histories([({}, history_symbol, benchmark[0])])
+        subject_payload, subject_status = histories.get(
+            history_symbol,
+            (None, "unavailable"),
+        )
+        benchmark_payload, benchmark_status = histories.get(
+            benchmark[0],
+            (None, "unavailable"),
+        )
+        as_of = self.clock()
+        now = self._parse_datetime(as_of) or datetime.now(timezone.utc)
+        cutoff = (now.date() - timedelta(days=bounded_days)).isoformat()
+        subject_rows = [
+            dict(row)
+            for row in (subject_payload or {}).get("data") or []
+            if str(row.get("date") or "") >= cutoff
+        ][-bounded_points:]
+        if not subject_rows:
+            return self._empty_price_chart(
+                history_symbol=history_symbol,
+                benchmark_symbol=benchmark[0],
+                benchmark_name=benchmark[1],
+                subject_payload=subject_payload,
+                subject_status=subject_status,
+                benchmark_payload=benchmark_payload,
+                benchmark_status=benchmark_status,
+                as_of=as_of,
+            )
+
+        chart_start = str(subject_rows[0].get("date") or "")
+        benchmark_rows = [
+            dict(row)
+            for row in (benchmark_payload or {}).get("data") or []
+            if str(row.get("date") or "") >= chart_start
+        ][-bounded_points:]
+        benchmark_by_date = {
+            str(row.get("date") or ""): row
+            for row in benchmark_rows
+            if row.get("date")
+        }
+        subject_start = subject_rows[0].get("close")
+        benchmark_start = (
+            benchmark_rows[0].get("close")
+            if benchmark_rows
+            else None
+        )
+        points: list[Dict[str, Any]] = []
+        benchmark_matches = 0
+        for row in subject_rows:
+            row_date = str(row.get("date") or "")
+            benchmark_row = benchmark_by_date.get(row_date)
+            benchmark_close = (
+                benchmark_row.get("close")
+                if benchmark_row is not None
+                else None
+            )
+            symbol_change = self._percent_change(subject_start, row.get("close"))
+            benchmark_change = self._percent_change(
+                benchmark_start,
+                benchmark_close,
+            )
+            if benchmark_close is not None:
+                benchmark_matches += 1
+            points.append({
+                "date": row_date,
+                "symbol_close": row.get("close"),
+                "benchmark_close": benchmark_close,
+                "symbol_change_percent": symbol_change,
+                "benchmark_change_percent": benchmark_change,
+                "relative_change_percent": (
+                    round(symbol_change - benchmark_change, 4)
+                    if symbol_change is not None and benchmark_change is not None
+                    else None
+                ),
+                "volume": row.get("volume"),
+            })
+
+        warning_codes: list[str] = []
+        if subject_status == "stale":
+            warning_codes.append("subject_history_stale")
+        if benchmark_payload is None:
+            warning_codes.append("benchmark_history_unavailable")
+        elif benchmark_status == "stale":
+            warning_codes.append("benchmark_history_stale")
+        if benchmark_payload is not None and benchmark_matches < len(points):
+            warning_codes.append("benchmark_history_date_mismatch")
+        return {
+            "status": "available" if benchmark_matches else "partial",
+            "history_symbol": history_symbol,
+            "benchmark_symbol": benchmark[0],
+            "benchmark_name": benchmark[1],
+            "points": points,
+            "source_state": self._source_state(
+                subject_payload,
+                subject_status,
+                as_of,
+            ),
+            "benchmark_source_state": self._source_state(
+                benchmark_payload,
+                benchmark_status,
+                as_of,
+            ),
+            "warning_codes": warning_codes,
+        }
+
+    def _empty_price_chart(
+        self,
+        *,
+        history_symbol: str,
+        benchmark_symbol: str,
+        benchmark_name: str,
+        subject_payload: Optional[Mapping[str, Any]],
+        subject_status: str,
+        benchmark_payload: Optional[Mapping[str, Any]],
+        benchmark_status: str,
+        as_of: str,
+    ) -> Dict[str, Any]:
+        warnings = ["subject_history_unavailable"]
+        if benchmark_payload is None:
+            warnings.append("benchmark_history_unavailable")
+        return {
+            "status": "unavailable",
+            "history_symbol": history_symbol,
+            "benchmark_symbol": benchmark_symbol,
+            "benchmark_name": benchmark_name,
+            "points": [],
+            "source_state": self._source_state(
+                subject_payload,
+                subject_status,
+                as_of,
+            ),
+            "benchmark_source_state": self._source_state(
+                benchmark_payload,
+                benchmark_status,
+                as_of,
+            ),
+            "warning_codes": warnings,
+        }
 
     def _build_uncached(self, *, allow_stale_fallback: bool) -> Dict[str, Any]:
         as_of = self.clock()

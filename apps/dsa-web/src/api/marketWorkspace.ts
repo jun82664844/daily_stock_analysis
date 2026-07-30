@@ -241,6 +241,27 @@ export type PublicSymbolEventArchiveItem = PublicMarketEventReaction & {
   eventSourceState: DataSourceState;
 };
 
+export type PublicSymbolEventChartPoint = {
+  date: string;
+  symbolClose: number;
+  benchmarkClose?: number | null;
+  symbolChangePercent: number;
+  benchmarkChangePercent?: number | null;
+  relativeChangePercent?: number | null;
+  volume?: number | null;
+};
+
+export type PublicSymbolEventChart = {
+  status: 'available' | 'partial' | 'unavailable';
+  historySymbol: string;
+  benchmarkSymbol: string;
+  benchmarkName: string;
+  points: PublicSymbolEventChartPoint[];
+  sourceState: DataSourceState;
+  benchmarkSourceState: DataSourceState;
+  warningCodes: string[];
+};
+
 export type PublicSymbolEventArchiveResponse = {
   symbol: string;
   name: string;
@@ -248,6 +269,7 @@ export type PublicSymbolEventArchiveResponse = {
   months: 6 | 12 | 24;
   asOf: string;
   items: PublicSymbolEventArchiveItem[];
+  chart: PublicSymbolEventChart;
   availableEventTypes: SymbolArchiveEventType[];
   warnings: string[];
   aiUsed: boolean;

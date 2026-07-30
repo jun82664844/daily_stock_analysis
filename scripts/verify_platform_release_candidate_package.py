@@ -473,6 +473,12 @@ REQUIRED_FILES = (
     "tests/test_public_symbol_event_archive_v139.py",
     "apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.tsx",
     "apps/dsa-web/src/components/market-workspace/SymbolEventArchiveV139.test.tsx",
+    "docs/superpowers/plans/2026-07-30-dsa-v140-event-kline-timeline.md",
+    "scripts/verify_platform_event_kline_timeline_v140.py",
+    "tests/test_platform_event_kline_timeline_v140_verifier.py",
+    "tests/test_public_symbol_event_timeline_v140.py",
+    "apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.tsx",
+    "apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.test.tsx",
 )
 
 VERIFIER_FILES = (
@@ -569,6 +575,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_event_data_availability_v137.py",
     "scripts/verify_platform_event_history_coverage_v138.py",
     "scripts/verify_platform_symbol_event_archive_v139.py",
+    "scripts/verify_platform_event_kline_timeline_v140.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   marketWorkspaceApi,
@@ -23,6 +23,32 @@ const response: PublicSymbolEventArchiveResponse = {
   market: 'us',
   months: 12,
   asOf: '2026-07-30T00:00:00Z',
+  chart: {
+    status: 'available',
+    historySymbol: 'AAPL',
+    benchmarkSymbol: '^GSPC',
+    benchmarkName: 'S&P 500',
+    points: [{
+      date: '2026-07-20',
+      symbolClose: 100,
+      benchmarkClose: 200,
+      symbolChangePercent: 0,
+      benchmarkChangePercent: 0,
+      relativeChangePercent: 0,
+      volume: 1_000,
+    }, {
+      date: '2026-07-21',
+      symbolClose: 102,
+      benchmarkClose: 202,
+      symbolChangePercent: 2,
+      benchmarkChangePercent: 1,
+      relativeChangePercent: 1,
+      volume: 1_200,
+    }],
+    sourceState: { source: 'yahoo_chart_public', status: 'fresh' },
+    benchmarkSourceState: { source: 'yahoo_chart_public', status: 'fresh' },
+    warningCodes: [],
+  },
   items: [{
     eventId: 'earnings-aapl',
     eventType: 'earnings',
@@ -109,8 +135,8 @@ describe('SymbolEventArchiveV139', () => {
     const panel = await screen.findByTestId('symbol-event-archive-v139');
     expect(within(panel).getByText('个股事件档案')).toBeInTheDocument();
     expect(within(panel).getByText('Apple Inc.（AAPL）财报披露')).toBeInTheDocument();
-    expect(within(panel).getByText('+2.00%')).toBeInTheDocument();
-    expect(within(panel).getAllByText('+1.00%')).toHaveLength(2);
+    expect(within(panel).getAllByText('+2.00%').length).toBeGreaterThanOrEqual(1);
+    expect(within(panel).getAllByText('+1.00%').length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getAllByRole('link', { name: '查看来源' })[0]).toHaveAttribute(
       'href',
       'https://finance.yahoo.com/quote/AAPL',
@@ -119,8 +145,8 @@ describe('SymbolEventArchiveV139', () => {
     expect(within(panel).queryByText(/买入|卖出|目标价|收益预测/)).not.toBeInTheDocument();
 
     fireEvent.click(within(panel).getByRole('button', { name: '3个交易日' }));
-    expect(within(panel).getByText('+4.00%')).toBeInTheDocument();
-    expect(within(panel).getByText('+3.00%')).toBeInTheDocument();
+    expect(within(panel).getAllByText('+4.00%').length).toBeGreaterThanOrEqual(1);
+    expect(within(panel).getAllByText('+3.00%').length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(within(panel).getByRole('button', { name: '分红除息' }));
     expect(within(panel).getByText('Apple Inc.（AAPL）分红除息')).toBeInTheDocument();
@@ -135,7 +161,9 @@ describe('SymbolEventArchiveV139', () => {
     expect(within(panel).getByText(/Same-period changes do not establish/)).toBeInTheDocument();
 
     fireEvent.click(within(panel).getByRole('button', { name: '24 months' }));
-    expect(marketWorkspaceApi.getSymbolEventArchive).toHaveBeenLastCalledWith('AAPL', 24);
+    await waitFor(() => {
+      expect(marketWorkspaceApi.getSymbolEventArchive).toHaveBeenLastCalledWith('AAPL', 24);
+    });
   });
 
   it('degrades without blocking the surrounding symbol workspace', async () => {

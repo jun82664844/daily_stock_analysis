@@ -214,6 +214,30 @@ class PublicSymbolEventArchiveItem(PublicMarketEventReaction):
     event_source_state: DataSourceState
 
 
+class PublicSymbolEventChartPoint(StrictModel):
+    date: str
+    symbol_close: float
+    benchmark_close: Optional[float] = None
+    symbol_change_percent: float
+    benchmark_change_percent: Optional[float] = None
+    relative_change_percent: Optional[float] = None
+    volume: Optional[float] = None
+
+
+class PublicSymbolEventChart(StrictModel):
+    status: Literal["available", "partial", "unavailable"]
+    history_symbol: str
+    benchmark_symbol: str
+    benchmark_name: str
+    points: List[PublicSymbolEventChartPoint] = Field(
+        default_factory=list,
+        max_length=560,
+    )
+    source_state: DataSourceState
+    benchmark_source_state: DataSourceState
+    warning_codes: List[str] = Field(default_factory=list, max_length=8)
+
+
 class PublicSymbolEventArchiveResponse(StrictModel):
     symbol: str
     name: str
@@ -224,6 +248,7 @@ class PublicSymbolEventArchiveResponse(StrictModel):
         default_factory=list,
         max_length=24,
     )
+    chart: PublicSymbolEventChart
     available_event_types: List[SymbolArchiveEventType] = Field(
         default_factory=list,
         max_length=5,

@@ -41,6 +41,23 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v140_event_kline_timeline_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        for path in (
+            "tests/test_public_symbol_event_timeline_v140.py",
+            "apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.tsx",
+            "apps/dsa-web/src/components/market-workspace/SymbolEventTimelineV140.test.tsx",
+            "scripts/verify_platform_event_kline_timeline_v140.py",
+            "tests/test_platform_event_kline_timeline_v140_verifier.py",
+            "docs/superpowers/plans/2026-07-30-dsa-v140-event-kline-timeline.md",
+        ):
+            self.assertIn(path, REQUIRED_FILES)
+        self.assertIn(
+            "scripts/verify_platform_event_kline_timeline_v140.py",
+            VERIFIER_FILES,
+        )
+
     def test_v139_symbol_event_archive_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
