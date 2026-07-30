@@ -24,6 +24,8 @@ const response: PublicMarketEventReactionResponse = {
     name: 'Apple Inc.',
     subjectType: 'security',
     eventTime: '2026-07-20T00:00:00Z',
+    eventTimeKind: 'scheduled',
+    classificationSource: 'provider_schedule',
     scheduleType: 'earnings_release',
     historySymbol: 'AAPL',
     baselineDate: '2026-07-20',
@@ -127,8 +129,9 @@ describe('MarketEventReactionPanelV136', () => {
     expect(within(panel).getByText('1.50 倍')).toBeInTheDocument();
     expect(within(panel).getByText(/事件日期 2026\/07\/20/)).toBeInTheDocument();
     expect(within(panel).getByText(/市场基准 标普500指数/)).toBeInTheDocument();
-    expect(within(panel).getByText('Apple earnings release')).toBeInTheDocument();
-    expect(within(panel).getByText(/来源: Yahoo 公开图表/)).toBeInTheDocument();
+    expect(within(panel).getByText('Apple Inc.（AAPL）财报披露')).toBeInTheDocument();
+    expect(within(panel).getByText('来源计划日期')).toBeInTheDocument();
+    expect(within(panel).getByText(/来源: 巨潮资讯 \/ Yahoo 公开日历与图表/)).toBeInTheDocument();
     expect(within(panel).getByText('同期表现不代表事件导致行情变化。仅提供资讯和数据，不构成投资建议。')).toBeInTheDocument();
     expect(within(panel).queryByText(/买入|卖出|目标价|利好|利空/)).not.toBeInTheDocument();
 
@@ -149,6 +152,35 @@ describe('MarketEventReactionPanelV136', () => {
     fireEvent.click(within(panel).getByRole('button', { name: '3 trading days' }));
     expect(within(panel).getByText('Awaiting enough trading sessions')).toBeInTheDocument();
     expect(within(panel).getByText('Same-period performance does not establish that the event caused a market move. Information and data only. Not investment advice.')).toBeInTheDocument();
+  });
+
+  it('labels provider-recorded historical company events without causal wording', async () => {
+    vi.mocked(marketWorkspaceApi.getEventReactions).mockResolvedValue({
+      ...response,
+      items: [{
+        ...response.items[0],
+        eventId: 'hk-dividend',
+        market: 'hk',
+        symbol: '9988.HK',
+        name: '阿里巴巴-W',
+        title: 'Alibaba ex-dividend',
+        eventTimeKind: 'observed',
+        classificationSource: 'provider_event_history',
+        scheduleType: 'ex_dividend',
+      }],
+    });
+
+    render(
+      <MarketEventReactionPanelV136
+        language="zh"
+        onOpenSymbol={vi.fn()}
+      />,
+    );
+
+    const panel = await screen.findByTestId('market-event-reactions-v136');
+    expect(within(panel).getByText('来源历史事件')).toBeInTheDocument();
+    expect(within(panel).getByText('阿里巴巴-W（9988.HK）除息日')).toBeInTheDocument();
+    expect(within(panel).queryByText(/导致上涨|导致下跌|买入|卖出/)).not.toBeInTheDocument();
   });
 
   it('shows independent market availability and the persistent cache origin', async () => {

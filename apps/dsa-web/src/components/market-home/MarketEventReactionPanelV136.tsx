@@ -22,7 +22,7 @@ const copy = {
     eyebrow: '公开历史行情 · 未使用 AI',
     boundaryEyebrow: '数据边界校验',
     title: '事件后市场观察',
-    subtitle: '按计划事件日期，对照后续 1、3、5、20 个交易日的证券、基准指数和成交量数据。',
+    subtitle: '按公开来源记录的计划日期或历史公司事件，对照后续 1、3、5、20 个交易日的证券、基准指数和成交量数据。',
     windowLabel: '观察时间窗口',
     window: (days: number) => `${days}个交易日`,
     observedChange: '证券同期变化',
@@ -38,7 +38,12 @@ const copy = {
     scheduleTypes: {
       earnings_release: '财报披露',
       ex_dividend: '除息日',
+      stock_split: '拆股事件',
       macro_policy: '宏观计划事件',
+    },
+    eventBasis: {
+      scheduled: '来源计划日期',
+      observed: '来源历史事件',
     },
     pending: '等待足够的交易日数据',
     insufficient: '历史行情不足，暂不能计算',
@@ -46,13 +51,13 @@ const copy = {
     partialUnavailable: '部分事件行情源暂时不可用，以下成功取得的数据仍可查看。',
     boundaryViolation: '响应未满足免 AI 数据边界，暂不展示该批数据。',
     rateLimited: (seconds: number) => `请求过于频繁，请等待 ${seconds} 秒后重新加载。`,
-    empty: '暂未取得可计算的历史计划事件',
+    empty: '暂未取得可计算的公开历史事件',
     retry: '重新加载',
     query: '查询',
     queryLabel: (symbol: string) => `查询 ${symbol}`,
     cache: (minutes: number) => `缓存约 ${minutes} 分钟`,
     source: '来源',
-    sourceProvider: 'Yahoo 公开图表',
+    sourceProvider: '巨潮资讯 / Yahoo 公开日历与图表',
     availability: '三市场数据可用性',
     eventCount: (count: number) => `${count} 个事件`,
     refreshing: '正在后台刷新公开事件数据',
@@ -67,7 +72,7 @@ const copy = {
     eyebrow: 'Public historical prices · No AI used',
     boundaryEyebrow: 'Data-boundary check',
     title: 'Post-event market observations',
-    subtitle: 'Security, benchmark-index and volume data 1, 3, 5 and 20 trading sessions after source-scheduled events.',
+    subtitle: 'Security, benchmark-index and volume data 1, 3, 5 and 20 trading sessions after source-scheduled dates or recorded corporate events.',
     windowLabel: 'Observation window',
     window: (days: number) => `${days} trading ${days === 1 ? 'day' : 'days'}`,
     observedChange: 'Security change',
@@ -83,7 +88,12 @@ const copy = {
     scheduleTypes: {
       earnings_release: 'Earnings release',
       ex_dividend: 'Ex-dividend date',
+      stock_split: 'Stock split',
       macro_policy: 'Scheduled macro event',
+    },
+    eventBasis: {
+      scheduled: 'Source-scheduled date',
+      observed: 'Recorded historical event',
     },
     pending: 'Awaiting enough trading sessions',
     insufficient: 'Insufficient historical prices for this window',
@@ -91,13 +101,13 @@ const copy = {
     partialUnavailable: 'Some event-price sources are unavailable. Successfully loaded observations remain visible below.',
     boundaryViolation: 'This response did not satisfy the no-AI data boundary, so the batch is not displayed.',
     rateLimited: (seconds: number) => `Too many requests. Reload after ${seconds} seconds.`,
-    empty: 'No eligible historical scheduled events are available yet',
+    empty: 'No eligible public historical events are available yet',
     retry: 'Reload',
     query: 'Query',
     queryLabel: (symbol: string) => `Query ${symbol}`,
     cache: (minutes: number) => `Cached for about ${minutes} min`,
     source: 'Source',
-    sourceProvider: 'Yahoo public chart',
+    sourceProvider: 'CNInfo / Yahoo public calendar and chart',
     availability: 'Three-market data availability',
     eventCount: (count: number) => `${count} ${count === 1 ? 'event' : 'events'}`,
     refreshing: 'Refreshing public event data in the background',
@@ -167,6 +177,17 @@ function benchmarkLabel(
     return labels[symbol as keyof typeof labels][language];
   }
   return item.benchmarkName || (language === 'zh' ? '暂无' : 'Unavailable');
+}
+
+function localizedEventTitle(
+  item: PublicMarketEventReaction,
+  language: 'zh' | 'en',
+  schedule: string,
+): string {
+  if (language === 'zh') {
+    return `${item.name}（${item.symbol}）${schedule}`;
+  }
+  return `${item.name} (${item.symbol}) ${schedule}`;
 }
 
 export default function MarketEventReactionPanelV136({ language, onOpenSymbol }: Props) {
@@ -356,14 +377,15 @@ export default function MarketEventReactionPanelV136({ language, onOpenSymbol }:
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       <span className="font-semibold text-cyan-300">{t.markets[item.market]}</span>
                       <span>{schedule}</span>
+                      <span>{t.eventBasis[item.eventTimeKind ?? 'scheduled']}</span>
                       <span>{t.statuses[item.sourceState.status]}</span>
                     </div>
                     <h4 className="mt-1 truncate text-base font-semibold text-slate-100">
                       {item.name} <span className="font-normal text-slate-400">{item.symbol}</span>
                     </h4>
-                    {item.title && item.title !== item.name ? (
+                    {item.title ? (
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
-                        {item.title}
+                        {localizedEventTitle(item, language, schedule)}
                       </p>
                     ) : null}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">

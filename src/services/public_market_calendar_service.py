@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import os
 import re
 import time
@@ -12,13 +13,14 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 from datetime import date, datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 
 CNINFO_REPORT_URL = "https://www.cninfo.com.cn/new/information/getPrbookInfo"
 CNINFO_REPORT_PAGE = "https://www.cninfo.com.cn/new/commonUrl?url=data/yypl"
 FOMC_CALENDAR_URL = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
 YAHOO_QUOTE_URL = "https://finance.yahoo.com/quote/{symbol}/"
+YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 
 CALENDAR_PAST_DAYS = 7
 CALENDAR_FUTURE_DAYS = 30
@@ -29,6 +31,9 @@ DEFAULT_TIMEOUT_SECONDS = 4.0
 DEFAULT_MAX_CACHE_ENTRIES = 64
 MAX_SYMBOLS_PER_MARKET = 6
 MAX_SOURCE_CACHE_EVENTS = 72
+MAX_HISTORICAL_PAST_DAYS = 400
+MAX_CORPORATE_ACTIONS_PER_SYMBOL = 24
+MAX_CORPORATE_ACTION_RESPONSE_BYTES = 512 * 1024
 
 _CALENDAR_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="public-market-calendar")
 _MONTHS = {
@@ -58,6 +63,9 @@ class PublicMarketCalendarService:
         yahoo_loader: Optional[Callable[[str], Mapping[str, Any]]] = None,
         historical_earnings_loader: Optional[
             Callable[[str], Sequence[Any]]
+        ] = None,
+        corporate_action_loader: Optional[
+            Callable[[str], Sequence[Mapping[str, Any]]]
         ] = None,
         fomc_loader: Optional[Callable[[int], Sequence[Mapping[str, date]]]] = None,
         timeout_seconds: Optional[float] = None,
@@ -113,6 +121,13 @@ class PublicMarketCalendarService:
             if yahoo_loader is None
             else None
         )
+        self.corporate_action_loader = (
+            corporate_action_loader
+            if corporate_action_loader is not None
+            else self._fetch_yahoo_corporate_actions
+            if yahoo_loader is None
+            else None
+        )
         self.fomc_loader = fomc_loader or self._fetch_fomc_meetings
         self._cache: Dict[str, tuple[float, List[Dict[str, Any]]]] = {}
         self._inflight: Dict[str, Future[List[Dict[str, Any]]]] = {}
@@ -128,6 +143,7 @@ class PublicMarketCalendarService:
         max_events: Optional[int] = None,
         newest_first: bool = False,
         include_historical: bool = False,
+        include_observed_history: bool = False,
         fail_on_source_unavailable: bool = False,
     ) -> List[Dict[str, Any]]:
         as_of_datetime = self._parse_datetime(as_of)
@@ -169,6 +185,19 @@ class PublicMarketCalendarService:
                         include_historical=include_historical,
                     )
                 )
+                if (
+                    include_historical
+                    and include_observed_history
+                    and self.corporate_action_loader is not None
+                ):
+                    jobs[f"yahoo-actions:{market}:{symbol}:history"] = (
+                        lambda security=security: (
+                            self._build_yahoo_corporate_action_events(
+                                security,
+                                as_of,
+                            )
+                        )
+                    )
         if "us" in markets:
             start_date = as_of_datetime.date() - timedelta(
                 days=past_days if include_historical else 0
@@ -216,7 +245,11 @@ class PublicMarketCalendarService:
                             loaded,
                             visible,
                             as_of_datetime,
-                            past_days=60,
+                            past_days=(
+                                max(60, past_days)
+                                if include_historical
+                                else 60
+                            ),
                             future_days=60,
                             max_events=MAX_SOURCE_CACHE_EVENTS,
                             newest_first=include_historical,
@@ -296,9 +329,23 @@ class PublicMarketCalendarService:
                 symbol=symbol,
                 name=name,
                 publisher="巨潮资讯",
-                source="cninfo_report_schedule",
+                source=(
+                    "cninfo_report_history"
+                    if disclosed is not None
+                    else "cninfo_report_schedule"
+                ),
                 url=CNINFO_REPORT_PAGE,
                 as_of=as_of,
+                time_kind=(
+                    "observed"
+                    if disclosed is not None
+                    else "scheduled"
+                ),
+                classification_source=(
+                    "provider_event_history"
+                    if disclosed is not None
+                    else "provider_schedule"
+                ),
             ))
         return events
 
@@ -379,6 +426,50 @@ class PublicMarketCalendarService:
             raise RuntimeError("yahoo_calendar_unavailable")
         return events
 
+    def _build_yahoo_corporate_action_events(
+        self,
+        security: Dict[str, str],
+        as_of: str,
+    ) -> List[Dict[str, Any]]:
+        if self.corporate_action_loader is None:
+            return []
+        symbol = security["symbol"]
+        events: List[Dict[str, Any]] = []
+        for action in self.corporate_action_loader(symbol):
+            if not isinstance(action, Mapping):
+                continue
+            action_date = self._coerce_date(action.get("date"))
+            kind = str(action.get("kind") or "").strip().lower()
+            if action_date is None or kind not in {"dividend", "split"}:
+                continue
+            is_dividend = kind == "dividend"
+            schedule_type = "ex_dividend" if is_dividend else "stock_split"
+            description = (
+                "Historical ex-dividend event recorded by the Yahoo public chart."
+                if is_dividend
+                else "Historical stock-split event recorded by the Yahoo public chart."
+            )
+            events.append(self._event(
+                market=security["market"],
+                category="dividend" if is_dividend else "corporate",
+                schedule_type=schedule_type,
+                scheduled=action_date,
+                title=(
+                    f"{security['name']} ({symbol}) "
+                    f"{'ex-dividend' if is_dividend else 'stock split'}"
+                ),
+                summary=description,
+                symbol=symbol,
+                name=security["name"],
+                publisher="Yahoo Finance",
+                source="yahoo_chart_corporate_actions",
+                url=YAHOO_QUOTE_URL.format(symbol=symbol),
+                as_of=as_of,
+                time_kind="observed",
+                classification_source="provider_event_history",
+            ))
+        return events
+
     def _build_fomc_events(self, year: int, as_of: str) -> List[Dict[str, Any]]:
         events: List[Dict[str, Any]] = []
         for meeting in self.fomc_loader(year):
@@ -413,7 +504,10 @@ class PublicMarketCalendarService:
         max_events: Optional[int] = None,
         newest_first: bool = False,
     ) -> List[Dict[str, Any]]:
-        bounded_past_days = max(0, min(int(past_days), 60))
+        bounded_past_days = max(
+            0,
+            min(int(past_days), MAX_HISTORICAL_PAST_DAYS),
+        )
         bounded_future_days = max(0, min(int(future_days), 60))
         result_limit = max(
             1,
@@ -428,6 +522,13 @@ class PublicMarketCalendarService:
         }
         unique: Dict[str, Dict[str, Any]] = {}
         for event in events:
+            event_symbol = str(event.get("symbol") or "").upper()
+            if (
+                visible_symbols
+                and event_symbol
+                and event_symbol not in visible_symbols
+            ):
+                continue
             scheduled = self._coerce_date(event.get("event_time"))
             if scheduled is None or not earliest <= scheduled.toordinal() <= latest:
                 continue
@@ -558,16 +659,23 @@ class PublicMarketCalendarService:
         source: str,
         url: str,
         as_of: str,
+        time_kind: str = "scheduled",
+        classification_source: str = "provider_schedule",
     ) -> Dict[str, Any]:
         event_time = f"{scheduled.isoformat()}T00:00:00Z"
-        raw = f"{source}\n{market}\n{symbol or ''}\n{schedule_type}\n{event_time}".encode("utf-8")
+        raw_value = (
+            f"{source}\n{market}\n{symbol or ''}\n{schedule_type}\n{event_time}"
+        )
+        if classification_source == "provider_event_history":
+            raw_value = f"{raw_value}\n{time_kind}"
+        raw = raw_value.encode("utf-8")
         safe_url = PublicMarketCalendarService._safe_http_url(url)
         source_record = {
             "publisher": publisher,
             "source": source,
             "url": safe_url,
             "event_time": event_time,
-            "time_kind": "scheduled",
+            "time_kind": time_kind,
         }
         return {
             "event_id": hashlib.sha256(raw).hexdigest()[:20],
@@ -579,7 +687,7 @@ class PublicMarketCalendarService:
             "name": name,
             "sector": None,
             "event_time": event_time,
-            "time_kind": "scheduled",
+            "time_kind": time_kind,
             "publisher": publisher,
             "url": safe_url,
             "source_state": {
@@ -590,12 +698,16 @@ class PublicMarketCalendarService:
                 "delay_seconds": 0,
                 "warning_code": None,
             },
-            "classification_source": "provider_schedule",
+            "classification_source": classification_source,
             "schedule_type": schedule_type,
             "relevance_score": 85 if symbol else 70,
             "importance": "high" if symbol else "medium",
             "relevance_reasons": [
-                "scheduled_event",
+                (
+                    "provider_event_history"
+                    if classification_source == "provider_event_history"
+                    else "scheduled_event"
+                ),
                 *(["linked_security"] if symbol else ["macro_event"]),
                 "source_link",
             ],
@@ -738,6 +850,88 @@ class PublicMarketCalendarService:
         if frame is None:
             return []
         return list(frame.index)
+
+    @staticmethod
+    def _fetch_yahoo_corporate_actions(
+        symbol: str,
+    ) -> Sequence[Mapping[str, Any]]:
+        import requests
+
+        normalized = str(symbol or "").strip().upper()
+        if not re.fullmatch(
+            r"(?:\d{4,5}\.HK|[A-Z]{1,5}(?:[-.][A-Z])?)",
+            normalized,
+        ):
+            raise ValueError("unsupported corporate-action symbol")
+        response = requests.get(
+            YAHOO_CHART_URL.format(symbol=quote(normalized, safe="")),
+            params={
+                "interval": "1d",
+                "range": "1y",
+                "events": "div,splits",
+            },
+            headers={
+                "Accept": "application/json",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                ),
+            },
+            timeout=(1.0, 8.0),
+            allow_redirects=False,
+            stream=True,
+        )
+        try:
+            response.raise_for_status()
+            chunks: List[bytes] = []
+            total = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > MAX_CORPORATE_ACTION_RESPONSE_BYTES:
+                    raise ValueError("corporate-action response too large")
+                chunks.append(chunk)
+            payload = json.loads(b"".join(chunks).decode("utf-8-sig"))
+        finally:
+            response.close()
+
+        chart = payload.get("chart") if isinstance(payload, Mapping) else None
+        results = chart.get("result") if isinstance(chart, Mapping) else None
+        result = results[0] if isinstance(results, list) and results else None
+        raw_events = (
+            result.get("events")
+            if isinstance(result, Mapping)
+            and isinstance(result.get("events"), Mapping)
+            else {}
+        )
+        actions: List[Dict[str, Any]] = []
+        for source_key, kind in (("dividends", "dividend"), ("splits", "split")):
+            source_events = raw_events.get(source_key)
+            if not isinstance(source_events, Mapping):
+                continue
+            for raw in source_events.values():
+                if not isinstance(raw, Mapping):
+                    continue
+                try:
+                    action_date = datetime.fromtimestamp(
+                        float(raw.get("date")),
+                        tz=timezone.utc,
+                    ).date()
+                except (OSError, OverflowError, TypeError, ValueError):
+                    continue
+                actions.append({
+                    "kind": kind,
+                    "date": action_date,
+                    "amount": raw.get("amount"),
+                    "split_ratio": raw.get("splitRatio"),
+                })
+        actions.sort(
+            key=lambda item: item["date"],
+            reverse=True,
+        )
+        return actions[:MAX_CORPORATE_ACTIONS_PER_SYMBOL]
 
     @classmethod
     def _fetch_fomc_meetings(cls, year: int) -> Sequence[Mapping[str, date]]:

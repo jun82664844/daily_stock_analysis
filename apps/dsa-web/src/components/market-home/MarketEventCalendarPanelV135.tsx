@@ -61,6 +61,7 @@ const copy = {
     scheduleTypes: {
       earnings_release: '财报披露',
       ex_dividend: '除息日',
+      stock_split: '拆股事件',
       macro_policy: '美联储 FOMC 会议',
     },
     scheduleRule: '只有来源明确给出日期的条目才标记为计划事件。',
@@ -96,6 +97,7 @@ const copy = {
     scheduleTypes: {
       earnings_release: 'earnings release',
       ex_dividend: 'ex-dividend date',
+      stock_split: 'stock split',
       macro_policy: 'Federal Reserve FOMC meeting',
     },
     scheduleRule: 'An item is marked as scheduled only when its source explicitly provides a date.',

@@ -30,23 +30,20 @@ def _tokens(
     forbidden: Sequence[str] = (),
 ) -> CheckResult:
     missing = [token for token in required if token not in source]
-    hits = [token for token in forbidden if token in source]
+    forbidden_hits = [token for token in forbidden if token in source]
     return CheckResult(
         name,
-        not missing and not hits,
-        {"missing": missing, "forbidden_hits": hits},
+        not missing and not forbidden_hits,
+        {"missing": missing, "forbidden_hits": forbidden_hits},
     )
 
 
 def run_static_checks(repo_root: Path) -> Iterable[CheckResult]:
-    cache = (
-        repo_root / "src/services/public_event_reaction_cache.py"
-    ).read_text(encoding="utf-8")
-    service = (
-        repo_root / "src/services/public_market_event_reaction_service.py"
-    ).read_text(encoding="utf-8")
     calendar = (
         repo_root / "src/services/public_market_calendar_service.py"
+    ).read_text(encoding="utf-8")
+    reaction = (
+        repo_root / "src/services/public_market_event_reaction_service.py"
     ).read_text(encoding="utf-8")
     endpoint = (
         repo_root / "api/v1/endpoints/market_workspace.py"
@@ -67,30 +64,20 @@ def run_static_checks(repo_root: Path) -> Iterable[CheckResult]:
     ).read_text(encoding="utf-8")
 
     yield _tokens(
-        "v137_versioned_atomic_public_snapshot",
-        cache,
+        "v138_cninfo_and_public_corporate_event_history",
+        calendar,
         (
-            "SNAPSHOT_VERSION = 1",
-            "DEFAULT_MAX_BYTES = 1024 * 1024",
-            "_FORBIDDEN_KEYS",
-            'value.get("ai_used") is not False',
-            'value.get("informational_only") is not True',
-            "temp_path.replace(self.path)",
-            "PLATFORM_PUBLIC_EVENT_REACTIONS_V137_CACHE_PATH",
-        ),
-    )
-    yield _tokens(
-        "v137_cache_first_single_flight",
-        service,
-        (
-            "def build(self, *, cache_first: bool = False)",
-            "def _build_cache_first(self)",
-            "def _start_background_refresh(self)",
-            "self._refresh_future is not None and not self._refresh_future.done()",
-            "def wait_for_refresh(",
-            "self.snapshot_store.write(payload)",
-            '"event_reaction_refreshing"',
-            '"event_reaction_response_stale"',
+            "corporate_action_loader",
+            "def _build_yahoo_corporate_action_events(",
+            "def _fetch_yahoo_corporate_actions(",
+            '"yahoo_chart_corporate_actions"',
+            '"cninfo_report_history"',
+            '"provider_event_history"',
+            'time_kind="observed"',
+            "MAX_HISTORICAL_PAST_DAYS = 400",
+            "event_symbol not in visible_symbols",
+            '"range": "1y"',
+            "MAX_CORPORATE_ACTION_RESPONSE_BYTES",
         ),
         forbidden=(
             "from litellm",
@@ -100,59 +87,70 @@ def run_static_checks(repo_root: Path) -> Iterable[CheckResult]:
         ),
     )
     yield _tokens(
-        "v137_independent_market_refresh_and_inflight_reuse",
-        f"{calendar}\n{endpoint}",
+        "v138_balanced_observation_contract",
+        reaction,
         (
-            "self._inflight",
-            'jobs[f"yahoo:{market}:{symbol}{suffix}"]',
-            "_EVENT_REACTION_LOADER_EXECUTOR",
-            "_EVENT_REACTION_DEFAULT_SECTIONS",
-            '"market_sources": market_sources',
-            '"event_calendar_market_unavailable"',
-            "prewarm_public_event_reactions",
+            "allow_event_history",
+            "PLATFORM_PUBLIC_EVENT_HISTORY_V138_ENABLED",
+            'classification_source == "provider_event_history"',
+            'time_kind == "observed"',
+            'for market in ("cn", "hk", "us")',
+            '"event_time_kind"',
+            '"classification_source"',
+            'params={"interval": "1d", "range": "1y", "events": "history"}',
+            "[-320:]",
+        ),
+        forbidden=(
+            "from litellm",
+            "import openai",
+            "from openai",
+            "import ollama",
         ),
     )
-    loader_start = endpoint.find("def _load_event_reaction_events():")
-    loader_end = endpoint.find("\n\n_public_event_reaction_service", loader_start)
-    loader = endpoint[loader_start:loader_end]
-    yield CheckResult(
-        "v137_cold_loader_skips_full_home_build",
-        loader_start >= 0
-        and "_public_home_service.build()" not in loader
-        and "past_days=past_days" in loader
-        and "include_historical=True" in loader,
-        {"loader_found": loader_start >= 0},
+    yield _tokens(
+        "v138_endpoint_and_schema",
+        f"{endpoint}\n{schema}\n{frontend_api}",
+        (
+            "PLATFORM_PUBLIC_EVENT_HISTORY_V138_ENABLED",
+            "PLATFORM_PUBLIC_EVENT_HISTORY_V138_PAST_DAYS",
+            "include_observed_history=event_history_enabled",
+            '"provider_event_history"',
+            "event_time_kind",
+            '"stock_split"',
+            "eventTimeKind",
+            "classificationSource",
+        ),
     )
     yield _tokens(
-        "v137_schema_and_bilingual_frontend",
-        f"{schema}\n{frontend_api}\n{panel}",
+        "v138_bilingual_information_only_ui",
+        panel,
         (
-            "class EventReactionCacheState",
-            "class EventReactionMarketSource",
-            "market_sources: List[EventReactionMarketSource]",
-            "marketSources: EventReactionMarketSource[]",
-            'data-testid="event-reaction-market-sources-v137"',
-            "三市场数据可用性",
-            "Three-market data availability",
-            "正在后台刷新公开事件数据",
-            "Refreshing public event data in the background",
-            "磁盘快照",
-            "Disk snapshot",
-            "pollAttempts.current >= 6",
-            "payload && (payload.aiUsed || !payload.informationalOnly)",
+            "来源计划日期",
+            "来源历史事件",
+            "Source-scheduled date",
+            "Recorded historical event",
+            "巨潮资讯 / Yahoo 公开日历与图表",
+            "CNInfo / Yahoo public calendar and chart",
+            "同期表现不代表事件导致行情变化",
+            "Same-period performance does not establish",
+        ),
+        forbidden=(
+            "建议买入",
+            "建议卖出",
+            "目标价",
+            "guaranteed return",
         ),
     )
     safe_defaults = all(
         token in content
         for content in (env_example, production)
         for token in (
-            "PLATFORM_PUBLIC_EVENT_REACTIONS_V137_CACHE_FIRST_ENABLED=false",
-            "PLATFORM_PUBLIC_EVENT_REACTIONS_V137_CACHE_PATH=local/public_event_reactions_v137.json",
-            "PLATFORM_PUBLIC_EVENT_REACTIONS_V137_DISK_STALE_TTL_SECONDS=86400",
+            "PLATFORM_PUBLIC_EVENT_HISTORY_V138_ENABLED=false",
+            "PLATFORM_PUBLIC_EVENT_HISTORY_V138_PAST_DAYS=180",
         )
     )
     yield CheckResult(
-        "v137_production_safe_defaults",
+        "v138_production_safe_defaults",
         safe_defaults,
         {"safe_defaults": safe_defaults},
     )
@@ -183,12 +181,11 @@ def focused_backend_check(repo_root: Path) -> CheckResult:
             sys.executable,
             "-m",
             "unittest",
-            "tests.test_public_event_reaction_cache_v137",
-            "tests.test_public_event_reaction_availability_v137",
-            "tests.test_public_event_reaction_startup_v137",
-            "tests.test_public_market_event_reaction_service_v136",
-            "tests.test_public_market_event_reaction_api_v136",
+            "tests.test_public_event_history_coverage_v138",
             "tests.test_public_market_calendar_service_v135",
+            "tests.test_public_market_event_reaction_service_v136",
+            "tests.test_public_event_reaction_availability_v137",
+            "tests.test_public_market_event_reaction_api_v136",
         ],
         cwd=repo_root,
         capture_output=True,
@@ -197,13 +194,17 @@ def focused_backend_check(repo_root: Path) -> CheckResult:
         errors="replace",
         check=False,
     )
-    return _process_result("v137_focused_backend", completed)
+    return _process_result("v138_focused_backend", completed)
 
 
 def focused_frontend_check(repo_root: Path) -> CheckResult:
     npm = shutil.which("npm.cmd") or shutil.which("npm")
     if npm is None:
-        return CheckResult("v137_focused_frontend", False, {"reason": "npm_not_found"})
+        return CheckResult(
+            "v138_focused_frontend",
+            False,
+            {"reason": "npm_not_found"},
+        )
     completed = subprocess.run(
         [
             npm,
@@ -211,7 +212,10 @@ def focused_frontend_check(repo_root: Path) -> CheckResult:
             "--",
             "--run",
             "src/api/__tests__/marketWorkspace.test.ts",
-            "src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx",
+            (
+                "src/components/market-home/__tests__/"
+                "MarketEventReactionPanelV136.test.tsx"
+            ),
         ],
         cwd=repo_root / "apps/dsa-web",
         capture_output=True,
@@ -220,7 +224,7 @@ def focused_frontend_check(repo_root: Path) -> CheckResult:
         errors="replace",
         check=False,
     )
-    return _process_result("v137_focused_frontend", completed)
+    return _process_result("v138_focused_frontend", completed)
 
 
 def run_checks(repo_root: Path) -> Iterable[CheckResult]:
@@ -230,12 +234,10 @@ def run_checks(repo_root: Path) -> Iterable[CheckResult]:
     yield homepage_bundle_check(
         repo_root / "static/assets",
         source_paths=(
-            repo_root / "src/services/public_event_reaction_cache.py",
-            repo_root / "src/services/public_market_event_reaction_service.py",
             repo_root / "src/services/public_market_calendar_service.py",
+            repo_root / "src/services/public_market_event_reaction_service.py",
             repo_root / "api/v1/endpoints/market_workspace.py",
             repo_root / "api/v1/schemas/market_workspace.py",
-            repo_root / "api/app.py",
             repo_root / "apps/dsa-web/src/api/marketWorkspace.ts",
             repo_root
             / "apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx",
@@ -245,7 +247,7 @@ def run_checks(repo_root: Path) -> Iterable[CheckResult]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Verify DSA V137 event data availability and cold-start cache."
+        description="Verify DSA V138 CN/HK public event-history coverage."
     )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     args = parser.parse_args()
@@ -254,7 +256,7 @@ def main() -> int:
         print(f"[{'OK' if check.ok else 'FAIL'}] {check.name}: {check.details}")
     if not all(check.ok for check in checks):
         return 1
-    print("DSA_PLATFORM_EVENT_DATA_AVAILABILITY_V137_OK")
+    print("DSA_PLATFORM_EVENT_HISTORY_COVERAGE_V138_OK")
     return 0
 
 

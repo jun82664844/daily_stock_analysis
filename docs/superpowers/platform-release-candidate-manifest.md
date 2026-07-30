@@ -2965,3 +2965,39 @@ Verifier, configuration and documentation:
 Acceptance marker: `DSA_PLATFORM_EVENT_DATA_AVAILABILITY_V137_OK`.
 
 Safety boundary: V137 persists only the public V136 event-observation response in a versioned, one-megabyte, atomically replaced local snapshot. The store recursively rejects API-key, token, cookie, identity and email fields, requires `ai_used=false` and `informational_only=true`, and never replaces a valid snapshot when every market source is unavailable. CN, HK and US event candidates refresh independently, slow calendar Futures are reused, and event observations no longer synchronously build the complete public home. Local startup may schedule one keyless anonymous prewarm; example and production templates remain disabled. The frontend shows market availability and memory/disk/refresh status in both languages with finite polling and preserves partial successful results. The feature does not read user data or keys, call AI, write account databases, invoke payment, or send notifications. Event-window observations remain historical data rather than causal or investment-advice claims.
+
+## V138 A股与港股历史事件覆盖
+
+Backend and contract:
+
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_event_reaction_service.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_event_history_coverage_v138.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx`
+
+Verifier and delivery:
+
+- `scripts/verify_platform_event_history_coverage_v138.py`
+- `tests/test_platform_event_history_coverage_v138_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v138-cn-hk-event-history-coverage.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_EVENT_HISTORY_COVERAGE_V138_OK`.
+
+Safety boundary: V138 uses only explicit dates from CNInfo report records, Yahoo public calendar data and Yahoo public chart corporate actions. News timestamps and model output are not eligible event dates. The feature keeps exact symbol filtering, bounded lookback, response-size limits, isolated market/source failures, no-AI and information-only flags, and production defaults disabled. It does not claim commercial market-data rights, event causality or investment suitability, and does not access user keys, user databases, payment, notifications or historical reports.

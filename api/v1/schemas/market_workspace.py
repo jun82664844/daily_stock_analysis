@@ -29,7 +29,12 @@ MarketEventCategory = Literal[
 ]
 MarketEventTimeKind = Literal["published", "observed", "retrieved", "scheduled", "unknown"]
 MarketEventImportance = Literal["high", "medium", "low"]
-MarketScheduledEventType = Literal["earnings_release", "ex_dividend", "macro_policy"]
+MarketScheduledEventType = Literal[
+    "earnings_release",
+    "ex_dividend",
+    "stock_split",
+    "macro_policy",
+]
 MarketEventReactionStatus = Literal["available", "partial", "pending", "unavailable"]
 MarketEventReactionWindowStatus = Literal["available", "pending", "insufficient_data"]
 
@@ -130,7 +135,11 @@ class PublicMarketEvent(StrictModel):
     publisher: Optional[str] = None
     url: Optional[str] = None
     source_state: DataSourceState
-    classification_source: Literal["keyword_rules", "provider_schedule"] = "keyword_rules"
+    classification_source: Literal[
+        "keyword_rules",
+        "provider_schedule",
+        "provider_event_history",
+    ] = "keyword_rules"
     schedule_type: Optional[MarketScheduledEventType] = None
     relevance_score: int = Field(0, ge=0, le=100)
     importance: MarketEventImportance = "low"
@@ -158,6 +167,11 @@ class PublicMarketEventReaction(StrictModel):
     name: str
     subject_type: Literal["security", "market_benchmark"]
     event_time: str
+    event_time_kind: Literal["scheduled", "observed"] = "scheduled"
+    classification_source: Literal[
+        "provider_schedule",
+        "provider_event_history",
+    ] = "provider_schedule"
     schedule_type: Optional[MarketScheduledEventType] = None
     history_symbol: str
     baseline_date: Optional[str] = None

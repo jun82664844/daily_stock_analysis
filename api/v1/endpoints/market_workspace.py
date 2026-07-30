@@ -92,18 +92,41 @@ _EVENT_REACTION_DEFAULT_SECTIONS = {
 }
 
 
+def _event_history_v138_enabled() -> bool:
+    return os.getenv(
+        "PLATFORM_PUBLIC_EVENT_HISTORY_V138_ENABLED",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _event_history_past_days() -> int:
+    if not _event_history_v138_enabled():
+        return 45
+    try:
+        configured = int(os.getenv(
+            "PLATFORM_PUBLIC_EVENT_HISTORY_V138_PAST_DAYS",
+            "180",
+        ))
+    except ValueError:
+        configured = 180
+    return max(45, min(configured, 400))
+
+
 def _load_event_reaction_events():
     as_of = datetime.now(timezone.utc).isoformat()
+    event_history_enabled = _event_history_v138_enabled()
+    past_days = _event_history_past_days()
     jobs = {
         market: _EVENT_REACTION_LOADER_EXECUTOR.submit(
             _public_market_calendar_service.load,
             [section],
             as_of,
-            past_days=45,
+            past_days=past_days,
             future_days=0,
             max_events=24,
             newest_first=True,
             include_historical=True,
+            include_observed_history=event_history_enabled,
             fail_on_source_unavailable=True,
         )
         for market, section in _EVENT_REACTION_DEFAULT_SECTIONS.items()

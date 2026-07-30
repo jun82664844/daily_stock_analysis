@@ -57,7 +57,11 @@ export type MarketEventCalendarEntryV134 = {
   personalized: boolean;
   sourceStatus: SourceStatus;
   publisher: string;
-  scheduleType?: 'earnings_release' | 'ex_dividend' | 'macro_policy';
+  scheduleType?:
+    | 'earnings_release'
+    | 'ex_dividend'
+    | 'stock_split'
+    | 'macro_policy';
   checkpointDays?: 1 | 3 | 5 | 20;
 };
 

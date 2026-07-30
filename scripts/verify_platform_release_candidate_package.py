@@ -462,6 +462,10 @@ REQUIRED_FILES = (
     "tests/test_public_event_reaction_availability_v137.py",
     "tests/test_public_event_reaction_startup_v137.py",
     "api/app.py",
+    "docs/superpowers/plans/2026-07-30-dsa-v138-cn-hk-event-history-coverage.md",
+    "scripts/verify_platform_event_history_coverage_v138.py",
+    "tests/test_platform_event_history_coverage_v138_verifier.py",
+    "tests/test_public_event_history_coverage_v138.py",
 )
 
 VERIFIER_FILES = (
@@ -556,6 +560,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_real_market_calendar_v135.py",
     "scripts/verify_platform_observed_event_reactions_v136.py",
     "scripts/verify_platform_event_data_availability_v137.py",
+    "scripts/verify_platform_event_history_coverage_v138.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

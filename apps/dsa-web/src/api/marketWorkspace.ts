@@ -84,8 +84,16 @@ export type PublicMarketEvent = {
   publisher?: string | null;
   url?: string | null;
   sourceState: DataSourceState;
-  classificationSource: 'keyword_rules' | 'provider_schedule';
-  scheduleType?: 'earnings_release' | 'ex_dividend' | 'macro_policy' | null;
+  classificationSource:
+    | 'keyword_rules'
+    | 'provider_schedule'
+    | 'provider_event_history';
+  scheduleType?:
+    | 'earnings_release'
+    | 'ex_dividend'
+    | 'stock_split'
+    | 'macro_policy'
+    | null;
   relevanceScore: number;
   importance: 'high' | 'medium' | 'low';
   relevanceReasons: string[];
@@ -189,7 +197,14 @@ export type PublicMarketEventReaction = {
   name: string;
   subjectType: 'security' | 'market_benchmark';
   eventTime: string;
-  scheduleType?: 'earnings_release' | 'ex_dividend' | 'macro_policy' | null;
+  eventTimeKind?: 'scheduled' | 'observed';
+  classificationSource?: 'provider_schedule' | 'provider_event_history';
+  scheduleType?:
+    | 'earnings_release'
+    | 'ex_dividend'
+    | 'stock_split'
+    | 'macro_policy'
+    | null;
   historySymbol: string;
   baselineDate?: string | null;
   benchmarkSymbol?: string | null;

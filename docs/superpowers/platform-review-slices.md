@@ -2634,3 +2634,37 @@ Verifier, configuration and documentation:
 - `docs/superpowers/platform-release-candidate-manifest.md`
 
 Review focus: versioned and size-bounded public-only disk snapshots, recursive secret and identity rejection, atomic replacement, no overwrite on all-market failure, cache-first immediate response, one in-flight refresh, independent CN/HK/US availability, calendar Future reuse, no synchronous full-home dependency, safe startup prewarm, production defaults disabled, bilingual market/cache status, finite polling, partial-result preservation, fail-closed AI/information-only contract, no user/key/database/payment/notification data, and non-causality/information-only wording.
+
+## V138 A股与港股历史事件覆盖
+
+Backend and public contract:
+
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_event_reaction_service.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_event_history_coverage_v138.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_event_history_coverage_v138.py`
+- `tests/test_platform_event_history_coverage_v138_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v138-cn-hk-event-history-coverage.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-product-rules.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: exact visible-symbol filtering before truncation, CNInfo actual-disclosure history, isolated Yahoo public-chart corporate actions, `scheduled/provider_schedule` versus `observed/provider_event_history`, 180-day bounded lookback, one-year price history, three-market slot reservation, safe URL and response-size bounds, production defaults disabled, bilingual event-basis labels, no AI/key/database/notification use, and explicit non-causality/information-only wording.

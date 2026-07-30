@@ -148,6 +148,10 @@ class PublicMarketEventReactionApiV136TestCase(unittest.TestCase):
         from api.v1.endpoints.market_workspace import _load_event_reaction_events
 
         with (
+            patch.dict(
+                os.environ,
+                {"PLATFORM_PUBLIC_EVENT_HISTORY_V138_ENABLED": "false"},
+            ),
             patch(
                 "api.v1.endpoints.market_workspace._public_home_service.build",
                 return_value={

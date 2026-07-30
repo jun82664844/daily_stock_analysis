@@ -64,6 +64,7 @@ class PublicMarketEventReactionService:
         executor: Optional[ThreadPoolExecutor] = None,
         snapshot_store: Optional[PublicEventReactionSnapshotStore] = None,
         refresh_executor: Optional[ThreadPoolExecutor] = None,
+        allow_event_history: Optional[bool] = None,
     ) -> None:
         self.event_loader = event_loader
         self.history_loader = history_loader or self._fetch_yahoo_history
@@ -116,6 +117,14 @@ class PublicMarketEventReactionService:
         self.executor = executor or _EXECUTOR
         self.snapshot_store = snapshot_store
         self.refresh_executor = refresh_executor or _EXECUTOR
+        self.allow_event_history = (
+            allow_event_history
+            if allow_event_history is not None
+            else os.getenv(
+                "PLATFORM_PUBLIC_EVENT_HISTORY_V138_ENABLED",
+                "false",
+            ).strip().lower() in {"1", "true", "yes", "on"}
+        )
         self._history_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._response_cache: Optional[tuple[float, Dict[str, Any]]] = None
         self._refresh_future: Optional[Future[Dict[str, Any]]] = None
@@ -412,9 +421,20 @@ class PublicMarketEventReactionService:
             event_id = str(event.get("event_id") or "").strip()
             if not event_id or event_id in seen:
                 continue
-            if event.get("time_kind") != "scheduled":
-                continue
-            if event.get("classification_source") != "provider_schedule":
+            time_kind = str(event.get("time_kind") or "")
+            classification_source = str(
+                event.get("classification_source") or ""
+            )
+            is_provider_schedule = (
+                time_kind == "scheduled"
+                and classification_source == "provider_schedule"
+            )
+            is_provider_history = (
+                self.allow_event_history
+                and time_kind == "observed"
+                and classification_source == "provider_event_history"
+            )
+            if not (is_provider_schedule or is_provider_history):
                 continue
             event_time = self._parse_datetime(event.get("event_time"))
             market = str(event.get("market") or "").strip().lower()
@@ -447,7 +467,39 @@ class PublicMarketEventReactionService:
             ),
             reverse=True,
         )
-        return selected[: self.max_events]
+        reserved = []
+        reserved_ids: set[str] = set()
+        for market in ("cn", "hk", "us"):
+            candidate = next(
+                (
+                    item
+                    for item in selected
+                    if item[0].get("market") == market
+                ),
+                None,
+            )
+            if candidate is None:
+                continue
+            reserved.append(candidate)
+            reserved_ids.add(str(candidate[0].get("event_id") or ""))
+        if self.max_events < len(reserved):
+            return selected[: self.max_events]
+        balanced = [
+            *reserved,
+            *[
+                item
+                for item in selected
+                if str(item[0].get("event_id") or "") not in reserved_ids
+            ],
+        ][: self.max_events]
+        balanced.sort(
+            key=lambda item: (
+                self._parse_datetime(item[0].get("event_time"))
+                or datetime.min.replace(tzinfo=timezone.utc)
+            ),
+            reverse=True,
+        )
+        return balanced
 
     def _load_histories(
         self,
@@ -568,6 +620,10 @@ class PublicMarketEventReactionService:
             "name": str(event.get("name") or event.get("symbol") or subject),
             "subject_type": str(event.get("_subject_type") or "security"),
             "event_time": str(event.get("event_time") or ""),
+            "event_time_kind": str(event.get("time_kind") or "scheduled"),
+            "classification_source": str(
+                event.get("classification_source") or "provider_schedule"
+            ),
             "schedule_type": event.get("schedule_type"),
             "history_symbol": subject,
             "baseline_date": baseline_date,
@@ -796,7 +852,7 @@ class PublicMarketEventReactionService:
                 "close": close,
                 "volume": cls._float(raw.get("volume")),
             }
-        rows = [rows_by_date[key] for key in sorted(rows_by_date)][-120:]
+        rows = [rows_by_date[key] for key in sorted(rows_by_date)][-320:]
         if not rows:
             return None
         return {
@@ -825,7 +881,7 @@ class PublicMarketEventReactionService:
             raise ValueError("unsupported event reaction symbol")
         response = requests.get(
             YAHOO_CHART_URL.format(symbol=quote(symbol, safe="")),
-            params={"interval": "1d", "range": "3mo", "events": "history"},
+            params={"interval": "1d", "range": "1y", "events": "history"},
             headers={
                 "Accept": "application/json",
                 "User-Agent": (

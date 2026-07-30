@@ -41,6 +41,21 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v138_event_history_coverage_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        for path in (
+            "tests/test_public_event_history_coverage_v138.py",
+            "scripts/verify_platform_event_history_coverage_v138.py",
+            "tests/test_platform_event_history_coverage_v138_verifier.py",
+            "docs/superpowers/plans/2026-07-30-dsa-v138-cn-hk-event-history-coverage.md",
+        ):
+            self.assertIn(path, REQUIRED_FILES)
+        self.assertIn(
+            "scripts/verify_platform_event_history_coverage_v138.py",
+            VERIFIER_FILES,
+        )
+
     def test_v137_event_data_availability_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
