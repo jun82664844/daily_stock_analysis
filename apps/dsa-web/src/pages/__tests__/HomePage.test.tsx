@@ -23,10 +23,17 @@ const navigateMock = vi.fn();
 describe('HomePage V126 source contract', () => {
   it('forwards private watchlist symbols only as client-side event context', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/pages/HomePage.tsx'), 'utf8');
+    const dailyEventSource = readFileSync(
+      resolve(process.cwd(), 'src/components/market-home/DailyMarketEventCenterV126.tsx'),
+      'utf8',
+    );
     expect(source).toContain('watchlistSymbols={platformWatchlistItems.map((item) => item.stockCode)}');
     expect(source).toContain("eventFollowUpScope={platformSession ? `user-${platformSession.user.id}` : 'guest'}");
+    expect(dailyEventSource).toContain('<MarketEventCalendarPanelV134');
+    expect(dailyEventSource).toContain('scope={eventFollowUpScope}');
     expect(source).not.toContain('events: platformWatchlistItems');
     expect(source).not.toContain('getHome(platformWatchlistItems');
+    expect(source).not.toContain('calendarAcknowledgements:');
   });
 });
 

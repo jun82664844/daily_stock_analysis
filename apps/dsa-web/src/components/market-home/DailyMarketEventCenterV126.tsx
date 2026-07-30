@@ -14,6 +14,7 @@ import {
 } from './marketEventPersonalizationV130';
 import MarketEventResearchPanelV132 from './MarketEventResearchPanelV132';
 import MarketEventFollowUpPanelV133 from './MarketEventFollowUpPanelV133';
+import MarketEventCalendarPanelV134 from './MarketEventCalendarPanelV134';
 import {
   adoptGuestFollowedMarketEvents,
   followMarketEvent,
@@ -401,6 +402,15 @@ export default function DailyMarketEventCenterV126({
             </div>
           </div>
         </div>
+
+        <MarketEventCalendarPanelV134
+          language={language}
+          events={events}
+          followedEvents={followedEvents}
+          watchlistSymbols={watchlistSymbols}
+          scope={eventFollowUpScope}
+          onOpenSymbol={onOpenSymbol}
+        />
 
         <MarketEventFollowUpPanelV133
           language={language}

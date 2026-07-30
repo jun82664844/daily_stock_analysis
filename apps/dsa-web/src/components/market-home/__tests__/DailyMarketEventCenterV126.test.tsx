@@ -523,4 +523,35 @@ describe('DailyMarketEventCenterV126', () => {
     expect(screen.queryByTestId('market-event-follow-up-panel-v133')).not.toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(marketEventFollowUpStorageKey('guest')) ?? '[]')).toEqual([]);
   });
+
+  it('adds and removes V134 follow-up calendar checkpoints with the V133 follow state', () => {
+    const onOpenSymbol = vi.fn();
+    render(
+      <DailyMarketEventCenterV126
+        language="en"
+        events={events}
+        marketItems={marketItems}
+        watchlistSymbols={['AAPL']}
+        eventFollowUpScope="guest"
+        onOpenSymbol={onOpenSymbol}
+      />,
+    );
+
+    expect(screen.getByTestId('market-event-calendar-v134')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Research event linked to AAPL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Follow AAPL' }));
+
+    const calendar = screen.getByTestId('market-event-calendar-v134');
+    expect(within(calendar).getByText('1-day follow-up')).toBeInTheDocument();
+    expect(within(calendar).getByText('3-day follow-up')).toBeInTheDocument();
+    expect(within(calendar).getByText('5-day follow-up')).toBeInTheDocument();
+    expect(within(calendar).getByText('20-day follow-up')).toBeInTheDocument();
+
+    fireEvent.click(within(calendar).getAllByRole('button', { name: 'Query AAPL' })[0]);
+    expect(onOpenSymbol).toHaveBeenCalledWith('AAPL');
+
+    const followUpPanel = screen.getByTestId('market-event-follow-up-panel-v133');
+    fireEvent.click(within(followUpPanel).getByRole('button', { name: 'Stop following AAPL' }));
+    expect(within(calendar).queryByText('1-day follow-up')).not.toBeInTheDocument();
+  });
 });

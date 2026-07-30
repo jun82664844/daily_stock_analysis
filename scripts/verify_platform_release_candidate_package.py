@@ -427,6 +427,13 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/components/market-home/MarketEventFollowUpPanelV133.tsx",
     "apps/dsa-web/src/components/market-home/__tests__/marketEventFollowUpV133.test.ts",
     "apps/dsa-web/src/components/market-home/__tests__/MarketEventFollowUpPanelV133.test.tsx",
+    "docs/superpowers/plans/2026-07-30-dsa-v134-free-market-calendar-reminders.md",
+    "scripts/verify_platform_free_market_calendar_v134.py",
+    "tests/test_platform_free_market_calendar_v134_verifier.py",
+    "apps/dsa-web/src/components/market-home/marketEventCalendarV134.ts",
+    "apps/dsa-web/src/components/market-home/MarketEventCalendarPanelV134.tsx",
+    "apps/dsa-web/src/components/market-home/__tests__/marketEventCalendarV134.test.ts",
+    "apps/dsa-web/src/components/market-home/__tests__/MarketEventCalendarPanelV134.test.tsx",
 )
 
 VERIFIER_FILES = (
@@ -517,6 +524,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_returning_event_inbox_v131.py",
     "scripts/verify_platform_event_driven_research_v132.py",
     "scripts/verify_platform_market_event_follow_up_v133.py",
+    "scripts/verify_platform_free_market_calendar_v134.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

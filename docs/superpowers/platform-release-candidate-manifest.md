@@ -2810,3 +2810,32 @@ Verifier and documentation:
 Acceptance marker: `DSA_PLATFORM_MARKET_EVENT_FOLLOW_UP_V133_OK`.
 
 Safety boundary: V133 stores at most 12 followed events and 32 observations per event in browser-local storage, migrates guest data only into the current numeric platform-user scope, and never persists email addresses. It reuses already-loaded public event and quote data, adds no network, model, API-quota or database call, does not claim that an event caused a market move, and provides information and data only rather than investment advice.
+
+## V134 Free Market Calendar And Local Reminders
+
+Frontend:
+
+- `apps/dsa-web/src/components/market-home/marketEventCalendarV134.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventCalendarPanelV134.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/marketEventCalendarV134.test.ts`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventCalendarPanelV134.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+- `apps/dsa-web/src/pages/__tests__/HomePage.test.tsx`
+
+Verifier and documentation:
+
+- `scripts/verify_platform_free_market_calendar_v134.py`
+- `tests/test_platform_free_market_calendar_v134_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v134-free-market-calendar-reminders.md`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_FREE_MARKET_CALENDAR_V134_OK`.
+
+Safety boundary: V134 only marks an item as scheduled when the public title or summary contains an explicit supported date; otherwise it preserves the publication-time basis. It reuses already-loaded three-market events and V133 follow-up checkpoints, keeps a bounded 7-day past and 30-day future view, stores at most 128 acknowledgement IDs in browser-local numeric-user scope, adds no network, model, API-quota, database or notification call, does not claim that an event caused a market move, and provides information and data only rather than investment advice.

@@ -41,6 +41,18 @@ DSA_ANALYSIS_NOT_INVESTMENT_ADVICE=true
 
 
 class PlatformReleaseCandidatePackageVerifierTestCase(unittest.TestCase):
+    def test_v134_free_market_calendar_is_part_of_release_package(self) -> None:
+        from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
+
+        self.assertIn("apps/dsa-web/src/components/market-home/marketEventCalendarV134.ts", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/MarketEventCalendarPanelV134.tsx", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/__tests__/marketEventCalendarV134.test.ts", REQUIRED_FILES)
+        self.assertIn("apps/dsa-web/src/components/market-home/__tests__/MarketEventCalendarPanelV134.test.tsx", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_free_market_calendar_v134.py", REQUIRED_FILES)
+        self.assertIn("scripts/verify_platform_free_market_calendar_v134.py", VERIFIER_FILES)
+        self.assertIn("tests/test_platform_free_market_calendar_v134_verifier.py", REQUIRED_FILES)
+        self.assertIn("docs/superpowers/plans/2026-07-30-dsa-v134-free-market-calendar-reminders.md", REQUIRED_FILES)
+
     def test_v133_market_event_follow_up_is_part_of_release_package(self) -> None:
         from scripts.verify_platform_release_candidate_package import REQUIRED_FILES, VERIFIER_FILES
 
