@@ -76,7 +76,10 @@ vi.mock('../../api/history', () => ({
 }));
 
 vi.mock('../../api/marketWorkspace', () => ({
-  marketWorkspaceApi: { getHome: vi.fn() },
+  marketWorkspaceApi: {
+    getHome: vi.fn(),
+    getEventReactions: vi.fn(),
+  },
 }));
 
 vi.mock('../../api/analysis', async () => {
@@ -142,6 +145,16 @@ vi.mock('../../api/platform', () => ({
     deleteWatchlistAlertRule: vi.fn(),
     saveSnapshotToHistory: vi.fn(),
   },
+}));
+
+vi.mock('../../hooks/useStockIndex', () => ({
+  useStockIndex: () => ({
+    index: [],
+    loading: false,
+    error: null,
+    fallback: true,
+    loaded: true,
+  }),
 }));
 
 const makeRadarItem = (overrides: Partial<PlatformWatchlistRadarItem>): PlatformWatchlistRadarItem => ({
@@ -400,6 +413,14 @@ describe('HomePage', () => {
     });
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
     vi.mocked(marketWorkspaceApi.getHome).mockRejectedValue(new Error('V116 disabled in legacy test'));
+    vi.mocked(marketWorkspaceApi.getEventReactions).mockResolvedValue({
+      asOf: '2026-07-30T00:00:00Z',
+      items: [],
+      warnings: [],
+      cache: { hit: true, ageSeconds: 0, ttlSeconds: 900 },
+      aiUsed: false,
+      informationalOnly: true,
+    });
     vi.mocked(platformApi.status).mockResolvedValue({ platformAuthEnabled: false });
     vi.mocked(platformApi.localModelStatus).mockResolvedValue({
       enabled: true,

@@ -2882,3 +2882,45 @@ Verifier, configuration and documentation:
 Acceptance marker: `DSA_PLATFORM_REAL_MARKET_CALENDAR_V135_OK`.
 
 Safety boundary: V135 reads explicit dates from CNInfo public report appointments, Yahoo Finance through the no-key yfinance channel, and the official Federal Reserve FOMC page. It does not claim Yahoo/yfinance is an officially licensed feed, does not display provider forecast values, and does not call AI, read user API keys, write the database, or send notifications. Sources run behind a four-second aggregate deadline with isolated caches and bounded stale fallback. Scheduled events are capped at 36 and the merged home event stream at 48. Production templates remain disabled by default. When platform authentication is enabled, unauthenticated visitors do not prefetch private history, watchlist, setup, or skill resources; the public market home and guest query remain enabled. The UI states that event and market observations do not establish causality and provides information and data only rather than investment advice.
+
+## V136 Observed Event-window Market Data
+
+Backend and public contract:
+
+- `src/platform_rate_limit.py`
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_event_reaction_service.py`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_reaction_service_v136.py`
+- `tests/test_public_market_event_reaction_api_v136.py`
+- `tests/test_public_market_calendar_service_v135.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_observed_event_reactions_v136.py`
+- `tests/test_platform_observed_event_reactions_v136_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v136-observed-event-market-reactions.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Acceptance marker: `DSA_PLATFORM_OBSERVED_EVENT_REACTIONS_V136_OK`.
+
+Safety boundary: V136 selects at most six already occurred source-scheduled events from a 45-day historical calendar, loads the previous CNInfo/FOMC period when the historical window crosses it, and reads HTTPS Yahoo Chart history as a no-key public channel. Because the calendar provides a date rather than an exact publication time, it uses the event-market date close as the conservative baseline and aligns 1/3/5/20-session observations to broad-market trading sessions; a suspended or missing security session remains unavailable instead of being replaced by a later date. The endpoint does not parse identity, the frontend does not upload user identity or cross-origin credentials, and same-origin session cookies do not participate in the result. It remains independently IP-rate-limited even when the global limiter is disabled, with a bounded in-process identity-bucket count that rejects new identities rather than evicting active buckets. All-source or empty-partial-source calendar failures are not cached as real empty results; stale timestamps are preserved, history cache keys are capped at 32, calendar cache keys at 64, and each source cache at 72 events. Partial source failures keep successful observations visible with a warning, while any AI-use or non-informational response fails closed in the UI. It does not call AI, read platform or user API keys, write the database, send notifications or upload local follow state. Production templates remain disabled. The UI explicitly states that same-period performance does not establish causality and provides information and data only rather than investment advice.

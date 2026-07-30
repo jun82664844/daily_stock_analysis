@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MarketSecurityItem, PublicMarketEvent } from '../../../api/marketWorkspace';
+import { marketWorkspaceApi, type MarketSecurityItem, type PublicMarketEvent } from '../../../api/marketWorkspace';
 import { MARKET_EVENT_SEEN_STORAGE_KEY } from '../../../lib/marketEventReadState';
 import DailyMarketEventCenterV126 from '../DailyMarketEventCenterV126';
 import { marketEventFollowUpStorageKey } from '../marketEventFollowUpV133';
@@ -69,7 +69,17 @@ const marketItems: MarketSecurityItem[] = [{
 }];
 
 describe('DailyMarketEventCenterV126', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    vi.spyOn(marketWorkspaceApi, 'getEventReactions').mockResolvedValue({
+      asOf: '2026-07-30T00:00:00Z',
+      items: [],
+      warnings: [],
+      cache: { hit: true, ageSeconds: 0, ttlSeconds: 900 },
+      aiUsed: false,
+      informationalOnly: true,
+    });
+  });
 
   it('shows bilingual structured events and highlights watchlist symbols', () => {
     const open = vi.fn();
@@ -160,6 +170,31 @@ describe('DailyMarketEventCenterV126', () => {
 
     const articles = screen.getAllByRole('article');
     expect(within(articles[0]).getByText('AAPL earnings results published')).toBeInTheDocument();
+  });
+
+  it('keeps the public calendar and event query usable when V136 is unavailable', async () => {
+    const open = vi.fn();
+    vi.spyOn(marketWorkspaceApi, 'getEventReactions').mockRejectedValueOnce(new Error('offline'));
+    render(
+      <DailyMarketEventCenterV126
+        language="zh"
+        events={events}
+        marketItems={marketItems}
+        watchlistSymbols={['AAPL']}
+        onOpenSymbol={open}
+      />,
+    );
+
+    const center = screen.getByTestId('daily-market-event-center-v126');
+    const calendar = within(center).getByTestId('market-event-calendar-v135');
+    const reactions = within(center).getByTestId('market-event-reactions-v136');
+    expect(calendar.compareDocumentPosition(reactions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => {
+      expect(within(reactions).getByText('事件窗口行情暂时不可用，其他市场资讯仍可继续浏览。')).toBeInTheDocument();
+    });
+    expect(within(center).getByText('AAPL earnings results published')).toBeInTheDocument();
+    fireEvent.click(within(center).getByRole('button', { name: '查询 AAPL' }));
+    expect(open).toHaveBeenCalledWith('AAPL');
   });
 
   it('defaults to explainable personalized priority and can return to relevance order', () => {

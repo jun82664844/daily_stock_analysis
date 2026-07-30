@@ -1,11 +1,22 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { marketWorkspaceApi, type PublicMarketHomeResponse, type SymbolWorkspaceResponse } from '../../../api/marketWorkspace';
 import PublicMarketHomeV116 from '../PublicMarketHomeV116';
 import { readRecentMarketSymbols } from '../marketRecentV124';
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  vi.spyOn(marketWorkspaceApi, 'getEventReactions').mockResolvedValue({
+    asOf: '2026-07-30T00:00:00Z',
+    items: [],
+    warnings: [],
+    cache: { hit: true, ageSeconds: 0, ttlSeconds: 900 },
+    aiUsed: false,
+    informationalOnly: true,
+  });
 });
 
 const data: PublicMarketHomeResponse = {

@@ -445,6 +445,15 @@ REQUIRED_FILES = (
     "apps/dsa-web/src/hooks/__tests__/useWatchlist.test.tsx",
     "apps/dsa-web/src/pages/HomePage.tsx",
     "apps/dsa-web/src/pages/__tests__/HomePage.test.tsx",
+    "docs/superpowers/plans/2026-07-30-dsa-v136-observed-event-market-reactions.md",
+    "scripts/verify_platform_observed_event_reactions_v136.py",
+    "tests/test_platform_observed_event_reactions_v136_verifier.py",
+    "src/services/public_market_event_reaction_service.py",
+    "tests/test_public_market_event_reaction_service_v136.py",
+    "tests/test_public_market_event_reaction_api_v136.py",
+    "api/middlewares/auth.py",
+    "apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx",
+    "apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx",
 )
 
 VERIFIER_FILES = (
@@ -537,6 +546,7 @@ VERIFIER_FILES = (
     "scripts/verify_platform_market_event_follow_up_v133.py",
     "scripts/verify_platform_free_market_calendar_v134.py",
     "scripts/verify_platform_real_market_calendar_v135.py",
+    "scripts/verify_platform_observed_event_reactions_v136.py",
     "scripts/cleanup_platform_e2e_data.py",
 )
 

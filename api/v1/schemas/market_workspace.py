@@ -30,6 +30,8 @@ MarketEventCategory = Literal[
 MarketEventTimeKind = Literal["published", "observed", "retrieved", "scheduled", "unknown"]
 MarketEventImportance = Literal["high", "medium", "low"]
 MarketScheduledEventType = Literal["earnings_release", "ex_dividend", "macro_policy"]
+MarketEventReactionStatus = Literal["available", "partial", "pending", "unavailable"]
+MarketEventReactionWindowStatus = Literal["available", "pending", "insufficient_data"]
 
 
 class StrictModel(BaseModel):
@@ -122,6 +124,45 @@ class PublicMarketEvent(StrictModel):
     source_count: int = Field(1, ge=1, le=20)
     source_publishers: List[str] = Field(default_factory=list, max_length=8)
     source_records: List[PublicMarketEventSourceRecord] = Field(default_factory=list, max_length=8)
+
+
+class MarketEventReactionWindow(StrictModel):
+    trading_days: Literal[1, 3, 5, 20]
+    status: MarketEventReactionWindowStatus
+    observed_date: Optional[str] = None
+    symbol_return_percent: Optional[float] = None
+    benchmark_return_percent: Optional[float] = None
+    relative_return_percent: Optional[float] = None
+    volume_ratio: Optional[float] = None
+
+
+class PublicMarketEventReaction(StrictModel):
+    event_id: str
+    market: Literal["cn", "hk", "us"]
+    title: str
+    symbol: str
+    name: str
+    subject_type: Literal["security", "market_benchmark"]
+    event_time: str
+    schedule_type: Optional[MarketScheduledEventType] = None
+    history_symbol: str
+    baseline_date: Optional[str] = None
+    benchmark_symbol: Optional[str] = None
+    benchmark_name: Optional[str] = None
+    status: MarketEventReactionStatus
+    windows: List[MarketEventReactionWindow] = Field(default_factory=list, max_length=4)
+    source_state: DataSourceState
+    benchmark_source_state: Optional[DataSourceState] = None
+    warning_codes: List[str] = Field(default_factory=list, max_length=8)
+
+
+class PublicMarketEventReactionResponse(StrictModel):
+    as_of: str
+    items: List[PublicMarketEventReaction] = Field(default_factory=list, max_length=6)
+    warnings: List[str] = Field(default_factory=list, max_length=12)
+    cache: MarketCacheState
+    ai_used: bool = False
+    informational_only: bool = True
 
 
 class MarketWorkspaceOverview(StrictModel):

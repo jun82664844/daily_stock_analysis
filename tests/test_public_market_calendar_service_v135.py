@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from src.services.public_market_calendar_service import PublicMarketCalendarService
@@ -220,6 +221,169 @@ class PublicMarketCalendarServiceV135TestCase(unittest.TestCase):
             {"start": date(2026, 7, 28), "end": date(2026, 7, 29)},
             {"start": date(2026, 9, 15), "end": date(2026, 9, 16)},
         ])
+
+    def test_extended_reaction_window_keeps_recent_past_events_newest_first(self) -> None:
+        service = PublicMarketCalendarService(
+            cninfo_loader=lambda _period: [{
+                "股票代码": "600519",
+                "股票简称": "贵州茅台",
+                "首次预约": date(2026, 6, 10),
+                "初次变更": None,
+                "二次变更": None,
+                "三次变更": None,
+                "实际披露": date(2026, 7, 10),
+            }],
+            yahoo_loader=lambda _symbol: {
+                "Earnings Date": [date(2026, 8, 12)],
+                "Earnings History": [date(2026, 7, 20), date(2026, 7, 5)],
+            },
+            fomc_loader=lambda _year: [{
+                "start": date(2026, 7, 28),
+                "end": date(2026, 7, 29),
+            }],
+        )
+
+        events = service.load(
+            _sections(),
+            "2026-07-30T00:00:00Z",
+            past_days=45,
+            future_days=0,
+            max_events=6,
+            newest_first=True,
+            include_historical=True,
+        )
+
+        self.assertEqual([event["event_time"][:10] for event in events], [
+            "2026-07-29",
+            "2026-07-20",
+            "2026-07-20",
+            "2026-07-10",
+            "2026-07-05",
+            "2026-07-05",
+        ])
+        self.assertTrue(all(event["event_time"][:10] <= "2026-07-30" for event in events))
+
+    def test_historical_load_raises_when_every_source_times_out(self) -> None:
+        def slow_yahoo_loader(_symbol: str):
+            time.sleep(0.05)
+            return {"Earnings History": [date(2026, 7, 20)]}
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            service = PublicMarketCalendarService(
+                yahoo_loader=slow_yahoo_loader,
+                cninfo_loader=lambda _period: [],
+                fomc_loader=lambda _year: [],
+                timeout_seconds=0.01,
+                executor=executor,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "calendar_sources_unavailable"):
+                service.load(
+                    [{"market": "us", "attention": [{
+                        "symbol": "AAPL",
+                        "name": "Apple",
+                    }]}],
+                    "2026-07-30T00:00:00Z",
+                    past_days=45,
+                    future_days=0,
+                    include_historical=True,
+                    fail_on_source_unavailable=True,
+                )
+
+    def test_historical_load_raises_when_only_successful_source_is_empty(self) -> None:
+        def slow_yahoo_loader(_symbol: str):
+            time.sleep(0.05)
+            return {"Earnings History": [date(2026, 7, 20)]}
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            service = PublicMarketCalendarService(
+                yahoo_loader=slow_yahoo_loader,
+                fomc_loader=lambda _year: [],
+                timeout_seconds=0.01,
+                executor=executor,
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "calendar_sources_unavailable"):
+                service.load(
+                    [{"market": "us", "attention": [{
+                        "symbol": "AAPL",
+                        "name": "Apple",
+                    }]}],
+                    "2026-07-30T00:00:00Z",
+                    past_days=45,
+                    future_days=0,
+                    include_historical=True,
+                    fail_on_source_unavailable=True,
+                )
+
+    def test_historical_loader_does_not_depend_on_future_calendar_source(self) -> None:
+        def unavailable_future_calendar(_symbol: str):
+            raise RuntimeError("future calendar unavailable")
+
+        service = PublicMarketCalendarService(
+            yahoo_loader=unavailable_future_calendar,
+            historical_earnings_loader=lambda _symbol: [date(2026, 7, 20)],
+            cninfo_loader=lambda _period: [],
+            fomc_loader=lambda _year: [],
+        )
+
+        events = service.load(
+            [{"market": "us", "attention": [{
+                "symbol": "AAPL",
+                "name": "Apple",
+            }]}],
+            "2026-07-30T00:00:00Z",
+            past_days=45,
+            future_days=0,
+            include_historical=True,
+            fail_on_source_unavailable=True,
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["event_time"][:10], "2026-07-20")
+
+    def test_calendar_cache_has_a_bounded_number_of_keys(self) -> None:
+        service = PublicMarketCalendarService(
+            cninfo_loader=lambda _period: [],
+            yahoo_loader=lambda _symbol: {},
+            fomc_loader=lambda _year: [],
+            max_cache_entries=2,
+        )
+
+        service._write_cache("one", 1.0, [])
+        service._write_cache("two", 2.0, [])
+        service._write_cache("three", 3.0, [])
+
+        self.assertEqual(len(service._cache), 2)
+        self.assertNotIn("one", service._cache)
+
+    def test_historical_window_loads_previous_cninfo_period_and_year(self) -> None:
+        periods: list[str] = []
+        years: list[int] = []
+        service = PublicMarketCalendarService(
+            cninfo_loader=lambda period: periods.append(period) or [],
+            yahoo_loader=lambda _symbol: {},
+            fomc_loader=lambda year: years.append(year) or [],
+        )
+
+        service.load(
+            [{"market": "cn"}, {"market": "us"}],
+            "2026-01-10T00:00:00Z",
+            past_days=45,
+            future_days=0,
+            include_historical=True,
+        )
+        service.load(
+            [{"market": "cn"}],
+            "2026-05-05T00:00:00Z",
+            past_days=45,
+            future_days=0,
+            include_historical=True,
+        )
+
+        self.assertIn("2025年报", periods)
+        self.assertIn("2026半年报", periods)
+        self.assertEqual(set(years), {2025, 2026})
 
 
 if __name__ == "__main__":

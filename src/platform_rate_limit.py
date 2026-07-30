@@ -39,6 +39,10 @@ def _limit_for_scope(scope: str) -> int:
     return _int_env(_scope_env_name(scope), _int_env("PLATFORM_RATE_LIMIT_DEFAULT_MAX", 120))
 
 
+def _max_bucket_count() -> int:
+    return min(_int_env("PLATFORM_RATE_LIMIT_MAX_BUCKETS", 4096), 65536)
+
+
 def _identity_for_request(request: Request, user_id: int | None) -> str:
     if user_id is not None:
         return f"user:{int(user_id)}"
@@ -57,6 +61,7 @@ def check_platform_rate_limit(
     scope: str,
     *,
     user_id: int | None = None,
+    enforce: bool = False,
 ) -> JSONResponse | None:
     """Return a 429 response when the request exceeds the configured bucket.
 
@@ -64,7 +69,7 @@ def check_platform_rate_limit(
     cannot poison each other while the process stays alive.
     """
 
-    if not _truthy_env("PLATFORM_RATE_LIMIT_ENABLED", "false"):
+    if not enforce and not _truthy_env("PLATFORM_RATE_LIMIT_ENABLED", "false"):
         return None
 
     window_seconds = _int_env("PLATFORM_RATE_LIMIT_WINDOW_SECONDS", 60)
@@ -78,6 +83,31 @@ def check_platform_rate_limit(
     )
 
     with _lock:
+        if key not in _buckets and len(_buckets) >= _max_bucket_count():
+            for bucket_key, timestamps in list(_buckets.items()):
+                live = [timestamp for timestamp in timestamps if timestamp > cutoff]
+                if live:
+                    _buckets[bucket_key] = live
+                else:
+                    _buckets.pop(bucket_key, None)
+            if len(_buckets) >= _max_bucket_count():
+                oldest_live = min(
+                    timestamp
+                    for timestamps in _buckets.values()
+                    for timestamp in timestamps
+                )
+                retry_after = max(
+                    1,
+                    int(round(window_seconds - (now - oldest_live))),
+                )
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": "rate_limited",
+                        "message": "Too many requests. Please wait before trying again.",
+                        "retry_after_seconds": retry_after,
+                    },
+                )
         hits = [timestamp for timestamp in _buckets.get(key, []) if timestamp > cutoff]
         if len(hits) >= max_requests:
             oldest = min(hits) if hits else now

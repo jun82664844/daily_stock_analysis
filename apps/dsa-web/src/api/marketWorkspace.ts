@@ -157,6 +157,45 @@ export type PublicMarketHomeResponse = {
   informationalOnly: boolean;
 };
 
+export type MarketEventReactionWindow = {
+  tradingDays: 1 | 3 | 5 | 20;
+  status: 'available' | 'pending' | 'insufficient_data';
+  observedDate?: string | null;
+  symbolReturnPercent?: number | null;
+  benchmarkReturnPercent?: number | null;
+  relativeReturnPercent?: number | null;
+  volumeRatio?: number | null;
+};
+
+export type PublicMarketEventReaction = {
+  eventId: string;
+  market: MarketCode;
+  title: string;
+  symbol: string;
+  name: string;
+  subjectType: 'security' | 'market_benchmark';
+  eventTime: string;
+  scheduleType?: 'earnings_release' | 'ex_dividend' | 'macro_policy' | null;
+  historySymbol: string;
+  baselineDate?: string | null;
+  benchmarkSymbol?: string | null;
+  benchmarkName?: string | null;
+  status: 'available' | 'partial' | 'pending' | 'unavailable';
+  windows: MarketEventReactionWindow[];
+  sourceState: DataSourceState;
+  benchmarkSourceState?: DataSourceState | null;
+  warningCodes: string[];
+};
+
+export type PublicMarketEventReactionResponse = {
+  asOf: string;
+  items: PublicMarketEventReaction[];
+  warnings: string[];
+  cache: MarketCacheState;
+  aiUsed: boolean;
+  informationalOnly: boolean;
+};
+
 export type MarketSearchItem = {
   symbol: string;
   name: string;
@@ -309,6 +348,25 @@ export const marketWorkspaceApi = {
       headlines: Array.isArray(body.headlines) ? body.headlines : [],
       sources: Array.isArray(body.sources) ? body.sources : [],
       warnings: Array.isArray(body.warnings) ? body.warnings : [],
+    };
+  },
+  async getEventReactions(): Promise<PublicMarketEventReactionResponse> {
+    const response = await apiClient.get(
+      '/api/v1/market-workspace/event-reactions',
+      { withCredentials: false },
+    );
+    const body = toCamelCase<PublicMarketEventReactionResponse>(response.data);
+    return {
+      ...body,
+      items: Array.isArray(body.items) ? body.items.map((item) => ({
+        ...item,
+        windows: Array.isArray(item.windows) ? item.windows : [],
+        warningCodes: Array.isArray(item.warningCodes) ? item.warningCodes : [],
+      })) : [],
+      warnings: Array.isArray(body.warnings) ? body.warnings : [],
+      cache: body.cache ?? { hit: false, ageSeconds: 0, ttlSeconds: 900 },
+      aiUsed: Boolean(body.aiUsed),
+      informationalOnly: true,
     };
   },
   async search(query: string, markets: MarketCode[] = ['cn', 'hk', 'us'], limit = 8): Promise<MarketSearchResponse> {

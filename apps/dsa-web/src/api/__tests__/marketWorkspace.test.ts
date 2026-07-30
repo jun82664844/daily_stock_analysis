@@ -85,6 +85,69 @@ describe('marketWorkspaceApi', () => {
     expect(body.events).toEqual([]);
   });
 
+  it('loads the public observed event-window contract without AI', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {
+      as_of: '2026-07-30T01:00:00Z',
+      items: [{
+        event_id: 'event-aapl',
+        market: 'us',
+        title: 'Apple earnings release',
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        subject_type: 'security',
+        event_time: '2026-07-20T00:00:00Z',
+        schedule_type: 'earnings_release',
+        history_symbol: 'AAPL',
+        baseline_date: '2026-07-17',
+        benchmark_symbol: '^GSPC',
+        benchmark_name: '标普500指数',
+        status: 'partial',
+        windows: [{
+          trading_days: 1,
+          status: 'available',
+          observed_date: '2026-07-20',
+          symbol_return_percent: 2,
+          benchmark_return_percent: 1,
+          relative_return_percent: 1,
+          volume_ratio: 1.5,
+        }],
+        source_state: { source: 'yahoo_chart_public', status: 'fresh' },
+        benchmark_source_state: { source: 'yahoo_chart_public', status: 'fresh' },
+        warning_codes: ['observation_window_incomplete'],
+      }],
+      warnings: [],
+      cache: { hit: false, age_seconds: 0, ttl_seconds: 900 },
+      ai_used: false,
+      informational_only: true,
+    } });
+
+    const body = await marketWorkspaceApi.getEventReactions();
+
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/api/v1/market-workspace/event-reactions',
+      { withCredentials: false },
+    );
+    expect(body.items[0].eventId).toBe('event-aapl');
+    expect(body.items[0].windows[0].tradingDays).toBe(1);
+    expect(body.items[0].windows[0].relativeReturnPercent).toBe(1);
+    expect(body.aiUsed).toBe(false);
+  });
+
+  it('does not mask a server-side V136 AI boundary regression', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {
+      as_of: '2026-07-30T00:00:00Z',
+      items: [],
+      warnings: [],
+      cache: { hit: false, age_seconds: 0, ttl_seconds: 900 },
+      ai_used: true,
+      informational_only: true,
+    } });
+
+    const body = await marketWorkspaceApi.getEventReactions();
+
+    expect(body.aiUsed).toBe(true);
+  });
+
   it('defaults V127 relevance fields for an older event payload', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: {
       as_of: '2026-07-13T01:30:00Z',

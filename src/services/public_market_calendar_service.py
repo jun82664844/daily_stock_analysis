@@ -9,7 +9,7 @@ import os
 import re
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, wait
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
 from urllib.parse import urlparse
@@ -26,7 +26,9 @@ DEFAULT_MAX_EVENTS = 36
 DEFAULT_CACHE_TTL_SECONDS = 900
 DEFAULT_STALE_TTL_SECONDS = 21600
 DEFAULT_TIMEOUT_SECONDS = 4.0
+DEFAULT_MAX_CACHE_ENTRIES = 64
 MAX_SYMBOLS_PER_MARKET = 6
+MAX_SOURCE_CACHE_EVENTS = 72
 
 _CALENDAR_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="public-market-calendar")
 _MONTHS = {
@@ -54,10 +56,14 @@ class PublicMarketCalendarService:
         *,
         cninfo_loader: Optional[Callable[[str], Sequence[Mapping[str, Any]]]] = None,
         yahoo_loader: Optional[Callable[[str], Mapping[str, Any]]] = None,
+        historical_earnings_loader: Optional[
+            Callable[[str], Sequence[Any]]
+        ] = None,
         fomc_loader: Optional[Callable[[int], Sequence[Mapping[str, date]]]] = None,
         timeout_seconds: Optional[float] = None,
         cache_ttl_seconds: Optional[int] = None,
         stale_ttl_seconds: Optional[int] = None,
+        max_cache_entries: Optional[int] = None,
         max_events: int = DEFAULT_MAX_EVENTS,
         clock: Callable[[], float] = time.monotonic,
         executor: Optional[ThreadPoolExecutor] = None,
@@ -81,11 +87,32 @@ class PublicMarketCalendarService:
                 str(DEFAULT_STALE_TTL_SECONDS),
             )),
         )
+        self.max_cache_entries = max(
+            1,
+            min(
+                int(
+                    max_cache_entries
+                    if max_cache_entries is not None
+                    else os.getenv(
+                        "PLATFORM_PUBLIC_MARKET_CALENDAR_CACHE_MAX_ENTRIES",
+                        str(DEFAULT_MAX_CACHE_ENTRIES),
+                    )
+                ),
+                256,
+            ),
+        )
         self.max_events = max(1, min(int(max_events), DEFAULT_MAX_EVENTS))
         self.clock = clock
         self.executor = executor or _CALENDAR_EXECUTOR
         self.cninfo_loader = cninfo_loader or self._fetch_cninfo_period
         self.yahoo_loader = yahoo_loader or self._fetch_yahoo_calendar
+        self.historical_earnings_loader = (
+            historical_earnings_loader
+            if historical_earnings_loader is not None
+            else self._fetch_yahoo_earnings_history
+            if yahoo_loader is None
+            else None
+        )
         self.fomc_loader = fomc_loader or self._fetch_fomc_meetings
         self._cache: Dict[str, tuple[float, List[Dict[str, Any]]]] = {}
         self._lock = Lock()
@@ -94,6 +121,13 @@ class PublicMarketCalendarService:
         self,
         sections: Sequence[Dict[str, Any]],
         as_of: str,
+        *,
+        past_days: int = CALENDAR_PAST_DAYS,
+        future_days: int = CALENDAR_FUTURE_DAYS,
+        max_events: Optional[int] = None,
+        newest_first: bool = False,
+        include_historical: bool = False,
+        fail_on_source_unavailable: bool = False,
     ) -> List[Dict[str, Any]]:
         as_of_datetime = self._parse_datetime(as_of)
         visible = self._visible_securities(sections)
@@ -102,7 +136,10 @@ class PublicMarketCalendarService:
             for section in sections
             if isinstance(section, dict)
         }
-        period = self._cninfo_period(as_of_datetime.date())
+        periods = self._cninfo_periods(
+            as_of_datetime.date(),
+            include_historical=include_historical,
+        )
         yahoo_securities = [
             item
             for market in ("hk", "us")
@@ -110,24 +147,44 @@ class PublicMarketCalendarService:
         ]
         jobs: Dict[str, Callable[[], List[Dict[str, Any]]]] = {}
         if "cn" in markets:
-            jobs[f"cninfo:{period}"] = lambda: self._build_cninfo_events(period, as_of)
+            suffix = ":history" if include_historical else ""
+            for period in periods:
+                jobs[f"cninfo:{period}{suffix}"] = (
+                    lambda period=period: self._build_cninfo_events(
+                        period,
+                        as_of,
+                        include_historical=include_historical,
+                    )
+                )
         if yahoo_securities:
             yahoo_key = ",".join(sorted(item["symbol"] for item in yahoo_securities))
-            jobs[f"yahoo:{yahoo_key}"] = lambda: self._build_yahoo_events(yahoo_securities, as_of)
-        if "us" in markets:
-            jobs[f"fomc:{as_of_datetime.year}"] = lambda: self._build_fomc_events(
-                as_of_datetime.year,
+            suffix = ":history" if include_historical else ""
+            jobs[f"yahoo:{yahoo_key}{suffix}"] = lambda: self._build_yahoo_events(
+                yahoo_securities,
                 as_of,
+                include_historical=include_historical,
             )
+        if "us" in markets:
+            start_date = as_of_datetime.date() - timedelta(
+                days=past_days if include_historical else 0
+            )
+            end_date = as_of_datetime.date() + timedelta(days=future_days)
+            for year in range(start_date.year, end_date.year + 1):
+                jobs[f"fomc:{year}"] = (
+                    lambda year=year: self._build_fomc_events(year, as_of)
+                )
 
         now = self.clock()
         events: List[Dict[str, Any]] = []
+        available_sources = 0
+        unavailable_sources = 0
         pending_jobs: Dict[str, Callable[[], List[Dict[str, Any]]]] = {}
         for key, job in jobs.items():
             cached = self._read_cache(key, now, allow_stale=False)
             if cached is None:
                 pending_jobs[key] = job
             else:
+                available_sources += 1
                 events.extend(self._with_status(cached, "cached", "calendar_source_cached"))
 
         futures: Dict[str, Future[List[Dict[str, Any]]]] = {
@@ -145,27 +202,67 @@ class PublicMarketCalendarService:
                     except Exception:
                         loaded = None
                     if loaded is not None:
+                        loaded = self._bounded_events(
+                            loaded,
+                            visible,
+                            as_of_datetime,
+                            past_days=60,
+                            future_days=60,
+                            max_events=MAX_SOURCE_CACHE_EVENTS,
+                            newest_first=include_historical,
+                        )
                         self._write_cache(key, now, loaded)
+                        available_sources += 1
                         events.extend(self._with_status(loaded, "fresh", None))
                         continue
                 stale = self._read_cache(key, now, allow_stale=True)
                 if stale is not None:
+                    available_sources += 1
                     events.extend(self._with_status(stale, "stale", "calendar_source_stale"))
+                else:
+                    unavailable_sources += 1
 
-        return self._bounded_events(events, visible, as_of_datetime)
+        if (
+            fail_on_source_unavailable
+            and jobs
+            and unavailable_sources > 0
+            and not events
+        ):
+            raise RuntimeError("calendar_sources_unavailable")
 
-    def _build_cninfo_events(self, period: str, as_of: str) -> List[Dict[str, Any]]:
+        return self._bounded_events(
+            events,
+            visible,
+            as_of_datetime,
+            past_days=past_days,
+            future_days=future_days,
+            max_events=max_events,
+            newest_first=newest_first,
+        )
+
+    def _build_cninfo_events(
+        self,
+        period: str,
+        as_of: str,
+        *,
+        include_historical: bool = False,
+    ) -> List[Dict[str, Any]]:
         events: List[Dict[str, Any]] = []
         for row in self.cninfo_loader(period):
             if not isinstance(row, Mapping):
                 continue
-            if self._coerce_date(row.get("实际披露")) is not None:
+            disclosed = self._coerce_date(row.get("实际披露"))
+            if disclosed is not None and not include_historical:
                 continue
             appointments = [
                 self._coerce_date(row.get(field))
                 for field in ("首次预约", "初次变更", "二次变更", "三次变更")
             ]
-            scheduled = next((value for value in reversed(appointments) if value is not None), None)
+            scheduled = (
+                disclosed
+                if disclosed is not None
+                else next((value for value in reversed(appointments) if value is not None), None)
+            )
             code = str(row.get("股票代码") or "").strip()
             symbol = self._cn_symbol(code)
             if scheduled is None or symbol is None:
@@ -176,8 +273,16 @@ class PublicMarketCalendarService:
                 category="earnings",
                 schedule_type="earnings_release",
                 scheduled=scheduled,
-                title=f"{name}（{symbol}）{period}预约披露",
-                summary=f"巨潮资讯定期报告预约，报告期：{period}。",
+                title=(
+                    f"{name}（{symbol}）{period}已披露"
+                    if disclosed is not None
+                    else f"{name}（{symbol}）{period}预约披露"
+                ),
+                summary=(
+                    f"巨潮资讯定期报告实际披露日期，报告期：{period}。"
+                    if disclosed is not None
+                    else f"巨潮资讯定期报告预约，报告期：{period}。"
+                ),
                 symbol=symbol,
                 name=name,
                 publisher="巨潮资讯",
@@ -191,6 +296,8 @@ class PublicMarketCalendarService:
         self,
         securities: Sequence[Dict[str, str]],
         as_of: str,
+        *,
+        include_historical: bool = False,
     ) -> List[Dict[str, Any]]:
         events: List[Dict[str, Any]] = []
         attempted = 0
@@ -198,18 +305,36 @@ class PublicMarketCalendarService:
         for security in securities:
             symbol = security["symbol"]
             attempted += 1
-            try:
-                calendar = dict(self.yahoo_loader(symbol) or {})
-            except Exception:
-                failed += 1
-                continue
+            if include_historical and self.historical_earnings_loader is not None:
+                try:
+                    calendar = {
+                        "Earnings History": list(
+                            self.historical_earnings_loader(symbol) or []
+                        )
+                    }
+                except Exception:
+                    failed += 1
+                    continue
+            else:
+                try:
+                    calendar = dict(self.yahoo_loader(symbol) or {})
+                except Exception:
+                    failed += 1
+                    continue
             earnings_dates = calendar.get("Earnings Date") or []
             if not isinstance(earnings_dates, (list, tuple, set)):
                 earnings_dates = [earnings_dates]
+            if include_historical:
+                historical_dates = calendar.get("Earnings History") or []
+                if not isinstance(historical_dates, (list, tuple, set)):
+                    historical_dates = [historical_dates]
+                earnings_dates = [*earnings_dates, *historical_dates]
+            seen_earnings_dates: set[date] = set()
             for scheduled in earnings_dates:
                 parsed = self._coerce_date(scheduled)
-                if parsed is None:
+                if parsed is None or parsed in seen_earnings_dates:
                     continue
+                seen_earnings_dates.add(parsed)
                 events.append(self._event(
                     market=security["market"],
                     category="earnings",
@@ -272,9 +397,20 @@ class PublicMarketCalendarService:
         events: Iterable[Dict[str, Any]],
         visible: Dict[str, List[Dict[str, str]]],
         as_of: datetime,
+        *,
+        past_days: int = CALENDAR_PAST_DAYS,
+        future_days: int = CALENDAR_FUTURE_DAYS,
+        max_events: Optional[int] = None,
+        newest_first: bool = False,
     ) -> List[Dict[str, Any]]:
-        earliest = as_of.date().toordinal() - CALENDAR_PAST_DAYS
-        latest = as_of.date().toordinal() + CALENDAR_FUTURE_DAYS
+        bounded_past_days = max(0, min(int(past_days), 60))
+        bounded_future_days = max(0, min(int(future_days), 60))
+        result_limit = max(
+            1,
+            min(int(max_events if max_events is not None else self.max_events), 72),
+        )
+        earliest = as_of.date().toordinal() - bounded_past_days
+        latest = as_of.date().toordinal() + bounded_future_days
         visible_symbols = {
             item["symbol"].upper()
             for items in visible.values()
@@ -288,16 +424,31 @@ class PublicMarketCalendarService:
             event_id = str(event.get("event_id") or "")
             if event_id and event_id not in unique:
                 unique[event_id] = event
-        ordered = sorted(
-            unique.values(),
-            key=lambda event: (
-                0 if str(event.get("symbol") or "").upper() in visible_symbols else 1,
-                str(event.get("event_time") or ""),
-                str(event.get("market") or ""),
-                str(event.get("symbol") or ""),
-            ),
-        )
-        return copy.deepcopy(ordered[: self.max_events])
+        if newest_first:
+            ordered = sorted(
+                unique.values(),
+                key=lambda event: (
+                    -(
+                        self._coerce_date(event.get("event_time")).toordinal()
+                        if self._coerce_date(event.get("event_time")) is not None
+                        else 0
+                    ),
+                    0 if str(event.get("symbol") or "").upper() in visible_symbols else 1,
+                    str(event.get("market") or ""),
+                    str(event.get("symbol") or ""),
+                ),
+            )
+        else:
+            ordered = sorted(
+                unique.values(),
+                key=lambda event: (
+                    0 if str(event.get("symbol") or "").upper() in visible_symbols else 1,
+                    str(event.get("event_time") or ""),
+                    str(event.get("market") or ""),
+                    str(event.get("symbol") or ""),
+                ),
+            )
+        return copy.deepcopy(ordered[:result_limit])
 
     def _read_cache(
         self,
@@ -308,6 +459,9 @@ class PublicMarketCalendarService:
     ) -> Optional[List[Dict[str, Any]]]:
         with self._lock:
             entry = self._cache.get(key)
+            if entry is not None and max(0.0, now - entry[0]) >= self.stale_ttl_seconds:
+                self._cache.pop(key, None)
+                entry = None
         if entry is None:
             return None
         age = max(0.0, now - entry[0])
@@ -318,6 +472,20 @@ class PublicMarketCalendarService:
 
     def _write_cache(self, key: str, now: float, events: List[Dict[str, Any]]) -> None:
         with self._lock:
+            expired = [
+                cached_key
+                for cached_key, entry in self._cache.items()
+                if max(0.0, now - entry[0]) >= self.stale_ttl_seconds
+            ]
+            for cached_key in expired:
+                self._cache.pop(cached_key, None)
+            self._cache.pop(key, None)
+            while len(self._cache) >= self.max_cache_entries:
+                oldest_key = min(
+                    self._cache,
+                    key=lambda cached_key: self._cache[cached_key][0],
+                )
+                self._cache.pop(oldest_key, None)
             self._cache[key] = (now, copy.deepcopy(events))
 
     @staticmethod
@@ -473,6 +641,24 @@ class PublicMarketCalendarService:
             return f"{today.year}三季"
         return f"{today.year}年报"
 
+    @classmethod
+    def _cninfo_periods(
+        cls,
+        today: date,
+        *,
+        include_historical: bool,
+    ) -> List[str]:
+        current = cls._cninfo_period(today)
+        if not include_historical:
+            return [current]
+        if today.month <= 4:
+            return [current]
+        if today.month <= 8:
+            return [current, f"{today.year - 1}年报"]
+        if today.month <= 10:
+            return [current, f"{today.year}半年报"]
+        return [current, f"{today.year}三季"]
+
     @staticmethod
     def _safe_http_url(value: Any) -> Optional[str]:
         text = str(value or "").strip()
@@ -533,6 +719,15 @@ class PublicMarketCalendarService:
         import yfinance as yf
 
         return dict(yf.Ticker(symbol).calendar or {})
+
+    @staticmethod
+    def _fetch_yahoo_earnings_history(symbol: str) -> Sequence[Any]:
+        import yfinance as yf
+
+        frame = yf.Ticker(symbol).get_earnings_dates(limit=12)
+        if frame is None:
+            return []
+        return list(frame.index)
 
     @classmethod
     def _fetch_fomc_meetings(cls, year: int) -> Sequence[Mapping[str, date]]:

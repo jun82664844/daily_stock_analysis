@@ -2555,3 +2555,43 @@ Verifier, configuration and documentation:
 - `docs/superpowers/platform-review-slices.md`
 
 Review focus: official CNInfo and Federal Reserve schedule parsing, no-key Yahoo/yfinance dates without official-license claims, latest CNInfo appointment selection, disclosed-row exclusion, date-only output with no forecasts, 4-second aggregate deadline, per-source cache and stale fallback, 36/48 caps, scheduled/provider contract, safe-default production flag, bilingual four-view UX, dormant private requests for unauthenticated platform visitors while the public home remains active, no AI/key/database/notification use, non-causality language, and information-only boundaries.
+
+## V136 Observed Event-window Market Data
+
+Backend and public contract:
+
+- `src/platform_rate_limit.py`
+- `src/services/public_market_calendar_service.py`
+- `src/services/public_market_event_reaction_service.py`
+- `api/middlewares/auth.py`
+- `api/v1/endpoints/market_workspace.py`
+- `api/v1/schemas/market_workspace.py`
+- `tests/test_public_market_event_reaction_service_v136.py`
+- `tests/test_public_market_event_reaction_api_v136.py`
+- `tests/test_public_market_calendar_service_v135.py`
+
+Frontend:
+
+- `apps/dsa-web/src/api/marketWorkspace.ts`
+- `apps/dsa-web/src/api/__tests__/marketWorkspace.test.ts`
+- `apps/dsa-web/src/components/market-home/MarketEventReactionPanelV136.tsx`
+- `apps/dsa-web/src/components/market-home/DailyMarketEventCenterV126.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/MarketEventReactionPanelV136.test.tsx`
+- `apps/dsa-web/src/components/market-home/__tests__/DailyMarketEventCenterV126.test.tsx`
+
+Verifier, configuration and documentation:
+
+- `scripts/verify_platform_observed_event_reactions_v136.py`
+- `tests/test_platform_observed_event_reactions_v136_verifier.py`
+- `docs/superpowers/plans/2026-07-30-dsa-v136-observed-event-market-reactions.md`
+- `.env.example`
+- `docs/superpowers/platform-production-env.example`
+- `.gitignore`
+- `scripts/verify_platform_release_candidate_package.py`
+- `tests/test_platform_release_candidate_package.py`
+- `docs/CHANGELOG.md`
+- `docs/superpowers/platform-local-v1-acceptance-status.md`
+- `docs/superpowers/platform-review-slices.md`
+- `docs/superpowers/platform-release-candidate-manifest.md`
+
+Review focus: 45-day source-scheduled past-event selection plus previous CNInfo/FOMC period coverage, event-market date guard and conservative event-date-close baseline, safe three-market symbol normalization, 1/3/5/20 market-session alignment that does not skip suspended-security dates, broad-market benchmark alignment, volume against the five sessions before the event date, six-event cap, concurrent bounded public-history reads, preserved stale timestamps, 32-symbol history-cache cap, 64-key calendar-cache cap, 72-event per-source cache cap, all-source or empty-partial-source failure, forced anonymous IP rate limiting, 4096 active identity-bucket cap without eviction, no backend identity parsing, no frontend identity or cross-origin credential upload, safe production defaults, bilingual missing-data/partial-source-failure states, fail-closed no-AI/information-only response checks, calendar/reaction/follow-up ordering, failure isolation, no AI/key/database/notification use, explicit non-causality wording, and information-only boundaries.
